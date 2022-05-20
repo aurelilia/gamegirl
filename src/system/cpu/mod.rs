@@ -1,5 +1,6 @@
 use crate::numutil::NumExt;
 use crate::system::io::addr;
+use crate::system::io::addr::{IE, IF};
 use crate::system::GameGirl;
 
 mod alu;
@@ -11,11 +12,8 @@ pub struct Cpu {
     pub pc: u16,
     pub sp: u16,
     pub ime: bool,
-    pub reg_ie: u16,
-    pub reg_if: u16,
     pub halt: bool,
     pub halt_bug: bool,
-    pub prepare_speed_switch: bool,
     pub regs: [u8; 8],
 }
 
@@ -48,7 +46,7 @@ impl Cpu {
     }
 
     fn check_interrupts(gg: &mut GameGirl, ime: bool) -> bool {
-        let bits = gg.cpu.reg_ie & gg.cpu.reg_if;
+        let bits = gg.mmu[IE] & gg.mmu[IF];
         if !ime || (bits == 0) {
             return false;
         }
@@ -56,7 +54,7 @@ impl Cpu {
         for bit in 0..5 {
             if bits.is_bit(bit) {
                 gg.cpu.halt = false;
-                gg.cpu.reg_if = gg.cpu.reg_if.set_bit(bit, false);
+                gg.mmu[IF] = gg.mmu[IF].set_bit(bit, false) as u8;
                 gg.cpu.ime = false;
                 gg.push_stack(gg.cpu.pc);
                 gg.cpu.pc = Interrupt::from_index(bit).addr();

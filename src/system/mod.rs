@@ -1,5 +1,6 @@
 use crate::numutil::NumExt;
 use crate::system::cpu::{Cpu, Interrupt};
+use crate::system::io::addr::{IF, KEY1};
 use crate::system::io::Mmu;
 
 mod cpu;
@@ -27,14 +28,14 @@ impl GameGirl {
 
     fn switch_speed(&mut self) {
         self.t_multiplier = if self.t_multiplier == 1 { 2 } else { 1 };
-        self.cpu.prepare_speed_switch = false;
+        self.mmu[KEY1] = 0;
         for _ in 0..=1024 {
             self.advance_clock(2)
         }
     }
 
     fn request_interrupt(&mut self, ir: Interrupt) {
-        self.cpu.reg_if = self.cpu.reg_if.set_bit(ir.to_index(), true);
+        self.mmu[IF] = self.mmu[IF].set_bit(ir.to_index(), true) as u8;
     }
 
     fn arg8(&self) -> u8 {

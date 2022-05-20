@@ -4,6 +4,7 @@ use crate::system::cpu::Flag::*;
 use crate::system::cpu::Reg::*;
 use crate::system::cpu::{data, DReg, Reg};
 use crate::system::io::addr;
+use crate::system::io::addr::KEY1;
 use crate::system::GameGirl;
 
 const EXT: u8 = 0xCB;
@@ -102,7 +103,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
         // 0x00 - 0x3F
         // -----------------------------------
         0x00 => (),
-        0x10 if gg.cpu.prepare_speed_switch => gg.switch_speed(),
+        0x10 if gg.mmu[KEY1] != 0 => gg.switch_speed(),
         0x20 if !gg.cpu.flag(Zero) => return jr(gg),
         0x30 if !gg.cpu.flag(Carry) => return jr(gg),
 

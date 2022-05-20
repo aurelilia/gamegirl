@@ -10,14 +10,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="82091e98-9695-4181-ab2a-b500cb705141" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/system/io/addr.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/system/cpu/alu.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/cpu/alu.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/system/cpu/data.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/cpu/data.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/numutil.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/numutil.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/system/cpu/inst.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/cpu/inst.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/system/cpu/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/cpu/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/system/io/addr.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/io/addr.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/system/io/cartridge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/io/cartridge.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/system/io/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/io/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/system/io/ppu/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/io/ppu/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/system/io/timer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/io/timer.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/system/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/system/mod.rs" afterDir="false" />
     </list>
@@ -59,6 +59,7 @@
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;
   }
 }</component>
@@ -76,7 +77,9 @@
       <updated>1652966303149</updated>
       <workItem from="1652966305928" duration="5015000" />
       <workItem from="1652976280172" duration="2381000" />
-      <workItem from="1652985969741" duration="5048000" />
+      <workItem from="1652985969741" duration="5550000" />
+      <workItem from="1653057221278" duration="3467000" />
+      <workItem from="1653077796196" duration="6488000" />
     </task>
     <servers />
   </component>

@@ -1,97 +1,80 @@
-use std::ops::Range;
+pub const HIGH_START: u16 = 0xFF00;
 
-pub const BOOTROM_DISABLE: u16 = 0xFF50;
-pub const INVALID_READ: u8 = 0xFF;
+pub const BOOTROM_DISABLE: u16 = 0xFF50 - HIGH_START;
 
 // LCD
-pub const LCDC: u16 = 0xFF40;
-pub const LY: u16 = 0xFF44;
-pub const LYC: u16 = 0xFF45;
-pub const STAT: u16 = 0xFF41;
-pub const SCY: u16 = 0xFF42;
-pub const SCX: u16 = 0xFF43;
-pub const WY: u16 = 0xFF4A;
-pub const WX: u16 = 0xFF4B;
-pub const BGP: u16 = 0xFF47;
-pub const OBP0: u16 = 0xFF48;
-pub const OBP1: u16 = 0xFF49;
-pub const BCPS: u16 = 0xFF68;
-pub const BCPD: u16 = 0xFF69;
-pub const OCPS: u16 = 0xFF6A;
-pub const OCPD: u16 = 0xFF6B;
+pub const LCDC: u16 = 0xFF40 - HIGH_START;
+pub const LY: u16 = 0xFF44 - HIGH_START;
+pub const LYC: u16 = 0xFF45 - HIGH_START;
+pub const STAT: u16 = 0xFF41 - HIGH_START;
+pub const SCY: u16 = 0xFF42 - HIGH_START;
+pub const SCX: u16 = 0xFF43 - HIGH_START;
+pub const WY: u16 = 0xFF4A - HIGH_START;
+pub const WX: u16 = 0xFF4B - HIGH_START;
+pub const BGP: u16 = 0xFF47 - HIGH_START;
+pub const OBP0: u16 = 0xFF48 - HIGH_START;
+pub const OBP1: u16 = 0xFF49 - HIGH_START;
+pub const BCPS: u16 = 0xFF68 - HIGH_START;
+pub const BCPD: u16 = 0xFF69 - HIGH_START;
+pub const OCPS: u16 = 0xFF6A - HIGH_START;
+pub const OCPD: u16 = 0xFF6B - HIGH_START;
 
 // Interrupts
-pub const IF: u16 = 0xFF0F;
-pub const IE: u16 = 0xFFFF;
+pub const IF: u16 = 0xFF0F - HIGH_START;
+pub const IE: u16 = 0xFFFF - HIGH_START;
 
 // Serial
-pub const SB: u16 = 0xFF01;
-pub const SC: u16 = 0xFF02;
+pub const SB: u16 = 0xFF01 - HIGH_START;
+pub const SC: u16 = 0xFF02 - HIGH_START;
 
 // Timer
-pub const DIV: u16 = 0xFF04;
-pub const TIMA: u16 = 0xFF05;
-pub const TMA: u16 = 0xFF06;
-pub const TAC: u16 = 0xFF07;
+pub const DIV: u16 = 0xFF04 - HIGH_START;
+pub const TIMA: u16 = 0xFF05 - HIGH_START;
+pub const TMA: u16 = 0xFF06 - HIGH_START;
+pub const TAC: u16 = 0xFF07 - HIGH_START;
 
 // Joypad
-pub const JOYP: u16 = 0xFF00;
+pub const JOYP: u16 = 0xFF00 - HIGH_START;
 
 // (H)DMA
-pub const DMA: u16 = 0xFF46;
-pub const HDMA_SRC_HIGH: u16 = 0xFF51;
-pub const HDMA_SRC_LOW: u16 = 0xFF52;
-pub const HDMA_DEST_HIGH: u16 = 0xFF53;
-pub const HDMA_DEST_LOW: u16 = 0xFF54;
-pub const HDMA_START: u16 = 0xFF55;
+pub const DMA: u16 = 0xFF46 - HIGH_START;
+pub const HDMA_SRC_HIGH: u16 = 0xFF51 - HIGH_START;
+pub const HDMA_SRC_LOW: u16 = 0xFF52 - HIGH_START;
+pub const HDMA_DEST_HIGH: u16 = 0xFF53 - HIGH_START;
+pub const HDMA_DEST_LOW: u16 = 0xFF54 - HIGH_START;
+pub const HDMA_START: u16 = 0xFF55 - HIGH_START;
 
 // Sound
-pub const NR10: u16 = 0xFF10;
-pub const NR11: u16 = 0xFF11;
-pub const NR12: u16 = 0xFF12;
-pub const NR13: u16 = 0xFF13;
-pub const NR14: u16 = 0xFF14;
-pub const NR21: u16 = 0xFF16;
-pub const NR22: u16 = 0xFF17;
-pub const NR23: u16 = 0xFF18;
-pub const NR24: u16 = 0xFF19;
-pub const NR30: u16 = 0xFF1A;
-pub const NR31: u16 = 0xFF1B;
-pub const NR32: u16 = 0xFF1C;
-pub const NR33: u16 = 0xFF1D;
-pub const NR34: u16 = 0xFF1E;
-pub const NR41: u16 = 0xFF20;
-pub const NR42: u16 = 0xFF21;
-pub const NR43: u16 = 0xFF22;
-pub const NR44: u16 = 0xFF23;
-pub const NR50: u16 = 0xFF24;
-pub const NR51: u16 = 0xFF25;
-pub const NR52: u16 = 0xFF26;
-
-pub const WAVE_SAMPLES: Range<u16> = 0xFF30..0xFF3F;
+pub const NR10: u16 = 0xFF10 - HIGH_START;
+pub const NR11: u16 = 0xFF11 - HIGH_START;
+pub const NR12: u16 = 0xFF12 - HIGH_START;
+pub const NR13: u16 = 0xFF13 - HIGH_START;
+pub const NR14: u16 = 0xFF14 - HIGH_START;
+pub const NR21: u16 = 0xFF16 - HIGH_START;
+pub const NR22: u16 = 0xFF17 - HIGH_START;
+pub const NR23: u16 = 0xFF18 - HIGH_START;
+pub const NR24: u16 = 0xFF19 - HIGH_START;
+pub const NR30: u16 = 0xFF1A - HIGH_START;
+pub const NR31: u16 = 0xFF1B - HIGH_START;
+pub const NR32: u16 = 0xFF1C - HIGH_START;
+pub const NR33: u16 = 0xFF1D - HIGH_START;
+pub const NR34: u16 = 0xFF1E - HIGH_START;
+pub const NR41: u16 = 0xFF20 - HIGH_START;
+pub const NR42: u16 = 0xFF21 - HIGH_START;
+pub const NR43: u16 = 0xFF22 - HIGH_START;
+pub const NR44: u16 = 0xFF23 - HIGH_START;
+pub const NR50: u16 = 0xFF24 - HIGH_START;
+pub const NR51: u16 = 0xFF25 - HIGH_START;
+pub const NR52: u16 = 0xFF26 - HIGH_START;
 
 // CGB
-pub const VRAM_SELECT: u16 = 0xFF4F;
-pub const WRAM_SELECT: u16 = 0xFF70;
-pub const HDMA: Range<u16> = HDMA_SRC_HIGH..HDMA_START;
-pub const KEY1: u16 = 0xFF4D;
+pub const VRAM_SELECT: u16 = 0xFF4F - HIGH_START;
+pub const WRAM_SELECT: u16 = 0xFF70 - HIGH_START;
+pub const KEY1: u16 = 0xFF4D - HIGH_START;
 
 /// DMG BOOT ROM, Bootix made by Hacktix: https://github.com/Hacktix/Bootix
 /// Thank you, Hacktix! This is Version 1.2.
-pub const BOOTIX_ROM: [i8; 256] = [
-    49, -2, -1, 33, -1, -97, -81, 50, -53, 124, 32, -6, 14, 17, 33, 38, -1, 62, -128, 50, -30, 12,
-    62, -13, 50, -30, 12, 62, 119, 50, -30, 17, 4, 1, 33, 16, -128, 26, -51, -72, 0, 26, -53, 55,
-    -51, -72, 0, 19, 123, -2, 52, 32, -16, 17, -52, 0, 6, 8, 26, 19, 34, 35, 5, 32, -7, 33, 4,
-    -103, 1, 12, 1, -51, -79, 0, 62, 25, 119, 33, 36, -103, 14, 12, -51, -79, 0, 62, -111, -32, 64,
-    6, 16, 17, -44, 0, 120, -32, 67, 5, 123, -2, -40, 40, 4, 26, -32, 71, 19, 14, 28, -51, -89, 0,
-    -81, -112, -32, 67, 5, 14, 28, -51, -89, 0, -81, -80, 32, -32, -32, 67, 62, -125, -51, -97, 0,
-    14, 39, -51, -89, 0, 62, -63, -51, -97, 0, 17, -118, 1, -16, 68, -2, -112, 32, -6, 27, 122,
-    -77, 32, -11, 24, 73, 14, 19, -30, 12, 62, -121, -30, -55, -16, 68, -2, -112, 32, -6, 13, 32,
-    -9, -55, 120, 34, 4, 13, 32, -6, -55, 71, 14, 4, -81, -59, -53, 16, 23, -63, -53, 16, 23, 13,
-    32, -11, 34, 35, 34, 35, -55, 60, 66, -71, -91, -71, -91, 66, 60, 0, 84, -88, -4, 66, 79, 79,
-    84, 73, 88, 46, 68, 77, 71, 32, 118, 49, 46, 50, 0, 62, -1, -58, 1, 11, 30, -40, 33, 77, 1, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 1, -32, 80,
-];
+pub const BOOTIX_ROM: &[u8; 256] = include_bytes!("bootrom/bootix_dmg.bin");
 
 /// CGB BOOT ROM, the original one. Taken from coffee-gb sources.
 pub const CGB_BOOTROM: [u8; 2048] = [

@@ -5,6 +5,7 @@ pub trait NumExt {
     fn set_bit(self, bit: u16, state: bool) -> u16;
     fn u16(self) -> u16;
     fn u8(self) -> u8;
+    fn us(self) -> usize;
 }
 
 // TODO Maybe make a macro for these repeated invocations
@@ -32,6 +33,10 @@ impl NumExt for u8 {
     fn u8(self) -> u8 {
         self
     }
+
+    fn us(self) -> usize {
+        self as usize
+    }
 }
 
 impl NumExt for u16 {
@@ -57,5 +62,9 @@ impl NumExt for u16 {
 
     fn u8(self) -> u8 {
         self as u8
+    }
+
+    fn us(self) -> usize {
+        self as usize
     }
 }
