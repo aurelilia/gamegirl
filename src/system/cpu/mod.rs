@@ -1,5 +1,4 @@
 use crate::numutil::NumExt;
-use crate::system::io::addr;
 use crate::system::io::addr::{IE, IF};
 use crate::system::GameGirl;
 
@@ -23,7 +22,7 @@ impl Cpu {
 
         if gg.cpu.halt {
             gg.advance_clock(1);
-            gg.cpu.halt = (gg.mmu.read(addr::IF) & gg.mmu.read(addr::IE) & 0x1F) == 0
+            gg.cpu.halt = (gg.mmu[IF] & gg.mmu[IE] & 0x1F) == 0
         } else {
             let inst = inst::get_next(gg);
             gg.advance_clock(inst.pre_cycles() as usize);
@@ -33,8 +32,8 @@ impl Cpu {
                 gg.cpu.halt_bug = false;
             }
 
-            let cycles = inst::execute(gg, inst);
-            if inst.inc_pc() {
+            let (cycles, inc) = inst::execute(gg, inst);
+            if inc {
                 gg.cpu.pc += inst.size().u16();
             }
             gg.advance_clock(cycles as usize);
@@ -92,11 +91,11 @@ impl Cpu {
 
     fn set_dreg(&mut self, reg: DReg, value: u16) {
         self.set_reg(reg.low(), value.u8());
-        self.set_reg(reg.high(), (value << 8).u8());
+        self.set_reg(reg.high(), (value >> 8).u8());
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Reg {
     A,
     B,

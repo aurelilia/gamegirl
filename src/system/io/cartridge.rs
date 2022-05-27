@@ -21,9 +21,9 @@ impl Cartridge {
     pub fn read(&self, addr: u16) -> u8 {
         let a = addr as usize;
         match addr {
-            0x0000..0x3FFF => self.rom[a],
-            0x4000..0x7FFF => self.rom[(a & 0x3FFF) + (0x4000 * self.rom_bank as usize)],
-            0xA000..0xBFFF if self.ram_bank.is_some() => {
+            0x0000..=0x3FFF => self.rom[a],
+            0x4000..=0x7FFF => self.rom[(a & 0x3FFF) + (0x4000 * self.rom_bank as usize)],
+            0xA000..=0xBFFF if self.ram_bank.is_some() => {
                 self.ram[(a & 0x1FFF) + (0x2000 * (self.ram_bank.unwrap() - 1).us())]
             }
             _ => 0xFF,

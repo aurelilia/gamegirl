@@ -22,21 +22,25 @@ impl GameGirl {
 
     // c is the value of the carry, only used by SBC
     pub(super) fn sub(&mut self, a: u16, b: u16, c: u16, set_carry: bool) -> u16 {
-        let result = a - b - c;
+        let result = a.wrapping_sub(b).wrapping_sub(c);
         self.cpu.set_fl(Flag::Zero, (result & 0xFF) == 0);
         self.cpu.set_fl(Flag::Negative, true);
-        self.cpu
-            .set_fli(Flag::HalfCarry, ((a & 0xF) - (b & 0xF) - c) & 0x10);
+        self.cpu.set_fli(
+            Flag::HalfCarry,
+            ((a & 0xF).wrapping_sub(b & 0xF).wrapping_sub(c)) & 0x10,
+        );
         if set_carry {
-            self.cpu
-                .set_fli(Flag::Carry, ((a & 0xFF) - (b & 0xFF) - c) & 0x100);
+            self.cpu.set_fli(
+                Flag::Carry,
+                ((a & 0xFF).wrapping_sub(b & 0xFF).wrapping_sub(c)) & 0x100,
+            );
         }
         result & 0xFF
     }
 
     pub(super) fn add_16_hl(&mut self, other: u16) {
         let hl = self.cpu.dreg(DReg::HL);
-        let result = hl + other;
+        let result = hl.wrapping_add(other);
         self.cpu.set_fl(Flag::Negative, false);
         self.cpu
             .set_fli(Flag::HalfCarry, ((hl & 0xFFF) + (other & 0xFFF)) & 0x1000);
@@ -54,16 +58,18 @@ impl GameGirl {
     // Thanks to https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
     // as well as kotcrab's xgbc emulator for showing me correct behavior for 0xE8 & 0xF8!
     pub(super) fn add_sp(&mut self) -> u16 {
-        let value = self.mmu.read(self.cpu.pc + 1).u16();
+        let value = self.mmu.read_signed(self.cpu.pc + 1) as i16;
         self.cpu.set_fl(Flag::Zero, false);
         self.cpu.set_fl(Flag::Negative, false);
         self.cpu.set_fli(
             Flag::HalfCarry,
-            ((self.cpu.sp & 0xF) + (value & 0xF)) & 0x10,
+            ((self.cpu.sp & 0xF).wrapping_add_signed(value & 0xF)) & 0x10,
         );
-        self.cpu
-            .set_fli(Flag::Carry, ((self.cpu.sp & 0xFF) + (value & 0xFF)) & 0x100);
-        self.cpu.sp + value
+        self.cpu.set_fli(
+            Flag::Carry,
+            ((self.cpu.sp & 0xFF).wrapping_add_signed(value & 0xFF)) & 0x100,
+        );
+        self.cpu.sp.wrapping_add_signed(value)
     }
 
     pub(super) fn rlc(&mut self, value: u8, maybe_set_z: bool) -> u8 {
@@ -171,11 +177,12 @@ impl GameGirl {
         value
     }
 
-    pub(super) fn z_flag_only(&mut self, value: u16) {
+    pub(super) fn z_flag_only(&mut self, value: u8) -> u8 {
         if value == 0 {
             self.cpu.set_reg(Reg::F, Flag::Zero.mask())
         } else {
             self.cpu.set_reg(Reg::F, 0)
         }
+        value
     }
 }

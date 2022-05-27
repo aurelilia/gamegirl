@@ -52,7 +52,7 @@ impl Timer {
                 self.counter_timer = 0;
             }
             TAC => {
-                self.control = (value & 7);
+                self.control = value & 7;
                 self.counter_running = self.control.is_bit(2);
                 self.counter_divider = match self.control & 3 {
                     0 => 1024, // 4K
@@ -76,5 +76,12 @@ impl Default for Timer {
             counter_running: false,
             counter_divider: 1024,
         }
+    }
+}
+
+impl GameGirl {
+    #[inline]
+    fn timer(&mut self) -> &mut Timer {
+        &mut self.mmu.timer
     }
 }

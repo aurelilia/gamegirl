@@ -31,20 +31,13 @@ const MATH: [fn(&mut GameGirl, u8) -> u8; 8] = [
         .u8()
     },
     |gg, v| {
-        gg.cpu.set_reg(
-            F,
-            HalfCarry.mask() + (Zero.from(gg.cpu.reg(A).u16()) ^ Zero.mask()),
-        );
-        gg.cpu.reg(A) & v
+        let val = gg.cpu.reg(A) & v;
+        gg.cpu
+            .set_reg(F, HalfCarry.mask() + (Zero.from(val.u16()) ^ Zero.mask()));
+        val
     },
-    |gg, v| {
-        gg.z_flag_only(gg.cpu.reg(A).u16());
-        gg.cpu.reg(A) ^ v
-    },
-    |gg, v| {
-        gg.z_flag_only(gg.cpu.reg(A).u16());
-        gg.cpu.reg(A) | v
-    },
+    |gg, v| gg.z_flag_only(gg.cpu.reg(A) ^ v),
+    |gg, v| gg.z_flag_only(gg.cpu.reg(A) | v),
     |gg, v| {
         gg.sub(gg.cpu.reg(A).u16(), v.u16(), 0, true);
         gg.cpu.reg(A)
@@ -88,16 +81,17 @@ impl Inst {
 
 pub fn get_next(gg: &GameGirl) -> Inst {
     Inst(gg.mmu.read(gg.cpu.pc), gg.arg8())
+    //println!("PC={:04X}, SP={:04X}, SPV={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, Z={:?}, I={}, II={:04X}", gg.cpu.pc, gg.cpu.sp, gg.mmu.read16(gg.cpu.sp), gg.cpu.dreg(AF), gg.cpu.dreg(BC), gg.cpu.dreg(DE), gg.cpu.dreg(HL), gg.cpu.flag(Zero), NAMES[inst.0.us()], inst.0.u16() + (inst.1.u16() << 8));
 }
 
 const MATH_REGS: [Reg; 8] = [B, C, D, E, H, L, A, A];
 
-pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
+pub fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
     const BDH: [Reg; 3] = [B, D, H];
     const CELA: [Reg; 4] = [C, E, L, A];
     const BCDEHLAF: [DReg; 4] = [BC, DE, HL, AF];
 
-    let si = inst.0 as usize;
+    let reg = ((inst.0 as usize) >> 4) & 3;
     match inst.0 {
         // -----------------------------------
         // 0x00 - 0x3F
@@ -107,7 +101,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
         0x20 if !gg.cpu.flag(Zero) => return jr(gg),
         0x30 if !gg.cpu.flag(Carry) => return jr(gg),
 
-        0x01 | 0x11 | 0x21 => gg.cpu.set_dreg(BCDEHLAF[si >> 4], gg.arg16()),
+        0x01 | 0x11 | 0x21 => gg.cpu.set_dreg(BCDEHLAF[reg], gg.arg16()),
         0x31 => gg.cpu.sp = gg.arg16(),
 
         0x02 => gg.mmu.write(gg.cpu.dreg(BC), gg.cpu.reg(A)),
@@ -123,12 +117,12 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
 
         0x03 | 0x13 | 0x23 => gg
             .cpu
-            .set_dreg(BCDEHLAF[si >> 4], gg.cpu.dreg(BCDEHLAF[si >> 4]) + 1),
-        0x33 => gg.cpu.sp += 1,
+            .set_dreg(BCDEHLAF[reg], gg.cpu.dreg(BCDEHLAF[reg]).wrapping_add(1)),
+        0x33 => gg.cpu.sp = gg.cpu.sp.wrapping_add(1),
 
         0x04 | 0x14 | 0x24 => {
-            let val = gg.add(gg.cpu.reg(BDH[si >> 4]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(BDH[si >> 4], val)
+            let val = gg.add(gg.cpu.reg(BDH[reg]).u16(), 1, 0, false).u8();
+            gg.cpu.set_reg(BDH[reg], val)
         }
         0x34 => {
             let addr = gg.cpu.dreg(HL);
@@ -139,8 +133,8 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
         }
 
         0x05 | 0x15 | 0x25 => {
-            let val = gg.sub(gg.cpu.reg(BDH[si >> 4]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(BDH[si >> 4], val)
+            let val = gg.sub(gg.cpu.reg(BDH[reg]).u16(), 1, 0, false).u8();
+            gg.cpu.set_reg(BDH[reg], val)
         }
         0x35 => {
             let addr = gg.cpu.dreg(HL);
@@ -150,7 +144,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
             gg.mmu.write(addr, val);
         }
 
-        0x06 | 0x16 | 0x26 => gg.cpu.set_reg(BDH[si >> 4], gg.arg8()),
+        0x06 | 0x16 | 0x26 => gg.cpu.set_reg(BDH[reg], gg.arg8()),
         0x36 => gg.mmu.write(gg.cpu.dreg(HL), gg.arg8()),
 
         0x07 => {
@@ -190,11 +184,11 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
             .set_reg(F, (gg.cpu.reg(F) & Zero.mask()) + 0b00010000),
 
         0x08 => gg.mmu.write16(gg.arg16(), gg.cpu.sp),
-        0x18 => gg.cpu.pc += gg.arg8().u16(),
+        0x18 => return jr(gg),
         0x28 if gg.cpu.flag(Zero) => return jr(gg),
         0x38 if gg.cpu.flag(Carry) => return jr(gg),
 
-        0x09 | 0x19 | 0x29 => gg.add_16_hl(gg.cpu.dreg(BCDEHLAF[si >> 4])),
+        0x09 | 0x19 | 0x29 => gg.add_16_hl(gg.cpu.dreg(BCDEHLAF[reg])),
         0x39 => gg.add_16_hl(gg.cpu.sp),
 
         0x0A => gg.cpu.set_reg(A, gg.mmu.read(gg.cpu.dreg(BC))),
@@ -210,18 +204,18 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
 
         0x0B | 0x1B | 0x2B => gg
             .cpu
-            .set_dreg(BCDEHLAF[si >> 4], gg.cpu.dreg(BCDEHLAF[si >> 4]) - 1),
-        0x3B => gg.cpu.sp -= 1,
+            .set_dreg(BCDEHLAF[reg], gg.cpu.dreg(BCDEHLAF[reg]).wrapping_sub(1)),
+        0x3B => gg.cpu.sp = gg.cpu.sp.wrapping_sub(1),
 
         0x0C | 0x1C | 0x2C | 0x3C => {
-            let val = gg.add(gg.cpu.reg(CELA[si >> 4]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(CELA[si >> 4], val)
+            let val = gg.add(gg.cpu.reg(CELA[reg]).u16(), 1, 0, false).u8();
+            gg.cpu.set_reg(CELA[reg], val)
         }
         0x0D | 0x1D | 0x2D | 0x3D => {
-            let val = gg.sub(gg.cpu.reg(CELA[si >> 4]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(CELA[si >> 4], val)
+            let val = gg.sub(gg.cpu.reg(CELA[reg]).u16(), 1, 0, false).u8();
+            gg.cpu.set_reg(CELA[reg], val)
         }
-        0x0E | 0x1E | 0x2E | 0x3E => gg.cpu.set_reg(CELA[si >> 4], gg.arg8()),
+        0x0E | 0x1E | 0x2E | 0x3E => gg.cpu.set_reg(CELA[reg], gg.arg8()),
 
         0x0F => {
             let val = gg.rrc(gg.cpu.reg(A), false);
@@ -249,8 +243,8 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
             gg.cpu.halt_bug = true
         }
         0x76 => gg.cpu.halt = true,
-        0x40..0x7F => {
-            let reg = (inst.0 & 0x30) >> 4;
+        0x40..=0x7F => {
+            let reg = (inst.0 - 0x40) >> 3;
             match reg {
                 6 => {
                     let addr = gg.cpu.dreg(HL);
@@ -266,9 +260,9 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
         // -----------------------------------
         // 0x80 - 0xBF
         // -----------------------------------
-        0x80..0xBF => {
-            let op = (inst.0 & 0x30) >> 4;
-            reg_set(gg, op, |gg, v| {
+        0x80..=0xBF => {
+            let op = (inst.0 - 0x80) >> 3;
+            reg_set(gg, inst.0, |gg, v| {
                 let val = MATH[op as usize](gg, v);
                 gg.cpu.set_reg(A, val);
             });
@@ -292,7 +286,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
 
         0xC1 | 0xD1 | 0xE1 | 0xF1 => {
             let val = gg.pop_stack();
-            gg.cpu.set_dreg(BCDEHLAF[si >> 4], val);
+            gg.cpu.set_dreg(BCDEHLAF[reg], val);
         }
 
         0xC2 if !gg.cpu.flag(Zero) => return jp(gg),
@@ -307,7 +301,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
         0xD4 if !gg.cpu.flag(Carry) => return call(gg),
 
         0xC5 | 0xD5 | 0xE5 | 0xF5 => {
-            let val = gg.cpu.dreg(BCDEHLAF[si >> 4]);
+            let val = gg.cpu.dreg(BCDEHLAF[reg]);
             gg.push_stack(val);
         }
 
@@ -362,28 +356,32 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> u8 {
 
         _ => (),
     }
-    inst.cycles()
+    (inst.cycles(), inst.inc_pc())
 }
 
-fn jr(gg: &mut GameGirl) -> u8 {
-    gg.cpu.pc += gg.arg8().u16();
-    3
+#[must_use]
+fn jr(gg: &mut GameGirl) -> (u8, bool) {
+    gg.cpu.pc = gg.cpu.pc.wrapping_add_signed((gg.arg8() as i8) as i16 + 2);
+    (3, false)
 }
 
-fn jp(gg: &mut GameGirl) -> u8 {
+#[must_use]
+fn jp(gg: &mut GameGirl) -> (u8, bool) {
     gg.cpu.pc = gg.arg16();
-    4
+    (4, false)
 }
 
-fn ret(gg: &mut GameGirl) -> u8 {
+#[must_use]
+fn ret(gg: &mut GameGirl) -> (u8, bool) {
     gg.cpu.pc = gg.pop_stack();
-    5
+    (5, false)
 }
 
-fn call(gg: &mut GameGirl) -> u8 {
+#[must_use]
+fn call(gg: &mut GameGirl) -> (u8, bool) {
     gg.push_stack(gg.cpu.pc + 3);
     gg.cpu.pc = gg.arg16();
-    6
+    (6, false)
 }
 
 fn execute_ext(gg: &mut GameGirl, ext: u8) {

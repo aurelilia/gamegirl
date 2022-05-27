@@ -558,7 +558,6 @@ pub const NAMES_EXT: [&str; 256] = [
 ];
 pub const INC_PC: [bool; 256] = [
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-    true, true, true, true, true, true, true, true, false, true, true, true, true, true, true,
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
@@ -569,10 +568,11 @@ pub const INC_PC: [bool; 256] = [
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
     true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-    true, true, true, true, false, true, true, true, false, true, false, true, false, true, false,
-    true, false, true, true, true, false, true, true, true, false, true, false, true, false, true,
-    false, true, false, true, true, true, false, false, true, true, false, true, false, true,
-    false, false, false, true, false, true, true, true, true, false, true, true, false, true, true,
-    true, true, false, false, true, false,
+    true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    true, true, true, false, true, true, true, false, true, false, true, false, true, false, true,
+    false, true, true, true, false, true, true, true, false, true, false, true, false, true, false,
+    true, false, true, true, true, false, false, true, true, false, true, false, true, false,
+    false, false, true, false, true, true, true, true, false, true, true, false, true, true, true,
+    true, false, false, true, false,
 ];
 pub const INC_PC_EXT: bool = true;
