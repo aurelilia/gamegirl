@@ -137,7 +137,23 @@ impl Ppu {
         )
     }
 
-    fn render_window(gg: &mut GameGirl) {}
+    fn render_window(gg: &mut GameGirl) {
+        let wx = gg.mmu[WX] as i16 - 7;
+        if wx < 0 || wx > 159 || gg.mmu[WY] > gg.mmu[LY] {
+            return;
+        }
+
+        Self::render_bg_or_window(
+            gg,
+            0,
+            wx as u8,
+            160,
+            gg.map_addr(WIN_MAP),
+            gg.mmu.ppu.window_line,
+            false,
+        );
+        gg.ppu().window_line += 1;
+    }
 
     fn render_bg_or_window(
         gg: &mut GameGirl,
@@ -167,9 +183,9 @@ impl Ppu {
             if tile_x == 8 {
                 tile_x = 0;
                 tile_addr = if correct_tile_addr && (tile_addr & 0x1F) == 0x1F {
-                    tile_addr - 0x20
+                    tile_addr - 0x19
                 } else {
-                    tile_addr
+                    tile_addr + 1
                 };
                 tile_data_addr = Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()].u16())
                     + (tile_y.u16() * 2);

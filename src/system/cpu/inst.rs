@@ -1,4 +1,5 @@
 use crate::numutil::NumExt;
+use crate::system::cpu::data::NAMES;
 use crate::system::cpu::DReg::*;
 use crate::system::cpu::Flag::*;
 use crate::system::cpu::Reg::*;
@@ -80,8 +81,9 @@ impl Inst {
 }
 
 pub fn get_next(gg: &GameGirl) -> Inst {
-    Inst(gg.mmu.read(gg.cpu.pc), gg.arg8())
+    let inst = Inst(gg.mmu.read(gg.cpu.pc), gg.arg8());
     //println!("PC={:04X}, SP={:04X}, SPV={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, Z={:?}, I={}, II={:04X}", gg.cpu.pc, gg.cpu.sp, gg.mmu.read16(gg.cpu.sp), gg.cpu.dreg(AF), gg.cpu.dreg(BC), gg.cpu.dreg(DE), gg.cpu.dreg(HL), gg.cpu.flag(Zero), NAMES[inst.0.us()], inst.0.u16() + (inst.1.u16() << 8));
+    inst
 }
 
 const MATH_REGS: [Reg; 8] = [B, C, D, E, H, L, A, A];
@@ -168,10 +170,10 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
                 }
             } else {
                 if gg.cpu.flag(Carry) {
-                    a -= 0x60;
+                    a = a.wrapping_sub(0x60);
                 }
                 if gg.cpu.flag(HalfCarry) {
-                    a = (a - 0x06) & 0xFF
+                    a = a.wrapping_sub(0x06) & 0xFF
                 }
             }
 
