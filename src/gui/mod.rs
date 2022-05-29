@@ -1,15 +1,15 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{
-    BufferSize, SampleRate, Stream, StreamConfig, SupportedOutputConfigs,
-    SupportedStreamConfigRange,
-};
+use cpal::{BufferSize, SampleRate, Stream, StreamConfig};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use gamegirl::system::io::apu::SAMPLE_RATE;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use crate::egui::{Color32, Event, ImageData};
 use crate::{egui, GameGirl};
 use gamegirl::system::io::joypad::{Button, Joypad};
+
+const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
 pub type Colour = Color32;
 
@@ -26,7 +26,7 @@ fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
             &StreamConfig {
                 channels: 2,
                 sample_rate: SampleRate(SAMPLE_RATE),
-                buffer_size: BufferSize::Fixed(1024),
+                buffer_size: BufferSize::Default,
             },
             move |data: &mut [f32], _| {
                 let samples = {
@@ -51,9 +51,6 @@ fn init_eframe(gg: Arc<Mutex<GameGirl>>) {
         "gameGirl",
         options,
         Box::new(|cc| {
-            let ctx = cc.egui_ctx.clone();
-            gg.lock().unwrap().mmu.ppu.repaint = Box::new(move || ctx.request_repaint());
-
             let manager = cc.egui_ctx.tex_manager();
             let texture = manager.write().alloc(
                 "screen".into(),
@@ -71,15 +68,16 @@ struct App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.update_gg(ctx);
+        self.update_gg(ctx, FRAME_LEN);
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.image(self.texture, [160.0, 144.0]);
         });
+        ctx.request_repaint();
     }
 }
 
 impl App {
-    fn update_gg(&mut self, ctx: &egui::Context) {
+    fn update_gg(&mut self, ctx: &egui::Context, advance_by: Duration) {
         let frame = {
             let mut gg = self.gg.lock().unwrap();
             for event in &ctx.input().events {
@@ -89,6 +87,8 @@ impl App {
                     }
                 }
             }
+
+            gg.advance_delta(advance_by.as_secs_f32());
             gg.mmu.ppu.last_frame.take()
         };
         if let Some(data) = frame {

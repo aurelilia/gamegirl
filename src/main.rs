@@ -1,3 +1,5 @@
+#![feature(duration_consts_float)]
+
 mod gui;
 
 use eframe::egui;

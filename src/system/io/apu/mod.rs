@@ -23,6 +23,7 @@ impl Apu {
         } else {
             mmu.apu.out_div -= DIVIDER;
             mmu.apu.samples.push(0.0);
+            mmu.apu.samples.push(0.0);
         }
     }
 }
