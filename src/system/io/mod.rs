@@ -17,7 +17,7 @@ pub mod addr;
 mod apu;
 mod cartridge;
 mod dma;
-mod joypad;
+pub mod joypad;
 mod ppu;
 mod timer;
 
@@ -69,7 +69,6 @@ impl Mmu {
 
     fn read_high(&self, addr: u16) -> u8 {
         match addr {
-            // TODO: joypad
             JOYP => self.joypad.read(self.high[JOYP as usize]),
             DIV | TAC => self.timer.read(addr),
             LY if !self[LCDC].is_bit(7) => 0,

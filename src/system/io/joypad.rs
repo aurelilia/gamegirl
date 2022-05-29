@@ -1,4 +1,8 @@
+use crate::system::cpu::Interrupt;
+use crate::system::io::addr::JOYP;
+use crate::system::GameGirl;
 use eframe::egui::Key;
+use eframe::egui::Key::J;
 
 #[derive(Default)]
 pub struct Joypad {
@@ -13,13 +17,19 @@ impl Joypad {
             _ => return 0xCF,
         };
         let mut res = 0;
-        for key in self.key_states.iter().rev().skip(row_start).take(4) {
+        for key in self.key_states.iter().skip(row_start).take(4).rev() {
             res <<= 1;
-            if !key {
-                res += 1;
-            }
+            res += (!key) as u8;
         }
         res | (joyp & 0x30) | 0b1100_0000
+    }
+
+    pub fn set(gg: &mut GameGirl, button: Button, state: bool) {
+        gg.mmu.joypad.key_states[button as usize] = state;
+        let read = gg.mmu.joypad.read(gg.mmu[JOYP]);
+        if read & 0x0F != 0x0F {
+            gg.request_interrupt(Interrupt::Joypad);
+        }
     }
 }
 
@@ -56,6 +66,13 @@ impl Button {
         Key::ArrowUp,
         Key::ArrowDown,
     ];
+
+    pub fn from_key(key: Key) -> Option<Self> {
+        Self::KEYS
+            .iter()
+            .position(|k| *k == key)
+            .map(|i| Self::BTNS[i])
+    }
 
     fn to_key(&self) -> Key {
         Self::KEYS[*self as usize]

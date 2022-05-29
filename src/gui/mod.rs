@@ -1,7 +1,8 @@
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 
-use crate::egui::{Color32, ImageData};
+use crate::egui::{Color32, Event, ImageData};
 use crate::{egui, GameGirl};
+use gamegirl::system::io::joypad::{Button, Joypad};
 
 pub type Colour = Color32;
 
@@ -31,6 +32,13 @@ struct App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        for event in &ctx.input().events {
+            if let Event::Key { key, pressed, .. } = event {
+                if let Some(button) = Button::from_key(*key) {
+                    Joypad::set(&mut self.gg, button, *pressed);
+                }
+            }
+        }
         self.gg.advance_delta(0.1);
 
         let data = self.gg.mmu.ppu.pixels.to_vec();
