@@ -24,16 +24,18 @@ impl Timer {
             }
         }
 
-        let tima = gg.mmu[TIMA];
+        let mut tima = gg.mmu[TIMA].u16();
         let mut tim = gg.timer(); // Work around borrow checker
         if tim.counter_running {
             tim.counter_timer += t_cycles;
-            let value = tima.us() + (tim.counter_timer / tim.counter_divider);
-            tim.counter_timer %= tim.counter_divider;
-            if value >= 0xFF {
-                tim.interrupt_in = 4;
+            while tim.counter_timer >= tim.counter_divider {
+                tim.counter_timer -= tim.counter_divider;
+                tima += 1;
+                if tima > 0xFF {
+                    tim.interrupt_in = 4;
+                }
             }
-            gg.mmu[TIMA] = value as u8;
+            gg.mmu[TIMA] = tima.u8();
         }
     }
 

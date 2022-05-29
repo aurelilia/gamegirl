@@ -1,6 +1,8 @@
 use crate::numutil::NumExt;
 use crate::system::io::addr::*;
 use crate::system::io::cartridge::Cartridge;
+use crate::system::io::dma::Dma;
+use crate::system::io::joypad::Joypad;
 use crate::system::io::ppu::Ppu;
 use crate::system::io::timer::Timer;
 use crate::system::GameGirl;
@@ -34,12 +36,15 @@ pub struct Mmu {
     pub cart: Cartridge,
     pub timer: Timer,
     pub ppu: Ppu,
+    pub joypad: Joypad,
+    pub dma: Dma,
 }
 
 impl Mmu {
     pub fn step(gg: &mut GameGirl, t_cycles: usize) {
         Timer::step(gg, t_cycles);
         Ppu::step(gg, t_cycles);
+        Dma::step(gg, t_cycles);
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -65,6 +70,7 @@ impl Mmu {
     fn read_high(&self, addr: u16) -> u8 {
         match addr {
             // TODO: joypad
+            JOYP => self.joypad.read(self.high[JOYP as usize]),
             DIV | TAC => self.timer.read(addr),
             LY if !self[LCDC].is_bit(7) => 0,
             _ => self[addr],
@@ -106,6 +112,10 @@ impl Mmu {
                     self[STAT] &= 0xF8;
                 }
             }
+            DMA => {
+                self[addr] = value;
+                self.dma.start();
+            }
 
             0x01 if self.debugger.is_some() => self
                 .debugger
@@ -123,13 +133,13 @@ impl Mmu {
 
     pub fn read16(&self, addr: u16) -> u16 {
         let low = self.read(addr);
-        let high = self.read(addr + 1);
+        let high = self.read(addr.wrapping_add(1));
         (high.u16() << 8) | low.u16()
     }
 
     pub fn write16(&mut self, addr: u16, value: u16) {
         self.write(addr, value.u8());
-        self.write(addr + 1, (value >> 8).u8());
+        self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
     pub fn new(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
@@ -148,6 +158,8 @@ impl Mmu {
             cart: Cartridge::from_rom(rom),
             timer: Timer::default(),
             ppu: Ppu::default(),
+            joypad: Joypad::default(),
+            dma: Dma::default(),
         };
         mmu.init_high();
         mmu
@@ -161,13 +173,14 @@ impl Mmu {
         self[SCX] = 0;
         self[WY] = 0;
         self[WX] = 0;
-
         self[BGP] = 0b1110_0100;
         self[OBP0] = 0b1110_0100;
         self[OBP1] = 0b1110_0100;
 
         self[SB] = 0;
         self[SC] = 0x7E;
+        self[TIMA] = 0;
+        self[TMA] = 0;
     }
 }
 

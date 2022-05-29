@@ -80,6 +80,8 @@ impl Cpu {
     }
 
     pub fn set_reg(&mut self, reg: Reg, value: u8) {
+        // Register F only allows writing the 4 high/flag bits
+        let value = if reg == Reg::F { value & 0xF0 } else { value };
         self.regs[reg.i()] = value
     }
 
@@ -95,7 +97,7 @@ impl Cpu {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Reg {
     A,
     B,

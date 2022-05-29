@@ -5,7 +5,7 @@ use crate::system::cpu::Flag::*;
 use crate::system::cpu::Reg::*;
 use crate::system::cpu::{data, DReg, Reg};
 use crate::system::io::addr;
-use crate::system::io::addr::KEY1;
+use crate::system::io::addr::{IE, IF, KEY1};
 use crate::system::GameGirl;
 
 const EXT: u8 = 0xCB;
@@ -241,9 +241,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
         // -----------------------------------
         // 0x40 - 0x7F
         // -----------------------------------
-        0x76 if !gg.cpu.ime && (gg.mmu.read(addr::IF) & gg.mmu.read(addr::IE) & 0x1F) != 0 => {
-            gg.cpu.halt_bug = true
-        }
+        0x76 if !gg.cpu.ime && (gg.mmu[IF] & gg.mmu[IE] & 0x1F) != 0 => gg.cpu.halt_bug = true,
         0x76 => gg.cpu.halt = true,
         0x40..=0x7F => {
             let reg = (inst.0 - 0x40) >> 3;
