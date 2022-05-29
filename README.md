@@ -2,7 +2,7 @@
 A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.angm.xyz/ellie/gamelin).
 
 ## Status
-Early, Tetris and Dr. Mario kinda work but not without a decent amount of visual glitches.
+Early, Tetris and Dr. Mario work perfectly but no audio.
 
 ## Goals
 The main goals of this emulator is to create a nice-to-use emulator with many comfort features that should be able

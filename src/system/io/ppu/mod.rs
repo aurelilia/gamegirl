@@ -216,7 +216,7 @@ impl Ppu {
     fn render_objs(gg: &mut GameGirl) {
         let mut count = 0;
         let sprite_offs = 8 + gg.lcdc(BIG_OBJS) as i16 * 8;
-        let ly = gg.mmu[LY] as i8 as i16;
+        let ly = gg.mmu[LY] as i16;
 
         for idx in 0..40 {
             let sprite = Sprite::from(&gg.mmu, idx);
@@ -362,8 +362,8 @@ impl Sprite {
     fn from(mmu: &Mmu, idx: u8) -> Self {
         let base = idx.us() * 4;
         Self {
-            x: mmu.oam[base + 1] as i8 as i16 - 8,
-            y: mmu.oam[base] as i8 as i16 - 16,
+            x: mmu.oam[base + 1] as i16 - 8,
+            y: mmu.oam[base] as i16 - 16,
             tile_num: mmu.oam[base + 2],
             opt: mmu.oam[base + 3],
         }
