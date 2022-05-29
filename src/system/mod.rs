@@ -1,3 +1,4 @@
+use std::mem;
 use std::sync::{Arc, RwLock};
 
 use crate::numutil::NumExt;
@@ -11,7 +12,8 @@ mod cpu;
 pub mod debugger;
 pub mod io;
 
-const M_CLOCK_HZ: f32 = 4194304.0 / 4.0;
+const T_CLOCK_HZ: usize = 4194304;
+const M_CLOCK_HZ: f32 = T_CLOCK_HZ as f32 / 4.0;
 
 pub struct GameGirl {
     pub cpu: Cpu,
@@ -33,6 +35,17 @@ impl GameGirl {
         while self.clock < target {
             self.advance();
         }
+    }
+
+    pub fn produce_samples(&mut self, count: usize) -> Vec<f32> {
+        while self.mmu.apu.samples.len() < count {
+            self.advance();
+        }
+        let mut samples = mem::take(&mut self.mmu.apu.samples);
+        while samples.len() > count {
+            self.mmu.apu.samples.push(samples.pop().unwrap());
+        }
+        samples
     }
 
     fn advance_clock(&mut self, m_cycles: usize) {

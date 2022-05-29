@@ -33,6 +33,8 @@ pub struct Ppu {
     kind: PpuKind,
 
     pub pixels: [Colour; 160 * 144],
+    pub last_frame: Option<Vec<Colour>>,
+    pub repaint: Box<dyn FnMut() + Send>,
 }
 
 impl Ppu {
@@ -66,6 +68,8 @@ impl Ppu {
                 if gg.mmu[LY] == 144 {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
+                    gg.ppu().last_frame = Some(gg.mmu.ppu.pixels.to_vec());
+                    (gg.ppu().repaint)();
                     Mode::VBlank
                 } else {
                     Mode::OAMScan
@@ -310,6 +314,8 @@ impl Default for Ppu {
                 used_x_obj_coords: [None; 10],
             },
             pixels: [Colour::BLACK; 160 * 144],
+            last_frame: None,
+            repaint: Box::new(|| ()),
         }
     }
 }

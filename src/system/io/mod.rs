@@ -1,5 +1,6 @@
 use crate::numutil::NumExt;
 use crate::system::io::addr::*;
+use crate::system::io::apu::Apu;
 use crate::system::io::cartridge::Cartridge;
 use crate::system::io::dma::Dma;
 use crate::system::io::joypad::Joypad;
@@ -14,7 +15,7 @@ use std::{
 use super::debugger::Debugger;
 
 pub mod addr;
-mod apu;
+pub mod apu;
 mod cartridge;
 mod dma;
 pub mod joypad;
@@ -38,6 +39,7 @@ pub struct Mmu {
     pub ppu: Ppu,
     pub joypad: Joypad,
     pub dma: Dma,
+    pub apu: Apu,
 }
 
 impl Mmu {
@@ -45,6 +47,7 @@ impl Mmu {
         Timer::step(gg, t_cycles);
         Ppu::step(gg, t_cycles);
         Dma::step(gg, t_cycles);
+        Apu::step(&mut gg.mmu, t_cycles);
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -159,6 +162,7 @@ impl Mmu {
             ppu: Ppu::default(),
             joypad: Joypad::default(),
             dma: Dma::default(),
+            apu: Apu::default(),
         };
         mmu.init_high();
         mmu
