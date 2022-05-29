@@ -3,8 +3,13 @@ use crate::system::io::addr::*;
 use crate::system::io::cartridge::Cartridge;
 use crate::system::io::ppu::Ppu;
 use crate::system::io::timer::Timer;
-use crate::GameGirl;
-use std::ops::{Index, IndexMut};
+use crate::system::GameGirl;
+use std::{
+    ops::{Index, IndexMut},
+    sync::{Arc, RwLock},
+};
+
+use super::debugger::Debugger;
 
 pub mod addr;
 mod apu;
@@ -24,6 +29,7 @@ pub struct Mmu {
 
     pub bootrom: Option<&'static [u8]>,
     pub cgb: bool,
+    debugger: Option<Arc<RwLock<Debugger>>>,
 
     pub cart: Cartridge,
     pub timer: Timer,
@@ -32,9 +38,8 @@ pub struct Mmu {
 
 impl Mmu {
     pub fn step(gg: &mut GameGirl, t_cycles: usize) {
-        let cycles = t_cycles / gg.t_multiplier.us();
-        Timer::step(gg, cycles);
-        Ppu::step(gg, cycles);
+        Timer::step(gg, t_cycles);
+        Ppu::step(gg, t_cycles);
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -102,7 +107,14 @@ impl Mmu {
                 }
             }
 
-            0x01 => eprint!("{}", value as char),
+            0x01 if self.debugger.is_some() => self
+                .debugger
+                .as_ref()
+                .unwrap()
+                .write()
+                .unwrap()
+                .serial_output
+                .push(value as char),
 
             LY | SC => (),
             _ => self[addr] = value,
@@ -120,8 +132,8 @@ impl Mmu {
         self.write(addr + 1, (value >> 8).u8());
     }
 
-    pub fn new(rom: Vec<u8>) -> Self {
-        Self {
+    pub fn new(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+        let mut mmu = Self {
             vram: [0; 16384],
             vram_bank: 0,
             wram: [0; 16384],
@@ -131,11 +143,14 @@ impl Mmu {
 
             bootrom: Some(BOOTIX_ROM),
             cgb: false,
+            debugger,
 
             cart: Cartridge::from_rom(rom),
             timer: Timer::default(),
             ppu: Ppu::default(),
-        }
+        };
+        mmu.init_high();
+        mmu
     }
 
     pub fn init_high(&mut self) {

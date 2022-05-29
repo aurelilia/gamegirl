@@ -1,18 +1,10 @@
 [package]
-name = "gamegirl"
+name = "tests"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eframe = "0.18.0"
-cpal = "0.13.5"
-
-
-[workspace]
-members = [".", "tests"]
-
-[profile.release]
-debug = true
-lto = true
+gamegirl = { path = ".." }
+ansi_term = "0.12.1"

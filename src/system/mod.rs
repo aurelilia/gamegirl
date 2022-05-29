@@ -1,18 +1,24 @@
+use std::sync::{Arc, RwLock};
+
 use crate::numutil::NumExt;
 use crate::system::cpu::{Cpu, Interrupt};
 use crate::system::io::addr::{IF, KEY1};
 use crate::system::io::Mmu;
 
+use self::debugger::Debugger;
+
 mod cpu;
+pub mod debugger;
 pub mod io;
 
-const T_CLOCK_HZ: f32 = 4194304.0;
+const M_CLOCK_HZ: f32 = 4194304.0 / 4.0;
 
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mmu: Mmu,
+    pub debugger: Option<Arc<RwLock<Debugger>>>,
 
-    pub t_multiplier: u8,
+    pub t_shift: u8,
     pub clock: usize,
 }
 
@@ -23,20 +29,20 @@ impl GameGirl {
 
     pub fn advance_delta(&mut self, delta: f32) {
         self.clock = 0;
-        let target = (T_CLOCK_HZ * delta) as usize;
+        let target = (M_CLOCK_HZ * delta) as usize;
         while self.clock < target {
             self.advance();
         }
     }
 
     fn advance_clock(&mut self, m_cycles: usize) {
-        let t_cycles = m_cycles * 4;
+        let t_cycles = m_cycles << self.t_shift;
         Mmu::step(self, t_cycles);
-        self.clock += t_cycles
+        self.clock += m_cycles
     }
 
     fn switch_speed(&mut self) {
-        self.t_multiplier = if self.t_multiplier == 1 { 2 } else { 1 };
+        self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
         self.mmu[KEY1] = 0;
         for _ in 0..=1024 {
             self.advance_clock(2)
@@ -66,15 +72,14 @@ impl GameGirl {
         self.mmu.write16(self.cpu.sp, value)
     }
 
-    pub fn new(rom: Vec<u8>) -> Self {
-        let mut gg = Self {
+    pub fn new(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+        Self {
             cpu: Cpu::default(),
-            mmu: Mmu::new(rom),
+            mmu: Mmu::new(rom, debugger.clone()),
+            debugger,
 
-            t_multiplier: 1,
+            t_shift: 2,
             clock: 0,
-        };
-        gg.mmu.init_high();
-        gg
+        }
     }
 }

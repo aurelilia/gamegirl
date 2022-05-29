@@ -1,8 +1,8 @@
-use crate::gui::Colour;
 use crate::numutil::NumExt;
 use crate::system::cpu::Interrupt;
 use crate::system::io::addr::*;
-use crate::GameGirl;
+use crate::system::GameGirl;
+use crate::Colour;
 
 mod cgb;
 mod dmg;
@@ -23,7 +23,7 @@ pub struct Ppu {
     window_line: u8,
     kind: PpuKind,
 
-    pub(crate) pixels: [Colour; 160 * 144],
+    pub pixels: [Colour; 160 * 144],
 }
 
 impl Ppu {
@@ -139,7 +139,7 @@ impl Ppu {
 
     fn render_window(gg: &mut GameGirl) {
         let wx = gg.mmu[WX] as i16 - 7;
-        if wx < 0 || wx > 159 || gg.mmu[WY] > gg.mmu[LY] {
+        if !(0..=159).contains(&wx) || gg.mmu[WY] > gg.mmu[LY] {
             return;
         }
 
@@ -164,6 +164,7 @@ impl Ppu {
         map_line: u8,
         correct_tile_addr: bool,
     ) {
+        let colours = Self::get_bg_colours(gg);
         let line = gg.mmu[LY];
         let mut tile_x = scroll_x & 7;
         let tile_y = map_line & 7;
@@ -176,8 +177,8 @@ impl Ppu {
         for tile_idx_addr in start_x..end_x {
             let colour_idx = (high.bit(7 - tile_x.u16()) << 1) + low.bit(7 - tile_x.u16());
             // TODO set occupied
-            let colour = Self::get_bg_colour(gg, colour_idx);
-            gg.ppu().set_pixel(tile_idx_addr, line, colour);
+            gg.ppu()
+                .set_pixel(tile_idx_addr, line, colours[colour_idx.us()]);
 
             tile_x += 1;
             if tile_x == 8 {

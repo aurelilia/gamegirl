@@ -1,7 +1,7 @@
 use crate::numutil::NumExt;
 use crate::system::cpu::Interrupt;
 use crate::system::io::addr::*;
-use crate::GameGirl;
+use crate::system::GameGirl;
 
 pub struct Timer {
     div_cycle_count: usize,

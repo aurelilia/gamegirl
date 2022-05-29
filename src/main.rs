@@ -1,17 +1,11 @@
-#![feature(exclusive_range_pattern)]
-#![feature(mixed_integer_ops)]
-#![allow(unused)]
+mod gui;
 
 use eframe::egui;
+use gamegirl::system::GameGirl;
 use std::env::args;
 use std::fs;
-use system::GameGirl;
-
-mod gui;
-pub mod numutil;
-mod system;
 
 fn main() {
-    let gg = GameGirl::new(fs::read(args().skip(1).next().unwrap()).unwrap());
+    let gg = GameGirl::new(fs::read(args().nth(1).unwrap()).unwrap(), None);
     gui::start(gg);
 }
