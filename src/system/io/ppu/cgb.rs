@@ -11,7 +11,7 @@ pub struct Cgb {
     obj_palette_idx: u8,
     obj_palette_inc: bool,
     pub obj_palettes: [CgbColour; 32],
-    pub unavailable_pixels: [bool; 160 * 144],
+    pub unavailable_pixels: [bool; 160],
 }
 
 impl Default for Cgb {
@@ -23,7 +23,7 @@ impl Default for Cgb {
             obj_palette_idx: 0,
             obj_palette_inc: false,
             obj_palettes: [CgbColour::default(); 32],
-            unavailable_pixels: [false; 160 * 144],
+            unavailable_pixels: [false; 160],
         }
     }
 }
@@ -144,13 +144,12 @@ impl Ppu {
             }
             .u16();
             let colour_idx = (high.bit(x) << 1) + low.bit(x);
-            let addr = ((tile_idx_addr.us() * 144) + line.us());
-            gg.ppu().bg_occupied_pixels[addr] |= (colour_idx != 0) && gg.lcdc(BG_EN);
+            gg.ppu().bg_occupied_pixels[tile_idx_addr.us()] |= (colour_idx != 0) && gg.lcdc(BG_EN);
 
             let palette = attributes & 7;
             let colour = {
                 let cgb = gg.cgb();
-                cgb.unavailable_pixels[addr] = (colour_idx != 0) && has_prio;
+                cgb.unavailable_pixels[tile_idx_addr.us()] = (colour_idx != 0) && has_prio;
                 cgb.bg_palettes[(palette.us() * 4) + colour_idx.us()]
             };
             gg.ppu().set_pixel(tile_idx_addr, line, colour.colour);

@@ -1,5 +1,5 @@
 use crate::system::io::Mmu;
-use crate::system::{GameGirl, T_CLOCK_HZ};
+use crate::system::T_CLOCK_HZ;
 
 mod misc;
 mod noise;

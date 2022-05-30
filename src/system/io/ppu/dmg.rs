@@ -1,6 +1,6 @@
 use crate::numutil::NumExt;
 use crate::system::io::addr::{BGP, LY};
-use crate::system::io::ppu::{Ppu, PpuKind, Sprite};
+use crate::system::io::ppu::{Ppu, PpuKind};
 use crate::system::GameGirl;
 use crate::Colour;
 
@@ -28,8 +28,7 @@ impl Ppu {
 
         for tile_idx_addr in start_x..end_x {
             let colour_idx = (high.bit(7 - tile_x.u16()) << 1) + low.bit(7 - tile_x.u16());
-            gg.ppu().bg_occupied_pixels[((tile_idx_addr.us() * 144) + line.us())] |=
-                colour_idx != 0;
+            gg.ppu().bg_occupied_pixels[tile_idx_addr.us()] |= colour_idx != 0;
             gg.ppu()
                 .set_pixel(tile_idx_addr, line, colours[colour_idx.us()]);
 
@@ -59,10 +58,12 @@ impl Ppu {
     pub fn allow_obj(&mut self, x: u8, count: u8) -> bool {
         match &mut self.kind {
             PpuKind::Dmg { used_x_obj_coords } => {
-                for i in 0..count.us() {
-                    if used_x_obj_coords[i] == Some(x) {
-                        return false;
-                    }
+                if used_x_obj_coords
+                    .iter()
+                    .take(count.us())
+                    .any(|e| *e == Some(x))
+                {
+                    return false;
                 }
                 used_x_obj_coords[count.us()] = Some(x);
                 true

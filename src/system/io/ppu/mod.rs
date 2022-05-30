@@ -29,7 +29,7 @@ const CGB_BANK: u16 = 3;
 pub struct Ppu {
     mode: Mode,
     mode_clock: u16,
-    bg_occupied_pixels: [bool; 160 * 144],
+    bg_occupied_pixels: [bool; 160],
     window_line: u8,
     kind: PpuKind,
 
@@ -58,6 +58,7 @@ impl Ppu {
 
             Mode::Upload => {
                 Self::render_line(gg);
+                gg.mmu.ppu.bg_occupied_pixels = [false; 160];
                 Self::stat_interrupt(gg, 3);
                 Mode::HBlank
             }
@@ -83,10 +84,6 @@ impl Ppu {
                 if gg.mmu[LY] > 153 {
                     gg.mmu[LY] = 0;
                     gg.mmu.ppu.window_line = 0;
-                    gg.mmu.ppu.bg_occupied_pixels = [false; 160 * 144];
-                    if let PpuKind::Cgb(cgb) = &mut gg.ppu().kind {
-                        cgb.unavailable_pixels = [false; 160 * 144];
-                    }
                     Self::stat_interrupt(gg, 5);
                     Mode::OAMScan
                 } else {
@@ -132,9 +129,11 @@ impl Ppu {
 
         if gg.lcdc(OBJ_EN) {
             Self::render_objs(gg);
-            if let PpuKind::Dmg { used_x_obj_coords } = &mut gg.mmu.ppu.kind {
-                *used_x_obj_coords = [None; 10];
-            }
+        }
+
+        match &mut gg.ppu().kind {
+            PpuKind::Dmg { used_x_obj_coords } => *used_x_obj_coords = [None; 10],
+            PpuKind::Cgb(cgb) => cgb.unavailable_pixels = [false; 160],
         }
     }
 
@@ -240,8 +239,8 @@ impl Ppu {
         let tile_data_addr = (tile_num.u16() * 0x10)
             + (tile_y as u16 * 2)
             + ((gg.mmu.cgb && sprite.opt.is_bit(CGB_BANK)) as u16) * 0x2000;
-        let mut high = gg.mmu.vram[tile_data_addr.us() + 1];
-        let mut low = gg.mmu.vram[tile_data_addr.us()];
+        let high = gg.mmu.vram[tile_data_addr.us() + 1];
+        let low = gg.mmu.vram[tile_data_addr.us()];
 
         for tile_x in 0..8 {
             let colour_idx = if !sprite.opt.is_bit(X_FLIP) {
@@ -252,7 +251,7 @@ impl Ppu {
             let screen_x = sprite.x + tile_x as i16;
             if (0..160).contains(&screen_x)
                 && colour_idx != 0
-                && Self::is_pixel_free(gg, screen_x, line, !sprite.opt.is_bit(PRIORITY))
+                && Self::is_pixel_free(gg, screen_x, !sprite.opt.is_bit(PRIORITY))
             {
                 Self::draw_obj_pixel(
                     gg,
@@ -277,7 +276,7 @@ impl Ppu {
         let colour = match &mut gg.mmu.ppu.kind {
             PpuKind::Dmg { .. } => Self::get_colour(dmg_palette, colour_idx),
             PpuKind::Cgb(cgb) => {
-                cgb.unavailable_pixels[(x.us() * 144) + y.us()] = colour_idx != 0;
+                cgb.unavailable_pixels[x.us()] = colour_idx != 0;
                 cgb.obj_palettes[((cgb_palette * 4) + colour_idx.u8()).us()].colour
             }
         };
@@ -289,12 +288,11 @@ impl Ppu {
         self.pixels[idx] = col;
     }
 
-    fn is_pixel_free(gg: &GameGirl, x: i16, y: i16, prio: bool) -> bool {
-        let addr = ((x * 144) + y) as usize;
-        let base = prio || !gg.mmu.ppu.bg_occupied_pixels[addr];
+    fn is_pixel_free(gg: &GameGirl, x: i16, prio: bool) -> bool {
+        let base = prio || !gg.mmu.ppu.bg_occupied_pixels[x as usize];
         match &gg.mmu.ppu.kind {
             PpuKind::Dmg { .. } => base,
-            PpuKind::Cgb(cgb) => base && !cgb.unavailable_pixels[addr],
+            PpuKind::Cgb(cgb) => base && !cgb.unavailable_pixels[x as usize],
         }
     }
 
@@ -320,7 +318,7 @@ impl Ppu {
         Self {
             mode: Mode::OAMScan,
             mode_clock: 0,
-            bg_occupied_pixels: [false; 160 * 144],
+            bg_occupied_pixels: [false; 160],
             window_line: 0,
             kind: if cgb {
                 PpuKind::Cgb(Cgb::default())

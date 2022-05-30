@@ -1,15 +1,12 @@
 use crate::numutil::NumExt;
 use crate::system::io::cartridge::MBCKind::*;
-use eframe::egui::Key::M;
 use std::iter;
 
 const CGB_FLAG: u16 = 0x0143;
 const CGB_ONLY: u8 = 0xC0;
-const DMG_AND_CGB: u8 = 0x80;
 const KIND: u16 = 0x0147;
 const ROM_BANKS: u16 = 0x0148;
 const RAM_BANKS: u16 = 0x0149;
-const DESTINATION: u16 = 0x014A;
 const BANK_COUNT_1MB: u16 = 64;
 
 pub struct Cartridge {
@@ -31,8 +28,8 @@ impl Cartridge {
             0x0000..=0x3FFF => self.rom[a + (0x4000 * self.rom0_bank as usize)],
             0x4000..=0x7FFF => self.rom[(a & 0x3FFF) + (0x4000 * self.rom1_bank as usize)],
             0xA000..=0xBFFF if !self.ram.is_empty() && self.ram_enable => {
-                if let MBC2 { ram } = self.kind {
-                    ram[a & 0x1FF]
+                if let MBC2 = self.kind {
+                    self.ram[0x1FF]
                 } else {
                     self.ram[(a & 0x1FFF) + (0x2000 * self.ram_bank.us())]
                 }
@@ -44,10 +41,13 @@ impl Cartridge {
     pub fn write(&mut self, addr: u16, value: u8) {
         match (&mut self.kind, addr) {
             // MBC2
-            (MBC2 { .. }, 0x0000..0x3FFF) if addr.is_bit(8) => {
+            (MBC2, 0x0000..=0x3FFF) if addr.is_bit(8) => {
                 self.rom1_bank = (value.u16() & 0x0F).max(1) % self.rom_bank_count()
             }
-            (MBC2 { .. }, 0x0000..0x3FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
+            (MBC2, 0x0000..=0x3FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
+            (MBC2, 0xA000..=0xBFFF) if self.ram_enable => {
+                self.ram[addr.us() & 0x1FF] = value | 0xF0
+            }
 
             // Shared between all (except MBC2...)
             (_, 0x0000..=0x1FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
@@ -81,9 +81,6 @@ impl Cartridge {
             (MBC3, 0x2000..=0x3FFF) => {
                 self.rom1_bank = value.max(1).u16() % self.rom_bank_count();
             }
-            (MBC3, 0x4000..=0x5FFF) => {
-                self.rom1_bank = self.rom1_bank.set_bit(8, value.is_bit(0)) % self.rom_bank_count()
-            }
 
             // MBC5
             (MBC5, 0x2000..=0x2FFF) => {
@@ -103,7 +100,7 @@ impl Cartridge {
         } else {
             0
         };
-        self.rom1_bank = self.rom1_bank & 0x1F;
+        self.rom1_bank &= self.rom1_bank;
         if self.rom_bank_count() >= BANK_COUNT_1MB {
             self.rom1_bank += bank2.u16() << 5;
         }
@@ -148,15 +145,15 @@ impl Cartridge {
             ram_bank: 0,
             ram_enable: false,
             kind: match kind {
-                0x01..0x04 => MBCKind::MBC1 {
+                0x01..0x04 => MBC1 {
                     ram_mode: false,
                     bank2: 0,
                 },
-                0x05..=0x06 => MBCKind::MBC2 { ram: [0xFF; 512] },
-                0x0F..=0x10 => MBCKind::MBC3, // TODO RTC variant
-                0x11..=0x13 => MBCKind::MBC3,
-                0x19..=0x1E => MBCKind::MBC5,
-                _ => MBCKind::NoMBC,
+                0x05..=0x06 => MBC2,
+                0x0F..=0x10 => MBC3, // TODO RTC variant
+                0x11..=0x13 => MBC3,
+                0x19..=0x1E => MBC5,
+                _ => NoMBC,
             },
         };
         cart.ram
@@ -168,7 +165,7 @@ impl Cartridge {
 pub enum MBCKind {
     NoMBC,
     MBC1 { ram_mode: bool, bank2: u8 },
-    MBC2 { ram: [u8; 512] },
+    MBC2,
     MBC3,
     MBC5,
 }

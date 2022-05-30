@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 pub const HIGH_START: u16 = 0xFF00;
 
 pub const BOOTROM_DISABLE: u16 = 0xFF50 - HIGH_START;

@@ -2,7 +2,6 @@ use crate::system::cpu::Interrupt;
 use crate::system::io::addr::JOYP;
 use crate::system::GameGirl;
 use eframe::egui::Key;
-use eframe::egui::Key::J;
 
 #[derive(Default)]
 pub struct Joypad {
@@ -74,7 +73,7 @@ impl Button {
             .map(|i| Self::BTNS[i])
     }
 
-    fn to_key(&self) -> Key {
-        Self::KEYS[*self as usize]
+    fn _to_key(self) -> Key {
+        Self::KEYS[self as usize]
     }
 }
