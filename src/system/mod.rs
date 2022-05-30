@@ -51,13 +51,13 @@ impl GameGirl {
 
     fn advance_clock(&mut self, m_cycles: usize) {
         let t_cycles = m_cycles << self.t_shift;
-        Mmu::step(self, t_cycles);
+        Mmu::step(self, m_cycles, t_cycles);
         self.clock += m_cycles
     }
 
     fn switch_speed(&mut self) {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
-        self.mmu[KEY1] = 0;
+        self.mmu[KEY1] = (self.t_shift & 1) << 7;
         for _ in 0..=1024 {
             self.advance_clock(2)
         }

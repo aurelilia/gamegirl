@@ -95,7 +95,7 @@ pub fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
         // 0x00 - 0x3F
         // -----------------------------------
         0x00 => (),
-        0x10 if gg.mmu[KEY1] != 0 => gg.switch_speed(),
+        0x10 if gg.mmu[KEY1].is_bit(0) => gg.switch_speed(),
         0x20 if !gg.cpu.flag(Zero) => return jr(gg),
         0x30 if !gg.cpu.flag(Carry) => return jr(gg),
 

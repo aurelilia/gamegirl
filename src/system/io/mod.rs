@@ -44,11 +44,12 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    pub fn step(gg: &mut GameGirl, t_cycles: usize) {
+    pub fn step(gg: &mut GameGirl, m_cycles: usize, t_cycles: usize) {
+        let t_cpu = m_cycles * 4;
         Hdma::step(gg);
-        Timer::step(gg, t_cycles);
+        Timer::step(gg, t_cpu);
         Ppu::step(gg, t_cycles);
-        Dma::step(gg, t_cycles);
+        Dma::step(gg, t_cpu);
         Apu::step(&mut gg.mmu, t_cycles);
     }
 
@@ -131,6 +132,7 @@ impl Mmu {
             }
             BCPS..=OCPD => self.ppu.write_high(addr, value),
             HDMA_START => Hdma::write_start(self, value),
+            KEY1 => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
 
             0x01 if self.debugger.is_some() => self
                 .debugger
@@ -202,6 +204,7 @@ impl Mmu {
         self[SC] = 0x7E;
         self[TIMA] = 0;
         self[TMA] = 0;
+        self[KEY1] = 0;
     }
 }
 
