@@ -2,7 +2,7 @@ use crate::numutil::NumExt;
 use crate::system::io::addr::*;
 use crate::system::io::apu::Apu;
 use crate::system::io::cartridge::Cartridge;
-use crate::system::io::dma::Dma;
+use crate::system::io::dma::{Dma, Hdma};
 use crate::system::io::joypad::Joypad;
 use crate::system::io::ppu::Ppu;
 use crate::system::io::timer::Timer;
@@ -40,10 +40,12 @@ pub struct Mmu {
     pub joypad: Joypad,
     pub dma: Dma,
     pub apu: Apu,
+    pub hdma: Hdma,
 }
 
 impl Mmu {
     pub fn step(gg: &mut GameGirl, t_cycles: usize) {
+        Hdma::step(gg);
         Timer::step(gg, t_cycles);
         Ppu::step(gg, t_cycles);
         Dma::step(gg, t_cycles);
@@ -77,8 +79,13 @@ impl Mmu {
         match addr {
             JOYP => self.joypad.read(self.high[JOYP as usize]),
             DIV | TAC => self.timer.read(addr),
+
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
+
+            HDMA_START if self.cgb => self.hdma.transfer_left as u8,
+            HDMA_SRC_HIGH..=HDMA_DEST_LOW => 0xFF,
+
             _ => self[addr],
         }
     }
@@ -123,6 +130,7 @@ impl Mmu {
                 self.dma.start();
             }
             BCPS..=OCPD => self.ppu.write_high(addr, value),
+            HDMA_START => Hdma::write_start(self, value),
 
             0x01 if self.debugger.is_some() => self
                 .debugger
@@ -171,6 +179,7 @@ impl Mmu {
             joypad: Joypad::default(),
             dma: Dma::default(),
             apu: Apu::default(),
+            hdma: Hdma::default(),
             cart,
         };
         mmu.init_high();

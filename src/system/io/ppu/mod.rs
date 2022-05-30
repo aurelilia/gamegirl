@@ -17,7 +17,7 @@ const BG_MAP: u16 = 3;
 const ALT_BG_TILE: u16 = 4;
 const WIN_EN: u16 = 5;
 const WIN_MAP: u16 = 6;
-const DISP_EN: u16 = 7;
+pub const DISP_EN: u16 = 7;
 
 // OAM sprites 'option' byte
 const DMG_PAL: u16 = 4;
@@ -59,6 +59,7 @@ impl Ppu {
             Mode::Upload => {
                 Self::render_line(gg);
                 gg.mmu.ppu.bg_occupied_pixels = [false; 160];
+                gg.mmu.hdma.ppu_in_hblank = true;
                 Self::stat_interrupt(gg, 3);
                 Mode::HBlank
             }
