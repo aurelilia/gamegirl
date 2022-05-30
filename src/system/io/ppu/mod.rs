@@ -1,6 +1,7 @@
 use crate::numutil::NumExt;
 use crate::system::cpu::Interrupt;
 use crate::system::io::addr::*;
+use crate::system::io::ppu::cgb::Cgb;
 use crate::system::io::Mmu;
 use crate::system::GameGirl;
 use crate::Colour;
@@ -83,6 +84,9 @@ impl Ppu {
                     gg.mmu[LY] = 0;
                     gg.mmu.ppu.window_line = 0;
                     gg.mmu.ppu.bg_occupied_pixels = [false; 160 * 144];
+                    if let PpuKind::Cgb(cgb) = &mut gg.ppu().kind {
+                        cgb.unavailable_pixels = [false; 160 * 144];
+                    }
                     Self::stat_interrupt(gg, 5);
                     Mode::OAMScan
                 } else {
@@ -118,7 +122,7 @@ impl Ppu {
             }
             PpuKind::Dmg { .. } => Self::clear_line(gg),
 
-            PpuKind::Cgb => {
+            PpuKind::Cgb(_) => {
                 Self::render_bg(gg);
                 if gg.lcdc(WIN_EN) {
                     Self::render_window(gg);
@@ -180,37 +184,19 @@ impl Ppu {
         map_line: u8,
         correct_tile_addr: bool,
     ) {
-        let colours = Self::get_bg_colours(gg);
-        let line = gg.mmu[LY];
-        let mut tile_x = scroll_x & 7;
-        let tile_y = map_line & 7;
-        let mut tile_addr = map_addr + ((map_line / 8).u16() * 0x20) + (scroll_x >> 3).u16();
-        let mut tile_data_addr =
-            Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()]) + (tile_y.u16() * 2);
-        let mut high = gg.mmu.vram[tile_data_addr.us() + 1];
-        let mut low = gg.mmu.vram[tile_data_addr.us()];
-
-        for tile_idx_addr in start_x..end_x {
-            let colour_idx = (high.bit(7 - tile_x.u16()) << 1) + low.bit(7 - tile_x.u16());
-            gg.ppu().bg_occupied_pixels[((tile_idx_addr.us() * 144) + line.us())] |=
-                colour_idx != 0;
-            gg.ppu()
-                .set_pixel(tile_idx_addr, line, colours[colour_idx.us()]);
-
-            tile_x += 1;
-            if tile_x == 8 {
-                tile_x = 0;
-                tile_addr = if correct_tile_addr && (tile_addr & 0x1F) == 0x1F {
-                    tile_addr - 0x1F
-                } else {
-                    tile_addr + 1
-                };
-                tile_data_addr =
-                    Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()]) + (tile_y.u16() * 2);
-                high = gg.mmu.vram[tile_data_addr.us() + 1];
-                low = gg.mmu.vram[tile_data_addr.us()];
-            }
-        }
+        let method = match gg.mmu.ppu.kind {
+            PpuKind::Dmg { .. } => Self::dmg_render_bg_or_window,
+            PpuKind::Cgb(_) => Self::cgb_render_bg_or_window,
+        };
+        method(
+            gg,
+            scroll_x,
+            start_x,
+            end_x,
+            map_addr,
+            map_line,
+            correct_tile_addr,
+        );
     }
 
     fn render_objs(gg: &mut GameGirl) {
@@ -251,7 +237,9 @@ impl Ppu {
             _ => sprite.tile_num,
         };
 
-        let tile_data_addr = (tile_num.u16() * 0x10) + (tile_y as u16 * 2);
+        let tile_data_addr = (tile_num.u16() * 0x10)
+            + (tile_y as u16 * 2)
+            + ((gg.mmu.cgb && sprite.opt.is_bit(CGB_BANK)) as u16) * 0x2000;
         let mut high = gg.mmu.vram[tile_data_addr.us() + 1];
         let mut low = gg.mmu.vram[tile_data_addr.us()];
 
@@ -266,13 +254,34 @@ impl Ppu {
                 && colour_idx != 0
                 && Self::is_pixel_free(gg, screen_x, line, !sprite.opt.is_bit(PRIORITY))
             {
-                gg.ppu().set_pixel(
+                Self::draw_obj_pixel(
+                    gg,
                     screen_x as u8,
                     line as u8,
-                    Self::get_colour(dmg_palette, colour_idx),
-                )
+                    colour_idx,
+                    dmg_palette,
+                    sprite.opt & 7,
+                );
             }
         }
+    }
+
+    fn draw_obj_pixel(
+        gg: &mut GameGirl,
+        x: u8,
+        y: u8,
+        colour_idx: u16,
+        dmg_palette: u8,
+        cgb_palette: u8,
+    ) {
+        let colour = match &mut gg.mmu.ppu.kind {
+            PpuKind::Dmg { .. } => Self::get_colour(dmg_palette, colour_idx),
+            PpuKind::Cgb(cgb) => {
+                cgb.unavailable_pixels[(x.us() * 144) + y.us()] = colour_idx != 0;
+                cgb.obj_palettes[((cgb_palette * 4) + colour_idx.u8()).us()].colour
+            }
+        };
+        gg.ppu().set_pixel(x, y, colour);
     }
 
     fn set_pixel(&mut self, x: u8, y: u8, col: Colour) {
@@ -281,10 +290,15 @@ impl Ppu {
     }
 
     fn is_pixel_free(gg: &GameGirl, x: i16, y: i16, prio: bool) -> bool {
-        prio || !gg.mmu.ppu.bg_occupied_pixels[((x * 144) + y) as usize]
+        let addr = ((x * 144) + y) as usize;
+        let base = prio || !gg.mmu.ppu.bg_occupied_pixels[addr];
+        match &gg.mmu.ppu.kind {
+            PpuKind::Dmg { .. } => base,
+            PpuKind::Cgb(cgb) => base && !cgb.unavailable_pixels[addr],
+        }
     }
 
-    fn bg_idx_tile_data_addr(gg: &GameGirl, window: bool, idx: u16) -> u16 {
+    fn _bg_idx_tile_data_addr(gg: &GameGirl, window: bool, idx: u16) -> u16 {
         let addr = match () {
             _ if window && gg.lcdc(WIN_MAP) => 0x1C00,
             _ if window => 0x1800,
@@ -301,17 +315,19 @@ impl Ppu {
             (0x1000 + (idx as i8 as i16 * 0x10)) as u16
         }
     }
-}
 
-impl Default for Ppu {
-    fn default() -> Self {
+    pub fn new(cgb: bool) -> Self {
         Self {
             mode: Mode::OAMScan,
             mode_clock: 0,
             bg_occupied_pixels: [false; 160 * 144],
             window_line: 0,
-            kind: PpuKind::Dmg {
-                used_x_obj_coords: [None; 10],
+            kind: if cgb {
+                PpuKind::Cgb(Cgb::default())
+            } else {
+                PpuKind::Dmg {
+                    used_x_obj_coords: [None; 10],
+                }
             },
             pixels: [Colour::BLACK; 160 * 144],
             last_frame: None,
@@ -320,10 +336,9 @@ impl Default for Ppu {
     }
 }
 
-#[derive(Copy, Clone)]
 pub enum PpuKind {
     Dmg { used_x_obj_coords: [Option<u8>; 10] },
-    Cgb,
+    Cgb(Cgb),
 }
 
 #[derive(Copy, Clone)]

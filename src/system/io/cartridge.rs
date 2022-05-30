@@ -130,11 +130,11 @@ impl Cartridge {
         }
     }
 
-    fn supports_cgb(&self) -> bool {
+    pub fn supports_cgb(&self) -> bool {
         self.rom[CGB_FLAG.us()].is_bit(7)
     }
 
-    fn requires_cgb(&self) -> bool {
+    pub fn requires_cgb(&self) -> bool {
         self.rom[CGB_FLAG.us()] == CGB_ONLY
     }
 

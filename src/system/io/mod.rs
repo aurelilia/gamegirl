@@ -16,7 +16,7 @@ use super::debugger::Debugger;
 
 pub mod addr;
 pub mod apu;
-mod cartridge;
+pub mod cartridge;
 mod dma;
 pub mod joypad;
 mod ppu;
@@ -25,7 +25,7 @@ mod timer;
 pub struct Mmu {
     pub vram: [u8; 2 * 8192],
     pub vram_bank: u8,
-    pub wram: [u8; 2 * 8192],
+    pub wram: [u8; 4 * 8192],
     pub wram_bank: u8,
     pub oam: [u8; 160],
     pub high: [u8; 256],
@@ -54,6 +54,9 @@ impl Mmu {
         let a = addr.us();
         match addr {
             0x0000..=0x0100 if self.bootrom.is_some() => self.bootrom.unwrap()[a],
+            0x0200..=0x0900 if self.bootrom.is_some() && self.cgb => {
+                self.bootrom.unwrap()[a - 0x0100]
+            }
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cart.read(addr),
 
             0x8000..=0x9FFF => self.vram[(a & 0x1FFF) + (self.vram_bank.us() * 0x2000)],
@@ -75,6 +78,7 @@ impl Mmu {
             JOYP => self.joypad.read(self.high[JOYP as usize]),
             DIV | TAC => self.timer.read(addr),
             LY if !self[LCDC].is_bit(7) => 0,
+            BCPS..=OCPD => self.ppu.read_high(addr),
             _ => self[addr],
         }
     }
@@ -118,6 +122,7 @@ impl Mmu {
                 self[addr] = value;
                 self.dma.start();
             }
+            BCPS..=OCPD => self.ppu.write_high(addr, value),
 
             0x01 if self.debugger.is_some() => self
                 .debugger
@@ -144,25 +149,29 @@ impl Mmu {
         self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
-    pub fn new(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+    pub fn new(cart: Cartridge, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
         let mut mmu = Self {
             vram: [0; 16384],
             vram_bank: 0,
-            wram: [0; 16384],
+            wram: [0; 32768],
             wram_bank: 1,
             oam: [0; 160],
             high: [0xFF; 256],
 
-            bootrom: Some(BOOTIX_ROM),
-            cgb: false,
+            bootrom: Some(if cart.supports_cgb() {
+                CGB_BOOTROM
+            } else {
+                BOOTIX_ROM
+            }),
+            cgb: cart.supports_cgb(),
             debugger,
 
-            cart: Cartridge::from_rom(rom),
             timer: Timer::default(),
-            ppu: Ppu::default(),
+            ppu: Ppu::new(cart.supports_cgb()),
             joypad: Joypad::default(),
             dma: Dma::default(),
             apu: Apu::default(),
+            cart,
         };
         mmu.init_high();
         mmu

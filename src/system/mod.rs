@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 use crate::numutil::NumExt;
 use crate::system::cpu::{Cpu, Interrupt};
 use crate::system::io::addr::{IF, KEY1};
+use crate::system::io::cartridge::Cartridge;
 use crate::system::io::Mmu;
 
 use self::debugger::Debugger;
@@ -86,9 +87,10 @@ impl GameGirl {
     }
 
     pub fn new(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+        let cart = Cartridge::from_rom(rom);
         Self {
             cpu: Cpu::default(),
-            mmu: Mmu::new(rom, debugger.clone()),
+            mmu: Mmu::new(cart, debugger.clone()),
             debugger,
 
             t_shift: 2,
