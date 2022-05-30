@@ -2,7 +2,9 @@
 A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.angm.xyz/ellie/gamelin).
 
 ## Status
-Early, Tetris and Dr. Mario work perfectly but no audio.
+Getting there. All features of the GB and GBC are implemented except for sound,
+and a lot of games already run without any visible emulation inaccuracies.  
+The GUI is currently still nonexistent however; only the core emulator is present.
 
 ## Goals
 The main goals of this emulator is to create a nice-to-use emulator with many comfort features that should be able
