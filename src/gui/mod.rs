@@ -1,83 +1,85 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{BufferSize, SampleRate, Stream, StreamConfig};
+mod debugger;
+
+use crate::egui::{TextureFilter};
+use eframe::egui::{self, widgets, Context, Event, ImageData, Ui};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
-use gamegirl::system::io::apu::SAMPLE_RATE;
+use eframe::epi;
+use eframe::epi::{Frame, Storage};
+use gamegirl::system::io::joypad::{Button, Joypad};
+use gamegirl::{system::GameGirl, Colour};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::egui::{Color32, Event, ImageData};
-use crate::{egui, GameGirl};
-use gamegirl::system::io::joypad::{Button, Joypad};
-
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
-pub type Colour = Color32;
+const WINDOW_COUNT: usize = 1;
+const WINDOWS: [(&str, fn(&GameGirl, &mut Ui)); WINDOW_COUNT] =
+    [("Registers", debugger::registers)];
 
-pub fn start(gg: GameGirl) {
-    let gg = Arc::new(Mutex::new(gg));
-    let _stream = setup_cpal(gg.clone());
-    init_eframe(gg);
-}
-
-fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
-    let device = cpal::default_host().default_output_device().unwrap();
-    let stream = device
-        .build_output_stream(
-            &StreamConfig {
-                channels: 2,
-                sample_rate: SampleRate(SAMPLE_RATE),
-                buffer_size: BufferSize::Default,
-            },
-            move |data: &mut [f32], _| {
-                let samples = {
-                    let mut gg = gg.lock().unwrap();
-                    gg.produce_samples(data.len())
-                };
-                data.copy_from_slice(&samples);
-            },
-            move |err| panic!("{err}"),
-        )
-        .unwrap();
-    stream.play().unwrap();
-    stream
-}
-
-fn init_eframe(gg: Arc<Mutex<GameGirl>>) {
+pub fn start(gg: Arc<Mutex<GameGirl>>) {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(160.0, 144.0)),
+        transparent: true,
         ..Default::default()
     };
     eframe::run_native(
-        "gameGirl",
-        options,
-        Box::new(|cc| {
-            let manager = cc.egui_ctx.tex_manager();
-            let texture = manager.write().alloc(
-                "screen".into(),
-                ColorImage::new([160, 144], Colour::BLACK).into(),
-            );
-            Box::new(App { gg, texture })
+        Box::new(App {
+            gg,
+            texture: TextureId::default(),
+            window_states: [false; WINDOW_COUNT],
         }),
+        options,
     )
 }
 
 struct App {
     gg: Arc<Mutex<GameGirl>>,
     texture: TextureId,
+    window_states: [bool; WINDOW_COUNT],
 }
 
-impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+impl epi::App for App {
+    fn update(&mut self, ctx: &Context, _frame: &Frame) {
         self.update_gg(ctx, FRAME_LEN);
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.image(self.texture, [160.0, 144.0]);
+
+        egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.visuals_mut().button_frame = false;
+                self.navbar(ui);
+            });
         });
+
+        egui::Window::new("GameGirl")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.image(self.texture, [320.0, 288.0]);
+            });
+
+        let gg = self.gg.lock().unwrap();
+        for ((name, runner), state) in WINDOWS.iter().zip(self.window_states.iter_mut()) {
+            egui::Window::new(*name)
+                .open(state)
+                .show(ctx, |ui| runner(&gg, ui));
+        }
+
         ctx.request_repaint();
+    }
+
+    fn setup(&mut self, ctx: &Context, _frame: &Frame, _storage: Option<&dyn Storage>) {
+        let manager = ctx.tex_manager();
+        self.texture = manager.write().alloc(
+            "screen".into(),
+            ColorImage::new([160, 144], Colour::BLACK).into(),
+            TextureFilter::Nearest,
+        );
+    }
+
+    fn name(&self) -> &str {
+        "GameGirl"
     }
 }
 
 impl App {
-    fn update_gg(&mut self, ctx: &egui::Context, advance_by: Duration) {
+    fn update_gg(&mut self, ctx: &Context, advance_by: Duration) {
         let frame = {
             let mut gg = self.gg.lock().unwrap();
             for event in &ctx.input().events {
@@ -98,6 +100,20 @@ impl App {
             }));
             let manager = ctx.tex_manager();
             manager.write().set(self.texture, img);
+        }
+    }
+
+    fn navbar(&mut self, ui: &mut Ui) {
+        widgets::global_dark_light_mode_switch(ui);
+        ui.separator();
+
+        ui.menu_button("💻 File", |ui| {
+            let _open = ui.button("Open ROM");
+        });
+        ui.separator();
+
+        if ui.selectable_label(false, "Registers").clicked() {
+            self.window_states[0] = true;
         }
     }
 }

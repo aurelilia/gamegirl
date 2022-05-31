@@ -68,7 +68,7 @@ impl Hdma {
     pub fn write_start(mmu: &mut Mmu, value: u8) {
         if mmu.hdma.hblank_transferring && !value.is_bit(7) {
             mmu.hdma.hblank_transferring = false;
-            mmu.hdma.transfer_left = mmu.hdma.transfer_left | 0x80;
+            mmu.hdma.transfer_left |= 0x80;
         } else {
             mmu.hdma.source = (mmu[HDMA_SRC_LOW].u16() & 0xF0) | (mmu[HDMA_SRC_HIGH].u16() << 8);
             mmu.hdma.dest =

@@ -9,7 +9,7 @@ use crate::system::io::Mmu;
 
 use self::debugger::Debugger;
 
-mod cpu;
+pub mod cpu;
 pub mod debugger;
 pub mod io;
 

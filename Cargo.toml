@@ -6,13 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eframe = "0.18.0"
 cpal = "0.13.5"
 
+[dependencies.eframe]
+git = "https://github.com/mccolljr/egui.git"
+branch = "mccolljr/texture_filter"
 
 [workspace]
 members = [".", "tests"]
 
 [profile.release]
-debug = true
 lto = true
+strip = true

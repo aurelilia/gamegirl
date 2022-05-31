@@ -85,7 +85,7 @@ impl Cpu {
         self.regs[reg.i()] = value
     }
 
-    fn dreg(&self, reg: DReg) -> u16 {
+    pub fn dreg(&self, reg: DReg) -> u16 {
         let low = self.reg(reg.low());
         let high = self.reg(reg.high());
         (high.u16() << 8) | low.u16()
@@ -115,7 +115,7 @@ impl Reg {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum DReg {
     BC,
     DE,
