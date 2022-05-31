@@ -24,6 +24,7 @@ pub struct GameGirl {
     t_shift: u8,
     clock: usize,
     pub running: bool,
+    pub rom_loaded: bool,
 }
 
 impl GameGirl {
@@ -94,6 +95,12 @@ impl GameGirl {
         self.mmu.write16(self.cpu.sp, value)
     }
 
+    pub fn reset(&mut self) {
+        self.cpu = Cpu::default();
+        self.mmu = self.mmu.reset();
+        self.t_shift = 2;
+    }
+
     pub fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
         Self {
             cpu: Cpu::default(),
@@ -103,6 +110,7 @@ impl GameGirl {
             t_shift: 2,
             clock: 0,
             running: false,
+            rom_loaded: false,
         }
     }
 
@@ -113,6 +121,7 @@ impl GameGirl {
         let cart = Cartridge::from_rom(cart);
         self.mmu.load_cart(cart);
         self.running = true;
+        self.rom_loaded = true;
     }
 
     pub fn with_cart(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {

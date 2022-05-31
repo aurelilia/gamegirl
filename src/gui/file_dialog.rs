@@ -1,7 +1,14 @@
 use crate::gui::Message;
+use rfd::FileHandle;
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
+
+pub struct File {
+    pub content: Vec<u8>,
+    pub path: Option<PathBuf>,
+}
 
 pub fn open(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
@@ -11,10 +18,21 @@ pub fn open(sender: mpsc::Sender<Message>) {
     execute(async move {
         let file = task.await;
         if let Some(file) = file {
-            let file = file.read().await;
-            sender.send(Message::FileOpen(file)).ok();
+            let path = path(&file);
+            let content = file.read().await;
+            sender.send(Message::FileOpen(File { content, path })).ok();
         }
     });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn path(f: &FileHandle) -> Option<PathBuf> {
+    Some(f.path().to_path_buf())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn path(f: &FileHandle) -> Option<PathBuf> {
+    None
 }
 
 #[cfg(not(target_arch = "wasm32"))]

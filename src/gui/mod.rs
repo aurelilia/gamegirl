@@ -1,6 +1,7 @@
 mod debugger;
 mod file_dialog;
 
+use crate::gui::file_dialog::File;
 use crate::system::io::joypad::{Button, Joypad};
 use crate::Colour;
 use crate::GameGirl;
@@ -9,6 +10,9 @@ use eframe::egui::{self, widgets, Context, Event, ImageData, Ui};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
 use eframe::epi::{Frame, Storage};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
@@ -41,25 +45,31 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
         texture: TextureId::default(),
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
+        state: State {
+            last_opened: vec![],
+        },
     }
 }
 
 struct App {
     gg: Arc<Mutex<GameGirl>>,
+
     texture: TextureId,
     window_states: [bool; WINDOW_COUNT],
     message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
+
+    state: State,
 }
 
 impl epi::App for App {
-    fn update(&mut self, ctx: &Context, _frame: &Frame) {
+    fn update(&mut self, ctx: &Context, frame: &Frame) {
         self.update_gg(ctx, FRAME_LEN);
         self.process_messages();
 
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.visuals_mut().button_frame = false;
-                self.navbar(ui);
+                self.navbar(frame, ui);
             });
         });
 
@@ -79,13 +89,20 @@ impl epi::App for App {
         ctx.request_repaint();
     }
 
-    fn setup(&mut self, ctx: &Context, _frame: &Frame, _storage: Option<&dyn Storage>) {
+    fn setup(&mut self, ctx: &Context, _frame: &Frame, storage: Option<&dyn Storage>) {
         let manager = ctx.tex_manager();
         self.texture = manager.write().alloc(
             "screen".into(),
             ColorImage::new([160, 144], Colour::BLACK).into(),
             TextureFilter::Nearest,
         );
+        if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamelin_data")) {
+            self.state = state;
+        }
+    }
+
+    fn save(&mut self, storage: &mut dyn Storage) {
+        epi::set_value(storage, "gamelin_data", &self.state);
     }
 
     fn name(&self) -> &str {
@@ -121,20 +138,70 @@ impl App {
     fn process_messages(&mut self) {
         loop {
             match self.message_channel.1.try_recv() {
-                Ok(Message::FileOpen(file)) => self.gg.lock().unwrap().load_cart(file, true),
+                Ok(Message::FileOpen(file)) => {
+                    self.gg.lock().unwrap().load_cart(file.content, true);
+                    if let Some(path) = file.path {
+                        if let Some(existing) =
+                            self.state.last_opened.iter().position(|p| *p == path)
+                        {
+                            self.state.last_opened.swap(0, existing);
+                        } else {
+                            self.state.last_opened.insert(0, path);
+                            self.state.last_opened.truncate(10);
+                        }
+                    }
+                }
                 Err(_) => break,
             }
         }
     }
 
-    fn navbar(&mut self, ui: &mut Ui) {
+    fn navbar(&mut self, frame: &Frame, ui: &mut Ui) {
         widgets::global_dark_light_mode_switch(ui);
         ui.separator();
 
-        ui.menu_button("💻 File", |ui| {
+        ui.menu_button("File", |ui| {
             if ui.button("Open ROM").clicked() {
                 file_dialog::open(self.message_channel.0.clone());
                 ui.close_menu();
+            }
+            if !self.state.last_opened.is_empty() {
+                ui.menu_button("Last Opened", |ui| {
+                    for path in &self.state.last_opened {
+                        if ui
+                            .button(path.file_name().unwrap().to_str().unwrap())
+                            .clicked()
+                        {
+                            self.message_channel
+                                .0
+                                .send(Message::FileOpen(File {
+                                    content: fs::read(path).unwrap(),
+                                    path: Some(path.clone()),
+                                }))
+                                .ok();
+                            ui.close_menu();
+                        }
+                    }
+                });
+            }
+            ui.separator();
+
+            if ui.button("Pause").clicked() {
+                let mut gg = self.gg.lock().unwrap();
+                gg.running = !gg.running && gg.rom_loaded;
+                ui.close_menu();
+            }
+            if ui.button("Reset").clicked() {
+                self.gg.lock().unwrap().reset();
+                ui.close_menu();
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                ui.separator();
+                if ui.button("Exit").clicked() {
+                    frame.quit();
+                }
             }
         });
         ui.separator();
@@ -145,6 +212,11 @@ impl App {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct State {
+    last_opened: Vec<PathBuf>,
+}
+
 pub enum Message {
-    FileOpen(Vec<u8>),
+    FileOpen(File),
 }

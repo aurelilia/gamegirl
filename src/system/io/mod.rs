@@ -159,6 +159,13 @@ impl Mmu {
         self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
+    pub(super) fn reset(&mut self) -> Self {
+        // TODO the clones are kinda eh
+        let mut new = Self::new(self.debugger.clone());
+        new.load_cart(self.cart.clone());
+        new
+    }
+
     pub(super) fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
         let mut mmu = Self {
             vram: [0; 16384],
