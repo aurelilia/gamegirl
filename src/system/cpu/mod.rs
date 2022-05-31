@@ -12,12 +12,12 @@ pub struct Cpu {
     pub sp: u16,
     pub ime: bool,
     pub halt: bool,
-    pub halt_bug: bool,
-    pub regs: [u8; 8],
+    halt_bug: bool,
+    regs: [u8; 8],
 }
 
 impl Cpu {
-    pub fn exec_next_inst(gg: &mut GameGirl) {
+    pub(super) fn exec_next_inst(gg: &mut GameGirl) {
         let ime = gg.cpu.ime;
 
         if gg.cpu.halt {

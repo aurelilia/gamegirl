@@ -14,37 +14,37 @@ use std::{
 
 use super::debugger::Debugger;
 
-pub mod addr;
+pub(super) mod addr;
 pub mod apu;
-pub mod cartridge;
+pub(super) mod cartridge;
 mod dma;
 pub mod joypad;
 mod ppu;
 mod timer;
 
 pub struct Mmu {
-    pub vram: [u8; 2 * 8192],
-    pub vram_bank: u8,
-    pub wram: [u8; 4 * 8192],
-    pub wram_bank: u8,
-    pub oam: [u8; 160],
-    pub high: [u8; 256],
+    vram: [u8; 2 * 8192],
+    vram_bank: u8,
+    wram: [u8; 4 * 8192],
+    wram_bank: u8,
+    oam: [u8; 160],
+    high: [u8; 256],
 
-    pub bootrom: Option<&'static [u8]>,
-    pub cgb: bool,
+    bootrom: Option<&'static [u8]>,
+    cgb: bool,
     debugger: Option<Arc<RwLock<Debugger>>>,
 
-    pub cart: Cartridge,
-    pub timer: Timer,
+    cart: Cartridge,
+    timer: Timer,
     pub ppu: Ppu,
-    pub joypad: Joypad,
-    pub dma: Dma,
-    pub apu: Apu,
-    pub hdma: Hdma,
+    joypad: Joypad,
+    dma: Dma,
+    pub(super) apu: Apu,
+    hdma: Hdma,
 }
 
 impl Mmu {
-    pub fn step(gg: &mut GameGirl, m_cycles: usize, t_cycles: usize) {
+    pub(super) fn step(gg: &mut GameGirl, m_cycles: usize, t_cycles: usize) {
         let t_cpu = m_cycles * 4;
         Hdma::step(gg);
         Timer::step(gg, t_cpu);
@@ -72,7 +72,7 @@ impl Mmu {
         }
     }
 
-    pub fn read_signed(&self, addr: u16) -> i8 {
+    pub(super) fn read_signed(&self, addr: u16) -> i8 {
         self.read(addr) as i8
     }
 
@@ -159,7 +159,7 @@ impl Mmu {
         self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
-    pub fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+    pub(super) fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
         let mut mmu = Self {
             vram: [0; 16384],
             vram_bank: 0,
@@ -195,7 +195,7 @@ impl Mmu {
         self.cart = cart;
     }
 
-    pub fn init_high(&mut self) {
+    fn init_high(&mut self) {
         self[LY] = 0;
         self[LCDC] = 0;
         self[STAT] = 0;

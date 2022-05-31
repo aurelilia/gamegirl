@@ -17,7 +17,7 @@ const BG_MAP: u16 = 3;
 const ALT_BG_TILE: u16 = 4;
 const WIN_EN: u16 = 5;
 const WIN_MAP: u16 = 6;
-pub const DISP_EN: u16 = 7;
+pub(super) const DISP_EN: u16 = 7;
 
 // OAM sprites 'option' byte
 const DMG_PAL: u16 = 4;
@@ -38,7 +38,7 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub fn step(gg: &mut GameGirl, t_cycles: usize) {
+    pub(super) fn step(gg: &mut GameGirl, t_cycles: usize) {
         if !gg.lcdc(DISP_EN) {
             return;
         }
@@ -313,7 +313,7 @@ impl Ppu {
         }
     }
 
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             mode: Mode::OAMScan,
             mode_clock: 0,
@@ -327,7 +327,7 @@ impl Ppu {
         }
     }
 
-    pub fn switch_kind(&mut self, cgb: bool) {
+    pub(super) fn switch_kind(&mut self, cgb: bool) {
         self.kind = if cgb {
             PpuKind::Cgb(Cgb::default())
         } else {

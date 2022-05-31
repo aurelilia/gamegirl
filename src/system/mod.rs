@@ -21,8 +21,8 @@ pub struct GameGirl {
     pub mmu: Mmu,
     pub debugger: Option<Arc<RwLock<Debugger>>>,
 
-    pub t_shift: u8,
-    pub clock: usize,
+    t_shift: u8,
+    clock: usize,
     pub running: bool,
 }
 
