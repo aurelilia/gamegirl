@@ -1,12 +1,13 @@
 mod debugger;
 
-use crate::egui::{TextureFilter};
+use crate::system::io::joypad::{Button, Joypad};
+use crate::Colour;
+use crate::GameGirl;
+use eframe::egui::TextureFilter;
 use eframe::egui::{self, widgets, Context, Event, ImageData, Ui};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
 use eframe::epi::{Frame, Storage};
-use gamegirl::system::io::joypad::{Button, Joypad};
-use gamegirl::{system::GameGirl, Colour};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -16,6 +17,7 @@ const WINDOW_COUNT: usize = 1;
 const WINDOWS: [(&str, fn(&GameGirl, &mut Ui)); WINDOW_COUNT] =
     [("Registers", debugger::registers)];
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn start(gg: Arc<Mutex<GameGirl>>) {
     let options = eframe::NativeOptions {
         transparent: true,
@@ -28,6 +30,21 @@ pub fn start(gg: Arc<Mutex<GameGirl>>) {
             window_states: [false; WINDOW_COUNT],
         }),
         options,
+    )
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn start(
+    gg: Arc<Mutex<GameGirl>>,
+    canvas_id: &str,
+) -> Result<(), eframe::wasm_bindgen::JsValue> {
+    eframe::start_web(
+        canvas_id,
+        Box::new(App {
+            gg,
+            texture: TextureId::default(),
+            window_states: [false; WINDOW_COUNT],
+        }),
     )
 }
 
