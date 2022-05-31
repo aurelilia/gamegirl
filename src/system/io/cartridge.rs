@@ -139,11 +139,6 @@ impl Cartridge {
         let kind = rom[KIND as usize];
         let mut cart = Self {
             rom,
-            rom0_bank: 0,
-            rom1_bank: 1,
-            ram: vec![],
-            ram_bank: 0,
-            ram_enable: false,
             kind: match kind {
                 0x01..0x04 => MBC1 {
                     ram_mode: false,
@@ -155,10 +150,23 @@ impl Cartridge {
                 0x19..=0x1E => MBC5,
                 _ => NoMBC,
             },
+            ..Self::dummy()
         };
         cart.ram
             .extend(iter::repeat(0).take(0x2000 * cart.ram_bank_count().us()));
         cart
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            rom: vec![],
+            rom0_bank: 0,
+            rom1_bank: 1,
+            ram: vec![],
+            ram_bank: 0,
+            ram_enable: false,
+            kind: NoMBC,
+        }
     }
 }
 

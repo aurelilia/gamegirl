@@ -16,6 +16,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 cpal = "0.13.5"
+rfd = "0.8.2"
+futures-executor = "0.3.21"
 
 [dependencies.eframe]
 git = "https://github.com/mccolljr/egui.git"
@@ -24,6 +26,7 @@ branch = "mccolljr/texture_filter"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 tracing-wasm = "0.2"
+wasm-bindgen-futures = "0.4.30"
 cpal = { version = "0.13.5", features = ["wasm-bindgen"] }
 
 

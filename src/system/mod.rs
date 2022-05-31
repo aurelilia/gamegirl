@@ -23,14 +23,14 @@ pub struct GameGirl {
 
     pub t_shift: u8,
     pub clock: usize,
+    pub running: bool,
 }
 
 impl GameGirl {
-    pub fn advance(&mut self) {
-        Cpu::exec_next_inst(self)
-    }
-
     pub fn advance_delta(&mut self, delta: f32) {
+        if !self.running {
+            return;
+        }
         self.clock = 0;
         let target = (M_CLOCK_HZ * delta) as usize;
         while self.clock < target {
@@ -38,7 +38,11 @@ impl GameGirl {
         }
     }
 
-    pub fn produce_samples(&mut self, count: usize) -> Vec<f32> {
+    pub fn produce_samples(&mut self, count: usize) -> Option<Vec<f32>> {
+        if !self.running {
+            return None;
+        }
+
         while self.mmu.apu.samples.len() < count {
             self.advance();
         }
@@ -46,7 +50,11 @@ impl GameGirl {
         while samples.len() > count {
             self.mmu.apu.samples.push(samples.pop().unwrap());
         }
-        samples
+        Some(samples)
+    }
+
+    fn advance(&mut self) {
+        Cpu::exec_next_inst(self)
     }
 
     fn advance_clock(&mut self, m_cycles: usize) {
@@ -86,15 +94,30 @@ impl GameGirl {
         self.mmu.write16(self.cpu.sp, value)
     }
 
-    pub fn new(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
-        let cart = Cartridge::from_rom(rom);
+    pub fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
         Self {
             cpu: Cpu::default(),
-            mmu: Mmu::new(cart, debugger.clone()),
+            mmu: Mmu::new(debugger.clone()),
             debugger,
 
             t_shift: 2,
             clock: 0,
+            running: false,
         }
+    }
+
+    pub fn load_cart(&mut self, cart: Vec<u8>, reset: bool) {
+        if reset {
+            *self = Self::new(self.debugger.clone());
+        }
+        let cart = Cartridge::from_rom(cart);
+        self.mmu.load_cart(cart);
+        self.running = true;
+    }
+
+    pub fn with_cart(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+        let mut gg = Self::new(debugger);
+        gg.load_cart(rom, false);
+        gg
     }
 }

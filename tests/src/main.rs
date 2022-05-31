@@ -62,7 +62,7 @@ fn run_inner(dir: &Path, name: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
 
 fn run(test: Vec<u8>, cond: fn(&GameGirl) -> ControlFlow<bool>) -> Result<(), String> {
     let dbg = Arc::new(RwLock::new(Debugger::default()));
-    let mut gg = GameGirl::new(test, Some(dbg.clone()));
+    let mut gg = GameGirl::with_cart(test, Some(dbg.clone()));
 
     for _ in 0..TIMEOUT {
         gg.advance_delta(1.0);

@@ -315,23 +315,29 @@ impl Ppu {
         }
     }
 
-    pub fn new(cgb: bool) -> Self {
+    pub fn new() -> Self {
         Self {
             mode: Mode::OAMScan,
             mode_clock: 0,
             bg_occupied_pixels: [false; 160],
             window_line: 0,
-            kind: if cgb {
-                PpuKind::Cgb(Cgb::default())
-            } else {
-                PpuKind::Dmg {
-                    used_x_obj_coords: [None; 10],
-                }
+            kind: PpuKind::Dmg {
+                used_x_obj_coords: [None; 10],
             },
             pixels: [Colour::BLACK; 160 * 144],
             last_frame: None,
             repaint: Box::new(|| ()),
         }
+    }
+
+    pub fn switch_kind(&mut self, cgb: bool) {
+        self.kind = if cgb {
+            PpuKind::Cgb(Cgb::default())
+        } else {
+            PpuKind::Dmg {
+                used_x_obj_coords: [None; 10],
+            }
+        };
     }
 }
 

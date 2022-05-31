@@ -1,4 +1,5 @@
 mod debugger;
+mod file_dialog;
 
 use crate::system::io::joypad::{Button, Joypad};
 use crate::Colour;
@@ -8,7 +9,7 @@ use eframe::egui::{self, widgets, Context, Event, ImageData, Ui};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
 use eframe::epi::{Frame, Storage};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
@@ -23,14 +24,7 @@ pub fn start(gg: Arc<Mutex<GameGirl>>) {
         transparent: true,
         ..Default::default()
     };
-    eframe::run_native(
-        Box::new(App {
-            gg,
-            texture: TextureId::default(),
-            window_states: [false; WINDOW_COUNT],
-        }),
-        options,
-    )
+    eframe::run_native(Box::new(make_app(gg)), options)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -38,25 +32,29 @@ pub fn start(
     gg: Arc<Mutex<GameGirl>>,
     canvas_id: &str,
 ) -> Result<(), eframe::wasm_bindgen::JsValue> {
-    eframe::start_web(
-        canvas_id,
-        Box::new(App {
-            gg,
-            texture: TextureId::default(),
-            window_states: [false; WINDOW_COUNT],
-        }),
-    )
+    eframe::start_web(canvas_id, Box::new(make_app(gg)))
+}
+
+fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
+    App {
+        gg,
+        texture: TextureId::default(),
+        window_states: [false; WINDOW_COUNT],
+        message_channel: mpsc::channel(),
+    }
 }
 
 struct App {
     gg: Arc<Mutex<GameGirl>>,
     texture: TextureId,
     window_states: [bool; WINDOW_COUNT],
+    message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
 }
 
 impl epi::App for App {
     fn update(&mut self, ctx: &Context, _frame: &Frame) {
         self.update_gg(ctx, FRAME_LEN);
+        self.process_messages();
 
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -120,12 +118,24 @@ impl App {
         }
     }
 
+    fn process_messages(&mut self) {
+        loop {
+            match self.message_channel.1.try_recv() {
+                Ok(Message::FileOpen(file)) => self.gg.lock().unwrap().load_cart(file, true),
+                Err(_) => break,
+            }
+        }
+    }
+
     fn navbar(&mut self, ui: &mut Ui) {
         widgets::global_dark_light_mode_switch(ui);
         ui.separator();
 
         ui.menu_button("💻 File", |ui| {
-            let _open = ui.button("Open ROM");
+            if ui.button("Open ROM").clicked() {
+                file_dialog::open(self.message_channel.0.clone());
+                ui.close_menu();
+            }
         });
         ui.separator();
 
@@ -133,4 +143,8 @@ impl App {
             self.window_states[0] = true;
         }
     }
+}
+
+pub enum Message {
+    FileOpen(Vec<u8>),
 }

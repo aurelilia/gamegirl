@@ -21,12 +21,10 @@ pub type Colour = Color32;
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub fn start(canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
-    static GAME: &[u8] = include_bytes!("game.gbc");
-
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
-    let gg = GameGirl::new(GAME.to_vec(), None);
+    let gg = GameGirl::new(None);
     let gg = Arc::new(Mutex::new(gg));
     let _stream = setup_cpal(gg.clone());
     gui::start(gg, canvas_id)
@@ -46,7 +44,9 @@ pub fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
                     let mut gg = gg.lock().unwrap();
                     gg.produce_samples(data.len())
                 };
-                data.copy_from_slice(&samples);
+                if let Some(samples) = samples {
+                    data.copy_from_slice(&samples);
+                }
             },
             move |err| panic!("{err}"),
         )

@@ -159,7 +159,7 @@ impl Mmu {
         self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
-    pub fn new(cart: Cartridge, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+    pub fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
         let mut mmu = Self {
             vram: [0; 16384],
             vram_bank: 0,
@@ -168,24 +168,31 @@ impl Mmu {
             oam: [0; 160],
             high: [0xFF; 256],
 
-            bootrom: Some(if cart.supports_cgb() {
-                CGB_BOOTROM
-            } else {
-                BOOTIX_ROM
-            }),
-            cgb: cart.supports_cgb(),
+            bootrom: None,
+            cgb: false,
             debugger,
 
             timer: Timer::default(),
-            ppu: Ppu::new(cart.supports_cgb()),
+            ppu: Ppu::new(),
             joypad: Joypad::default(),
             dma: Dma::default(),
             apu: Apu::default(),
             hdma: Hdma::default(),
-            cart,
+            cart: Cartridge::dummy(),
         };
         mmu.init_high();
         mmu
+    }
+
+    pub fn load_cart(&mut self, cart: Cartridge) {
+        self.bootrom = Some(if cart.supports_cgb() {
+            CGB_BOOTROM
+        } else {
+            BOOTIX_ROM
+        });
+        self.cgb = cart.supports_cgb();
+        self.ppu.switch_kind(self.cgb);
+        self.cart = cart;
     }
 
     pub fn init_high(&mut self) {
