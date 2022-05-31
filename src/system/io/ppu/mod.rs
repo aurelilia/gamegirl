@@ -33,9 +33,8 @@ pub struct Ppu {
     window_line: u8,
     kind: PpuKind,
 
-    pub pixels: [Colour; 160 * 144],
+    pixels: [Colour; 160 * 144],
     pub last_frame: Option<Vec<Colour>>,
-    pub repaint: Box<dyn FnMut() + Send>,
 }
 
 impl Ppu {
@@ -72,7 +71,6 @@ impl Ppu {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
                     gg.ppu().last_frame = Some(gg.mmu.ppu.pixels.to_vec());
-                    (gg.ppu().repaint)();
                     Mode::VBlank
                 } else {
                     Mode::OAMScan
@@ -326,7 +324,6 @@ impl Ppu {
             },
             pixels: [Colour::BLACK; 160 * 144],
             last_frame: None,
-            repaint: Box::new(|| ()),
         }
     }
 
