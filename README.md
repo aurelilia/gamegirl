@@ -1,10 +1,20 @@
 # GameGirl
 A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.angm.xyz/ellie/gamelin).
 
+
 ## Status
-Getting there. All features of the GB and GBC are implemented except for sound,
-and a lot of games already run without any visible emulation inaccuracies.  
-The GUI is currently still nonexistent however; only the core emulator is present.
+The emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
+enough to make most commercial games run perfectly.  
+Many features are still missing but being worked on.
+
+### Features
+- Complete DMG/CGB implementation
+- Debugger with:
+    - Line-by-line advance
+    - PC and write breakpoints
+    - Memory, register and stack view
+    - Cartridge Info Viewer
+
 
 ## Goals
 The main goals of this emulator is to create a nice-to-use emulator with many comfort features that should be able
@@ -13,10 +23,27 @@ by actual games; implementing complex but ultimately useless hardware details th
 (like the OAM bug or MBC1 multicarts) is not a goal of this emulator, particularly considering
 the speed requirements needed to make it work in the browser.
 
+
 ## Build
 ``` bash
 cargo build --release
 ```
+
+
+## Testing
+Blargg and mooneye ROMs can be run automatically:
+```bash
+# Release recommended for speed
+cargo run -p tests --release
+```
+
+### Blargg test results
+All tests except for `oam_bug` (which will not be implemented) pass.
+
+### Mooneye test results
+- `acceptance`: 27 out of 75 pass
+- `emulator-only`: All pass (except MBC1 multicart; will not be supported)
+
 
 ## Thanks To
 - [Imran Nazar, for their series of blog posts on GB emulation](http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-The-CPU)
