@@ -9,7 +9,7 @@ use crate::system::io::timer::Timer;
 use crate::system::GameGirl;
 use std::{
     ops::{Index, IndexMut},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use super::debugger::Debugger;
@@ -32,9 +32,9 @@ pub struct Mmu {
 
     bootrom: Option<&'static [u8]>,
     cgb: bool,
-    debugger: Option<Arc<RwLock<Debugger>>>,
+    pub(super) debugger: Arc<Debugger>,
 
-    cart: Cartridge,
+    pub cart: Cartridge,
     timer: Timer,
     pub ppu: Ppu,
     joypad: Joypad,
@@ -56,8 +56,8 @@ impl Mmu {
     pub fn read(&self, addr: u16) -> u8 {
         let a = addr.us();
         match addr {
-            0x0000..=0x0100 if self.bootrom.is_some() => self.bootrom.unwrap()[a],
-            0x0200..=0x0900 if self.bootrom.is_some() && self.cgb => {
+            0x0000..0x0100 if self.bootrom.is_some() => self.bootrom.unwrap()[a],
+            0x0200..0x0900 if self.bootrom.is_some() && self.cgb => {
                 self.bootrom.unwrap()[a - 0x0100]
             }
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cart.read(addr),
@@ -84,7 +84,7 @@ impl Mmu {
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
 
-            NR10..=NR52 => self.apu.read_register(HIGH_START + addr),
+            NR10..=WAV_END => self.apu.read_register(HIGH_START + addr),
             0x76 if self.cgb => self.apu.read_pcm12(),
             0x77 if self.cgb => self.apu.read_pcm34(),
 
@@ -96,6 +96,7 @@ impl Mmu {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
+        self.debugger.write_occurred(addr);
         let a = addr.us();
         match addr {
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cart.write(addr, value),
@@ -139,13 +140,11 @@ impl Mmu {
             KEY1 => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
             NR10..=WAV_END => self.apu.write_register(HIGH_START + addr, value),
 
-            0x01 if self.debugger.is_some() => self
+            0x01 => self
                 .debugger
-                .as_ref()
-                .unwrap()
-                .write()
-                .unwrap()
                 .serial_output
+                .lock()
+                .unwrap()
                 .push(value as char),
 
             LY | SC => (),
@@ -171,7 +170,7 @@ impl Mmu {
         new
     }
 
-    pub(super) fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+    pub(super) fn new(debugger: Arc<Debugger>) -> Self {
         let mut mmu = Self {
             vram: [0; 16384],
             vram_bank: 0,

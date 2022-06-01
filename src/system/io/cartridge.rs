@@ -11,11 +11,11 @@ const BANK_COUNT_1MB: u16 = 64;
 
 #[derive(Clone)]
 pub struct Cartridge {
-    pub rom: Vec<u8>,
+    pub(super) rom: Vec<u8>,
     pub rom0_bank: u16,
     pub rom1_bank: u16,
 
-    pub ram: Vec<u8>,
+    pub(super) ram: Vec<u8>,
     pub ram_bank: u8,
     pub ram_enable: bool,
 
@@ -113,11 +113,11 @@ impl Cartridge {
         };
     }
 
-    fn rom_bank_count(&self) -> u16 {
+    pub fn rom_bank_count(&self) -> u16 {
         2 << self.rom[ROM_BANKS.us()].u16()
     }
 
-    fn ram_bank_count(&self) -> u8 {
+    pub fn ram_bank_count(&self) -> u8 {
         match self.rom[RAM_BANKS.us()] {
             0 => 0,
             2 => 1,
@@ -134,6 +134,19 @@ impl Cartridge {
 
     pub fn requires_cgb(&self) -> bool {
         self.rom[CGB_FLAG.us()] == CGB_ONLY
+    }
+
+    pub fn title(&self, extended: bool) -> String {
+        let mut buf = String::with_capacity(20);
+        let end = if extended { 0x0142 } else { 0x013E };
+        for b in 0x134..=end {
+            let value = self.rom[b];
+            if value == 0 {
+                break;
+            }
+            buf.push(value as char);
+        }
+        buf
     }
 
     pub fn from_rom(rom: Vec<u8>) -> Self {
@@ -171,7 +184,7 @@ impl Cartridge {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum MBCKind {
     NoMBC,
     MBC1 { ram_mode: bool, bank2: u8 },

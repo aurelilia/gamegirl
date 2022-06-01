@@ -1,5 +1,6 @@
 use std::mem;
-use std::sync::{Arc, RwLock};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use crate::numutil::NumExt;
 use crate::system::cpu::{Cpu, Interrupt};
@@ -19,7 +20,7 @@ const M_CLOCK_HZ: f32 = T_CLOCK_HZ as f32 / 4.0;
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mmu: Mmu,
-    pub debugger: Option<Arc<RwLock<Debugger>>>,
+    pub debugger: Arc<Debugger>,
 
     t_shift: u8,
     clock: usize,
@@ -35,6 +36,11 @@ impl GameGirl {
         self.clock = 0;
         let target = (M_CLOCK_HZ * delta) as usize;
         while self.clock < target {
+            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
+                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+                self.running = false;
+                break;
+            }
             self.advance();
         }
     }
@@ -45,6 +51,11 @@ impl GameGirl {
         }
 
         while self.mmu.apu.buffer.len() < count {
+            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
+                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+                self.running = false;
+                return None;
+            }
             self.advance();
         }
         let mut samples = mem::take(&mut self.mmu.apu.buffer);
@@ -54,7 +65,7 @@ impl GameGirl {
         Some(samples)
     }
 
-    fn advance(&mut self) {
+    pub fn advance(&mut self) {
         Cpu::exec_next_inst(self)
     }
 
@@ -101,7 +112,8 @@ impl GameGirl {
         self.t_shift = 2;
     }
 
-    pub fn new(debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
+    pub fn new() -> Self {
+        let debugger = Arc::new(Debugger::default());
         Self {
             cpu: Cpu::default(),
             mmu: Mmu::new(debugger.clone()),
@@ -116,7 +128,10 @@ impl GameGirl {
 
     pub fn load_cart(&mut self, cart: Vec<u8>, reset: bool) {
         if reset {
-            *self = Self::new(self.debugger.clone());
+            let dbg = self.debugger.clone();
+            *self = Self::new();
+            self.debugger = dbg.clone();
+            self.mmu.debugger = dbg;
         }
         let cart = Cartridge::from_rom(cart);
         self.mmu.load_cart(cart);
@@ -124,8 +139,8 @@ impl GameGirl {
         self.rom_loaded = true;
     }
 
-    pub fn with_cart(rom: Vec<u8>, debugger: Option<Arc<RwLock<Debugger>>>) -> Self {
-        let mut gg = Self::new(debugger);
+    pub fn with_cart(rom: Vec<u8>) -> Self {
+        let mut gg = Self::new();
         gg.load_cart(rom, false);
         gg
     }

@@ -4,7 +4,7 @@ use crate::system::GameGirl;
 
 mod alu;
 mod data;
-mod inst;
+pub mod inst;
 
 #[derive(Debug, Default)]
 pub struct Cpu {
@@ -18,6 +18,9 @@ pub struct Cpu {
 
 impl Cpu {
     pub(super) fn exec_next_inst(gg: &mut GameGirl) {
+        if !gg.debugger.should_execute(gg.cpu.pc) {
+            return;
+        }
         let ime = gg.cpu.ime;
 
         if gg.cpu.halt {

@@ -47,6 +47,15 @@ const MATH: [fn(&mut GameGirl, u8) -> u8; 8] = [
 pub struct Inst(u8, u8);
 
 impl Inst {
+    pub fn formatted_name(&self, arg: u16) -> String {
+        let base = self.get(&data::NAMES, &data::NAMES_EXT);
+        let base = base.replace("a8", &format!("FF{:02X}", arg & 0xFF));
+        let base = base.replace("a16", &format!("{:04X}", arg));
+        let base = base.replace("d8", &format!("d{:02X}", arg & 0xFF));
+        let base = base.replace("d16", &format!("d{:04X}", arg));
+        base
+    }
+
     pub fn size(&self) -> u8 {
         self.get_(&data::SIZE, data::SIZE_EXT)
     }
@@ -82,9 +91,13 @@ pub fn get_next(gg: &GameGirl) -> Inst {
     Inst(gg.mmu.read(gg.cpu.pc), gg.arg8())
 }
 
+pub fn get_at(gg: &GameGirl, addr: u16) -> Inst {
+    Inst(gg.mmu.read(addr), gg.mmu.read(addr + 1))
+}
+
 const MATH_REGS: [Reg; 8] = [B, C, D, E, H, L, A, A];
 
-pub fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
+pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
     const BDH: [Reg; 3] = [B, D, H];
     const CELA: [Reg; 4] = [C, E, L, A];
     const BCDEHLAF: [DReg; 4] = [BC, DE, HL, AF];

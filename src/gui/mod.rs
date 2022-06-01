@@ -18,9 +18,13 @@ use std::time::Duration;
 
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
-const WINDOW_COUNT: usize = 1;
-const WINDOWS: [(&str, fn(&GameGirl, &mut Ui)); WINDOW_COUNT] =
-    [("Registers", debugger::registers)];
+const WINDOW_COUNT: usize = 4;
+const WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); WINDOW_COUNT] = [
+    ("Debugger", debugger::debugger),
+    ("Breakpoints", debugger::breakpoints),
+    ("Memory", debugger::memory),
+    ("Cartridge", debugger::cart_info),
+];
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start(gg: Arc<Mutex<GameGirl>>) {
@@ -79,11 +83,11 @@ impl epi::App for App {
                 ui.image(self.texture, [320.0, 288.0]);
             });
 
-        let gg = self.gg.lock().unwrap();
+        let mut gg = self.gg.lock().unwrap();
         for ((name, runner), state) in WINDOWS.iter().zip(self.window_states.iter_mut()) {
             egui::Window::new(*name)
                 .open(state)
-                .show(ctx, |ui| runner(&gg, ui));
+                .show(ctx, |ui| runner(&mut gg, ui));
         }
 
         ctx.request_repaint();
@@ -206,9 +210,20 @@ impl App {
         });
         ui.separator();
 
-        if ui.selectable_label(false, "Registers").clicked() {
-            self.window_states[0] = true;
-        }
+        ui.menu_button("Debugger", |ui| {
+            if ui.button("Debugger").clicked() {
+                self.window_states[0] = true;
+            }
+            if ui.button("Breakpoints").clicked() {
+                self.window_states[1] = true;
+            }
+            if ui.button("Memory Viewer").clicked() {
+                self.window_states[2] = true;
+            }
+            if ui.button("Cartridge Viewer").clicked() {
+                self.window_states[3] = true;
+            }
+        });
     }
 }
 

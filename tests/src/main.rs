@@ -3,12 +3,10 @@
 mod blargg;
 
 use ansi_term::Colour;
-use gamegirl::system::debugger::Debugger;
 use gamegirl::system::GameGirl;
 use std::fs;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 const TIMEOUT: usize = 60;
@@ -62,17 +60,17 @@ fn run_inner(dir: &Path, name: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
 }
 
 fn run(test: Vec<u8>, cond: fn(&GameGirl) -> ControlFlow<bool>) -> Result<(), String> {
-    let dbg = Arc::new(RwLock::new(Debugger::default()));
-    let mut gg = GameGirl::with_cart(test, Some(dbg.clone()));
+    let mut gg = GameGirl::with_cart(test);
 
     for _ in 0..TIMEOUT {
         gg.advance_delta(1.0);
         match cond(&gg) {
             ControlFlow::Break(s) if s => return Ok(()),
+            ControlFlow::Break(_) => break,
             _ => (),
         }
     }
 
-    let ret = Err(dbg.read().unwrap().serial_output.clone());
+    let ret = Err(gg.debugger.serial_output.lock().unwrap().clone());
     ret
 }

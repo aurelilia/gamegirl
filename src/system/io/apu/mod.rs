@@ -158,7 +158,7 @@ impl Apu {
         // as these are not affected by power off, but `addr % 5 != 2` also
         // includes `0xFF25` and we don't want to be able to write to it
         if !self.power && addr <= 0xFF25 && (addr % 5 != 2 || addr == 0xFF25) {
-            // return;
+            return;
         }
 
         let is_length_clock_next = self.is_length_clock_next();
