@@ -9,6 +9,7 @@ Many features are still missing but being worked on.
 
 ### Features
 - Complete DMG/CGB implementation
+- Savegame support in common `.sav` format (No RTC yet.)
 - Debugger with:
     - Line-by-line advance
     - PC and write breakpoints

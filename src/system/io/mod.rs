@@ -16,7 +16,7 @@ use super::debugger::Debugger;
 
 pub(super) mod addr;
 pub(crate) mod apu;
-pub(super) mod cartridge;
+pub mod cartridge;
 mod dma;
 pub mod joypad;
 mod ppu;

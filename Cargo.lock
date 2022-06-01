@@ -1030,6 +1030,7 @@ dependencies = [
 name = "gamegirl"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "bitflags",
  "console_error_panic_hook",
  "cpal",
@@ -1039,6 +1040,7 @@ dependencies = [
  "serde",
  "tracing-wasm",
  "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

@@ -126,14 +126,13 @@ impl GameGirl {
         }
     }
 
-    pub fn load_cart(&mut self, cart: Vec<u8>, reset: bool) {
+    pub fn load_cart(&mut self, cart: Cartridge, reset: bool) {
         if reset {
             let dbg = self.debugger.clone();
             *self = Self::new();
             self.debugger = dbg.clone();
             self.mmu.debugger = dbg;
         }
-        let cart = Cartridge::from_rom(cart);
         self.mmu.load_cart(cart);
         self.running = true;
         self.rom_loaded = true;
@@ -141,7 +140,7 @@ impl GameGirl {
 
     pub fn with_cart(rom: Vec<u8>) -> Self {
         let mut gg = Self::new();
-        gg.load_cart(rom, false);
+        gg.load_cart(Cartridge::from_rom(rom), false);
         gg
     }
 }

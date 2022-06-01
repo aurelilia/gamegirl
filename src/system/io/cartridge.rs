@@ -11,7 +11,7 @@ const BANK_COUNT_1MB: u16 = 64;
 
 #[derive(Clone)]
 pub struct Cartridge {
-    pub(super) rom: Vec<u8>,
+    pub rom: Vec<u8>,
     pub rom0_bank: u16,
     pub rom1_bank: u16,
 
@@ -23,7 +23,7 @@ pub struct Cartridge {
 }
 
 impl Cartridge {
-    pub fn read(&self, addr: u16) -> u8 {
+    pub(super) fn read(&self, addr: u16) -> u8 {
         let a = addr as usize;
         match addr {
             0x0000..=0x3FFF => self.rom[a + (0x4000 * self.rom0_bank as usize)],
@@ -39,7 +39,7 @@ impl Cartridge {
         }
     }
 
-    pub fn write(&mut self, addr: u16, value: u8) {
+    pub(super) fn write(&mut self, addr: u16, value: u8) {
         match (&mut self.kind, addr) {
             // MBC2
             (MBC2, 0x0000..=0x3FFF) if addr.is_bit(8) => {
@@ -170,6 +170,14 @@ impl Cartridge {
         cart.ram
             .extend(iter::repeat(0).take(0x2000 * cart.ram_bank_count().us()));
         cart
+    }
+
+    pub fn load_ram(&mut self, ram: Vec<u8>) {
+        self.ram = ram;
+    }
+
+    pub fn ram(&self) -> &[u8] {
+        &self.ram
     }
 
     pub fn dummy() -> Self {

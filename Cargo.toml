@@ -30,6 +30,8 @@ features = ["persistence"]
 console_error_panic_hook = "0.1.6"
 tracing-wasm = "0.2"
 wasm-bindgen-futures = "0.4.30"
+web-sys = { version = "0.3.57", features = ["Storage", "Window"] }
+base64 = "0.13.0"
 cpal = { version = "0.13.5", features = ["wasm-bindgen"] }
 
 

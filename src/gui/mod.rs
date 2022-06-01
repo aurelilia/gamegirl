@@ -3,6 +3,9 @@ mod file_dialog;
 mod options;
 
 use crate::gui::file_dialog::File;
+use crate::gui::options::Options;
+use crate::storage::Storage as CartStore;
+use crate::system::io::cartridge::Cartridge;
 use crate::system::io::joypad::{Button, Joypad};
 use crate::Colour;
 use crate::GameGirl;
@@ -53,17 +56,20 @@ pub fn start(
 fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
     App {
         gg,
+        current_rom_path: None,
         texture: TextureId::default(),
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
         state: State {
             last_opened: vec![],
+            options: Options {},
         },
     }
 }
 
 struct App {
     gg: Arc<Mutex<GameGirl>>,
+    current_rom_path: Option<PathBuf>,
 
     texture: TextureId,
     window_states: [bool; WINDOW_COUNT],
@@ -122,6 +128,7 @@ impl epi::App for App {
     }
 
     fn save(&mut self, storage: &mut dyn Storage) {
+        self.save_game();
         epi::set_value(storage, "gamelin_data", &self.state);
     }
 
@@ -163,7 +170,12 @@ impl App {
         loop {
             match self.message_channel.1.try_recv() {
                 Ok(Message::FileOpen(file)) => {
-                    self.gg.lock().unwrap().load_cart(file.content, true);
+                    self.save_game();
+                    let mut cart = Cartridge::from_rom(file.content);
+                    CartStore::load(file.path.clone(), &mut cart);
+                    self.gg.lock().unwrap().load_cart(cart, true);
+
+                    self.current_rom_path = file.path.clone();
                     if let Some(path) = file.path {
                         if let Some(existing) =
                             self.state.last_opened.iter().position(|p| *p == path)
@@ -177,6 +189,13 @@ impl App {
                 }
                 Err(_) => break,
             }
+        }
+    }
+
+    fn save_game(&self) {
+        let gg = self.gg.lock().unwrap();
+        if gg.mmu.cart.rom.len() > 0 && gg.mmu.cart.ram_bank_count() > 0 {
+            CartStore::save(self.current_rom_path.clone(), &gg.mmu.cart);
         }
     }
 
@@ -210,6 +229,10 @@ impl App {
             }
             ui.separator();
 
+            if ui.button("Save").clicked() {
+                self.save_game();
+                ui.close_menu();
+            }
             if ui.button("Pause").clicked() {
                 let mut gg = self.gg.lock().unwrap();
                 gg.running = !gg.running && gg.rom_loaded;
@@ -247,6 +270,7 @@ impl App {
         ui.menu_button("Options", |ui| {
             if ui.button("About").clicked() {
                 self.window_states[4] = true;
+                ui.close_menu();
             }
         });
     }
@@ -255,6 +279,7 @@ impl App {
 #[derive(Serialize, Deserialize)]
 pub struct State {
     last_opened: Vec<PathBuf>,
+    options: Options,
 }
 
 pub enum Message {

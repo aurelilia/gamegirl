@@ -4,6 +4,7 @@
 
 pub mod gui;
 pub mod numutil;
+mod storage;
 pub mod system;
 
 use crate::system::io::apu::SAMPLE_RATE;

@@ -1,5 +1,9 @@
 use crate::gui::State;
 use eframe::egui::Ui;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct Options {}
 
 pub fn about(_state: &mut State, ui: &mut Ui) {
     ui.horizontal(|ui| {
