@@ -5,8 +5,8 @@ use crate::gui::file_dialog::File;
 use crate::system::io::joypad::{Button, Joypad};
 use crate::Colour;
 use crate::GameGirl;
-use eframe::egui::TextureFilter;
 use eframe::egui::{self, widgets, Context, Event, ImageData, Ui};
+use eframe::egui::{vec2, TextureFilter, Vec2};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
 use eframe::epi::{Frame, Storage};
@@ -111,6 +111,10 @@ impl epi::App for App {
 
     fn name(&self) -> &str {
         "GameGirl"
+    }
+
+    fn max_size_points(&self) -> Vec2 {
+        vec2(4000.0, 4000.0)
     }
 }
 

@@ -59,7 +59,7 @@ impl GameGirl {
             self.advance();
         }
         let mut samples = mem::take(&mut self.mmu.apu.buffer);
-        for sample in  samples.drain(count..) {
+        for sample in samples.drain(count..) {
             self.mmu.apu.buffer.push(sample);
         }
         Some(samples)

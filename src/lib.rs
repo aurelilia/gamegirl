@@ -20,14 +20,18 @@ pub type Colour = Color32;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub fn start(canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
+pub struct Handle(Stream);
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
     let gg = GameGirl::new();
     let gg = Arc::new(Mutex::new(gg));
-    let _stream = setup_cpal(gg.clone());
-    gui::start(gg, canvas_id)
+    let stream = setup_cpal(gg.clone());
+    gui::start(gg, canvas_id).map(|_| Handle(stream))
 }
 
 pub fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
