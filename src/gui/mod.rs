@@ -1,5 +1,6 @@
 mod debugger;
 mod file_dialog;
+mod options;
 
 use crate::gui::file_dialog::File;
 use crate::system::io::joypad::{Button, Joypad};
@@ -18,13 +19,19 @@ use std::time::Duration;
 
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
-const WINDOW_COUNT: usize = 4;
-const WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); WINDOW_COUNT] = [
+const WINDOW_COUNT: usize = GG_WINDOW_COUNT + STATE_WINDOW_COUNT;
+
+const GG_WINDOW_COUNT: usize = 4;
+const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
     ("Debugger", debugger::debugger),
     ("Breakpoints", debugger::breakpoints),
     ("Memory", debugger::memory),
     ("Cartridge", debugger::cart_info),
 ];
+
+const STATE_WINDOW_COUNT: usize = 1;
+const STATE_WINDOWS: [(&str, fn(&mut State, &mut Ui)); STATE_WINDOW_COUNT] =
+    [("About", options::about)];
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start(gg: Arc<Mutex<GameGirl>>) {
@@ -83,8 +90,17 @@ impl epi::App for App {
                 ui.image(self.texture, [320.0, 288.0]);
             });
 
+        for ((name, runner), state) in STATE_WINDOWS
+            .iter()
+            .zip(self.window_states.iter_mut().skip(GG_WINDOW_COUNT))
+        {
+            egui::Window::new(*name)
+                .open(state)
+                .show(ctx, |ui| runner(&mut self.state, ui));
+        }
+
         let mut gg = self.gg.lock().unwrap();
-        for ((name, runner), state) in WINDOWS.iter().zip(self.window_states.iter_mut()) {
+        for ((name, runner), state) in GG_WINDOWS.iter().zip(self.window_states.iter_mut()) {
             egui::Window::new(*name)
                 .open(state)
                 .show(ctx, |ui| runner(&mut gg, ui));
@@ -212,7 +228,6 @@ impl App {
                 }
             }
         });
-        ui.separator();
 
         ui.menu_button("Debugger", |ui| {
             if ui.button("Debugger").clicked() {
@@ -226,6 +241,12 @@ impl App {
             }
             if ui.button("Cartridge Viewer").clicked() {
                 self.window_states[3] = true;
+            }
+        });
+
+        ui.menu_button("Options", |ui| {
+            if ui.button("About").clicked() {
+                self.window_states[4] = true;
             }
         });
     }
