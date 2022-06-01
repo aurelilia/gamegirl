@@ -119,6 +119,7 @@ impl Cartridge {
 
     pub fn ram_bank_count(&self) -> u8 {
         match self.rom[RAM_BANKS.us()] {
+            0 if self.kind == MBC2 => 1,
             0 => 0,
             2 => 1,
             3 => 4,
@@ -184,7 +185,7 @@ impl Cartridge {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MBCKind {
     NoMBC,
     MBC1 { ram_mode: bool, bank2: u8 },

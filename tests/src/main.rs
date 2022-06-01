@@ -1,6 +1,7 @@
 #![feature(is_some_with)]
 
 mod blargg;
+mod mooneye;
 
 use ansi_term::Colour;
 use gamegirl::system::GameGirl;
@@ -8,13 +9,16 @@ use std::fs;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use rayon::prelude::*;
 
-const TIMEOUT: usize = 60;
+const TIMEOUT: usize = 30;
 
 fn main() {
     println!("Executing blargg tests");
     blargg::exec();
     blargg::exec_sound();
+    println!("Executing mooneye tests");
+    mooneye::exec();
 }
 
 pub fn run_dir(dir: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
@@ -29,34 +33,34 @@ fn run_inner(dir: &Path, name: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
         .collect::<Vec<_>>();
     entries.sort_by_key(|e| e.file_name());
 
-    for entry in entries.iter().filter(|e| e.path().is_dir()) {
+    entries.par_iter().filter(|e| e.path().is_dir()).for_each(|entry| {
         let name = format!("{name}/{}", entry.file_name().to_str().unwrap());
         run_inner(&entry.path(), &name, cond);
-    }
+    });
 
-    for entry in entries.iter().filter(|e| {
+    entries.par_iter().filter(|e| {
         e.path()
             .extension()
             .is_some_and(|s| s.to_str().unwrap() == "gb")
-    }) {
-        print!("Running {name}/{}... ", entry.file_name().to_str().unwrap());
+    }).for_each(|entry| {
         let rn = Instant::now();
         match run(fs::read(entry.path()).unwrap(), cond) {
             Ok(_) => println!(
-                "{} in {}ms",
+                "Ran {name}/{}... {} in {}ms",
+                entry.file_name().to_str().unwrap(),
                 Colour::Green.bold().paint("SUCCESS"),
                 rn.elapsed().as_micros() as f64 / 1000.0
             ),
             Err(serial) => {
                 println!(
-                    "{} in {}ms",
+                    "Ran {name}/{}... {} in {}ms\nOutput: {serial}",
+                    entry.file_name().to_str().unwrap(),
                     Colour::Red.bold().paint("FAIL"),
                     rn.elapsed().as_micros() as f64 / 1000.0
                 );
-                println!("Output: {serial}");
             }
         }
-    }
+    });
 }
 
 fn run(test: Vec<u8>, cond: fn(&GameGirl) -> ControlFlow<bool>) -> Result<(), String> {
