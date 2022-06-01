@@ -68,6 +68,8 @@ pub const NR44: u16 = 0xFF23 - HIGH_START;
 pub const NR50: u16 = 0xFF24 - HIGH_START;
 pub const NR51: u16 = 0xFF25 - HIGH_START;
 pub const NR52: u16 = 0xFF26 - HIGH_START;
+pub const WAV_START: u16 = 0xFF30 - HIGH_START;
+pub const WAV_END: u16 = 0xFF3F - HIGH_START;
 
 // CGB
 pub const VRAM_SELECT: u16 = 0xFF4F - HIGH_START;

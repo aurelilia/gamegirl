@@ -39,7 +39,7 @@ pub fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
                 sample_rate: SampleRate(SAMPLE_RATE),
                 buffer_size: BufferSize::Default,
             },
-            move |data: &mut [f32], _| {
+            move |data: &mut [i16], _| {
                 let samples = {
                     let mut gg = gg.lock().unwrap();
                     gg.produce_samples(data.len())

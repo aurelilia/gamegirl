@@ -16,10 +16,11 @@ const TIMEOUT: usize = 60;
 fn main() {
     println!("Executing blargg tests");
     blargg::exec();
+    blargg::exec_sound();
 }
 
 pub fn run_dir(dir: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
-    run_inner(&PathBuf::from("").join(dir), dir, cond);
+    run_inner(&PathBuf::from("tests").join(dir), dir, cond);
 }
 
 fn run_inner(dir: &Path, name: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {

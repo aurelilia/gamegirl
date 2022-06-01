@@ -12,3 +12,15 @@ pub fn exec() {
         }
     })
 }
+
+pub fn exec_sound() {
+    crate::run_dir("blargg_sound", |gg| {
+        if gg.mmu.read(0xA000) == 0 {
+            Break(true)
+        } else if gg.mmu.read(0xA000) != 0x80 {
+            Break(false)
+        } else {
+            Continue(())
+        }
+    })
+}

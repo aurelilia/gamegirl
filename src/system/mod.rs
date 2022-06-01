@@ -39,7 +39,7 @@ impl GameGirl {
         }
     }
 
-    pub fn produce_samples(&mut self, count: usize) -> Option<Vec<f32>> {
+    pub fn produce_samples(&mut self, count: usize) -> Option<Vec<i16>> {
         if !self.running {
             return None;
         }
