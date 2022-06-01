@@ -83,7 +83,10 @@ impl Mmu {
 
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
+
             NR10..=NR52 => self.apu.read_register(HIGH_START + addr),
+            0x76 if self.cgb => self.apu.read_pcm12(),
+            0x77 if self.cgb => self.apu.read_pcm34(),
 
             HDMA_START if self.cgb => self.hdma.transfer_left as u8,
             HDMA_SRC_HIGH..=HDMA_DEST_LOW => 0xFF,

@@ -1,4 +1,3 @@
-
 use super::envelope::EnvelopGenerator;
 use super::ApuChannel;
 

@@ -16,22 +16,12 @@ use wave_channel::WaveChannel;
 
 use crate::numutil::NumExt;
 
-use super::{Mmu, addr::{KEY1, DIV}};
+use super::{
+    addr::{DIV, KEY1},
+    Mmu,
+};
 
 pub const SAMPLE_RATE: u32 = 44100;
-
-/// Contains the flushed output buffer of the `APU`.
-/// The main buffer `all` is the summation of all of the other buffers/channels.
-/// If you want a combination of different channels, you can just add them together.
-/// All volume control is done before pushing to the buffers.
-pub struct AudioBuffers {
-    pub pulse1: Vec<f32>,
-    pub pulse2: Vec<f32>,
-    pub wave: Vec<f32>,
-    pub noise: Vec<f32>,
-
-    pub all: Vec<f32>,
-}
 
 bitflags! {
     struct ChannelsControl: u8 {
@@ -79,10 +69,6 @@ pub struct Apu {
     sample_counter: f64,
 
     pub buffer: Vec<f32>,
-    pulse1_buffers: Vec<f32>,
-    pulse2_buffers: Vec<f32>,
-    wave_buffers: Vec<f32>,
-    noise_buffers: Vec<f32>,
 
     /// Stores the value of the 4th bit (5th in double speed mode) of the divider
     /// as sequencer clocks are controlled by the divider
@@ -110,11 +96,6 @@ impl Apu {
             channels_selection: ChannelsSelection::from_bits_truncate(0),
             power: false,
             buffer: Vec::new(),
-
-            pulse1_buffers: Vec::new(),
-            pulse2_buffers: Vec::new(),
-            wave_buffers: Vec::new(),
-            noise_buffers: Vec::new(),
 
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
@@ -177,7 +158,7 @@ impl Apu {
         // as these are not affected by power off, but `addr % 5 != 2` also
         // includes `0xFF25` and we don't want to be able to write to it
         if !self.power && addr <= 0xFF25 && (addr % 5 != 2 || addr == 0xFF25) {
-            return;
+            // return;
         }
 
         let is_length_clock_next = self.is_length_clock_next();
@@ -333,17 +314,6 @@ impl Apu {
         let p2 = self.noise.output() & 0xF;
 
         (p2 << 4) | p1
-    }
-
-    pub fn get_buffers(&mut self) -> AudioBuffers {
-        AudioBuffers {
-            pulse1: std::mem::take(&mut self.pulse1_buffers),
-            pulse2: std::mem::take(&mut self.pulse2_buffers),
-            wave: std::mem::take(&mut self.wave_buffers),
-            noise: std::mem::take(&mut self.noise_buffers),
-
-            all: std::mem::take(&mut self.buffer),
-        }
     }
 
     pub fn step(mmu: &mut Mmu, cycles: usize) {
@@ -507,19 +477,6 @@ impl Apu {
         };
 
         // one sample for the right, one for the left
-
-        self.pulse1_buffers.push(right_pulse1);
-        self.pulse1_buffers.push(left_pulse1);
-
-        self.pulse2_buffers.push(right_pulse2);
-        self.pulse2_buffers.push(left_pulse2);
-
-        self.wave_buffers.push(right_wave);
-        self.wave_buffers.push(left_wave);
-
-        self.noise_buffers.push(right_noise);
-        self.noise_buffers.push(left_noise);
-
         let right_sample = right_pulse1 + right_pulse2 + right_wave + right_noise;
         let left_sample = left_pulse1 + left_pulse2 + left_wave + left_noise;
         self.buffer.push(right_sample / 8.0);

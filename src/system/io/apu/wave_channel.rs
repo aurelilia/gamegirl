@@ -1,4 +1,3 @@
-
 use super::ApuChannel;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
