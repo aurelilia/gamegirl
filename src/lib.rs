@@ -24,7 +24,7 @@ pub fn start(canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
-    let gg = GameGirl::new(None);
+    let gg = GameGirl::new();
     let gg = Arc::new(Mutex::new(gg));
     let _stream = setup_cpal(gg.clone());
     gui::start(gg, canvas_id)

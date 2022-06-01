@@ -160,7 +160,7 @@ impl App {
         }
     }
 
-    fn navbar(&mut self, frame: &Frame, ui: &mut Ui) {
+    fn navbar(&mut self, _frame: &Frame, ui: &mut Ui) {
         widgets::global_dark_light_mode_switch(ui);
         ui.separator();
 
@@ -204,7 +204,7 @@ impl App {
             {
                 ui.separator();
                 if ui.button("Exit").clicked() {
-                    frame.quit();
+                    _frame.quit();
                 }
             }
         });

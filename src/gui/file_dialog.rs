@@ -3,7 +3,6 @@ use rfd::FileHandle;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::thread;
 
 pub struct File {
     pub content: Vec<u8>,
@@ -31,13 +30,13 @@ fn path(f: &FileHandle) -> Option<PathBuf> {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn path(f: &FileHandle) -> Option<PathBuf> {
+fn path(_f: &FileHandle) -> Option<PathBuf> {
     None
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn execute<F: Future<Output = ()> + Send + 'static>(f: F) {
-    thread::spawn(move || futures_executor::block_on(f));
+    std::thread::spawn(move || futures_executor::block_on(f));
 }
 
 #[cfg(target_arch = "wasm32")]
