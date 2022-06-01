@@ -39,17 +39,17 @@ impl GameGirl {
         }
     }
 
-    pub fn produce_samples(&mut self, count: usize) -> Option<Vec<i16>> {
+    pub fn produce_samples(&mut self, count: usize) -> Option<Vec<f32>> {
         if !self.running {
             return None;
         }
 
-        while self.mmu.apu.samples.len() < count {
+        while self.mmu.apu.buffer.len() < count {
             self.advance();
         }
-        let mut samples = mem::take(&mut self.mmu.apu.samples);
+        let mut samples = mem::take(&mut self.mmu.apu.buffer);
         while samples.len() > count {
-            self.mmu.apu.samples.push(samples.pop().unwrap());
+            self.mmu.apu.buffer.push(samples.pop().unwrap());
         }
         Some(samples)
     }

@@ -19,6 +19,7 @@ cpal = "0.13.5"
 rfd = "0.8.2"
 futures-executor = "0.3.21"
 serde = "1.0.137"
+bitflags = "1.3.2"
 
 [dependencies.eframe]
 git = "https://github.com/mccolljr/egui.git"

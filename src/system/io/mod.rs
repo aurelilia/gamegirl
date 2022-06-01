@@ -50,7 +50,7 @@ impl Mmu {
         Timer::step(gg, t_cpu);
         Ppu::step(gg, t_cycles);
         Dma::step(gg, t_cpu);
-        gg.mmu.apu.step(t_cycles);
+        Apu::step(&mut gg.mmu, m_cycles);
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -83,7 +83,7 @@ impl Mmu {
 
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
-            NR10..=NR52 => Apu::read(self, addr),
+            NR10..=NR52 => self.apu.read_register(HIGH_START + addr),
 
             HDMA_START if self.cgb => self.hdma.transfer_left as u8,
             HDMA_SRC_HIGH..=HDMA_DEST_LOW => 0xFF,
@@ -134,7 +134,7 @@ impl Mmu {
             BCPS..=OCPD => self.ppu.write_high(addr, value),
             HDMA_START => Hdma::write_start(self, value),
             KEY1 => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
-            NR10..=WAV_END => Apu::write(self, addr, value),
+            NR10..=WAV_END => self.apu.write_register(HIGH_START + addr, value),
 
             0x01 if self.debugger.is_some() => self
                 .debugger
@@ -185,7 +185,7 @@ impl Mmu {
             ppu: Ppu::new(),
             joypad: Joypad::default(),
             dma: Dma::default(),
-            apu: Apu::new(),
+            apu: Apu::new(false),
             hdma: Hdma::default(),
             cart: Cartridge::dummy(),
         };
@@ -201,6 +201,7 @@ impl Mmu {
         });
         self.cgb = cart.supports_cgb();
         self.ppu.switch_kind(self.cgb);
+        self.apu = Apu::new(self.cgb);
         self.cart = cart;
     }
 
