@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::mem;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -17,9 +18,12 @@ pub mod io;
 const T_CLOCK_HZ: usize = 4194304;
 const M_CLOCK_HZ: f32 = T_CLOCK_HZ as f32 / 4.0;
 
+#[derive(Deserialize, Serialize)]
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mmu: Mmu,
+    #[serde(skip)]
+    #[serde(default)]
     pub debugger: Arc<Debugger>,
 
     t_shift: u8,
@@ -110,6 +114,28 @@ impl GameGirl {
         self.cpu = Cpu::default();
         self.mmu = self.mmu.reset();
         self.t_shift = 2;
+    }
+
+    pub fn save_state(&self) -> Vec<u8> {
+        let mut dest = vec![];
+        let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
+        bincode::serialize_into(&mut writer, self).unwrap();
+        writer.finish().unwrap();
+        dest
+    }
+
+    pub fn load_state(&mut self, state: &[u8]) {
+        let new = if cfg!(target_arch = "wasm32") {
+            // Currently crashes...
+            return;
+        } else {
+            let decoder = zstd::stream::Decoder::new(state).unwrap();
+            bincode::deserialize_from(decoder).unwrap()
+        };
+        let old_self = mem::replace(self, new);
+        self.debugger = old_self.debugger;
+        self.mmu.cart.rom = old_self.mmu.cart.rom;
+        self.mmu.bootrom = old_self.mmu.bootrom;
     }
 
     pub fn new() -> Self {

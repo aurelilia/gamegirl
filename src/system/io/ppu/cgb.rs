@@ -3,7 +3,10 @@ use crate::system::io::addr::*;
 use crate::system::io::ppu::{Ppu, PpuKind, BG_EN};
 use crate::system::GameGirl;
 use crate::Colour;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
+#[derive(Deserialize, Serialize)]
 pub struct Cgb {
     bg_palette_idx: u8,
     bg_palette_inc: bool,
@@ -11,6 +14,7 @@ pub struct Cgb {
     obj_palette_idx: u8,
     obj_palette_inc: bool,
     pub obj_palettes: [CgbColour; 32],
+    #[serde(with = "BigArray")]
     pub unavailable_pixels: [bool; 160],
 }
 
@@ -28,7 +32,7 @@ impl Default for Cgb {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Deserialize, Serialize)]
 pub struct CgbColour {
     pub colour: Colour,
     raw_high: u8,

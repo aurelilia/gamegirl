@@ -1,12 +1,13 @@
 use crate::numutil::NumExt;
 use crate::system::io::addr::{IE, IF};
 use crate::system::GameGirl;
+use serde::{Deserialize, Serialize};
 
 mod alu;
 mod data;
 pub mod inst;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Cpu {
     pub pc: u16,
     pub sp: u16,

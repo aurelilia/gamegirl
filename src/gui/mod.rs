@@ -1,15 +1,17 @@
 mod debugger;
 mod file_dialog;
 mod options;
+mod rewind;
 
 use crate::gui::file_dialog::File;
 use crate::gui::options::Options;
+use crate::gui::rewind::Rewinding;
 use crate::storage::Storage as CartStore;
 use crate::system::io::cartridge::Cartridge;
 use crate::system::io::joypad::{Button, Joypad};
 use crate::Colour;
 use crate::GameGirl;
-use eframe::egui::{self, widgets, Context, Event, ImageData, Ui};
+use eframe::egui::{self, widgets, Context, Event, ImageData, Key, Ui};
 use eframe::egui::{vec2, TextureFilter, Vec2};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
@@ -57,9 +59,12 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
     App {
         gg,
         current_rom_path: None,
+        rewinder: Rewinding::default(),
+
         texture: TextureId::default(),
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
+
         state: State {
             last_opened: vec![],
             options: Options {},
@@ -70,6 +75,7 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
 struct App {
     gg: Arc<Mutex<GameGirl>>,
     current_rom_path: Option<PathBuf>,
+    rewinder: Rewinding,
 
     texture: TextureId,
     window_states: [bool; WINDOW_COUNT],
@@ -143,19 +149,7 @@ impl epi::App for App {
 
 impl App {
     fn update_gg(&mut self, ctx: &Context, advance_by: Duration) {
-        let frame = {
-            let mut gg = self.gg.lock().unwrap();
-            for event in &ctx.input().events {
-                if let Event::Key { key, pressed, .. } = event {
-                    if let Some(button) = Button::from_key(*key) {
-                        Joypad::set(&mut gg, button, *pressed);
-                    }
-                }
-            }
-
-            gg.advance_delta(advance_by.as_secs_f32());
-            gg.mmu.ppu.last_frame.take()
-        };
+        let frame = self.get_gg_frame(ctx, advance_by);
         if let Some(data) = frame {
             let img = ImageDelta::full(ImageData::Color(ColorImage {
                 size: [160, 144],
@@ -164,6 +158,36 @@ impl App {
             let manager = ctx.tex_manager();
             manager.write().set(self.texture, img);
         }
+    }
+
+    fn get_gg_frame(&mut self, ctx: &Context, advance_by: Duration) -> Option<Vec<Colour>> {
+        let mut gg = self.gg.lock().unwrap();
+        for event in &ctx.input().events {
+            if let Event::Key { key, pressed, .. } = event {
+                if let Some(button) = Button::from_key(*key) {
+                    Joypad::set(&mut gg, button, *pressed);
+                }
+                if *key == Key::R {
+                    self.rewinder.rewinding = *pressed;
+                    gg.running = !*pressed;
+                }
+            }
+        }
+
+        if self.rewinder.rewinding {
+            if let Some(state) = self.rewinder.rewind_buffer.pop() {
+                gg.load_state(state);
+                // Produce a frame
+                gg.advance_delta(advance_by.as_secs_f32());
+            } else {
+                self.rewinder.rewinding = false;
+                gg.running = true;
+            }
+        } else {
+            gg.advance_delta(advance_by.as_secs_f32());
+            self.rewinder.rewind_buffer.push(gg.save_state());
+        }
+        gg.mmu.ppu.last_frame.take()
     }
 
     fn process_messages(&mut self) {
@@ -264,6 +288,31 @@ impl App {
             }
             if ui.button("Cartridge Viewer").clicked() {
                 self.window_states[3] = true;
+            }
+        });
+
+        ui.menu_button("Savestates", |ui| {
+            for (i, state) in self.rewinder.save_states.iter_mut().enumerate() {
+                if ui.button(format!("Save State {}", i + 1)).clicked() {
+                    *state = Some(self.gg.lock().unwrap().save_state());
+                    ui.close_menu();
+                }
+            }
+            ui.separator();
+
+            for (i, state) in self
+                .rewinder
+                .save_states
+                .iter()
+                .filter_map(|s| s.as_ref())
+                .enumerate()
+            {
+                if ui.button(format!("Load State {}", i + 1)).clicked() {
+                    let mut gg = self.gg.lock().unwrap();
+                    self.rewinder.before_last_ss_load = Some(gg.save_state());
+                    gg.load_state(state);
+                    ui.close_menu();
+                }
             }
         });
 

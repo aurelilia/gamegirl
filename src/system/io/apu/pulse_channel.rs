@@ -1,5 +1,7 @@
 use super::envelope::EnvelopGenerator;
 use super::ApuChannel;
+use serde::Deserialize;
+use serde::Serialize;
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -8,6 +10,7 @@ const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
+#[derive(Deserialize, Serialize)]
 pub struct PulseChannel {
     sweep_period: u8,
     sweep_current_time: u8,

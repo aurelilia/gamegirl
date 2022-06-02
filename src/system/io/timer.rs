@@ -2,7 +2,10 @@ use crate::numutil::NumExt;
 use crate::system::cpu::Interrupt;
 use crate::system::io::addr::*;
 use crate::system::GameGirl;
+use serde::Deserialize;
+use serde::Serialize;
 
+#[derive(Deserialize, Serialize)]
 pub struct Timer {
     div_cycle_count: usize,
     counter_timer: usize,

@@ -2,8 +2,10 @@ use crate::system::cpu::Interrupt;
 use crate::system::io::addr::JOYP;
 use crate::system::GameGirl;
 use eframe::egui::Key;
+use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Default)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct Joypad {
     key_states: [bool; 8],
 }

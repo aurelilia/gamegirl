@@ -5,6 +5,9 @@ use crate::system::io::ppu::cgb::Cgb;
 use crate::system::io::Mmu;
 use crate::system::GameGirl;
 use crate::Colour;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_big_array::BigArray;
 
 mod cgb;
 mod dmg;
@@ -26,14 +29,19 @@ const Y_FLIP: u16 = 6;
 const PRIORITY: u16 = 7;
 const CGB_BANK: u16 = 3;
 
+#[derive(Deserialize, Serialize)]
 pub struct Ppu {
     mode: Mode,
     mode_clock: u16,
+    #[serde(with = "BigArray")]
     bg_occupied_pixels: [bool; 160],
     window_line: u8,
     kind: PpuKind,
 
+    #[serde(with = "BigArray")]
     pixels: [Colour; 160 * 144],
+    #[serde(skip)]
+    #[serde(default)]
     pub last_frame: Option<Vec<Colour>>,
 }
 
@@ -338,12 +346,13 @@ impl Ppu {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum PpuKind {
     Dmg { used_x_obj_coords: [Option<u8>; 10] },
     Cgb(Cgb),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Deserialize, Serialize)]
 enum Mode {
     HBlank = 204,
     VBlank = 456,

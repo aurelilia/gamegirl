@@ -1,8 +1,10 @@
 use super::ApuChannel;
+use serde::Deserialize;
+use serde::Serialize;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
-#[derive(Default)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct WaveChannel {
     volume: u8,
     volume_shift: u8,

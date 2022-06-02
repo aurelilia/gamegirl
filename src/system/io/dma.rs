@@ -5,8 +5,10 @@ use crate::system::io::addr::{
 use crate::system::io::ppu::DISP_EN;
 use crate::system::io::Mmu;
 use crate::system::GameGirl;
+use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Default)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct Dma {
     time_left: i16,
 }
@@ -32,7 +34,7 @@ impl Dma {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct Hdma {
     source: u16,
     dest: u16,

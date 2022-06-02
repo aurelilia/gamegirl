@@ -12,6 +12,8 @@ use bitflags::bitflags;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;
 use pulse_channel::PulseChannel;
+use serde::Deserialize;
+use serde::Serialize;
 use wave_channel::WaveChannel;
 
 use crate::numutil::NumExt;
@@ -24,6 +26,7 @@ use super::{
 pub const SAMPLE_RATE: u32 = 44100;
 
 bitflags! {
+    #[derive(Deserialize, Serialize)]
     struct ChannelsControl: u8 {
         const VIN_LEFT  = 1 << 7;
         const VOL_LEFT  = 7 << 4;
@@ -43,6 +46,7 @@ impl ChannelsControl {
 }
 
 bitflags! {
+    #[derive(Deserialize, Serialize)]
     struct ChannelsSelection: u8 {
         const NOISE_LEFT   = 1 << 7;
         const WAVE_LEFT    = 1 << 6;
@@ -55,6 +59,7 @@ bitflags! {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Apu {
     pulse1: Dac<LengthCountedChannel<PulseChannel>>,
     pulse2: Dac<LengthCountedChannel<PulseChannel>>,

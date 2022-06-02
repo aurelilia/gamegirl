@@ -1,5 +1,7 @@
 use crate::numutil::NumExt;
 use crate::system::io::cartridge::MBCKind::*;
+use serde::Deserialize;
+use serde::Serialize;
 use std::iter;
 
 const CGB_FLAG: u16 = 0x0143;
@@ -9,8 +11,10 @@ const ROM_BANKS: u16 = 0x0148;
 const RAM_BANKS: u16 = 0x0149;
 const BANK_COUNT_1MB: u16 = 64;
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Cartridge {
+    #[serde(skip)]
+    #[serde(default)]
     pub rom: Vec<u8>,
     pub rom0_bank: u16,
     pub rom1_bank: u16,
@@ -193,7 +197,7 @@ impl Cartridge {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum MBCKind {
     NoMBC,
     MBC1 { ram_mode: bool, bank2: u8 },

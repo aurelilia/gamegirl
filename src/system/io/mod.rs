@@ -7,6 +7,8 @@ use crate::system::io::joypad::Joypad;
 use crate::system::io::ppu::Ppu;
 use crate::system::io::timer::Timer;
 use crate::system::GameGirl;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 use std::{
     ops::{Index, IndexMut},
     sync::Arc,
@@ -22,16 +24,25 @@ pub mod joypad;
 mod ppu;
 mod timer;
 
+#[derive(Deserialize, Serialize)]
 pub struct Mmu {
+    #[serde(with = "BigArray")]
     vram: [u8; 2 * 8192],
     vram_bank: u8,
+    #[serde(with = "BigArray")]
     wram: [u8; 4 * 8192],
     wram_bank: u8,
+    #[serde(with = "BigArray")]
     oam: [u8; 160],
+    #[serde(with = "BigArray")]
     high: [u8; 256],
 
-    bootrom: Option<&'static [u8]>,
+    #[serde(skip)]
+    #[serde(default)]
+    pub(super) bootrom: Option<Vec<u8>>,
     cgb: bool,
+    #[serde(skip)]
+    #[serde(default)]
     pub(super) debugger: Arc<Debugger>,
 
     pub cart: Cartridge,
@@ -56,9 +67,9 @@ impl Mmu {
     pub fn read(&self, addr: u16) -> u8 {
         let a = addr.us();
         match addr {
-            0x0000..0x0100 if self.bootrom.is_some() => self.bootrom.unwrap()[a],
+            0x0000..0x0100 if self.bootrom.is_some() => self.bootrom.as_ref().unwrap()[a],
             0x0200..0x0900 if self.bootrom.is_some() && self.cgb => {
-                self.bootrom.unwrap()[a - 0x0100]
+                self.bootrom.as_ref().unwrap()[a - 0x0100]
             }
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cart.read(addr),
 
@@ -197,9 +208,9 @@ impl Mmu {
 
     pub fn load_cart(&mut self, cart: Cartridge) {
         self.bootrom = Some(if cart.supports_cgb() {
-            CGB_BOOTROM
+            CGB_BOOTROM.to_vec()
         } else {
-            BOOTIX_ROM
+            BOOTIX_ROM.to_vec()
         });
         self.cgb = cart.supports_cgb();
         self.ppu.switch_kind(self.cgb);

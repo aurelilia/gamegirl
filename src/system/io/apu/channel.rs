@@ -1,3 +1,6 @@
+use serde::Deserialize;
+use serde::Serialize;
+
 pub trait ApuChannel {
     fn output(&self) -> u8;
     fn muted(&self) -> bool;
@@ -8,6 +11,7 @@ pub trait ApuChannel {
     fn trigger(&mut self);
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct LengthCountedChannel<C: ApuChannel> {
     // FIXME: re-order the organization of apu channels,
     //  `dac_enable`, should not be here like this
@@ -124,6 +128,7 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Dac<C: ApuChannel> {
     capacitor: f32,
     channel: C,
