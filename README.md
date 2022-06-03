@@ -5,16 +5,19 @@ A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.ang
 ## Status
 The emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
-Many features are still missing but being worked on.
+Some features are still missing but being worked on.
 
 ### Features
 - Complete DMG/CGB implementation
 - Savegame support in common `.sav` format (No RTC yet.)
+- Support for creating and loading save states with "undo last load" function
+- Rewinding support with little memory use (~1MB per second of rewinding at 60fps)
 - Debugger with:
     - Line-by-line advance
     - PC and write breakpoints
     - Memory, register and stack view
     - Cartridge Info Viewer
+- Automated running of blargg and mooneye tests
 
 
 ## Goals
