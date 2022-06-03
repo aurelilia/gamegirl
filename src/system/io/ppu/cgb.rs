@@ -14,6 +14,7 @@ pub struct Cgb {
     obj_palette_idx: u8,
     obj_palette_inc: bool,
     pub obj_palettes: [CgbColour; 32],
+    pub(super) dmg_used_x_obj_cords: Option<[Option<u8>; 10]>,
     #[serde(with = "BigArray")]
     pub unavailable_pixels: [bool; 160],
 }
@@ -27,6 +28,7 @@ impl Default for Cgb {
             obj_palette_idx: 0,
             obj_palette_inc: false,
             obj_palettes: [CgbColour::default(); 32],
+            dmg_used_x_obj_cords: None,
             unavailable_pixels: [false; 160],
         }
     }
@@ -98,6 +100,10 @@ impl Ppu {
                 &mut cgb.obj_palettes,
                 value,
             ),
+            (PpuKind::Cgb(cgb), OPRI) if value.is_bit(0) => {
+                cgb.dmg_used_x_obj_cords = Some([None; 10])
+            }
+            (PpuKind::Cgb(cgb), OPRI) => cgb.dmg_used_x_obj_cords = None,
             _ => (),
         }
     }

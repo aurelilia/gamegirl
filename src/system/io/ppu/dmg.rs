@@ -1,5 +1,6 @@
 use crate::numutil::NumExt;
 use crate::system::io::addr::{BGP, LY};
+use crate::system::io::ppu::cgb::Cgb;
 use crate::system::io::ppu::{Ppu, PpuKind};
 use crate::system::GameGirl;
 use crate::Colour;
@@ -57,7 +58,11 @@ impl Ppu {
 
     pub fn allow_obj(&mut self, x: u8, count: u8) -> bool {
         match &mut self.kind {
-            PpuKind::Dmg { used_x_obj_coords } => {
+            PpuKind::Dmg { used_x_obj_coords }
+            | PpuKind::Cgb(Cgb {
+                dmg_used_x_obj_cords: Some(used_x_obj_coords),
+                ..
+            }) => {
                 if used_x_obj_coords
                     .iter()
                     .take(count.us())

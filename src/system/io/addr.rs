@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 pub const HIGH_START: u16 = 0xFF00;
 
 pub const BOOTROM_DISABLE: u16 = 0xFF50 - HIGH_START;
@@ -20,6 +18,7 @@ pub const BCPS: u16 = 0xFF68 - HIGH_START;
 pub const BCPD: u16 = 0xFF69 - HIGH_START;
 pub const OCPS: u16 = 0xFF6A - HIGH_START;
 pub const OCPD: u16 = 0xFF6B - HIGH_START;
+pub const OPRI: u16 = 0xFF6C - HIGH_START;
 
 // Interrupts
 pub const IF: u16 = 0xFF0F - HIGH_START;
@@ -48,27 +47,6 @@ pub const HDMA_START: u16 = 0xFF55 - HIGH_START;
 
 // Sound
 pub const NR10: u16 = 0xFF10 - HIGH_START;
-pub const NR11: u16 = 0xFF11 - HIGH_START;
-pub const NR12: u16 = 0xFF12 - HIGH_START;
-pub const NR13: u16 = 0xFF13 - HIGH_START;
-pub const NR14: u16 = 0xFF14 - HIGH_START;
-pub const NR21: u16 = 0xFF16 - HIGH_START;
-pub const NR22: u16 = 0xFF17 - HIGH_START;
-pub const NR23: u16 = 0xFF18 - HIGH_START;
-pub const NR24: u16 = 0xFF19 - HIGH_START;
-pub const NR30: u16 = 0xFF1A - HIGH_START;
-pub const NR31: u16 = 0xFF1B - HIGH_START;
-pub const NR32: u16 = 0xFF1C - HIGH_START;
-pub const NR33: u16 = 0xFF1D - HIGH_START;
-pub const NR34: u16 = 0xFF1E - HIGH_START;
-pub const NR41: u16 = 0xFF20 - HIGH_START;
-pub const NR42: u16 = 0xFF21 - HIGH_START;
-pub const NR43: u16 = 0xFF22 - HIGH_START;
-pub const NR44: u16 = 0xFF23 - HIGH_START;
-pub const NR50: u16 = 0xFF24 - HIGH_START;
-pub const NR51: u16 = 0xFF25 - HIGH_START;
-pub const NR52: u16 = 0xFF26 - HIGH_START;
-pub const WAV_START: u16 = 0xFF30 - HIGH_START;
 pub const WAV_END: u16 = 0xFF3F - HIGH_START;
 
 // CGB

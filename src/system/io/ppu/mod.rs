@@ -117,7 +117,7 @@ impl Ppu {
     }
 
     fn render_line(gg: &mut GameGirl) {
-        match gg.mmu.ppu.kind {
+        match &gg.mmu.ppu.kind {
             PpuKind::Dmg { .. } if gg.lcdc(BG_EN) => {
                 Self::render_bg(gg);
                 if gg.lcdc(WIN_EN) {
@@ -126,10 +126,15 @@ impl Ppu {
             }
             PpuKind::Dmg { .. } => Self::clear_line(gg),
 
-            PpuKind::Cgb(_) => {
-                Self::render_bg(gg);
-                if gg.lcdc(WIN_EN) {
-                    Self::render_window(gg);
+            PpuKind::Cgb(cgb) => {
+                // Emulate DMG behavior in DMG mode.
+                if !cgb.dmg_used_x_obj_cords.is_some() || gg.lcdc(BG_EN) {
+                    Self::render_bg(gg);
+                    if gg.lcdc(WIN_EN) {
+                        Self::render_window(gg);
+                    }
+                } else {
+                    Self::clear_line(gg)
                 }
             }
         }
@@ -139,6 +144,14 @@ impl Ppu {
         }
 
         match &mut gg.ppu().kind {
+            PpuKind::Cgb(Cgb {
+                unavailable_pixels,
+                dmg_used_x_obj_cords: Some(used_x_obj_coords),
+                ..
+            }) => {
+                *unavailable_pixels = [false; 160];
+                *used_x_obj_coords = [None; 10];
+            }
             PpuKind::Dmg { used_x_obj_coords } => *used_x_obj_coords = [None; 10],
             PpuKind::Cgb(cgb) => cgb.unavailable_pixels = [false; 160],
         }
@@ -299,7 +312,10 @@ impl Ppu {
         let base = prio || !gg.mmu.ppu.bg_occupied_pixels[x as usize];
         match &gg.mmu.ppu.kind {
             PpuKind::Dmg { .. } => base,
-            PpuKind::Cgb(cgb) => base && !cgb.unavailable_pixels[x as usize],
+            // Make sure we ignore unavailbe pixels in DMG compat mode
+            PpuKind::Cgb(cgb) => {
+                base && (cgb.dmg_used_x_obj_cords.is_some() || !cgb.unavailable_pixels[x as usize])
+            }
         }
     }
 

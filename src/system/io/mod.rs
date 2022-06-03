@@ -146,7 +146,7 @@ impl Mmu {
                 self[addr] = value;
                 self.dma.start();
             }
-            BCPS..=OCPD => self.ppu.write_high(addr, value),
+            BCPS..=OPRI => self.ppu.write_high(addr, value),
             HDMA_START => Hdma::write_start(self, value),
             KEY1 => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
             NR10..=WAV_END => self.apu.write_register(HIGH_START + addr, value),
