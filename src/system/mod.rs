@@ -117,6 +117,10 @@ impl GameGirl {
     }
 
     pub fn save_state(&self) -> Vec<u8> {
+        if cfg!(target_arch = "wasm32") {
+            // Currently crashes when loading...
+            return vec![];
+        }
         let mut dest = vec![];
         let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
         bincode::serialize_into(&mut writer, self).unwrap();
@@ -125,14 +129,12 @@ impl GameGirl {
     }
 
     pub fn load_state(&mut self, state: &[u8]) {
-        let new = if cfg!(target_arch = "wasm32") {
+        if cfg!(target_arch = "wasm32") {
             // Currently crashes...
             return;
-        } else {
-            let decoder = zstd::stream::Decoder::new(state).unwrap();
-            bincode::deserialize_from(decoder).unwrap()
-        };
-        let old_self = mem::replace(self, new);
+        }
+        let decoder = zstd::stream::Decoder::new(state).unwrap();
+        let old_self = mem::replace(self, bincode::deserialize_from(decoder).unwrap());
         self.debugger = old_self.debugger;
         self.mmu.cart.rom = old_self.mmu.cart.rom;
         self.mmu.bootrom = old_self.mmu.bootrom;
