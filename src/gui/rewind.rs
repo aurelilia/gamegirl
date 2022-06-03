@@ -7,6 +7,12 @@ pub struct Rewinding {
     pub rewinding: bool,
 }
 
+impl Rewinding {
+    pub fn set_rw_buf_size(&mut self, secs: usize) {
+        self.rewind_buffer = RWBuffer::new(secs);
+    }
+}
+
 impl Default for Rewinding {
     fn default() -> Self {
         Self {
@@ -45,14 +51,11 @@ impl RWBuffer {
         }
         self.stop_idx = self.cur_idx + 1;
         self.vec[self.cur_idx] = val;
-
-        let total = self.vec.iter().map(|v| v.len()).sum::<usize>();
-        println!("Buffer usage: {}MB", total / 1024 / 1024);
     }
 
-    fn new(elems: usize) -> Self {
+    fn new(secs: usize) -> Self {
         Self {
-            vec: iter::repeat(vec![]).take(elems).collect(),
+            vec: iter::repeat(vec![]).take(60 * secs).collect(),
             cur_idx: 0,
             stop_idx: 0,
         }

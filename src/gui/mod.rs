@@ -34,9 +34,9 @@ const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
     ("Cartridge", debugger::cart_info),
 ];
 
-const STATE_WINDOW_COUNT: usize = 1;
-const STATE_WINDOWS: [(&str, fn(&mut State, &mut Ui)); STATE_WINDOW_COUNT] =
-    [("About", options::about)];
+const STATE_WINDOW_COUNT: usize = 2;
+const STATE_WINDOWS: [(&str, fn(&Context, &mut State, &mut Ui)); STATE_WINDOW_COUNT] =
+    [("Options", options::options), ("About", options::about)];
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start(gg: Arc<Mutex<GameGirl>>) {
@@ -67,7 +67,7 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
 
         state: State {
             last_opened: vec![],
-            options: Options {},
+            options: Options::default(),
         },
     }
 }
@@ -108,7 +108,7 @@ impl epi::App for App {
         {
             egui::Window::new(*name)
                 .open(state)
-                .show(ctx, |ui| runner(&mut self.state, ui));
+                .show(ctx, |ui| runner(ctx, &mut self.state, ui));
         }
 
         let mut gg = self.gg.lock().unwrap();
@@ -130,6 +130,8 @@ impl epi::App for App {
         );
         if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamelin_data")) {
             self.state = state;
+            self.rewinder
+                .set_rw_buf_size(self.state.options.rewind_buffer_size);
         }
     }
 
@@ -186,7 +188,9 @@ impl App {
             }
         } else {
             gg.advance_delta(advance_by.as_secs_f32());
-            self.rewinder.rewind_buffer.push(gg.save_state());
+            if self.state.options.enable_rewind {
+                self.rewinder.rewind_buffer.push(gg.save_state());
+            }
         }
         gg.mmu.ppu.last_frame.take()
     }
@@ -198,7 +202,10 @@ impl App {
                     self.save_game();
                     let mut cart = Cartridge::from_rom(file.content);
                     CartStore::load(file.path.clone(), &mut cart);
-                    self.gg.lock().unwrap().load_cart(cart, true);
+                    self.gg
+                        .lock()
+                        .unwrap()
+                        .load_cart(cart, &self.state.options.gg, true);
 
                     self.current_rom_path = file.path.clone();
                     if let Some(path) = file.path {
@@ -318,8 +325,12 @@ impl App {
         });
 
         ui.menu_button("Options", |ui| {
-            if ui.button("About").clicked() {
+            if ui.button("Options").clicked() {
                 self.window_states[4] = true;
+                ui.close_menu();
+            }
+            if ui.button("About").clicked() {
+                self.window_states[5] = true;
                 ui.close_menu();
             }
         });

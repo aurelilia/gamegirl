@@ -160,21 +160,39 @@ impl GameGirl {
         }
     }
 
-    pub fn load_cart(&mut self, cart: Cartridge, reset: bool) {
+    pub fn load_cart(&mut self, cart: Cartridge, config: &GGOptions, reset: bool) {
         if reset {
             let dbg = self.debugger.clone();
             *self = Self::new();
             self.debugger = dbg.clone();
             self.mmu.debugger = dbg;
         }
-        self.mmu.load_cart(cart);
+        self.mmu.load_cart(cart, config);
         self.running = true;
         self.rom_loaded = true;
     }
 
     pub fn with_cart(rom: Vec<u8>) -> Self {
         let mut gg = Self::new();
-        gg.load_cart(Cartridge::from_rom(rom), false);
+        gg.load_cart(Cartridge::from_rom(rom), &GGOptions::default(), false);
         gg
+    }
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct GGOptions {
+    pub mode: CgbMode,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum CgbMode {
+    Always,
+    Prefer,
+    Never,
+}
+
+impl Default for CgbMode {
+    fn default() -> Self {
+        Self::Prefer
     }
 }

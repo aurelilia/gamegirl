@@ -6,7 +6,7 @@ use crate::system::io::dma::{Dma, Hdma};
 use crate::system::io::joypad::Joypad;
 use crate::system::io::ppu::Ppu;
 use crate::system::io::timer::Timer;
-use crate::system::GameGirl;
+use crate::system::{CgbMode, GGOptions, GameGirl};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::{
@@ -177,7 +177,8 @@ impl Mmu {
     pub(super) fn reset(&mut self) -> Self {
         // TODO the clones are kinda eh
         let mut new = Self::new(self.debugger.clone());
-        new.load_cart(self.cart.clone());
+        new.cgb = self.cgb;
+        new.load_cart_inner(self.cart.clone());
         new
     }
 
@@ -206,13 +207,21 @@ impl Mmu {
         mmu
     }
 
-    pub fn load_cart(&mut self, cart: Cartridge) {
-        self.bootrom = Some(if cart.supports_cgb() {
+    pub fn load_cart(&mut self, cart: Cartridge, conf: &GGOptions) {
+        self.cgb = match conf.mode {
+            CgbMode::Always => true,
+            CgbMode::Prefer => cart.supports_cgb(),
+            CgbMode::Never => cart.requires_cgb(),
+        };
+        self.load_cart_inner(cart);
+    }
+
+    fn load_cart_inner(&mut self, cart: Cartridge) {
+        self.bootrom = Some(if self.cgb {
             CGB_BOOTROM.to_vec()
         } else {
             BOOTIX_ROM.to_vec()
         });
-        self.cgb = cart.supports_cgb();
         self.ppu.switch_kind(self.cgb);
         self.apu = Apu::new(self.cgb);
         self.cart = cart;
