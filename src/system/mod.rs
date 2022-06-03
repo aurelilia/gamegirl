@@ -30,6 +30,7 @@ pub struct GameGirl {
     clock: usize,
     pub running: bool,
     pub rom_loaded: bool,
+    pub invert_audio_samples: bool,
 }
 
 impl GameGirl {
@@ -65,6 +66,10 @@ impl GameGirl {
         let mut samples = mem::take(&mut self.mmu.apu.buffer);
         for sample in samples.drain(count..) {
             self.mmu.apu.buffer.push(sample);
+        }
+
+        if self.invert_audio_samples {
+            samples.reverse();
         }
         Some(samples)
     }
@@ -151,6 +156,7 @@ impl GameGirl {
             clock: 0,
             running: false,
             rom_loaded: false,
+            invert_audio_samples: false,
         }
     }
 

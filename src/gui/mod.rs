@@ -169,7 +169,7 @@ impl App {
                 }
                 if *key == Key::R {
                     self.rewinder.rewinding = *pressed;
-                    gg.running = !*pressed;
+                    gg.invert_audio_samples = *pressed;
                 }
             }
         }
@@ -177,11 +177,12 @@ impl App {
         if self.rewinder.rewinding {
             if let Some(state) = self.rewinder.rewind_buffer.pop() {
                 gg.load_state(state);
+                gg.invert_audio_samples = true;
                 // Produce a frame
                 gg.advance_delta(advance_by.as_secs_f32());
             } else {
                 self.rewinder.rewinding = false;
-                gg.running = true;
+                gg.invert_audio_samples = false;
             }
         } else {
             gg.advance_delta(advance_by.as_secs_f32());
