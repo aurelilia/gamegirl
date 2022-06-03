@@ -11,7 +11,8 @@ use crate::system::io::cartridge::Cartridge;
 use crate::system::io::joypad::{Button, Joypad};
 use crate::Colour;
 use crate::GameGirl;
-use eframe::egui::{self, widgets, Context, Event, ImageData, Key, Ui};
+use eframe::egui::util::History;
+use eframe::egui::{self, widgets, Context, Event, ImageData, Key, Layout, Ui};
 use eframe::egui::{vec2, TextureFilter, Vec2};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
@@ -74,6 +75,7 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
         texture: TextureId::default(),
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
+        frame_times: History::new(0..120, 2.0),
 
         state: State {
             last_opened: vec![],
@@ -97,6 +99,8 @@ struct App {
     window_states: [bool; WINDOW_COUNT],
     /// Message channel for reacting to some async events, see [Message].
     message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
+    /// Frame times.
+    frame_times: History<f32>,
 
     /// The App state, which is persisted on reboot.
     state: State,
@@ -110,7 +114,8 @@ impl epi::App for App {
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.visuals_mut().button_frame = false;
-                self.navbar(frame, ui);
+                let now = { ctx.input().time };
+                self.navbar(now, frame, ui);
             });
         });
 
@@ -151,7 +156,8 @@ impl epi::App for App {
         if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamelin_data")) {
             self.state = state;
         }
-        self.rewinder.set_rw_buf_size(self.state.options.rewind_buffer_size);
+        self.rewinder
+            .set_rw_buf_size(self.state.options.rewind_buffer_size);
     }
 
     fn save(&mut self, storage: &mut dyn Storage) {
@@ -255,7 +261,7 @@ impl App {
     }
 
     /// Paint the navbar.
-    fn navbar(&mut self, _frame: &Frame, ui: &mut Ui) {
+    fn navbar(&mut self, now: f64, frame: &Frame, ui: &mut Ui) {
         widgets::global_dark_light_mode_switch(ui);
         ui.separator();
 
@@ -303,7 +309,7 @@ impl App {
             {
                 ui.separator();
                 if ui.button("Exit").clicked() {
-                    _frame.quit();
+                    frame.quit();
                 }
             }
         });
@@ -357,6 +363,17 @@ impl App {
                 self.window_states[5] = true;
                 ui.close_menu();
             }
+        });
+
+        ui.with_layout(Layout::right_to_left(), |ui| {
+            let time = frame.info().cpu_usage.unwrap_or(0.0);
+            self.frame_times.add(now, time);
+            // Backwards because we're in RTL layout
+            ui.monospace(format!(
+                "{:.3}ms",
+                self.frame_times.average().unwrap_or(0.0) * 1000.0
+            ));
+            ui.label("Frame time: ");
         });
     }
 }

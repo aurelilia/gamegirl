@@ -19,7 +19,7 @@ impl Default for Options {
         Self {
             gg: Default::default(),
             enable_rewind: true,
-            rewind_buffer_size: 10
+            rewind_buffer_size: 10,
         }
     }
 }
