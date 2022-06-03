@@ -6,6 +6,7 @@ use crate::Colour;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
+/// Data required for a CGB PPU, mainly palette data.
 #[derive(Deserialize, Serialize)]
 pub struct Cgb {
     bg_palette_idx: u8,
@@ -34,6 +35,7 @@ impl Default for Cgb {
     }
 }
 
+/// A CGB palette colour.
 #[derive(Copy, Clone, Default, Deserialize, Serialize)]
 pub struct CgbColour {
     pub colour: Colour,

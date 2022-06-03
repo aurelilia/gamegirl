@@ -29,6 +29,8 @@ const Y_FLIP: u16 = 6;
 const PRIORITY: u16 = 7;
 const CGB_BANK: u16 = 3;
 
+/// PPU of the system, with differing ways of function depending on
+/// DMG/CGB mode.
 #[derive(Deserialize, Serialize)]
 pub struct Ppu {
     mode: Mode,
@@ -40,6 +42,7 @@ pub struct Ppu {
 
     #[serde(with = "BigArray")]
     pixels: [Colour; 160 * 144],
+    /// The last frame finished by the PPU, ready for display.
     #[serde(skip)]
     #[serde(default)]
     pub last_frame: Option<Vec<Colour>>,
@@ -312,7 +315,7 @@ impl Ppu {
         let base = prio || !gg.mmu.ppu.bg_occupied_pixels[x as usize];
         match &gg.mmu.ppu.kind {
             PpuKind::Dmg { .. } => base,
-            // Make sure we ignore unavailbe pixels in DMG compat mode
+            // Make sure we ignore unavailable pixels in DMG compat mode
             PpuKind::Cgb(cgb) => {
                 base && (cgb.dmg_used_x_obj_cords.is_some() || !cgb.unavailable_pixels[x as usize])
             }
@@ -362,12 +365,14 @@ impl Ppu {
     }
 }
 
+/// The kind of PPU this is
 #[derive(Deserialize, Serialize)]
 pub enum PpuKind {
     Dmg { used_x_obj_coords: [Option<u8>; 10] },
     Cgb(Cgb),
 }
 
+/// Mode the PPU can be in.
 #[derive(Copy, Clone, Deserialize, Serialize)]
 enum Mode {
     HBlank = 204,
@@ -392,6 +397,7 @@ impl Mode {
     }
 }
 
+/// Data for a single sprite in OAM.
 #[derive(Debug)]
 struct Sprite {
     x: i16,

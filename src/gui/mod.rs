@@ -22,11 +22,17 @@ use std::path::PathBuf;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
+/// How long a frame takes, and how much the GG should be advanced
+/// each frame. TODO: This assumption only holds for 60hz devices!
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
+/// Total count of windows in GUI.
 const WINDOW_COUNT: usize = GG_WINDOW_COUNT + STATE_WINDOW_COUNT;
 
+/// Count of GUI windows that take the GG as a parameter.
+/// For now, this is only the debugger's windows.
 const GG_WINDOW_COUNT: usize = 4;
+/// GUI windows that take the GG as parameter.
 const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
     ("Debugger", debugger::debugger),
     ("Breakpoints", debugger::breakpoints),
@@ -34,10 +40,13 @@ const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
     ("Cartridge", debugger::cart_info),
 ];
 
+/// Count of GUI windows that take the App state as a parameter.
 const STATE_WINDOW_COUNT: usize = 2;
+/// GUI windows that take the App state as a parameter.
 const STATE_WINDOWS: [(&str, fn(&Context, &mut State, &mut Ui)); STATE_WINDOW_COUNT] =
     [("Options", options::options), ("About", options::about)];
 
+/// Start the GUI. Since this is native, this call will never return.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start(gg: Arc<Mutex<GameGirl>>) {
     let options = eframe::NativeOptions {
@@ -47,6 +56,7 @@ pub fn start(gg: Arc<Mutex<GameGirl>>) {
     eframe::run_native(Box::new(make_app(gg)), options)
 }
 
+/// Start the GUI. Since this is WASM, this call will return.
 #[cfg(target_arch = "wasm32")]
 pub fn start(
     gg: Arc<Mutex<GameGirl>>,
@@ -72,15 +82,23 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
     }
 }
 
+/// The App state.
 struct App {
+    /// The GG currently running.
     gg: Arc<Mutex<GameGirl>>,
+    /// The path to the ROM currently running, if any. Always None on WASM.
     current_rom_path: Option<PathBuf>,
+    /// Rewinder state.
     rewinder: Rewinding,
 
+    /// Texture for the GG's PPU output.
     texture: TextureId,
+    /// Open/closed states of all windows.
     window_states: [bool; WINDOW_COUNT],
+    /// Message channel for reacting to some async events, see [Message].
     message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
 
+    /// The App state, which is persisted on reboot.
     state: State,
 }
 
@@ -118,6 +136,8 @@ impl epi::App for App {
                 .show(ctx, |ui| runner(&mut gg, ui));
         }
 
+        // Immediately repaint, since the GG will have a new frame.
+        // egui will automatically bind the framerate to VSYNC.
         ctx.request_repaint();
     }
 
@@ -150,6 +170,7 @@ impl epi::App for App {
 }
 
 impl App {
+    /// Update the system's state
     fn update_gg(&mut self, ctx: &Context, advance_by: Duration) {
         let frame = self.get_gg_frame(ctx, advance_by);
         if let Some(data) = frame {
@@ -162,6 +183,7 @@ impl App {
         }
     }
 
+    /// Process keyboard inputs and return the GG's next frame, if one was produced.
     fn get_gg_frame(&mut self, ctx: &Context, advance_by: Duration) -> Option<Vec<Colour>> {
         let mut gg = self.gg.lock().unwrap();
         for event in &ctx.input().events {
@@ -195,6 +217,7 @@ impl App {
         gg.mmu.ppu.last_frame.take()
     }
 
+    /// Process all async messages that came in during this frame.
     fn process_messages(&mut self) {
         loop {
             match self.message_channel.1.try_recv() {
@@ -224,6 +247,7 @@ impl App {
         }
     }
 
+    /// Save the system cart RAM, if a cart is loaded and it has RAM.
     fn save_game(&self) {
         let gg = self.gg.lock().unwrap();
         if gg.mmu.cart.rom.len() > 0 && gg.mmu.cart.ram_bank_count() > 0 {
@@ -231,6 +255,7 @@ impl App {
         }
     }
 
+    /// Paint the navbar.
     fn navbar(&mut self, _frame: &Frame, ui: &mut Ui) {
         widgets::global_dark_light_mode_switch(ui);
         ui.separator();
@@ -337,12 +362,18 @@ impl App {
     }
 }
 
+/// State that is persisted on app reboot.
 #[derive(Serialize, Deserialize)]
 pub struct State {
+    /// A list of last opened ROMs. Size is capped to 10, last opened
+    /// ROM is at index 0. The oldest ROM gets removed first.
     last_opened: Vec<PathBuf>,
+    /// User configuration options.
     options: Options,
 }
 
+/// A message that can be sent from some async context.
 pub enum Message {
+    /// A file picked by the user to be opend as a ROM, from the "Open ROM" file picker dialog.
     FileOpen(File),
 }

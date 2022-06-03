@@ -43,10 +43,13 @@ const MATH: [fn(&mut GameGirl, u8) -> u8; 8] = [
     },
 ];
 
+/// An instruction that can be executed by the CPU.
 #[derive(Copy, Clone)]
 pub struct Inst(u8, u8);
 
 impl Inst {
+    /// Produce the name of the instruction, with immediate
+    /// parameters replaced with their actual value.
     pub fn formatted_name(&self, arg: u16) -> String {
         let base = self.get(&data::NAMES, &data::NAMES_EXT);
         let base = base.replace("a8", &format!("FF{:02X}", arg & 0xFF));

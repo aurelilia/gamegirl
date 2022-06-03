@@ -3,13 +3,18 @@ use crate::system::{CgbMode, GGOptions};
 use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, Ui};
 use serde::{Deserialize, Serialize};
 
+/// User-configurable options.
 #[derive(Default, Serialize, Deserialize)]
 pub struct Options {
+    /// Options passed to the system when loading a ROM.
     pub gg: GGOptions,
+    /// Enable rewinding.
     pub enable_rewind: bool,
+    /// Rewind buffer size (if enabled), in seconds.
     pub rewind_buffer_size: usize,
 }
 
+/// Show the options menu.
 pub fn options(ctx: &Context, state: &mut State, ui: &mut Ui) {
     CollapsingHeader::new("Emulation").show(ui, |ui| {
         ComboBox::from_label("GB Colour mode")
@@ -36,6 +41,7 @@ pub fn options(ctx: &Context, state: &mut State, ui: &mut Ui) {
     CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
 }
 
+/// Show a nice little "About" window. c:
 pub fn about(_ctx: &Context, _state: &mut State, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.label("GameGirl v0.1 made by ");

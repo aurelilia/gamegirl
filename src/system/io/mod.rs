@@ -24,6 +24,11 @@ pub mod joypad;
 mod ppu;
 mod timer;
 
+/// The MMU of the GG, containing all IO devices along
+/// with big arrays holding internal memory.
+///
+/// IO registers can be directly read by IO devices by indexing the MMU,
+/// the various addresses are defined in the `addr` submodule.
 #[derive(Deserialize, Serialize)]
 pub struct Mmu {
     #[serde(with = "BigArray")]
@@ -55,6 +60,8 @@ pub struct Mmu {
 }
 
 impl Mmu {
+    /// Step the system forward by the given amount of cycles.
+    /// The given T cycles should already be adjusted for CGB 2x speed mode.
     pub(super) fn step(gg: &mut GameGirl, m_cycles: usize, t_cycles: usize) {
         let t_cpu = m_cycles * 4;
         Hdma::step(gg);
@@ -174,6 +181,7 @@ impl Mmu {
         self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
+    /// Reset the MMU and all IO devices except the cartridge.
     pub(super) fn reset(&mut self) -> Self {
         // TODO the clones are kinda eh
         let mut new = Self::new(self.debugger.clone());
@@ -207,7 +215,7 @@ impl Mmu {
         mmu
     }
 
-    pub fn load_cart(&mut self, cart: Cartridge, conf: &GGOptions) {
+    pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &GGOptions) {
         self.cgb = match conf.mode {
             CgbMode::Always => true,
             CgbMode::Prefer => cart.supports_cgb(),

@@ -8,6 +8,9 @@ use crate::system::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// OAM DMA transfer available on DMG and CGB.
+/// This implementation writes everything at once
+/// once the timer of 648 cycles is up.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Dma {
     time_left: i16,
@@ -34,6 +37,7 @@ impl Dma {
     }
 }
 
+/// HDMA VRAM transfer available only on CGB.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Hdma {
     source: u16,

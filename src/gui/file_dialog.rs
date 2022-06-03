@@ -4,11 +4,16 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::mpsc;
 
+/// A file picked by the user.
 pub struct File {
+    /// File content in bytes
     pub content: Vec<u8>,
+    /// Path of the file. Always None on WASM.
     pub path: Option<PathBuf>,
 }
 
+/// Open a file dialog. This operation is async and returns immediately,
+/// sending a [Message] once the user has picked a file.
 pub fn open(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
         .add_filter("GameGirl games", &["gb", "gbc"])

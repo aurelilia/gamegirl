@@ -18,6 +18,8 @@ pub mod io;
 const T_CLOCK_HZ: usize = 4194304;
 const M_CLOCK_HZ: f32 = T_CLOCK_HZ as f32 / 4.0;
 
+/// The system and it's state.
+/// Represents the entire console.
 #[derive(Deserialize, Serialize)]
 pub struct GameGirl {
     pub cpu: Cpu,
@@ -26,14 +28,23 @@ pub struct GameGirl {
     #[serde(default)]
     pub debugger: Arc<Debugger>,
 
+    /// Shift of t clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
+    /// Temporary for keeping track of how many clocks elapsed in [advance_delta].
     clock: usize,
+    /// If the system is running. If false, any calls to [advance_delta] and [produce_samples] do nothing.
     pub running: bool,
+    /// If there is a ROM loaded / cartridge inserted.
     pub rom_loaded: bool,
+    /// If the audio samples produced by [produce_samples] should be in reversed order.
+    /// `true` while rewinding.
     pub invert_audio_samples: bool,
 }
 
 impl GameGirl {
+    /// Advance the system clock by the given delta in seconds.
+    /// Might advance a few clocks more; especially if a GDMA transfer
+    /// occurs at the wrong time.
     pub fn advance_delta(&mut self, delta: f32) {
         if !self.running {
             return;
@@ -50,6 +61,9 @@ impl GameGirl {
         }
     }
 
+    /// Produce the next `count` amount of audio samples.
+    /// Returns `None` if the system is not currently running
+    /// and no audio should be played.
     pub fn produce_samples(&mut self, count: usize) -> Option<Vec<f32>> {
         if !self.running {
             return None;
@@ -74,16 +88,19 @@ impl GameGirl {
         Some(samples)
     }
 
+    /// Advance the system by a single CPU instruction.
     pub fn advance(&mut self) {
         Cpu::exec_next_inst(self)
     }
 
+    /// Advance the MMU, which is everything except the CPU.
     fn advance_clock(&mut self, m_cycles: usize) {
         let t_cycles = m_cycles << self.t_shift;
         Mmu::step(self, m_cycles, t_cycles);
         self.clock += m_cycles
     }
 
+    /// Switch between CGB 2x and normal speed mode.
     fn switch_speed(&mut self) {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
         self.mmu[KEY1] = (self.t_shift & 1) << 7;
@@ -115,12 +132,16 @@ impl GameGirl {
         self.mmu.write16(self.cpu.sp, value)
     }
 
+    /// Reset the console, while keeping the current cartridge inserted.
     pub fn reset(&mut self) {
         self.cpu = Cpu::default();
         self.mmu = self.mmu.reset();
         self.t_shift = 2;
     }
 
+    /// Create a save state that can be loaded with [load_state].
+    /// It is zstd-compressed bincode.
+    /// PPU display output and the cartridge are not stored.
     pub fn save_state(&self) -> Vec<u8> {
         if cfg!(target_arch = "wasm32") {
             // Currently crashes when loading...
@@ -133,6 +154,8 @@ impl GameGirl {
         dest
     }
 
+    /// Load a state produced by [save_state].
+    /// Will restore the current cartridge and debugger.
     pub fn load_state(&mut self, state: &[u8]) {
         if cfg!(target_arch = "wasm32") {
             // Currently crashes...
@@ -145,6 +168,7 @@ impl GameGirl {
         self.mmu.bootrom = old_self.mmu.bootrom;
     }
 
+    /// Create a new console with no cartridge loaded.
     pub fn new() -> Self {
         let debugger = Arc::new(Debugger::default());
         Self {
@@ -160,6 +184,8 @@ impl GameGirl {
         }
     }
 
+    /// Load the given cartridge.
+    /// `reset` indicates if the system should be reset before loading.
     pub fn load_cart(&mut self, cart: Cartridge, config: &GGOptions, reset: bool) {
         if reset {
             let dbg = self.debugger.clone();
@@ -172,6 +198,7 @@ impl GameGirl {
         self.rom_loaded = true;
     }
 
+    /// Create a system with a cart already loaded.
     pub fn with_cart(rom: Vec<u8>) -> Self {
         let mut gg = Self::new();
         gg.load_cart(Cartridge::from_rom(rom), &GGOptions::default(), false);
@@ -179,15 +206,23 @@ impl GameGirl {
     }
 }
 
+/// Configuration used when initializing the system.
 #[derive(Default, Serialize, Deserialize)]
 pub struct GGOptions {
+    /// How to handle CGB mode.
     pub mode: CgbMode,
 }
 
+/// How to handle CGB mode depending on cart compatibility.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum CgbMode {
+    /// Always run in CGB mode, even when the cart does not support it.
+    /// If it does not, it is run in DMG compatibility mode, just like on a
+    /// real CGB.
     Always,
+    /// If the cart has CGB support, run it as CGB; if not, don't.
     Prefer,
+    /// Never run the cart in CGB mode unless it requires it.
     Never,
 }
 

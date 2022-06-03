@@ -5,6 +5,7 @@ use crate::system::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// Timer available on DMG and CGB.
 #[derive(Deserialize, Serialize)]
 pub struct Timer {
     div_cycle_count: usize,

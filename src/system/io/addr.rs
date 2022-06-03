@@ -1,3 +1,5 @@
+//! This file contains a bunch of IO registers used by the MMU and it's subcomponents.
+
 pub const HIGH_START: u16 = 0xFF00;
 
 pub const BOOTROM_DISABLE: u16 = 0xFF50 - HIGH_START;

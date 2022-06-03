@@ -11,12 +11,15 @@ const ROM_BANKS: u16 = 0x0148;
 const RAM_BANKS: u16 = 0x0149;
 const BANK_COUNT_1MB: u16 = 64;
 
+/// Struct representing the game cartridge.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Cartridge {
     #[serde(skip)]
     #[serde(default)]
     pub rom: Vec<u8>,
+    /// Bank of the ROM area 0-4000. This is used by some MBCs.
     pub rom0_bank: u16,
+    /// Bank of the ROM area 4000-8000.
     pub rom1_bank: u16,
 
     pub(super) ram: Vec<u8>,
@@ -141,6 +144,7 @@ impl Cartridge {
         self.rom[CGB_FLAG.us()] == CGB_ONLY
     }
 
+    /// Read out the title in the cartridge header.
     pub fn title(&self, extended: bool) -> String {
         let mut buf = String::with_capacity(20);
         let end = if extended { 0x0142 } else { 0x013E };
@@ -197,6 +201,7 @@ impl Cartridge {
     }
 }
 
+/// Various MBCs supported by GG.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum MBCKind {
     NoMBC,

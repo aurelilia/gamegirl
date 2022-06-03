@@ -7,6 +7,7 @@ mod alu;
 mod data;
 pub mod inst;
 
+/// The system CPU and it's registers.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Cpu {
     pub pc: u16,
@@ -18,6 +19,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
+    /// Execute the next instruction, moving the entire system forward.
     pub(super) fn exec_next_inst(gg: &mut GameGirl) {
         if !gg.debugger.should_execute(gg.cpu.pc) {
             return;
@@ -48,6 +50,7 @@ impl Cpu {
         }
     }
 
+    /// Check if any interrupts occurred.
     fn check_interrupts(gg: &mut GameGirl, ime: bool) -> bool {
         let bits = gg.mmu[IE] & gg.mmu[IF];
         if !ime || (bits == 0) {
@@ -101,6 +104,7 @@ impl Cpu {
     }
 }
 
+/// The CPU's registers.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Reg {
     A,
@@ -119,6 +123,7 @@ impl Reg {
     }
 }
 
+/// The CPU's double registers.
 #[derive(Debug, Copy, Clone)]
 pub enum DReg {
     BC,
@@ -147,6 +152,7 @@ impl DReg {
     }
 }
 
+/// Flags stored in the F register.
 #[derive(Copy, Clone)]
 pub enum Flag {
     Zero = 7,
@@ -173,6 +179,7 @@ impl Flag {
     }
 }
 
+/// Interrupts and their vectors.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Interrupt {
     VBlank = 0x0040,

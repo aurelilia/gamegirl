@@ -5,6 +5,7 @@ use eframe::egui::Key;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// Joypad of the console.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Joypad {
     key_states: [bool; 8],
@@ -25,6 +26,7 @@ impl Joypad {
         res | (joyp & 0x30) | 0b1100_0000
     }
 
+    /// To be called by GUI code; sets the state of a given button.
     pub fn set(gg: &mut GameGirl, button: Button, state: bool) {
         gg.mmu.joypad.key_states[button as usize] = state;
         let read = gg.mmu.joypad.read(gg.mmu[JOYP]);

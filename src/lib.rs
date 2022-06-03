@@ -17,12 +17,14 @@ use std::sync::{Arc, Mutex};
 #[cfg(target_arch = "wasm32")]
 use eframe::wasm_bindgen::{self, prelude::*};
 
+/// Colour type used by the PPU for display output.
 pub type Colour = Color32;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct Handle(Stream);
 
+/// Start the emulator on WASM. See web/index.html for usage.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
@@ -35,6 +37,12 @@ pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
     gui::start(gg, canvas_id).map(|_| Handle(stream))
 }
 
+/// Setup audio playback on the default audio device using CPAL.
+/// Will automatically poll the gg for audio when needed on a separate thread.
+/// *NOT* used for synchronization, since audio samples are requested less than
+/// 60 times per second, which would lead to choppy display.
+/// Make sure to keep the returned Stream around to prevent the audio playback
+/// thread from closing.
 pub fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
     let device = cpal::default_host().default_output_device().unwrap();
     let stream = device
@@ -51,6 +59,8 @@ pub fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
                 };
                 if let Some(samples) = samples {
                     data.copy_from_slice(&samples);
+                } else {
+                    data.fill(0.0);
                 }
             },
             move |err| panic!("{err}"),

@@ -6,6 +6,8 @@ use crate::Colour;
 use eframe::egui::{Align, Label, RichText, ScrollArea, TextEdit, Ui};
 use std::fmt::Write;
 
+/// Debugger window with instruction view, stack inspection and register inspection.
+/// Allows for inst-by-inst advancing.
 pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
     if !gg.rom_loaded {
         ui.label("No ROM loaded yet!");
@@ -83,6 +85,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
     });
 }
 
+/// Window for configuring active breakpoints.
 pub fn breakpoints(gg: &mut GameGirl, ui: &mut Ui) {
     let mut bps = gg.debugger.breakpoints.lock().unwrap();
     for bp in bps.iter_mut() {
@@ -109,6 +112,7 @@ pub fn breakpoints(gg: &mut GameGirl, ui: &mut Ui) {
     });
 }
 
+/// Memory viewer showing the entire GG's address space.
 pub fn memory(gg: &mut GameGirl, ui: &mut Ui) {
     let mut buf = String::new();
     let mut position = None;
@@ -161,6 +165,7 @@ pub fn memory(gg: &mut GameGirl, ui: &mut Ui) {
     });
 }
 
+/// Window showing information about the loaded ROM/cart.
 pub fn cart_info(gg: &mut GameGirl, ui: &mut Ui) {
     if !gg.rom_loaded {
         ui.label("No ROM loaded yet!");
