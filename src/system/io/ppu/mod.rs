@@ -7,7 +7,6 @@ use crate::system::GameGirl;
 use crate::Colour;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_big_array::BigArray;
 
 mod cgb;
 mod dmg;
@@ -35,12 +34,12 @@ const CGB_BANK: u16 = 3;
 pub struct Ppu {
     mode: Mode,
     mode_clock: u16,
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     bg_occupied_pixels: [bool; 160],
     window_line: u8,
     kind: PpuKind,
 
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     pixels: [Colour; 160 * 144],
     /// The last frame finished by the PPU, ready for display.
     #[serde(skip)]

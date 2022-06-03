@@ -8,7 +8,6 @@ use crate::system::io::ppu::Ppu;
 use crate::system::io::timer::Timer;
 use crate::system::{CgbMode, GGOptions, GameGirl};
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 use std::{
     ops::{Index, IndexMut},
     sync::Arc,
@@ -31,15 +30,15 @@ mod timer;
 /// the various addresses are defined in the `addr` submodule.
 #[derive(Deserialize, Serialize)]
 pub struct Mmu {
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     vram: [u8; 2 * 8192],
     vram_bank: u8,
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     wram: [u8; 4 * 8192],
     wram_bank: u8,
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     oam: [u8; 160],
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     high: [u8; 256],
 
     #[serde(skip)]

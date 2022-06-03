@@ -4,7 +4,6 @@ use crate::system::io::ppu::{Ppu, PpuKind, BG_EN};
 use crate::system::GameGirl;
 use crate::Colour;
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 
 /// Data required for a CGB PPU, mainly palette data.
 #[derive(Deserialize, Serialize)]
@@ -16,7 +15,7 @@ pub struct Cgb {
     obj_palette_inc: bool,
     pub obj_palettes: [CgbColour; 32],
     pub(super) dmg_used_x_obj_cords: Option<[Option<u8>; 10]>,
-    #[serde(with = "BigArray")]
+    #[serde(with = "serde_arrays")]
     pub unavailable_pixels: [bool; 160],
 }
 

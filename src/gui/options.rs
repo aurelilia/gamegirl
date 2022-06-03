@@ -4,7 +4,7 @@ use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, Ui};
 use serde::{Deserialize, Serialize};
 
 /// User-configurable options.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Options {
     /// Options passed to the system when loading a ROM.
     pub gg: GGOptions,
@@ -12,6 +12,16 @@ pub struct Options {
     pub enable_rewind: bool,
     /// Rewind buffer size (if enabled), in seconds.
     pub rewind_buffer_size: usize,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            gg: Default::default(),
+            enable_rewind: true,
+            rewind_buffer_size: 10
+        }
+    }
 }
 
 /// Show the options menu.

@@ -150,9 +150,8 @@ impl epi::App for App {
         );
         if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamelin_data")) {
             self.state = state;
-            self.rewinder
-                .set_rw_buf_size(self.state.options.rewind_buffer_size);
         }
+        self.rewinder.set_rw_buf_size(self.state.options.rewind_buffer_size);
     }
 
     fn save(&mut self, storage: &mut dyn Storage) {
