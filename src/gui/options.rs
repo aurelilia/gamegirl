@@ -42,7 +42,7 @@ pub fn options(ctx: &Context, state: &mut State, ui: &mut Ui) {
                 ui.add(Slider::new(&mut state.options.rewind_buffer_size, 1..=60));
                 ui.label(format!(
                     "({}s, ~{}MB)",
-                    state.options.rewind_buffer_size, state.options.rewind_buffer_size
+                    state.options.rewind_buffer_size, state.options.rewind_buffer_size,
                 ));
             });
         }

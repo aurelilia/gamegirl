@@ -34,12 +34,14 @@ const CGB_BANK: u16 = 3;
 pub struct Ppu {
     mode: Mode,
     mode_clock: u16,
-    #[serde(with = "serde_arrays")]
+    #[serde(skip)]
+    #[serde(default = "serde_bool_arr")]
     bg_occupied_pixels: [bool; 160],
     window_line: u8,
     kind: PpuKind,
 
-    #[serde(with = "serde_arrays")]
+    #[serde(skip)]
+    #[serde(default = "serde_colour_arr")]
     pixels: [Colour; 160 * 144],
     /// The last frame finished by the PPU, ready for display.
     #[serde(skip)]
@@ -93,6 +95,7 @@ impl Ppu {
                 if gg.mmu[LY] > 153 {
                     gg.mmu[LY] = 0;
                     gg.mmu.ppu.window_line = 0;
+                    (gg.frame_finished)(gg);
                     Self::stat_interrupt(gg, 5);
                     Mode::OAMScan
                 } else {
@@ -436,4 +439,12 @@ impl GameGirl {
             0x1800
         }
     }
+}
+
+fn serde_bool_arr() -> [bool; 160] {
+    [false; 160]
+}
+
+fn serde_colour_arr() -> [Colour; 160 * 144] {
+    [Colour::BLACK; 160 * 144]
 }

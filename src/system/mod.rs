@@ -1,3 +1,4 @@
+use crate::Colour;
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::sync::atomic::Ordering;
@@ -39,6 +40,10 @@ pub struct GameGirl {
     /// If the audio samples produced by [produce_samples] should be in reversed order.
     /// `true` while rewinding.
     pub invert_audio_samples: bool,
+    /// Called when a frame is finished rendering. (End of VBlank)
+    #[serde(skip)]
+    #[serde(default = "frame_finished")]
+    pub frame_finished: Box<dyn Fn(&GameGirl) + Send>,
 }
 
 impl GameGirl {
@@ -61,6 +66,25 @@ impl GameGirl {
         }
     }
 
+    /// Step until the PPU has finished producing the current frame.
+    /// Only used for rewinding since it causes audio desync very easily.
+    pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
+        if !self.running {
+            return None;
+        }
+
+        while self.mmu.ppu.last_frame == None {
+            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
+                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+                self.running = false;
+                return None;
+            }
+            self.advance();
+        }
+
+        self.mmu.ppu.last_frame.take()
+    }
+
     /// Produce the next `count` amount of audio samples.
     /// Returns `None` if the system is not currently running
     /// and no audio should be played.
@@ -77,14 +101,25 @@ impl GameGirl {
             }
             self.advance();
         }
+
         let mut samples = mem::take(&mut self.mmu.apu.buffer);
-        for sample in samples.drain(count..) {
-            self.mmu.apu.buffer.push(sample);
+        if self.invert_audio_samples {
+            // If rewinding, truncate and get rid of any excess samples to prevent
+            // audio samples getting backed up
+            samples.truncate(count);
+            samples.reverse();
+        } else {
+            // Otherwise, store any excess samples back in the buffer for next time
+            // while again not storing too many to avoid backing up.
+            // This way can cause clipping if the console produces audio too fast,
+            // however this is preferred to audio falling behind and eating
+            // a lot of memory.
+            for sample in samples.drain(count..) {
+                self.mmu.apu.buffer.push(sample);
+            }
+            self.mmu.apu.buffer.truncate(10_000);
         }
 
-        if self.invert_audio_samples {
-            samples.reverse();
-        }
         Some(samples)
     }
 
@@ -165,6 +200,7 @@ impl GameGirl {
         let old_self = mem::replace(self, bincode::deserialize_from(decoder).unwrap());
         self.debugger = old_self.debugger;
         self.mmu.cart.rom = old_self.mmu.cart.rom;
+        self.frame_finished = old_self.frame_finished;
         self.mmu.bootrom = old_self.mmu.bootrom;
     }
 
@@ -181,6 +217,7 @@ impl GameGirl {
             running: false,
             rom_loaded: false,
             invert_audio_samples: false,
+            frame_finished: Box::new(|_| ()),
         }
     }
 
@@ -188,10 +225,10 @@ impl GameGirl {
     /// `reset` indicates if the system should be reset before loading.
     pub fn load_cart(&mut self, cart: Cartridge, config: &GGOptions, reset: bool) {
         if reset {
-            let dbg = self.debugger.clone();
-            *self = Self::new();
-            self.debugger = dbg.clone();
-            self.mmu.debugger = dbg;
+            let old_self = mem::replace(self, Self::new());
+            self.debugger = old_self.debugger.clone();
+            self.mmu.debugger = old_self.debugger;
+            self.frame_finished = old_self.frame_finished;
         }
         self.mmu.load_cart(cart, config);
         self.running = true;
@@ -230,4 +267,8 @@ impl Default for CgbMode {
     fn default() -> Self {
         Self::Prefer
     }
+}
+
+fn frame_finished() -> Box<dyn Fn(&GameGirl) + Send> {
+    Box::new(|_| ())
 }

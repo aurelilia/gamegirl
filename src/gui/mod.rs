@@ -158,6 +158,15 @@ impl epi::App for App {
         }
         self.rewinder
             .set_rw_buf_size(self.state.options.rewind_buffer_size);
+
+        let buffer = self.rewinder.rewind_buffer.clone();
+        if self.state.options.enable_rewind {
+            self.gg.lock().unwrap().frame_finished = Box::new(move |gg| {
+                if !gg.invert_audio_samples {
+                    buffer.lock().unwrap().push(gg.save_state());
+                }
+            });
+        }
     }
 
     fn save(&mut self, storage: &mut dyn Storage) {
@@ -204,20 +213,16 @@ impl App {
         }
 
         if self.rewinder.rewinding {
-            if let Some(state) = self.rewinder.rewind_buffer.pop() {
+            if let Some(state) = self.rewinder.rewind_buffer.lock().unwrap().pop() {
                 gg.load_state(state);
                 gg.invert_audio_samples = true;
-                // Produce a frame
-                gg.advance_delta(advance_by.as_secs_f32());
+                return gg.produce_frame();
             } else {
                 self.rewinder.rewinding = false;
                 gg.invert_audio_samples = false;
             }
         } else {
             gg.advance_delta(advance_by.as_secs_f32());
-            if self.state.options.enable_rewind {
-                self.rewinder.rewind_buffer.push(gg.save_state());
-            }
         }
         gg.mmu.ppu.last_frame.take()
     }

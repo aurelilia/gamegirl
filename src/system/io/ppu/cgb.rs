@@ -14,8 +14,11 @@ pub struct Cgb {
     obj_palette_idx: u8,
     obj_palette_inc: bool,
     pub obj_palettes: [CgbColour; 32],
+    #[serde(skip)]
+    #[serde(default)]
     pub(super) dmg_used_x_obj_cords: Option<[Option<u8>; 10]>,
-    #[serde(with = "serde_arrays")]
+    #[serde(skip)]
+    #[serde(default = "super::serde_bool_arr")]
     pub unavailable_pixels: [bool; 160],
 }
 
