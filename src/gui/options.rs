@@ -85,6 +85,15 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
 
         CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
     });
+
+    CollapsingHeader::new("Audio").show(ui, |ui| {
+        ui.horizontal(|ui| {
+            if ui.add(Slider::new(&mut opt.gg.volume, 0.0..=1.0)).changed() {
+                app.gg.lock().unwrap().config.volume = opt.gg.volume;
+            }
+            ui.label("Volume");
+        });
+    });
 }
 
 /// Show a nice little "About" window. c:

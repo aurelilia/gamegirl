@@ -86,42 +86,47 @@ impl GameGirl {
         self.mmu.ppu.last_frame.take()
     }
 
-    /// Produce the next `count` amount of audio samples.
-    /// Returns `None` if the system is not currently running
+    /// Produce the next audio samples and write them to the given buffer.
+    /// Writes zeroes if the system is not currently running
     /// and no audio should be played.
-    pub fn produce_samples(&mut self, count: usize) -> Option<Vec<f32>> {
+    pub fn produce_samples(&mut self, samples: &mut [f32]) {
         if !self.running {
-            return None;
+            samples.fill(0.0);
+            return;
         }
 
-        while self.mmu.apu.buffer.len() < count {
+        while self.mmu.apu.buffer.len() < samples.len() {
             if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
                 self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
                 self.running = false;
-                return None;
+                samples.fill(0.0);
+                return;
             }
             self.advance();
         }
 
-        let mut samples = mem::take(&mut self.mmu.apu.buffer);
+        let mut buffer = mem::take(&mut self.mmu.apu.buffer);
         if self.invert_audio_samples {
             // If rewinding, truncate and get rid of any excess samples to prevent
             // audio samples getting backed up
-            samples.truncate(count);
-            samples.reverse();
+            for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
+                *dst = src * self.config.volume;
+            }
         } else {
             // Otherwise, store any excess samples back in the buffer for next time
             // while again not storing too many to avoid backing up.
             // This way can cause clipping if the console produces audio too fast,
             // however this is preferred to audio falling behind and eating
             // a lot of memory.
-            for sample in samples.drain(count..) {
+            for sample in buffer.drain(samples.len()..) {
                 self.mmu.apu.buffer.push(sample);
             }
             self.mmu.apu.buffer.truncate(10_000);
-        }
 
-        Some(samples)
+            for (src, dst) in buffer.into_iter().zip(samples.iter_mut()) {
+                *dst = src * self.config.volume;
+            }
+        }
     }
 
     /// Advance the system by a single CPU instruction.
@@ -256,7 +261,7 @@ impl GameGirl {
 }
 
 /// Configuration used when initializing the system.
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GGOptions {
     /// How to handle CGB mode.
     pub mode: CgbMode,
@@ -264,6 +269,19 @@ pub struct GGOptions {
     pub compress_savestates: bool,
     /// If CGB colours should be corrected.
     pub cgb_colour_correction: bool,
+    /// Audio volume multiplier
+    pub volume: f32,
+}
+
+impl Default for GGOptions {
+    fn default() -> Self {
+        Self {
+            mode: CgbMode::Prefer,
+            compress_savestates: false,
+            cgb_colour_correction: false,
+            volume: 0.5,
+        }
+    }
 }
 
 /// How to handle CGB mode depending on cart compatibility.
@@ -277,12 +295,6 @@ pub enum CgbMode {
     Prefer,
     /// Never run the cart in CGB mode unless it requires it.
     Never,
-}
-
-impl Default for CgbMode {
-    fn default() -> Self {
-        Self::Prefer
-    }
 }
 
 fn frame_finished() -> Box<dyn Fn(&GameGirl) + Send> {
