@@ -1,5 +1,5 @@
 use crate::gui::input::{Input, InputAction};
-use crate::gui::App;
+use crate::gui::{input::HOTKEYS, App};
 use crate::system::io::joypad::Button;
 use crate::system::{CgbMode, GGOptions};
 use eframe::egui;
@@ -14,6 +14,10 @@ pub struct Options {
     /// Input configuration.
     pub input: Input,
 
+    /// Fast forward speed for the hold button.
+    pub fast_forward_hold_speed: usize,
+    /// Fast forward speed for the toggle button.
+    pub fast_forward_toggle_speed: usize,
     /// Enable rewinding.
     pub enable_rewind: bool,
     /// Rewind buffer size (if enabled), in seconds.
@@ -30,6 +34,8 @@ impl Default for Options {
         Self {
             gg: Default::default(),
             input: Input::new(),
+            fast_forward_hold_speed: 2,
+            fast_forward_toggle_speed: 2,
             enable_rewind: true,
             rewind_buffer_size: 10,
             display_scale: 2,
@@ -49,6 +55,17 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 ui.selectable_value(&mut opt.gg.mode, CgbMode::Prefer, "Prefer");
                 ui.selectable_value(&mut opt.gg.mode, CgbMode::Never, "Never");
             });
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            ui.add(Slider::new(&mut opt.fast_forward_hold_speed, 2..=10));
+            ui.label("Fast forward speed (Hold)");
+        });
+        ui.horizontal(|ui| {
+            ui.add(Slider::new(&mut opt.fast_forward_toggle_speed, 2..=10));
+            ui.label("Fast forward speed (Toggle)");
+        });
+        ui.separator();
 
         ui.checkbox(&mut opt.gg.compress_savestates, "Compress save states/rewinding")
             .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
@@ -103,9 +120,36 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         });
     });
 
-    CollapsingHeader::new("Input").show(ui, |ui| {
-        for btn in &Button::BUTTONS {
-            let action = InputAction::Button(*btn);
+    input_section(
+        ui,
+        "Input",
+        opt,
+        Button::BUTTONS
+            .iter()
+            .map(|btn| (format!("{:?}", btn), InputAction::Button(*btn))),
+    );
+    input_section(
+        ui,
+        "Hotkeys",
+        opt,
+        HOTKEYS
+            .iter()
+            .enumerate()
+            .map(|(i, (n, _))| (n.to_string(), InputAction::Hotkey(i as u8))),
+    );
+
+    ui.separator();
+    ui.label("Some options require a restart to apply.");
+}
+
+fn input_section(
+    ui: &mut Ui,
+    name: &'static str,
+    opt: &mut Options,
+    iter: impl Iterator<Item = (String, InputAction)>,
+) {
+    CollapsingHeader::new(name).show(ui, |ui| {
+        for (name, action) in iter {
             let active = Some(action) == opt.input.pending;
             let text = if active {
                 "...".to_string()
@@ -120,7 +164,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 {
                     opt.input.pending = Some(action);
                 }
-                ui.label(format!("{:?}", btn));
+                ui.label(name);
             });
         }
     });

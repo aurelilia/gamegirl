@@ -14,7 +14,7 @@ use crate::system::io::joypad::Joypad;
 use crate::Colour;
 use crate::GameGirl;
 use eframe::egui::util::History;
-use eframe::egui::{self, widgets, Context, Event, ImageData, Key, Layout, Ui};
+use eframe::egui::{self, widgets, Context, Event, ImageData, Layout, Ui};
 use eframe::egui::{vec2, TextureFilter, Vec2};
 use eframe::epaint::{ColorImage, ImageDelta, TextureId};
 use eframe::epi;
@@ -73,6 +73,7 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
         gg,
         current_rom_path: None,
         rewinder: Rewinding::default(),
+        fast_forward_toggled: false,
 
         texture: TextureId::default(),
         window_states: [false; WINDOW_COUNT],
@@ -94,6 +95,8 @@ struct App {
     current_rom_path: Option<PathBuf>,
     /// Rewinder state.
     rewinder: Rewinding,
+    /// If the emulator is fast-forwarding using the toggle hotkey.
+    fast_forward_toggled: bool,
 
     /// Texture for the GG's PPU output.
     texture: TextureId,
@@ -206,7 +209,6 @@ impl App {
 
     /// Process keyboard inputs and return the GG's next frame, if one was produced.
     fn get_gg_frame(&mut self, ctx: &Context, advance_by: Duration) -> Option<Vec<Colour>> {
-        let mut gg = self.gg.lock().unwrap();
         for event in &ctx.input().events {
             if let Event::Key { key, pressed, .. } = event {
                 if let Some(action) = self.state.options.input.pending.take() {
@@ -215,17 +217,18 @@ impl App {
                 }
 
                 match self.state.options.input.get_key(*key) {
-                    Some(InputAction::Button(btn)) => Joypad::set(&mut gg, btn, *pressed),
-                    Some(InputAction::Hotkey(_idx)) => todo!(),
+                    Some(InputAction::Button(btn)) => {
+                        Joypad::set(&mut self.gg.lock().unwrap(), btn, *pressed)
+                    }
+                    Some(InputAction::Hotkey(idx)) => {
+                        input::HOTKEYS[idx as usize].1(self, *pressed)
+                    }
                     None => (),
-                }
-                if *key == Key::R {
-                    self.rewinder.rewinding = *pressed;
-                    gg.invert_audio_samples = *pressed;
                 }
             }
         }
 
+        let mut gg = self.gg.lock().unwrap();
         if self.rewinder.rewinding {
             if let Some(state) = self.rewinder.rewind_buffer.lock().unwrap().pop() {
                 gg.load_state(state);

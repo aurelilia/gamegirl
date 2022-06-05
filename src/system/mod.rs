@@ -30,7 +30,7 @@ pub struct GameGirl {
     pub debugger: Arc<Debugger>,
     pub config: GGOptions,
 
-    /// Shift of t clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
+    /// Shift of t-clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
     /// Temporary for keeping track of how many clocks elapsed in [advance_delta].
     clock: usize,
@@ -41,6 +41,10 @@ pub struct GameGirl {
     /// If the audio samples produced by [produce_samples] should be in reversed order.
     /// `true` while rewinding.
     pub invert_audio_samples: bool,
+    /// Speed multiplier the system should run at.
+    /// ex. 1x is regular speed, 2x is double speed.
+    /// Affects [advance_delta] and sound sample output.
+    pub speed_multiplier: usize,
     /// Called when a frame is finished rendering. (End of VBlank)
     #[serde(skip)]
     #[serde(default = "frame_finished")]
@@ -56,7 +60,7 @@ impl GameGirl {
             return;
         }
         self.clock = 0;
-        let target = (M_CLOCK_HZ * delta) as usize;
+        let target = (M_CLOCK_HZ * delta * self.speed_multiplier as f32) as usize;
         while self.clock < target {
             if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
                 self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
@@ -95,7 +99,8 @@ impl GameGirl {
             return;
         }
 
-        while self.mmu.apu.buffer.len() < samples.len() {
+        let target = samples.len() * self.speed_multiplier;
+        while self.mmu.apu.buffer.len() < target {
             if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
                 self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
                 self.running = false;
@@ -118,12 +123,16 @@ impl GameGirl {
             // This way can cause clipping if the console produces audio too fast,
             // however this is preferred to audio falling behind and eating
             // a lot of memory.
-            for sample in buffer.drain(samples.len()..) {
+            for sample in buffer.drain(target..) {
                 self.mmu.apu.buffer.push(sample);
             }
-            self.mmu.apu.buffer.truncate(10_000);
+            self.mmu.apu.buffer.truncate(5_000);
 
-            for (src, dst) in buffer.into_iter().zip(samples.iter_mut()) {
+            for (src, dst) in buffer
+                .into_iter()
+                .step_by(self.speed_multiplier)
+                .zip(samples.iter_mut())
+            {
                 *dst = src * self.config.volume;
             }
         }
@@ -233,6 +242,7 @@ impl GameGirl {
             running: false,
             rom_loaded: false,
             invert_audio_samples: false,
+            speed_multiplier: 1,
             frame_finished: Box::new(|_| ()),
         }
     }

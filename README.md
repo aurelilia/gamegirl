@@ -8,9 +8,12 @@ enough to make most commercial games run perfectly.
 Some features are still missing but being worked on.
 
 ### Features
-- Complete DMG/CGB implementation
+- Complete DMG/CGB implementation, including running DMG games on CGB
+- Colour correction for CGB
+- Highly configurable, including input
 - Savegame support in common `.sav` format (No RTC yet.)
 - Support for creating and loading save states with "undo last load" function
+- Fast forwarding hotkeys, both toggle and hold
 - Rewinding support with little memory use (~1MB per second of rewinding at 60fps)
 - Debugger with:
     - Line-by-line advance

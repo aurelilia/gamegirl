@@ -1,9 +1,55 @@
+use crate::gui::{file_dialog, App};
 use crate::system::io::joypad::Button;
 use crate::system::io::joypad::Button::*;
 use eframe::egui::Key;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use InputAction::*;
+
+pub(super) const HOTKEYS: &[(&str, fn(&mut App, bool))] = &[
+    ("Open ROM", |a, p| {
+        pressed(a, p, |app| file_dialog::open(app.message_channel.0.clone()))
+    }),
+    ("Reset", |a, p| {
+        pressed(a, p, |app| app.gg.lock().unwrap().reset())
+    }),
+    ("Pause", |a, p| {
+        pressed(a, p, |app| {
+            let mut gg = app.gg.lock().unwrap();
+            gg.running = !gg.running && gg.rom_loaded;
+        })
+    }),
+    ("Save", |a, p| pressed(a, p, |app| app.save_game())),
+    ("Fast Forward (Hold)", |app, pressed| {
+        let mut gg = app.gg.lock().unwrap();
+        if pressed {
+            gg.speed_multiplier = app.state.options.fast_forward_hold_speed;
+        } else {
+            gg.speed_multiplier = 1;
+        }
+    }),
+    ("Fast Forward (Toggle)", |a, p| {
+        pressed(a, p, |app| {
+            let mut gg = app.gg.lock().unwrap();
+            app.fast_forward_toggled = !app.fast_forward_toggled;
+            if app.fast_forward_toggled {
+                gg.speed_multiplier = app.state.options.fast_forward_toggle_speed;
+            } else {
+                gg.speed_multiplier = 1;
+            }
+        });
+    }),
+    ("Rewind (Hold)", |app, pressed| {
+        app.rewinder.rewinding = pressed;
+        app.gg.lock().unwrap().invert_audio_samples = pressed;
+    }),
+];
+
+fn pressed(app: &mut App, pressed: bool, inner: fn(&mut App)) {
+    if pressed {
+        inner(app);
+    }
+}
 
 /// Input configuration struct.
 #[derive(Deserialize, Serialize)]
@@ -55,6 +101,7 @@ impl Input {
                 (Key::ArrowUp, Button(Up)),
                 (Key::ArrowLeft, Button(Left)),
                 (Key::ArrowRight, Button(Right)),
+                (Key::R, Hotkey(4)),
             ]),
             pending: None,
         }
