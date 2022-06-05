@@ -28,7 +28,7 @@ use std::time::Duration;
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
 /// Total count of windows in GUI.
-const WINDOW_COUNT: usize = GG_WINDOW_COUNT + STATE_WINDOW_COUNT;
+const WINDOW_COUNT: usize = GG_WINDOW_COUNT + APP_WINDOW_COUNT;
 
 /// Count of GUI windows that take the GG as a parameter.
 /// For now, this is only the debugger's windows.
@@ -41,10 +41,10 @@ const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
     ("Cartridge", debugger::cart_info),
 ];
 
-/// Count of GUI windows that take the App state as a parameter.
-const STATE_WINDOW_COUNT: usize = 2;
-/// GUI windows that take the App state as a parameter.
-const STATE_WINDOWS: [(&str, fn(&Context, &mut State, &mut Ui)); STATE_WINDOW_COUNT] =
+/// Count of GUI windows that take the App as a parameter.
+const APP_WINDOW_COUNT: usize = 2;
+/// GUI windows that take the App as a parameter.
+const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] =
     [("Options", options::options), ("About", options::about)];
 
 /// Start the GUI. Since this is native, this call will never return.
@@ -122,17 +122,26 @@ impl epi::App for App {
         egui::Window::new("GameGirl")
             .resizable(false)
             .show(ctx, |ui| {
-                ui.image(self.texture, [320.0, 288.0]);
+                ui.image(
+                    self.texture,
+                    [
+                        160.0 * self.state.options.display_scale as f32,
+                        144.0 * self.state.options.display_scale as f32,
+                    ],
+                );
             });
 
-        for ((name, runner), state) in STATE_WINDOWS
+        // TODO cloning the window states is a little eh but it works ig
+        let mut states = self.window_states.clone();
+        for ((name, runner), state) in APP_WINDOWS
             .iter()
-            .zip(self.window_states.iter_mut().skip(GG_WINDOW_COUNT))
+            .zip(states.iter_mut().skip(GG_WINDOW_COUNT))
         {
             egui::Window::new(*name)
                 .open(state)
-                .show(ctx, |ui| runner(ctx, &mut self.state, ui));
+                .show(ctx, |ui| runner(self, ctx, ui));
         }
+        self.window_states = states;
 
         let mut gg = self.gg.lock().unwrap();
         for ((name, runner), state) in GG_WINDOWS.iter().zip(self.window_states.iter_mut()) {

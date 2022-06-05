@@ -1,4 +1,4 @@
-use crate::gui::State;
+use crate::gui::App;
 use crate::system::{CgbMode, GGOptions};
 use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, Ui};
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,8 @@ pub struct Options {
     pub enable_rewind: bool,
     /// Rewind buffer size (if enabled), in seconds.
     pub rewind_buffer_size: usize,
+    /// Scale of the GG display.
+    pub display_scale: usize,
 }
 
 impl Default for Options {
@@ -20,42 +22,51 @@ impl Default for Options {
             gg: Default::default(),
             enable_rewind: true,
             rewind_buffer_size: 10,
+            display_scale: 2,
         }
     }
 }
 
 /// Show the options menu.
-pub fn options(ctx: &Context, state: &mut State, ui: &mut Ui) {
+pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
+    let opt = &mut app.state.options;
     CollapsingHeader::new("Emulation").show(ui, |ui| {
         ComboBox::from_label("GB Colour mode")
-            .selected_text(format!("{:?}", state.options.gg.mode))
+            .selected_text(format!("{:?}", opt.gg.mode))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut state.options.gg.mode, CgbMode::Always, "Always");
-                ui.selectable_value(&mut state.options.gg.mode, CgbMode::Prefer, "Prefer");
-                ui.selectable_value(&mut state.options.gg.mode, CgbMode::Never, "Never");
+                ui.selectable_value(&mut opt.gg.mode, CgbMode::Always, "Always");
+                ui.selectable_value(&mut opt.gg.mode, CgbMode::Prefer, "Prefer");
+                ui.selectable_value(&mut opt.gg.mode, CgbMode::Never, "Never");
             });
 
-        ui.checkbox(&mut state.options.gg.compress_savestates, "Compress save states/rewinding")
+        ui.checkbox(&mut opt.gg.compress_savestates, "Compress save states/rewinding")
             .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
-        ui.checkbox(&mut state.options.enable_rewind, "Enable Rewinding");
-        if state.options.enable_rewind {
+        ui.checkbox(&mut opt.enable_rewind, "Enable Rewinding");
+        if opt.enable_rewind {
             ui.horizontal(|ui| {
                 ui.label("Rewind buffer size: ");
-                ui.add(Slider::new(&mut state.options.rewind_buffer_size, 1..=60));
+                ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60));
                 ui.label(format!(
                     "({}s, ~{}MB RAM)",
-                    state.options.rewind_buffer_size,
-                    state.options.rewind_buffer_size + state.options.rewind_buffer_size * (!state.options.gg.compress_savestates as usize * 4),
+                    opt.rewind_buffer_size,
+                    opt.rewind_buffer_size + opt.rewind_buffer_size * (!opt.gg.compress_savestates as usize * 4),
                 ));
             });
         }
     });
 
-    CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
+    CollapsingHeader::new("Graphics").show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.label("Screen scale: ");
+            ui.add(Slider::new(&mut opt.display_scale, 1..=10));
+        });
+
+        CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
+    });
 }
 
 /// Show a nice little "About" window. c:
-pub fn about(_ctx: &Context, _state: &mut State, ui: &mut Ui) {
+pub(super) fn about(_app: &mut App, _ctx: &Context, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.label("GameGirl v0.1 made by ");
         ui.hyperlink_to("ellie leela", "https://angm.xyz");
