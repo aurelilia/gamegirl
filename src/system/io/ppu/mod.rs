@@ -356,9 +356,9 @@ impl Ppu {
         }
     }
 
-    pub(super) fn switch_kind(&mut self, cgb: bool) {
+    pub(super) fn configure(&mut self, cgb: bool, colour_correction: bool) {
         self.kind = if cgb {
-            PpuKind::Cgb(Cgb::default())
+            PpuKind::Cgb(Cgb::new(colour_correction))
         } else {
             PpuKind::Dmg {
                 used_x_obj_coords: [None; 10],

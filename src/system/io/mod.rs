@@ -181,11 +181,11 @@ impl Mmu {
     }
 
     /// Reset the MMU and all IO devices except the cartridge.
-    pub(super) fn reset(&mut self) -> Self {
+    pub(super) fn reset(&mut self, config: &GGOptions) -> Self {
         // TODO the clones are kinda eh
         let mut new = Self::new(self.debugger.clone());
         new.cgb = self.cgb;
-        new.load_cart_inner(self.cart.clone());
+        new.load_cart(self.cart.clone(), config);
         new
     }
 
@@ -220,16 +220,12 @@ impl Mmu {
             CgbMode::Prefer => cart.supports_cgb(),
             CgbMode::Never => cart.requires_cgb(),
         };
-        self.load_cart_inner(cart);
-    }
-
-    fn load_cart_inner(&mut self, cart: Cartridge) {
         self.bootrom = Some(if self.cgb {
             CGB_BOOTROM.to_vec()
         } else {
             BOOTIX_ROM.to_vec()
         });
-        self.ppu.switch_kind(self.cgb);
+        self.ppu.configure(self.cgb, conf.cgb_colour_correction);
         self.apu = Apu::new(self.cgb);
         self.cart = cart;
     }

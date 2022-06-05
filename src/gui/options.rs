@@ -56,6 +56,11 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
     });
 
     CollapsingHeader::new("Graphics").show(ui, |ui| {
+        ui.checkbox(
+            &mut opt.gg.cgb_colour_correction,
+            "Enable GBC colour correction",
+        )
+        .on_hover_text("Adjust colours to be more accurate to a real GBC screen.");
         ui.horizontal(|ui| {
             ui.label("Screen scale: ");
             ui.add(Slider::new(&mut opt.display_scale, 1..=10));

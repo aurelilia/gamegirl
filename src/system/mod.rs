@@ -171,7 +171,7 @@ impl GameGirl {
     /// Reset the console, while keeping the current cartridge inserted.
     pub fn reset(&mut self) {
         self.cpu = Cpu::default();
-        self.mmu = self.mmu.reset();
+        self.mmu = self.mmu.reset(&self.config);
         self.t_shift = 2;
     }
 
@@ -262,6 +262,8 @@ pub struct GGOptions {
     pub mode: CgbMode,
     /// If save states should be compressed.
     pub compress_savestates: bool,
+    /// If CGB colours should be corrected.
+    pub cgb_colour_correction: bool,
 }
 
 /// How to handle CGB mode depending on cart compatibility.

@@ -13,7 +13,9 @@ pub struct Cgb {
     bg_palettes: [CgbColour; 32],
     obj_palette_idx: u8,
     obj_palette_inc: bool,
-    pub obj_palettes: [CgbColour; 32],
+    pub(super) obj_palettes: [CgbColour; 32],
+
+    pub(super) colour_correction: bool,
     #[serde(skip)]
     #[serde(default)]
     pub(super) dmg_used_x_obj_cords: Option<[Option<u8>; 10]>,
@@ -22,8 +24,8 @@ pub struct Cgb {
     pub unavailable_pixels: [bool; 160],
 }
 
-impl Default for Cgb {
-    fn default() -> Self {
+impl Cgb {
+    pub fn new(colour_correction: bool) -> Self {
         Self {
             bg_palette_idx: 0,
             bg_palette_inc: false,
@@ -31,6 +33,7 @@ impl Default for Cgb {
             obj_palette_idx: 0,
             obj_palette_inc: false,
             obj_palettes: [CgbColour::default(); 32],
+            colour_correction,
             dmg_used_x_obj_cords: None,
             unavailable_pixels: [false; 160],
         }
@@ -46,14 +49,27 @@ pub struct CgbColour {
 }
 
 impl CgbColour {
-    fn recalculate(&mut self) {
+    fn recalculate(&mut self, colour_correction: bool) {
         let mut colours = self.colour.to_array();
         colours[0] = self.raw_low & 0x1F;
         colours[1] = ((self.raw_high & 3) << 3) | self.raw_low >> 5;
         colours[2] = (self.raw_high >> 2) & 0x1F;
-        for col in colours.iter_mut().take(3) {
-            *col = (*col << 3) | (*col >> 2);
+
+        if colour_correction {
+            // https://near.sh/articles/video/color-emulation
+            let (r, g, b) = (colours[0].u16(), colours[1].u16(), colours[2].u16());
+            let r1 = r * 26 + g * 4 + b * 2;
+            let g1 = g * 24 + b * 8;
+            let b1 = r * 6 + g * 4 + b * 22;
+            colours[0] = (r1.min(960) >> 2).u8();
+            colours[1] = (g1.min(960) >> 2).u8();
+            colours[2] = (b1.min(960) >> 2).u8();
+        } else {
+            for col in colours.iter_mut().take(3) {
+                *col = (*col << 3) | (*col >> 2);
+            }
         }
+
         self.colour = Colour::from_rgb(colours[0], colours[1], colours[2]);
     }
 }
@@ -96,12 +112,14 @@ impl Ppu {
                 &mut cgb.bg_palette_idx,
                 cgb.bg_palette_inc,
                 &mut cgb.bg_palettes,
+                cgb.colour_correction,
                 value,
             ),
             (PpuKind::Cgb(cgb), OCPD) => Self::write_cpd(
                 &mut cgb.obj_palette_idx,
                 cgb.obj_palette_inc,
                 &mut cgb.obj_palettes,
+                cgb.colour_correction,
                 value,
             ),
             (PpuKind::Cgb(cgb), OPRI) if value.is_bit(0) => {
@@ -112,14 +130,20 @@ impl Ppu {
         }
     }
 
-    fn write_cpd(index: &mut u8, inc: bool, palettes: &mut [CgbColour], value: u8) {
+    fn write_cpd(
+        index: &mut u8,
+        inc: bool,
+        palettes: &mut [CgbColour],
+        colour_correction: bool,
+        value: u8,
+    ) {
         let palette = &mut palettes[(index.us() >> 1) & 0x1F];
         if index.is_bit(0) {
             palette.raw_high = value;
         } else {
             palette.raw_low = value;
         };
-        palette.recalculate();
+        palette.recalculate(colour_correction);
         if inc {
             *index += 1;
         }
