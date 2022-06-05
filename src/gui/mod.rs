@@ -156,18 +156,14 @@ impl epi::App for App {
     }
 
     fn setup(&mut self, ctx: &Context, _frame: &Frame, storage: Option<&dyn Storage>) {
-        let manager = ctx.tex_manager();
-        self.texture = manager.write().alloc(
-            "screen".into(),
-            ColorImage::new([160, 144], Colour::BLACK).into(),
-            TextureFilter::Nearest,
-        );
         if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamelin_data")) {
             self.state = state;
         }
+
+        self.texture = Self::make_screen_texture(ctx, self.state.options.tex_filter);
+
         self.rewinder
             .set_rw_buf_size(self.state.options.rewind_buffer_size);
-
         let buffer = self.rewinder.rewind_buffer.clone();
         if self.state.options.enable_rewind {
             self.gg.lock().unwrap().frame_finished = Box::new(move |gg| {
@@ -389,6 +385,17 @@ impl App {
             ));
             ui.label("Frame time: ");
         });
+    }
+
+    /// Create the screen texture.
+    fn make_screen_texture(ctx: &Context, filter: TextureFilter) -> TextureId {
+        let manager = ctx.tex_manager();
+        let id = manager.write().alloc(
+            "screen".into(),
+            ColorImage::new([160, 144], Colour::BLACK).into(),
+            filter,
+        );
+        id
     }
 }
 

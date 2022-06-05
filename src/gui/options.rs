@@ -1,6 +1,6 @@
 use crate::gui::App;
 use crate::system::{CgbMode, GGOptions};
-use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, Ui};
+use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui};
 use serde::{Deserialize, Serialize};
 
 /// User-configurable options.
@@ -14,6 +14,8 @@ pub struct Options {
     pub rewind_buffer_size: usize,
     /// Scale of the GG display.
     pub display_scale: usize,
+    /// Texture filter applied to the display.
+    pub tex_filter: TextureFilter,
 }
 
 impl Default for Options {
@@ -23,6 +25,7 @@ impl Default for Options {
             enable_rewind: true,
             rewind_buffer_size: 10,
             display_scale: 2,
+            tex_filter: TextureFilter::Nearest,
         }
     }
 }
@@ -44,13 +47,12 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         ui.checkbox(&mut opt.enable_rewind, "Enable Rewinding");
         if opt.enable_rewind {
             ui.horizontal(|ui| {
-                ui.label("Rewind buffer size: ");
-                ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60));
-                ui.label(format!(
-                    "({}s, ~{}MB RAM)",
-                    opt.rewind_buffer_size,
-                    opt.rewind_buffer_size + opt.rewind_buffer_size * (!opt.gg.compress_savestates as usize * 4),
-                ));
+                ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60))
+                    .on_hover_text(format!(
+                        "Uses about ~{}MB of RAM",
+                        opt.rewind_buffer_size + opt.rewind_buffer_size * (!opt.gg.compress_savestates as usize * 4),
+                    ));
+                ui.label("Rewind time in seconds");
             });
         }
     });
@@ -61,9 +63,24 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
             "Enable GBC colour correction",
         )
         .on_hover_text("Adjust colours to be more accurate to a real GBC screen.");
+
+        ComboBox::from_label("Texture filter")
+            .selected_text(format!("{:?}", opt.tex_filter))
+            .show_ui(ui, |ui| {
+                let a = ui
+                    .selectable_value(&mut opt.tex_filter, TextureFilter::Nearest, "Nearest")
+                    .changed();
+                let b = ui
+                    .selectable_value(&mut opt.tex_filter, TextureFilter::Linear, "Linear")
+                    .changed();
+                if a || b {
+                    app.texture = App::make_screen_texture(ctx, opt.tex_filter);
+                }
+            });
+
         ui.horizontal(|ui| {
-            ui.label("Screen scale: ");
             ui.add(Slider::new(&mut opt.display_scale, 1..=10));
+            ui.label("Screen scale");
         });
 
         CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
@@ -73,11 +90,11 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
 /// Show a nice little "About" window. c:
 pub(super) fn about(_app: &mut App, _ctx: &Context, ui: &mut Ui) {
     ui.horizontal(|ui| {
-        ui.label("GameGirl v0.1 made by ");
+        ui.label("GameGirl v0.1 made by");
         ui.hyperlink_to("ellie leela", "https://angm.xyz");
     });
     ui.horizontal(|ui| {
-        ui.label("Based on my previous emulator ");
+        ui.label("Based on my previous emulator");
         ui.hyperlink_to("gamelin", "https://git.angm.xyz/ellie/gamelin");
     });
     ui.horizontal(|ui| {
