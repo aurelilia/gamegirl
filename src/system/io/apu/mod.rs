@@ -322,7 +322,7 @@ impl Apu {
     }
 
     pub fn step(mmu: &mut Mmu, cycles: usize) {
-        let ds = mmu[KEY1].is_bit(7);
+        let ds = mmu.cgb && mmu[KEY1].is_bit(7);
         let div = mmu.read_high(DIV);
         for _ in 0..cycles {
             mmu.apu.clock(ds, div);

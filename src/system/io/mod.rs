@@ -95,7 +95,7 @@ impl Mmu {
 
     fn read_high(&self, addr: u16) -> u8 {
         match addr {
-            JOYP => self.joypad.read(self.high[JOYP as usize]),
+            JOYP => self.joypad.read(self[JOYP]),
             DIV | TAC => self.timer.read(addr),
 
             LY if !self[LCDC].is_bit(7) => 0,
@@ -136,6 +136,7 @@ impl Mmu {
                 self.wram_bank = u8::max(1, value & 7);
                 self[WRAM_SELECT] = value | 0xF8;
             }
+            KEY1 if self.cgb => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
 
             IF => self[IF] = value | 0xE0,
             IE => self[IE] = value | 0xE0,
@@ -148,23 +149,24 @@ impl Mmu {
                     self[STAT] &= 0xF8;
                 }
             }
+            STAT => self[STAT] = value | 0x80, // Bit 7 unavailable
             DMA => {
                 self[addr] = value;
                 self.dma.start();
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
             HDMA_START => Hdma::write_start(self, value),
-            KEY1 => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
             NR10..=WAV_END => self.apu.write_register(HIGH_START + addr, value),
 
-            0x01 => self
+            SB => self
                 .debugger
                 .serial_output
                 .lock()
                 .unwrap()
                 .push(value as char),
 
-            LY | SC => (),
+            // Last 3 are unmapped regions.
+            LY | SC | 0x03 | 0x08..=0x0E | 0x4C..=0x7F => (),
             _ => self[addr] = value,
         }
     }
@@ -232,6 +234,7 @@ impl Mmu {
 
     fn init_high(&mut self) {
         self[LY] = 0;
+        self[LYC] = 0;
         self[LCDC] = 0;
         self[STAT] = 0;
         self[SCY] = 0;
@@ -246,7 +249,11 @@ impl Mmu {
         self[SC] = 0x7E;
         self[TIMA] = 0;
         self[TMA] = 0;
-        self[KEY1] = 0;
+        self[IF] = 0xE1;
+
+        if self.cgb {
+            self[KEY1] = 0;
+        }
     }
 }
 
