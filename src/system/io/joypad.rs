@@ -1,7 +1,6 @@
 use crate::system::cpu::Interrupt;
 use crate::system::io::addr::JOYP;
 use crate::system::GameGirl;
-use eframe::egui::Key;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -36,7 +35,7 @@ impl Joypad {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Deserialize, Serialize)]
 pub enum Button {
     A,
     B,
@@ -49,7 +48,7 @@ pub enum Button {
 }
 
 impl Button {
-    const BTNS: [Self; 8] = [
+    pub const BUTTONS: [Self; 8] = [
         Self::A,
         Self::B,
         Self::Select,
@@ -59,25 +58,4 @@ impl Button {
         Self::Up,
         Self::Down,
     ];
-    const KEYS: [Key; 8] = [
-        Key::X,
-        Key::Z,
-        Key::Space,
-        Key::Enter,
-        Key::ArrowRight,
-        Key::ArrowLeft,
-        Key::ArrowUp,
-        Key::ArrowDown,
-    ];
-
-    pub fn from_key(key: Key) -> Option<Self> {
-        Self::KEYS
-            .iter()
-            .position(|k| *k == key)
-            .map(|i| Self::BTNS[i])
-    }
-
-    fn _to_key(self) -> Key {
-        Self::KEYS[self as usize]
-    }
 }

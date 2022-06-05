@@ -1,4 +1,6 @@
+use crate::gui::input::{Input, InputAction};
 use crate::gui::App;
+use crate::system::io::joypad::Button;
 use crate::system::{CgbMode, GGOptions};
 use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui};
 use serde::{Deserialize, Serialize};
@@ -8,10 +10,14 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     /// Options passed to the system when loading a ROM.
     pub gg: GGOptions,
+    /// Input configuration.
+    pub input: Input,
+
     /// Enable rewinding.
     pub enable_rewind: bool,
     /// Rewind buffer size (if enabled), in seconds.
     pub rewind_buffer_size: usize,
+
     /// Scale of the GG display.
     pub display_scale: usize,
     /// Texture filter applied to the display.
@@ -22,6 +28,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             gg: Default::default(),
+            input: Input::new(),
             enable_rewind: true,
             rewind_buffer_size: 10,
             display_scale: 2,
@@ -93,6 +100,16 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
             }
             ui.label("Volume");
         });
+    });
+
+    // TODO buttons are misaligned
+    CollapsingHeader::new("Input").show(ui, |ui| {
+        for btn in &Button::BUTTONS {
+            ui.horizontal(|ui| {
+                ui.label(format!("{:?}", btn));
+                ui.button(opt.input.key_for_fmt(InputAction::Button(*btn)));
+            });
+        }
     });
 }
 

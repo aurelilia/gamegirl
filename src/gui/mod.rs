@@ -1,14 +1,16 @@
 mod debugger;
 mod file_dialog;
+mod input;
 mod options;
 mod rewind;
 
 use crate::gui::file_dialog::File;
+use crate::gui::input::InputAction;
 use crate::gui::options::Options;
 use crate::gui::rewind::Rewinding;
 use crate::storage::Storage as CartStore;
 use crate::system::io::cartridge::Cartridge;
-use crate::system::io::joypad::{Button, Joypad};
+use crate::system::io::joypad::Joypad;
 use crate::Colour;
 use crate::GameGirl;
 use eframe::egui::util::History;
@@ -207,8 +209,10 @@ impl App {
         let mut gg = self.gg.lock().unwrap();
         for event in &ctx.input().events {
             if let Event::Key { key, pressed, .. } = event {
-                if let Some(button) = Button::from_key(*key) {
-                    Joypad::set(&mut gg, button, *pressed);
+                match self.state.options.input.get_key(*key) {
+                    Some(InputAction::Button(btn)) => Joypad::set(&mut gg, btn, *pressed),
+                    Some(InputAction::Hotkey(_idx)) => todo!(),
+                    None => (),
                 }
                 if *key == Key::R {
                     self.rewinder.rewinding = *pressed;
