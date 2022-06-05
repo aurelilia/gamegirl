@@ -209,6 +209,11 @@ impl App {
         let mut gg = self.gg.lock().unwrap();
         for event in &ctx.input().events {
             if let Event::Key { key, pressed, .. } = event {
+                if let Some(action) = self.state.options.input.pending.take() {
+                    self.state.options.input.set_key(*key, action);
+                    continue;
+                }
+
                 match self.state.options.input.get_key(*key) {
                     Some(InputAction::Button(btn)) => Joypad::set(&mut gg, btn, *pressed),
                     Some(InputAction::Hotkey(_idx)) => todo!(),

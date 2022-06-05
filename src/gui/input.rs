@@ -9,6 +9,9 @@ use InputAction::*;
 #[derive(Deserialize, Serialize)]
 pub struct Input {
     mappings: HashMap<Key, InputAction>,
+    #[serde(skip)]
+    #[serde(default)]
+    pub(crate) pending: Option<InputAction>,
 }
 
 impl Input {
@@ -19,6 +22,9 @@ impl Input {
 
     /// Set a key's mapping.
     pub fn set_key(&mut self, key: Key, value: InputAction) {
+        if let Some(prev) = self.key_for(value) {
+            self.mappings.remove(&prev);
+        }
         self.mappings.insert(key, value);
     }
 
@@ -50,6 +56,7 @@ impl Input {
                 (Key::ArrowLeft, Button(Left)),
                 (Key::ArrowRight, Button(Right)),
             ]),
+            pending: None,
         }
     }
 }

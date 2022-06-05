@@ -2,7 +2,8 @@ use crate::gui::input::{Input, InputAction};
 use crate::gui::App;
 use crate::system::io::joypad::Button;
 use crate::system::{CgbMode, GGOptions};
-use eframe::egui::{CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui};
+use eframe::egui;
+use eframe::egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui};
 use serde::{Deserialize, Serialize};
 
 /// User-configurable options.
@@ -102,12 +103,24 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         });
     });
 
-    // TODO buttons are misaligned
     CollapsingHeader::new("Input").show(ui, |ui| {
         for btn in &Button::BUTTONS {
+            let action = InputAction::Button(*btn);
+            let active = Some(action) == opt.input.pending;
+            let text = if active {
+                "...".to_string()
+            } else {
+                opt.input.key_for_fmt(action)
+            };
+
             ui.horizontal(|ui| {
+                if ui
+                    .add_sized(vec2(90.0, 20.0), egui::Button::new(text))
+                    .clicked()
+                {
+                    opt.input.pending = Some(action);
+                }
                 ui.label(format!("{:?}", btn));
-                ui.button(opt.input.key_for_fmt(InputAction::Button(*btn)));
             });
         }
     });
