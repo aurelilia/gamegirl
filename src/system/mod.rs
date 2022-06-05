@@ -28,6 +28,7 @@ pub struct GameGirl {
     #[serde(skip)]
     #[serde(default)]
     pub debugger: Arc<Debugger>,
+    pub config: GGOptions,
 
     /// Shift of t clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
@@ -182,11 +183,15 @@ impl GameGirl {
             // Currently crashes when loading...
             return vec![];
         }
-        let mut dest = vec![];
-        let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
-        bincode::serialize_into(&mut writer, self).unwrap();
-        writer.finish().unwrap();
-        dest
+        if self.config.compress_savestates {
+            let mut dest = vec![];
+            let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
+            bincode::serialize_into(&mut writer, self).unwrap();
+            writer.finish().unwrap();
+            dest
+        } else {
+            bincode::serialize(self).unwrap()
+        }
     }
 
     /// Load a state produced by [save_state].
@@ -196,8 +201,13 @@ impl GameGirl {
             // Currently crashes...
             return;
         }
-        let decoder = zstd::stream::Decoder::new(state).unwrap();
-        let old_self = mem::replace(self, bincode::deserialize_from(decoder).unwrap());
+        let new_self = if self.config.compress_savestates {
+            let decoder = zstd::stream::Decoder::new(state).unwrap();
+            bincode::deserialize_from(decoder).unwrap()
+        } else {
+            bincode::deserialize(state).unwrap()
+        };
+        let old_self = mem::replace(self, new_self);
         self.debugger = old_self.debugger;
         self.mmu.cart.rom = old_self.mmu.cart.rom;
         self.frame_finished = old_self.frame_finished;
@@ -211,6 +221,7 @@ impl GameGirl {
             cpu: Cpu::default(),
             mmu: Mmu::new(debugger.clone()),
             debugger,
+            config: GGOptions::default(),
 
             t_shift: 2,
             clock: 0,
@@ -231,6 +242,7 @@ impl GameGirl {
             self.frame_finished = old_self.frame_finished;
         }
         self.mmu.load_cart(cart, config);
+        self.config = config.clone();
         self.running = true;
         self.rom_loaded = true;
     }
@@ -244,14 +256,16 @@ impl GameGirl {
 }
 
 /// Configuration used when initializing the system.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct GGOptions {
     /// How to handle CGB mode.
     pub mode: CgbMode,
+    /// If save states should be compressed.
+    pub compress_savestates: bool,
 }
 
 /// How to handle CGB mode depending on cart compatibility.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CgbMode {
     /// Always run in CGB mode, even when the cart does not support it.
     /// If it does not, it is run in DMG compatibility mode, just like on a

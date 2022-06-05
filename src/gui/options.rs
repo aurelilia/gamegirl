@@ -35,14 +35,17 @@ pub fn options(ctx: &Context, state: &mut State, ui: &mut Ui) {
                 ui.selectable_value(&mut state.options.gg.mode, CgbMode::Never, "Never");
             });
 
+        ui.checkbox(&mut state.options.gg.compress_savestates, "Compress save states/rewinding")
+            .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
         ui.checkbox(&mut state.options.enable_rewind, "Enable Rewinding");
         if state.options.enable_rewind {
             ui.horizontal(|ui| {
                 ui.label("Rewind buffer size: ");
                 ui.add(Slider::new(&mut state.options.rewind_buffer_size, 1..=60));
                 ui.label(format!(
-                    "({}s, ~{}MB)",
-                    state.options.rewind_buffer_size, state.options.rewind_buffer_size,
+                    "({}s, ~{}MB RAM)",
+                    state.options.rewind_buffer_size,
+                    state.options.rewind_buffer_size + state.options.rewind_buffer_size * (!state.options.gg.compress_savestates as usize * 4),
                 ));
             });
         }
