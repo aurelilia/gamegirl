@@ -15,7 +15,7 @@ impl Joypad {
         let row_start = match joyp & 0x30 {
             0x10 => 0,
             0x20 => 4,
-            _ => return 0xCF,
+            _ => return 0xFF,
         };
         let mut res = 0;
         for key in self.key_states.iter().skip(row_start).take(4).rev() {

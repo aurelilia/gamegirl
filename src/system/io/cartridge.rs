@@ -37,7 +37,7 @@ impl Cartridge {
             0x4000..=0x7FFF => self.rom[(a & 0x3FFF) + (0x4000 * self.rom1_bank as usize)],
             0xA000..=0xBFFF if !self.ram.is_empty() && self.ram_enable => {
                 if let MBC2 = self.kind {
-                    self.ram[0x1FF]
+                    self.ram[a & 0x1FF]
                 } else {
                     self.ram[(a & 0x1FFF) + (0x2000 * self.ram_bank.us())]
                 }
@@ -59,7 +59,7 @@ impl Cartridge {
 
             // Shared between all (except MBC2...)
             (_, 0x0000..=0x1FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
-            (_, 0xA000..=0xBFFF) if !self.ram.is_empty() => {
+            (_, 0xA000..=0xBFFF) if !self.ram.is_empty() && self.ram_enable => {
                 self.ram[(addr & 0x1FFF).us() + (0x2000 * self.ram_bank.us())] = value
             }
 
@@ -108,7 +108,7 @@ impl Cartridge {
         } else {
             0
         };
-        self.rom1_bank &= self.rom1_bank;
+        self.rom1_bank &= 0x1F;
         if self.rom_bank_count() >= BANK_COUNT_1MB {
             self.rom1_bank += bank2.u16() << 5;
         }
