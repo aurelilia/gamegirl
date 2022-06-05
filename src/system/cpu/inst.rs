@@ -56,6 +56,7 @@ impl Inst {
         let base = base.replace("a16", &format!("{:04X}", arg));
         let base = base.replace("d8", &format!("d{:02X}", arg & 0xFF));
         let base = base.replace("d16", &format!("d{:04X}", arg));
+        let base = base.replace("s8", &format!("d{:02X}", arg.u8() as i8));
         base
     }
 
@@ -65,10 +66,6 @@ impl Inst {
 
     pub fn cycles(&self) -> u8 {
         self.get_(&data::CYCLES, data::CYCLES_EXT)
-    }
-
-    pub fn pre_cycles(&self) -> u8 {
-        self.get(&data::PRE_CYCLES, &data::PRE_CYCLES_EXT)
     }
 
     pub fn inc_pc(&self) -> bool {
@@ -159,7 +156,10 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
         }
 
         0x06 | 0x16 | 0x26 => gg.cpu.set_reg(BDH[reg], gg.arg8()),
-        0x36 => gg.mmu.write(gg.cpu.dreg(HL), gg.arg8()),
+        0x36 => {
+            gg.advance_clock(1);
+            gg.mmu.write(gg.cpu.dreg(HL), gg.arg8())
+        },
 
         0x07 => {
             let val = gg.rlc(gg.cpu.reg(A), false);
@@ -426,6 +426,7 @@ fn reg_ext<const ADV: bool, T: FnOnce(&mut GameGirl, u8) -> u8>(
     let reg = op & 0x07;
     match reg {
         6 => {
+            gg.advance_clock(1);
             let addr = gg.cpu.dreg(HL);
             let value = gg.mmu.read(addr);
             if ADV {

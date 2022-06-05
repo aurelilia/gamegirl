@@ -52,3 +52,4 @@ macro_rules! num_ext_impl {
 
 num_ext_impl!(u8);
 num_ext_impl!(u16);
+num_ext_impl!(usize);

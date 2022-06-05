@@ -31,8 +31,6 @@ impl Cpu {
             gg.cpu.halt = (gg.mmu[IF] & gg.mmu[IE] & 0x1F) == 0
         } else {
             let inst = inst::get_next(gg);
-            gg.advance_clock(inst.pre_cycles() as usize);
-
             if gg.cpu.halt_bug {
                 gg.cpu.pc -= 1;
                 gg.cpu.halt_bug = false;
