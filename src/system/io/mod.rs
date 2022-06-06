@@ -141,7 +141,7 @@ impl Mmu {
             HDMA_SRC_HIGH..=HDMA_DEST_LOW if self.cgb => self[addr] = value,
 
             IF => self[IF] = value | 0xE0,
-            IE => self[IE] = value | 0xE0,
+            IE => self[IE] = value,
             BOOTROM_DISABLE => self.bootrom = None,
 
             DIV | TAC => Timer::write(self, addr, value),
@@ -236,7 +236,7 @@ impl Mmu {
         self[LY] = 0;
         self[LYC] = 0;
         self[LCDC] = 0;
-        self[STAT] = 0;
+        self[STAT] = 0x80;
         self[SCY] = 0;
         self[SCX] = 0;
         self[WY] = 0;
@@ -249,7 +249,7 @@ impl Mmu {
         self[SC] = 0x7E;
         self[TIMA] = 0;
         self[TMA] = 0;
-        self[IF] = 0xE1;
+        self[IF] = 0xE0;
 
         if self.cgb {
             self[KEY1] = 0;

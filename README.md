@@ -48,7 +48,7 @@ cargo run -p tests --release
 All tests except for `oam_bug` (which will not be implemented) pass.
 
 ### Mooneye test results
-- `acceptance`: 27 out of 75 pass
+- `acceptance`: 30 out of 71 pass
 - `emulator-only`: All pass (except MBC1 multicart; will not be supported)
 
 

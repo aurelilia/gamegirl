@@ -51,6 +51,9 @@ pub struct Hdma {
 
 impl Hdma {
     pub fn step(gg: &mut GameGirl) {
+        if !gg.mmu.cgb {
+            return;
+        }
         if gg.mmu.hdma.gdma_queued {
             gg.mmu.hdma.gdma_queued = false;
             gg.advance_clock(1);
