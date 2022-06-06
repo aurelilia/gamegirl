@@ -144,6 +144,7 @@ impl GameGirl {
     }
 
     /// Advance the MMU, which is everything except the CPU.
+    /// Should not advance by more than 7 cycles at once.3
     fn advance_clock(&mut self, m_cycles: u16) {
         let t_cycles = m_cycles << self.t_shift;
         Mmu::step(self, m_cycles, t_cycles);

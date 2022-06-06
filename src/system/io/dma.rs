@@ -103,7 +103,9 @@ impl Hdma {
             gg.mmu.hdma.source += 1;
             gg.mmu.hdma.dest += 1;
         }
-        gg.advance_clock(8);
+        // 8 at once is 1 too much, split it
+        gg.advance_clock(4);
+        gg.advance_clock(4);
         gg.mmu.hdma.transfer_left -= 1;
     }
 }

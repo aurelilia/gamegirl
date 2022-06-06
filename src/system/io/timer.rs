@@ -29,18 +29,15 @@ impl Timer {
             gg.request_interrupt(Interrupt::Timer);
         }
 
-        let mut tima = gg.mmu[TIMA].u16();
+        let tima = gg.mmu[TIMA];
         let mut tim = gg.timer(); // Work around borrow checker
         if tim.counter_running {
             tim.counter_timer += m_cycles;
-            while tim.counter_timer >= tim.counter_divider {
+            if tim.counter_timer >= tim.counter_divider {
                 tim.counter_timer -= tim.counter_divider;
-                tima += 1;
-                if tima > 0xFF {
-                    tim.interrupt_next = true;
-                }
+                tim.interrupt_next = tima == 0xFF;
+                gg.mmu[TIMA] = gg.mmu[TIMA].wrapping_add(1);
             }
-            gg.mmu[TIMA] = tima.u8();
         }
     }
 

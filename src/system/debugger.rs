@@ -18,6 +18,9 @@ pub struct Debugger {
 impl Debugger {
     /// Called before a memory write is executed, which might trigger a BP.
     pub fn write_occurred(&self, addr: u16) {
+        if self.breakpoints_enabled.load(Ordering::Relaxed) == false {
+            return;
+        }
         let hit = self
             .breakpoints
             .lock()
@@ -32,6 +35,9 @@ impl Debugger {
     /// Called before an instruction is executed, which might trigger a BP.
     /// If it does, function returns false and inst should not be executed.
     pub fn should_execute(&self, pc: u16) -> bool {
+        if self.breakpoints_enabled.load(Ordering::Relaxed) == false {
+            return true;
+        }
         let hit = self
             .breakpoints
             .lock()

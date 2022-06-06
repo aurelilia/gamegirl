@@ -6,21 +6,28 @@ mod mooneye;
 use ansi_term::Colour;
 use gamegirl::system::GameGirl;
 use rayon::prelude::*;
-use std::fs;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+use std::{env, fs};
 
 const TIMEOUT: usize = 30;
 
 fn main() {
-    println!("Executing blargg tests");
-    blargg::exec();
-    blargg::exec_sound();
-    println!("\nExecuting mooneye tests");
-    mooneye::exec("acceptance");
-    mooneye::exec("emulator-only");
+    if env::args().any(|a| a == "--bench") {
+        let mut gg = GameGirl::with_cart(fs::read("bench.gb").unwrap());
+        for _ in 0..15 {
+            gg.advance_delta(1.0);
+        }
+    } else {
+        println!("Executing blargg tests");
+        blargg::exec();
+        blargg::exec_sound();
+        println!("\nExecuting mooneye tests");
+        mooneye::exec("acceptance");
+        mooneye::exec("emulator-only");
+    }
 }
 
 pub fn run_dir(dir: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {

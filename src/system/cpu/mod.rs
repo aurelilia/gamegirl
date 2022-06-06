@@ -50,7 +50,7 @@ impl Cpu {
 
     /// Check if any interrupts occurred.
     fn check_interrupts(gg: &mut GameGirl, ime: bool) -> bool {
-        let bits = gg.mmu[IE] & gg.mmu[IF];
+        let bits = gg.mmu[IE] & gg.mmu[IF] & 0x1F;
         if !ime || (bits == 0) {
             return false;
         }
