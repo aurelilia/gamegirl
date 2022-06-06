@@ -137,6 +137,8 @@ impl Mmu {
                 self[WRAM_SELECT] = value | 0xF8;
             }
             KEY1 if self.cgb => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
+            HDMA_START => Hdma::write_start(self, value),
+            HDMA_SRC_HIGH..=HDMA_DEST_LOW if self.cgb => self[addr] = value,
 
             IF => self[IF] = value | 0xE0,
             IE => self[IE] = value | 0xE0,
@@ -155,7 +157,6 @@ impl Mmu {
                 self.dma.start();
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
-            HDMA_START => Hdma::write_start(self, value),
             NR10..=WAV_END => self.apu.write_register(HIGH_START + addr, value),
 
             SB => self
