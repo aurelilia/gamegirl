@@ -159,10 +159,12 @@ impl Ppu {
         correct_tile_addr: bool,
     ) {
         let line = gg.mmu[LY];
+        let bg_en = gg.lcdc(BG_EN);
+
         let mut tile_x = scroll_x & 7;
         let mut tile_addr = map_addr + ((map_line / 8).u16() * 0x20) + (scroll_x >> 3).u16();
         let mut attributes = gg.mmu.vram[0x2000 + (tile_addr.us() & 0x1FFF)];
-        let mut has_prio = attributes.is_bit(7) && gg.lcdc(BG_EN);
+        let mut has_prio = attributes.is_bit(7) && bg_en;
         let mut tile_y = if attributes.is_bit(6) {
             7 - (map_line & 7)
         } else {
@@ -182,7 +184,7 @@ impl Ppu {
             }
             .u16();
             let colour_idx = (high.bit(x) << 1) + low.bit(x);
-            gg.ppu().bg_occupied_pixels[tile_idx_addr.us()] |= (colour_idx != 0) && gg.lcdc(BG_EN);
+            gg.ppu().bg_occupied_pixels[tile_idx_addr.us()] |= (colour_idx != 0) && bg_en;
 
             let palette = attributes & 7;
             let colour = {
@@ -201,7 +203,7 @@ impl Ppu {
                     tile_addr + 1
                 };
                 attributes = gg.mmu.vram[0x2000 + (tile_addr.us() & 0x1FFF)];
-                has_prio = attributes.is_bit(7) && gg.lcdc(BG_EN);
+                has_prio = attributes.is_bit(7) && bg_en;
                 tile_y = if attributes.is_bit(6) {
                     7 - (map_line & 7)
                 } else {
