@@ -8,9 +8,10 @@ use serde::Serialize;
 /// Timer available on DMG and CGB.
 #[derive(Deserialize, Serialize)]
 pub struct Timer {
-    div_cycle_count: usize,
+    div: usize,
     counter_timer: usize,
-    interrupt_in: isize,
+    interrupt_next: bool,
+
     control: u8,
     counter_running: bool,
     counter_divider: usize,
@@ -19,13 +20,11 @@ pub struct Timer {
 impl Timer {
     pub fn step(gg: &mut GameGirl, t_cycles: usize) {
         let mut tim = gg.timer();
-        tim.div_cycle_count += t_cycles;
-        if tim.interrupt_in > 0 {
-            tim.interrupt_in -= t_cycles as isize;
-            if tim.interrupt_in <= 0 {
-                gg.mmu[TIMA] = gg.mmu[TMA];
-                gg.request_interrupt(Interrupt::Timer);
-            }
+        tim.div += t_cycles;
+        if tim.interrupt_next {
+            tim.interrupt_next = false;
+            gg.mmu[TIMA] = gg.mmu[TMA];
+            gg.request_interrupt(Interrupt::Timer);
         }
 
         let mut tima = gg.mmu[TIMA].u16();
@@ -36,7 +35,7 @@ impl Timer {
                 tim.counter_timer -= tim.counter_divider;
                 tima += 1;
                 if tima > 0xFF {
-                    tim.interrupt_in = 4;
+                    tim.interrupt_next = true;
                 }
             }
             gg.mmu[TIMA] = tima.u8();
@@ -45,7 +44,7 @@ impl Timer {
 
     pub fn read(&self, addr: u16) -> u8 {
         match addr {
-            DIV => (self.div_cycle_count >> 8) as u8,
+            DIV => (self.div >> 8) as u8,
             TAC => self.control | 0xF8,
             _ => 0xFF,
         }
@@ -54,7 +53,7 @@ impl Timer {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             DIV => {
-                self.div_cycle_count = 0;
+                self.div = 0;
                 self.counter_timer = 0;
             }
             TAC => {
@@ -75,9 +74,9 @@ impl Timer {
 impl Default for Timer {
     fn default() -> Self {
         Self {
-            div_cycle_count: 0,
+            div: 0,
             counter_timer: 0,
-            interrupt_in: 0,
+            interrupt_next: false,
             control: 0,
             counter_running: false,
             counter_divider: 1024,
