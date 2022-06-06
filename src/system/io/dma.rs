@@ -17,11 +17,11 @@ pub struct Dma {
 }
 
 impl Dma {
-    pub fn step(gg: &mut GameGirl, t_cycles: usize) {
+    pub fn step(gg: &mut GameGirl, m_cycles: u16) {
         if gg.mmu.dma.time_left <= 0 {
             return;
         }
-        gg.mmu.dma.time_left -= t_cycles as i16;
+        gg.mmu.dma.time_left -= m_cycles as i16;
         if gg.mmu.dma.time_left > 0 {
             return;
         }
@@ -33,7 +33,7 @@ impl Dma {
     }
 
     pub fn start(&mut self) {
-        self.time_left = 648;
+        self.time_left = 162;
     }
 }
 

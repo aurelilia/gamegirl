@@ -144,10 +144,10 @@ impl GameGirl {
     }
 
     /// Advance the MMU, which is everything except the CPU.
-    fn advance_clock(&mut self, m_cycles: usize) {
+    fn advance_clock(&mut self, m_cycles: u16) {
         let t_cycles = m_cycles << self.t_shift;
         Mmu::step(self, m_cycles, t_cycles);
-        self.clock += m_cycles
+        self.clock += m_cycles.us();
     }
 
     /// Switch between CGB 2x and normal speed mode.

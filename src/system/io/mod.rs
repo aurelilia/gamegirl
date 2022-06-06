@@ -61,12 +61,11 @@ pub struct Mmu {
 impl Mmu {
     /// Step the system forward by the given amount of cycles.
     /// The given T cycles should already be adjusted for CGB 2x speed mode.
-    pub(super) fn step(gg: &mut GameGirl, m_cycles: usize, t_cycles: usize) {
-        let t_cpu = m_cycles * 4;
+    pub(super) fn step(gg: &mut GameGirl, m_cycles: u16, t_cycles: u16) {
         Hdma::step(gg);
-        Timer::step(gg, t_cpu);
+        Timer::step(gg, m_cycles);
         Ppu::step(gg, t_cycles);
-        Dma::step(gg, t_cpu);
+        Dma::step(gg, m_cycles);
         Apu::step(&mut gg.mmu, m_cycles);
     }
 

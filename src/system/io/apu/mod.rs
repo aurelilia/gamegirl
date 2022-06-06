@@ -321,7 +321,7 @@ impl Apu {
         (p2 << 4) | p1
     }
 
-    pub fn step(mmu: &mut Mmu, cycles: usize) {
+    pub fn step(mmu: &mut Mmu, cycles: u16) {
         let ds = mmu.cgb && mmu[KEY1].is_bit(7);
         let div = mmu.read_high(DIV);
         for _ in 0..cycles {

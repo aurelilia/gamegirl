@@ -56,7 +56,7 @@ fn run_inner(
     entries.sort_by_key(|e| e.file_name());
 
     entries
-        .iter()
+        .par_iter()
         .filter(|e| e.path().is_dir())
         .for_each(|entry| {
             let name = format!("{name}/{}", entry.file_name().to_str().unwrap());
@@ -64,7 +64,7 @@ fn run_inner(
         });
 
     entries
-        .iter()
+        .par_iter()
         .filter(|e| {
             e.path()
                 .extension()

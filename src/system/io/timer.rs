@@ -9,20 +9,20 @@ use serde::Serialize;
 /// Timer available on DMG and CGB.
 #[derive(Deserialize, Serialize)]
 pub struct Timer {
-    div: usize,
-    counter_timer: usize,
+    div: u16,
+    counter_timer: u16,
     interrupt_next: bool,
 
     control: u8,
     counter_running: bool,
-    counter_divider: usize,
+    counter_divider: u16,
     counter_bit: u16,
 }
 
 impl Timer {
-    pub fn step(gg: &mut GameGirl, t_cycles: usize) {
+    pub fn step(gg: &mut GameGirl, m_cycles: u16) {
         let mut tim = gg.timer();
-        tim.div += t_cycles;
+        tim.div += m_cycles;
         if tim.interrupt_next {
             tim.interrupt_next = false;
             gg.mmu[TIMA] = gg.mmu[TMA];
@@ -32,7 +32,7 @@ impl Timer {
         let mut tima = gg.mmu[TIMA].u16();
         let mut tim = gg.timer(); // Work around borrow checker
         if tim.counter_running {
-            tim.counter_timer += t_cycles;
+            tim.counter_timer += m_cycles;
             while tim.counter_timer >= tim.counter_divider {
                 tim.counter_timer -= tim.counter_divider;
                 tima += 1;
@@ -46,7 +46,7 @@ impl Timer {
 
     pub fn read(&self, addr: u16) -> u8 {
         match addr {
-            DIV => (self.div >> 8) as u8,
+            DIV => (self.div >> 6) as u8,
             TAC => self.control | 0xF8,
             _ => 0xFF,
         }
@@ -71,16 +71,16 @@ impl Timer {
                 mmu.timer.control = value & 7;
                 mmu.timer.counter_running = mmu.timer.control.is_bit(2);
                 mmu.timer.counter_divider = match mmu.timer.control & 3 {
-                    0 => 1024, // 4K
-                    1 => 16,   // 256K
-                    2 => 64,   // 64K
-                    _ => 256,  // 16K (3)
+                    0 => 256, // 4K
+                    1 => 4,   // 256K
+                    2 => 16,  // 64K
+                    _ => 64,  // 16K (3)
                 };
                 mmu.timer.counter_bit = match mmu.timer.control & 3 {
-                    0 => 9, // 4K
-                    1 => 3, // 256K
-                    2 => 5, // 64K
-                    _ => 7, // 16K (3)
+                    0 => 7, // 4K
+                    1 => 1, // 256K
+                    2 => 3, // 64K
+                    _ => 5, // 16K (3)
                 };
             }
             _ => (),

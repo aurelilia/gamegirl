@@ -50,13 +50,13 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub(super) fn step(gg: &mut GameGirl, t_cycles: usize) {
+    pub(super) fn step(gg: &mut GameGirl, t_cycles: u16) {
         if !gg.lcdc(DISP_EN) {
             return;
         }
         let mode = {
             let ppu = gg.ppu();
-            ppu.mode_clock += t_cycles as u16;
+            ppu.mode_clock += t_cycles;
             if ppu.mode_clock < ppu.mode.cycles() {
                 return;
             }

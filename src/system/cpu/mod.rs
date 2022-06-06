@@ -40,7 +40,7 @@ impl Cpu {
             if inc {
                 gg.cpu.pc += inst.size().u16();
             }
-            gg.advance_clock(cycles as usize);
+            gg.advance_clock(cycles.u16());
         }
 
         if Self::check_interrupts(gg, ime && gg.cpu.ime) {
