@@ -4,6 +4,7 @@ use crate::system::io::addr::*;
 use crate::system::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
+use crate::system::io::Mmu;
 
 /// Timer available on DMG and CGB.
 #[derive(Deserialize, Serialize)]
@@ -15,6 +16,7 @@ pub struct Timer {
     control: u8,
     counter_running: bool,
     counter_divider: usize,
+    counter_bit: u16,
 }
 
 impl Timer {
@@ -50,21 +52,36 @@ impl Timer {
         }
     }
 
-    pub fn write(&mut self, addr: u16, value: u8) {
+    pub fn write(mmu: &mut Mmu, addr: u16, value: u8) {
         match addr {
             DIV => {
-                self.div = 0;
-                self.counter_timer = 0;
+                let prev = mmu.timer.div.is_bit(mmu.timer.counter_bit);
+                mmu.timer.div = 0;
+                mmu.timer.counter_timer = 0;
+                if prev {
+                    let mut tima = mmu[TIMA].u16();
+                    tima += 1;
+                    if tima > 0xFF {
+                        mmu.timer.interrupt_next = true;
+                    }
+                    mmu[TIMA] = tima.u8();
+                }
             }
             TAC => {
-                self.control = value & 7;
-                self.counter_running = self.control.is_bit(2);
-                self.counter_divider = match self.control & 3 {
+                mmu.timer.control = value & 7;
+                mmu.timer.counter_running = mmu.timer.control.is_bit(2);
+                mmu.timer.counter_divider = match mmu.timer.control & 3 {
                     0 => 1024, // 4K
                     1 => 16,   // 256K
                     2 => 64,   // 64K
                     _ => 256,  // 16K (3)
-                }
+                };
+                mmu.timer.counter_bit = match mmu.timer.control & 3 {
+                    0 => 9, // 4K
+                    1 => 3, // 256K
+                    2 => 5, // 64K
+                    _ => 7, // 16K (3)
+                };
             }
             _ => (),
         }
@@ -80,6 +97,7 @@ impl Default for Timer {
             control: 0,
             counter_running: false,
             counter_divider: 1024,
+            counter_bit: 9
         }
     }
 }

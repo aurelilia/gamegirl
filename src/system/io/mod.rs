@@ -142,7 +142,7 @@ impl Mmu {
             IE => self[IE] = value | 0xE0,
             BOOTROM_DISABLE => self.bootrom = None,
 
-            DIV | TAC => self.timer.write(addr, value),
+            DIV | TAC => Timer::write(self, addr, value),
             LCDC => {
                 self[LCDC] = value;
                 if !value.is_bit(7) {
