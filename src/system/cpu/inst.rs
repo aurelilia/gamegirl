@@ -159,7 +159,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
         0x36 => {
             gg.advance_clock(1);
             gg.mmu.write(gg.cpu.dreg(HL), gg.arg8())
-        },
+        }
 
         0x07 => {
             let val = gg.rlc(gg.cpu.reg(A), false);

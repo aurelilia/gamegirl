@@ -26,11 +26,27 @@ fn main() {
 pub fn run_dir(dir: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
     let total = AtomicUsize::new(0);
     let success = AtomicUsize::new(0);
-    run_inner(&PathBuf::from("tests").join(dir), dir, &total, &success, cond);
-    println!("{}/{} tests succeeded", success.load(Ordering::Relaxed), total.load(Ordering::Relaxed));
+    run_inner(
+        &PathBuf::from("tests").join(dir),
+        dir,
+        &total,
+        &success,
+        cond,
+    );
+    println!(
+        "{}/{} tests succeeded",
+        success.load(Ordering::Relaxed),
+        total.load(Ordering::Relaxed)
+    );
 }
 
-fn run_inner(dir: &Path, name: &str, total: &AtomicUsize, success: &AtomicUsize, cond: fn(&GameGirl) -> ControlFlow<bool>) {
+fn run_inner(
+    dir: &Path,
+    name: &str,
+    total: &AtomicUsize,
+    success: &AtomicUsize,
+    cond: fn(&GameGirl) -> ControlFlow<bool>,
+) {
     let mut entries = dir
         .read_dir()
         .unwrap()
@@ -66,7 +82,7 @@ fn run_inner(dir: &Path, name: &str, total: &AtomicUsize, success: &AtomicUsize,
                         rn.elapsed().as_micros() as f64 / 1000.0
                     );
                     success.fetch_add(1, Ordering::Relaxed);
-                },
+                }
                 Err(_) => {
                     println!(
                         "Ran {name}/{}... {} in {}ms",

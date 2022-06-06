@@ -1,10 +1,10 @@
 use crate::numutil::NumExt;
 use crate::system::cpu::Interrupt;
 use crate::system::io::addr::*;
+use crate::system::io::Mmu;
 use crate::system::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
-use crate::system::io::Mmu;
 
 /// Timer available on DMG and CGB.
 #[derive(Deserialize, Serialize)]
@@ -97,7 +97,7 @@ impl Default for Timer {
             control: 0,
             counter_running: false,
             counter_divider: 1024,
-            counter_bit: 9
+            counter_bit: 9,
         }
     }
 }
