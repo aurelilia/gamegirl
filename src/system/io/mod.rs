@@ -192,7 +192,7 @@ impl Mmu {
     }
 
     pub(super) fn new(debugger: Arc<Debugger>) -> Self {
-        let mut mmu = Self {
+        Self {
             vram: [0; 16384],
             vram_bank: 0,
             wram: [0; 32768],
@@ -211,9 +211,7 @@ impl Mmu {
             apu: Apu::new(false),
             hdma: Hdma::default(),
             cart: Cartridge::dummy(),
-        };
-        mmu.init_high();
-        mmu
+        }
     }
 
     pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &GGOptions) {
@@ -230,6 +228,7 @@ impl Mmu {
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
         self.apu = Apu::new(self.cgb);
         self.cart = cart;
+        self.init_high();
     }
 
     fn init_high(&mut self) {
