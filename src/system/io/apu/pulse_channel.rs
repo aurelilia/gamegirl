@@ -148,7 +148,7 @@ impl PulseChannel {
 
 impl PulseChannel {
     fn clock_sequencer(&mut self) {
-        self.sequencer_position = (self.sequencer_position + 1) % 8;
+        self.sequencer_position = (self.sequencer_position + 1) & 7;
     }
 
     fn reload_sweep_counter(&mut self) {

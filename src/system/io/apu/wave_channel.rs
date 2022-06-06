@@ -12,7 +12,6 @@ pub struct WaveChannel {
 
     buffer: [u8; 16],
     buffer_position: u8,
-    buffer_position_just_clocked: bool,
 
     frequency_timer: u16,
 
@@ -62,19 +61,13 @@ impl WaveChannel {
         }
     }
 
-    pub fn clock(&mut self) {
-        // wave is clocked two times
-        for _ in 0..2 {
-            self.buffer_position_just_clocked = false;
-            if self.frequency_timer == 0 {
-                self.clock_position();
-                self.buffer_position_just_clocked = true;
-
-                // reload timer
-                self.frequency_timer = 0x7FF - self.frequency;
-            } else {
-                self.frequency_timer -= 1;
-            }
+    // Cycles here is the one adjusted for normal/double speed.
+    pub fn clock(&mut self, cycles: u16) {
+        if cycles > self.frequency_timer {
+            self.clock_position();
+            self.frequency_timer = (0x7FF - self.frequency) - (cycles - self.frequency_timer);
+        } else {
+            self.frequency_timer -= cycles;
         }
     }
 
@@ -91,10 +84,6 @@ impl WaveChannel {
     /// returns `Some` if the wave is accessable, `None` otherwise (for DMG)
     fn wave_buffer_index(&self, offset: u8) -> Option<usize> {
         let index = if self.dac_enable && self.channel_enable {
-            if !self.cgb && !self.buffer_position_just_clocked {
-                return None;
-            }
-
             self.buffer_position / 2
         } else {
             offset

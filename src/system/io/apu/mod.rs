@@ -323,55 +323,47 @@ impl Apu {
 
     pub fn step(mmu: &mut Mmu, cycles: u16) {
         let ds = mmu.cgb && mmu[KEY1].is_bit(7);
-        let div = mmu.read_high(DIV);
-        for _ in 0..cycles {
-            mmu.apu.clock(ds, div);
-        }
+        let div = mmu.timer.read(DIV);
+        mmu.apu.clock(cycles, ds, div);
     }
 
     /// The APU is clocked by the divider, on the falling edge of the bit 12
     /// of the divider, this is needed since the divider can be clocked manually
     /// by resetting it to 0 on write
-    pub fn clock(&mut self, double_speed: bool, divider: u8) {
+    pub fn clock(&mut self, cycles: u16, double_speed: bool, divider: u8) {
         // 2 in normal speed, 1 in double speed
         let clocks = (!double_speed) as u8 + 1;
-
-        self.clocks_counter += clocks;
-        if self.clocks_counter >= 2 {
-            self.clocks_counter -= 2;
-        } else {
-            // don't do anything, wait for the next cycle
-            return;
-        }
+        let div_bit = 4 + double_speed as u8;
 
         const SAMPLE_RATE: f64 = 44100.;
         const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 4) as f64) / SAMPLE_RATE;
-
-        self.sample_counter += 1.;
+        self.sample_counter += cycles as f64;
         if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
             self.push_output();
-
             self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
 
-        if !self.power {
+        let adj_clocks = clocks * cycles.u8();
+        self.clocks_counter += adj_clocks;
+
+        if self.power {
+            self.wave.channel_mut().clock(adj_clocks.u16());
+        } else {
+            self.clocks_counter &= 1;
             return;
         }
 
-        self.pulse1.channel_mut().clock();
-        self.pulse2.channel_mut().clock();
-        self.wave.channel_mut().clock();
-        self.noise.channel_mut().clock();
+        while self.clocks_counter >= 2 {
+            self.clocks_counter -= 2;
+            self.pulse1.channel_mut().clock();
+            self.pulse2.channel_mut().clock();
+            self.noise.channel_mut().clock();
+        }
 
         let old_div_sequencer_bit = self.divider_sequencer_clock_bit;
-        let bit = if double_speed { 5 } else { 4 };
-        let new_div_sequencer_bit = (divider >> bit) & 1 == 1;
-
-        self.divider_sequencer_clock_bit = new_div_sequencer_bit;
-
-        if old_div_sequencer_bit && !new_div_sequencer_bit {
+        self.divider_sequencer_clock_bit = (divider >> div_bit) & 1 == 1;
+        if old_div_sequencer_bit && !self.divider_sequencer_clock_bit {
             self.sequencer_position += 1;
-
             match self.sequencer_position {
                 1 | 5 => {
                     self.pulse1.clock_length_counter();
