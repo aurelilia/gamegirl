@@ -1,10 +1,18 @@
+use crate::gui::App;
 use crate::numutil::NumExt;
 use crate::system::cpu::{inst, DReg};
 use crate::system::debugger::Breakpoint;
+use crate::system::io::ppu;
+use crate::system::io::ppu::Ppu;
 use crate::system::GameGirl;
 use crate::Colour;
-use eframe::egui::{Align, Label, RichText, ScrollArea, TextEdit, Ui};
+use eframe::egui::{
+    vec2, Align, ColorImage, Context, ImageData, Label, RichText, ScrollArea, TextEdit,
+    TextureFilter, TextureId, Ui,
+};
+use eframe::epaint::ImageDelta;
 use std::fmt::Write;
+use std::iter;
 
 /// Debugger window with instruction view, stack inspection and register inspection.
 /// Allows for inst-by-inst advancing.
@@ -190,4 +198,135 @@ pub fn cart_info(gg: &mut GameGirl, ui: &mut Ui) {
     ui.label(format!("Current ROM1 bank: {}", gg.mmu.cart.rom1_bank));
     ui.label(format!("Current RAM bank: {}", gg.mmu.cart.ram_bank));
     ui.label(format!("MBC type and state: {:?}", gg.mmu.cart.kind));
+}
+
+/// State for visual debugging tools.
+#[derive(Default)]
+pub struct VisualDebugState {
+    /// Texture ID for VRAM viewer
+    vram_texture: Option<TextureId>,
+    /// Texture ID for BG viewer
+    bg_texture: Option<TextureId>,
+    /// Texture ID for Window viewer
+    window_texture: Option<TextureId>,
+}
+
+/// Window showing current VRAM contents rendered as tiles.
+pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
+    let gg = app.gg.lock().unwrap();
+    if !gg.rom_loaded {
+        ui.label("No ROM loaded yet!");
+        return;
+    }
+
+    let mut buf = make_buffer(32, 24);
+    for tile in (0..0x1800).step_by(0x10) {
+        let tile_idx = tile / 0x10;
+        // Tile in Bank 0
+        draw_tile(
+            &gg,
+            &mut buf,
+            (tile_idx & 0xF).u8(),
+            (tile_idx / 0x10).u8(),
+            tile,
+        );
+        // Tile in Bank 1 (for CGB)
+        draw_tile(
+            &gg,
+            &mut buf,
+            (tile_idx & 0xF).u8() + 0x10,
+            (tile_idx / 0x10).u8(),
+            tile + 0x2000,
+        );
+    }
+
+    let img = upload_texture(ctx, 32, 24, &mut app.visual_debug.vram_texture, buf);
+    ui.image(img, vec2(32. * 16., 24. * 16.));
+}
+
+pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
+    fn render_tiles(
+        ctx: &Context,
+        gg: &GameGirl,
+        window: bool,
+        id: &mut Option<TextureId>,
+    ) -> TextureId {
+        let mut buf = make_buffer(32, 32);
+        for tile_idx_addr in 0..(32 * 32) {
+            let data_addr = Ppu::bg_idx_tile_data_addr(gg, window, tile_idx_addr);
+            draw_tile(
+                gg,
+                &mut buf,
+                (tile_idx_addr % 0x20).u8(),
+                (tile_idx_addr / 0x20).u8(),
+                data_addr,
+            );
+        }
+        upload_texture(ctx, 32, 32, id, buf)
+    }
+
+    let gg = app.gg.lock().unwrap();
+    if !gg.rom_loaded {
+        ui.label("No ROM loaded yet!");
+        return;
+    }
+
+    let bg_id = render_tiles(ctx, &gg, false, &mut app.visual_debug.bg_texture);
+    let win_id = render_tiles(ctx, &gg, true, &mut app.visual_debug.window_texture);
+
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.label("Background Map");
+            ui.image(bg_id, vec2(32. * 16., 32. * 16.));
+        });
+        ui.separator();
+        ui.vertical(|ui| {
+            ui.label("Window Map");
+            ui.image(win_id, vec2(32. * 16., 32. * 16.));
+        });
+    });
+}
+
+fn make_buffer(x: usize, y: usize) -> Vec<Colour> {
+    let count = (x * 8) * (y * 8);
+    let mut buf = Vec::with_capacity(count);
+    buf.extend(iter::repeat(Colour::BLACK).take(count));
+    buf
+}
+
+fn upload_texture(
+    ctx: &Context,
+    x: usize,
+    y: usize,
+    id: &mut Option<TextureId>,
+    buf: Vec<Colour>,
+) -> TextureId {
+    let id = get_or_make_texture(ctx, id);
+    let img = ImageDelta::full(ImageData::Color(ColorImage {
+        size: [x * 8, y * 8],
+        pixels: buf,
+    }));
+    let manager = ctx.tex_manager();
+    manager.write().set(id, img);
+    id
+}
+
+fn draw_tile(gg: &GameGirl, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u16) {
+    for line in 0..8 {
+        let base_addr = tile_ptr + (line * 2);
+        let high = gg.mmu.vram[base_addr.us()];
+        let low = gg.mmu.vram[base_addr.us() + 1];
+
+        for pixel in 0..8 {
+            let colour_idx = (high.bit(7 - pixel) << 1) + low.bit(7 - pixel);
+            let colour = ppu::COLOURS[colour_idx.us()];
+
+            let idx = ((x.us() * 8) + pixel.us()) + (((y.us() * 8) + line.us()) * 256);
+            buf[idx] = Colour::from_gray(colour);
+        }
+    }
+}
+
+fn get_or_make_texture(ctx: &Context, tex: &mut Option<TextureId>) -> TextureId {
+    *tex.get_or_insert_with(|| App::make_screen_texture(ctx, TextureFilter::Nearest))
 }

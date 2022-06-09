@@ -20,7 +20,7 @@ pub(crate) mod apu;
 pub mod cartridge;
 mod dma;
 pub mod joypad;
-mod ppu;
+pub mod ppu;
 mod timer;
 
 /// The MMU of the GG, containing all IO devices along
@@ -31,7 +31,7 @@ mod timer;
 #[derive(Deserialize, Serialize)]
 pub struct Mmu {
     #[serde(with = "serde_arrays")]
-    vram: [u8; 2 * 8192],
+    pub(crate) vram: [u8; 2 * 8192],
     vram_bank: u8,
     #[serde(with = "serde_arrays")]
     wram: [u8; 4 * 8192],
@@ -44,7 +44,7 @@ pub struct Mmu {
     #[serde(skip)]
     #[serde(default)]
     pub(super) bootrom: Option<Vec<u8>>,
-    cgb: bool,
+    pub(crate) cgb: bool,
     #[serde(skip)]
     #[serde(default)]
     pub(super) debugger: Arc<Debugger>,

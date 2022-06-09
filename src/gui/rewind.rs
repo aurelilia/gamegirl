@@ -68,9 +68,6 @@ impl RWBuffer {
         }
         self.stop_idx = self.cur_idx + 1;
         self.vec[self.cur_idx] = val;
-
-        let total = self.vec.iter().map(|v| v.len()).sum::<usize>();
-        println!("Buffer usage: {}MB", total / 1024 / 1024);
     }
 
     /// Create a new buffer with the given seconds of rewind storage.

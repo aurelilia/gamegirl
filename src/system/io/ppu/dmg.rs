@@ -5,7 +5,7 @@ use crate::system::io::ppu::{Ppu, PpuKind};
 use crate::system::GameGirl;
 use crate::Colour;
 
-const COLOURS: [u8; 4] = [255, 191, 63, 0];
+pub const COLOURS: [u8; 4] = [255, 191, 63, 0];
 
 impl Ppu {
     pub fn dmg_render_bg_or_window(

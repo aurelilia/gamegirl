@@ -4,6 +4,7 @@ mod input;
 mod options;
 mod rewind;
 
+use crate::gui::debugger::VisualDebugState;
 use crate::gui::file_dialog::File;
 use crate::gui::input::InputAction;
 use crate::gui::options::Options;
@@ -44,10 +45,14 @@ const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
 ];
 
 /// Count of GUI windows that take the App as a parameter.
-const APP_WINDOW_COUNT: usize = 2;
+const APP_WINDOW_COUNT: usize = 4;
 /// GUI windows that take the App as a parameter.
-const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] =
-    [("Options", options::options), ("About", options::about)];
+const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] = [
+    ("Options", options::options),
+    ("About", options::about),
+    ("VRAM", debugger::vram_viewer),
+    ("Background Map", debugger::bg_map_viewer),
+];
 
 /// Start the GUI. Since this is native, this call will never return.
 #[cfg(not(target_arch = "wasm32"))]
@@ -73,6 +78,7 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
         gg,
         current_rom_path: None,
         rewinder: Rewinding::default(),
+        visual_debug: VisualDebugState::default(),
         fast_forward_toggled: false,
 
         texture: TextureId::default(),
@@ -95,6 +101,8 @@ struct App {
     current_rom_path: Option<PathBuf>,
     /// Rewinder state.
     rewinder: Rewinding,
+    /// State for visual debugging tools.
+    visual_debug: VisualDebugState,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     fast_forward_toggled: bool,
 
@@ -337,18 +345,13 @@ impl App {
         });
 
         ui.menu_button("Debugger", |ui| {
-            if ui.button("Debugger").clicked() {
-                self.window_states[0] = true;
-            }
-            if ui.button("Breakpoints").clicked() {
-                self.window_states[1] = true;
-            }
-            if ui.button("Memory Viewer").clicked() {
-                self.window_states[2] = true;
-            }
-            if ui.button("Cartridge Viewer").clicked() {
-                self.window_states[3] = true;
-            }
+            self.window_states[0] |= ui.button("Debugger").clicked();
+            self.window_states[1] |= ui.button("Breakpoints").clicked();
+            self.window_states[2] |= ui.button("Memory Viewer").clicked();
+            self.window_states[3] |= ui.button("Cartridge Viewer").clicked();
+            ui.separator();
+            self.window_states[6] |= ui.button("VRAM Viewer").clicked();
+            self.window_states[7] |= ui.button("Background Map Viewer").clicked();
         });
 
         ui.menu_button("Savestates", |ui| {

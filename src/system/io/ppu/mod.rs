@@ -8,6 +8,8 @@ use crate::Colour;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub use dmg::COLOURS;
+
 mod cgb;
 mod dmg;
 
@@ -324,7 +326,7 @@ impl Ppu {
         }
     }
 
-    fn _bg_idx_tile_data_addr(gg: &GameGirl, window: bool, idx: u16) -> u16 {
+    pub fn bg_idx_tile_data_addr(gg: &GameGirl, window: bool, idx: u16) -> u16 {
         let addr = match () {
             _ if window && gg.lcdc(WIN_MAP) => 0x1C00,
             _ if window => 0x1800,
