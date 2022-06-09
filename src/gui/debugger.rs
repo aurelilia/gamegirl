@@ -244,6 +244,7 @@ pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
     ui.image(img, vec2(32. * 16., 24. * 16.));
 }
 
+/// Window showing 32x32 tile map of background and window.
 pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
     fn render_tiles(
         ctx: &Context,
@@ -287,6 +288,7 @@ pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
     });
 }
 
+/// Create a buffer with the given size in tiles (8x8 tiles)
 fn make_buffer(x: usize, y: usize) -> Vec<Colour> {
     let count = (x * 8) * (y * 8);
     let mut buf = Vec::with_capacity(count);
@@ -294,6 +296,7 @@ fn make_buffer(x: usize, y: usize) -> Vec<Colour> {
     buf
 }
 
+/// Create the given texture if needed and then upload the given image to it.
 fn upload_texture(
     ctx: &Context,
     x: usize,
@@ -311,6 +314,7 @@ fn upload_texture(
     id
 }
 
+/// Draw a full 8x8 tile to the given buffer. The pointer is in VRAM; X/Y is in tiles.
 fn draw_tile(gg: &GameGirl, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u16) {
     for line in 0..8 {
         let base_addr = tile_ptr + (line * 2);
@@ -327,6 +331,7 @@ fn draw_tile(gg: &GameGirl, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u16) {
     }
 }
 
+/// Get or create the given texture ID.
 fn get_or_make_texture(ctx: &Context, tex: &mut Option<TextureId>) -> TextureId {
     *tex.get_or_insert_with(|| App::make_screen_texture(ctx, TextureFilter::Nearest))
 }
