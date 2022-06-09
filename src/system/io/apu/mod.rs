@@ -335,14 +335,6 @@ impl Apu {
         let clocks = (!double_speed) as u8 + 1;
         let div_bit = 4 + double_speed as u8;
 
-        const SAMPLE_RATE: f64 = 44100.;
-        const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 4) as f64) / SAMPLE_RATE;
-        self.sample_counter += cycles as f64;
-        if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
-            self.push_output();
-            self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
-        }
-
         let adj_clocks = clocks * cycles.u8();
         self.clocks_counter += adj_clocks;
 
@@ -358,6 +350,14 @@ impl Apu {
             self.pulse1.channel_mut().clock();
             self.pulse2.channel_mut().clock();
             self.noise.channel_mut().clock();
+        }
+
+        const SAMPLE_RATE: f64 = 44100.;
+        const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 2) as f64) / SAMPLE_RATE;
+        self.sample_counter += adj_clocks as f64;
+        if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
+            self.push_output();
+            self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
 
         let old_div_sequencer_bit = self.divider_sequencer_clock_bit;

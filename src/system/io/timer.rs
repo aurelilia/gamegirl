@@ -22,7 +22,7 @@ pub struct Timer {
 impl Timer {
     pub fn step(gg: &mut GameGirl, m_cycles: u16) {
         let mut tim = gg.timer();
-        tim.div += m_cycles;
+        tim.div = tim.div.wrapping_add(m_cycles);
         if tim.interrupt_next {
             tim.interrupt_next = false;
             gg.mmu[TIMA] = gg.mmu[TMA];
