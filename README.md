@@ -5,7 +5,7 @@ A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.ang
 ## Status
 The emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
-Some features are still missing but being worked on.
+A few features are still missing but being worked on.
 
 ### Features
 - Complete DMG/CGB implementation, including running DMG games on CGB
@@ -20,7 +20,17 @@ Some features are still missing but being worked on.
     - PC and write breakpoints
     - Memory, register and stack view
     - Cartridge Info Viewer
+    - Visual debugging tools: VRAM and map viewers
 - Automated running of blargg and mooneye tests
+
+
+## Screenshots
+##### Playing Pokemon Crystal Clear
+![Gamegirl playing Pokemon Crystal Clear](img/1.jpg)
+##### Pokemon Pinball with running debugger and memory viewer
+![Gamegirl playing Pokemon Pinball](img/2.jpg)
+##### TLoZ: Oracle of Ages with some visual debugging tools open
+![Gamegirl playing Oracle of Ages](img/3.jpg)
 
 
 ## Goals
@@ -50,6 +60,9 @@ All tests except for `oam_bug` (which will not be implemented) pass.
 ### Mooneye test results
 - `acceptance`: 30 out of 71 pass
 - `emulator-only`: All pass (except MBC1 multicart; will not be supported)
+
+### Acid2
+mattcurrie's dmg-acid2 and cgb-acid2 are both corre, including CGB compatibility mode on dmg-acid2.
 
 
 ## Thanks To
