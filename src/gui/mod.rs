@@ -141,7 +141,7 @@ impl epi::App for App {
             });
 
         // TODO cloning the window states is a little eh but it works ig
-        let mut states = self.window_states.clone();
+        let mut states = self.window_states;
         for ((name, runner), state) in APP_WINDOWS
             .iter()
             .zip(states.iter_mut().skip(GGC_WINDOW_COUNT))

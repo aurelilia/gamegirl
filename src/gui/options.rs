@@ -1,5 +1,5 @@
 use crate::common::Button;
-use crate::ggc::{CgbMode, GGOptions};
+use crate::ggc::{CgbMode, GGConfig};
 use crate::gui::input::{Input, InputAction};
 use crate::gui::{input::HOTKEYS, App};
 use eframe::egui;
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Options {
     /// Options passed to the system when loading a ROM.
-    pub gg: GGOptions,
+    pub gg: GGConfig,
     /// Input configuration.
     pub input: Input,
 

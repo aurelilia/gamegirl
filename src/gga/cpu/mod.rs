@@ -7,16 +7,15 @@ use crate::{
 use std::fmt::Display;
 
 /// Represents the CPU of the console - an ARM7TDMI.
-#[derive(Debug, Clone)]
-pub struct CPU {
-    pub mode: CPUMode,
+pub struct Cpu {
+    pub mode: CpuMode,
     pub regs: Regs,
-    pub IE: u16,
-    pub IF: u16,
-    pub IME: bool,
+    pub ie: u16,
+    pub if_: u16,
+    pub ime: bool,
 }
 
-impl CPU {
+impl Cpu {
     fn flag(&self, flag: Flag) -> bool {
         self.regs.cpsr.is_bit(flag as u16)
     }
@@ -35,8 +34,7 @@ impl CPU {
 }
 
 /// CPU state.
-#[derive(Debug, Clone)]
-pub enum CPUMode {
+pub enum CpuMode {
     Arm,
     Thumb,
 }
@@ -49,7 +47,6 @@ pub enum Flag {
 }
 
 /// All registers on the ARM7TDMI.
-#[derive(Debug, Clone)]
 pub struct Regs {
     pub low: [u32; 8],
     pub high: [FiqReg; 5],
@@ -61,14 +58,14 @@ pub struct Regs {
 }
 
 /// A register with values for FIQ and all other modes
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct FiqReg {
     pub reg: u32,
     pub fiq: u32,
 }
 
 /// A register with different values for the different CPU modes
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct ModeReg {
     pub reg: u32,
     pub fiq: u32,

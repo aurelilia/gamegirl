@@ -1,9 +1,9 @@
 use crate::{
-    gga::cpu::{Flag, CPU},
+    gga::cpu::{Cpu, Flag},
     numutil::NumExt,
 };
 
-impl CPU {
+impl Cpu {
     /// Logical/Arithmetic shift left
     pub fn lsl(&mut self, value: u32, by: u32) -> u32 {
         if by == 0 {

@@ -5,7 +5,7 @@ use crate::ggc::io::dma::{Dma, Hdma};
 use crate::ggc::io::joypad::Joypad;
 use crate::ggc::io::ppu::Ppu;
 use crate::ggc::io::timer::Timer;
-use crate::ggc::{CgbMode, GGOptions, GameGirl};
+use crate::ggc::{CgbMode, GGConfig, GameGirl};
 use crate::numutil::NumExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -183,7 +183,7 @@ impl Mmu {
     }
 
     /// Reset the MMU and all IO devices except the cartridge.
-    pub(super) fn reset(&mut self, config: &GGOptions) -> Self {
+    pub(super) fn reset(&mut self, config: &GGConfig) -> Self {
         // TODO the clones are kinda eh
         let mut new = Self::new(self.debugger.clone());
         new.cgb = self.cgb;
@@ -214,7 +214,7 @@ impl Mmu {
         }
     }
 
-    pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &GGOptions) {
+    pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &GGConfig) {
         self.cgb = match conf.mode {
             CgbMode::Always => true,
             CgbMode::Prefer => cart.supports_cgb(),

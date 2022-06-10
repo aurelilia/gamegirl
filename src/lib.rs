@@ -33,7 +33,7 @@ pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
-    let gg = System::new();
+    let gg = System::default();
     let gg = Arc::new(Mutex::new(gg));
     let stream = setup_cpal(gg.clone());
     gui::start(gg, canvas_id).map(|_| Handle(stream))

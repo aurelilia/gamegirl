@@ -107,7 +107,7 @@ impl Cpu {
 }
 
 /// The CPU's registers.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Reg {
     A,
     B,

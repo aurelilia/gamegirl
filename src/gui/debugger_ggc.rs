@@ -231,7 +231,7 @@ pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
         let tile_idx = tile / 0x10;
         // Tile in Bank 0
         draw_tile(
-            &gg,
+            gg,
             &mut buf,
             (tile_idx & 0xF).u8(),
             (tile_idx / 0x10).u8(),
@@ -239,7 +239,7 @@ pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
         );
         // Tile in Bank 1 (for CGB)
         draw_tile(
-            &gg,
+            gg,
             &mut buf,
             (tile_idx & 0xF).u8() + 0x10,
             (tile_idx / 0x10).u8(),
@@ -285,8 +285,8 @@ pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
         return;
     }
 
-    let bg_id = render_tiles(ctx, &gg, false, &mut app.visual_debug.bg_texture);
-    let win_id = render_tiles(ctx, &gg, true, &mut app.visual_debug.window_texture);
+    let bg_id = render_tiles(ctx, gg, false, &mut app.visual_debug.bg_texture);
+    let win_id = render_tiles(ctx, gg, true, &mut app.visual_debug.window_texture);
 
     ui.horizontal(|ui| {
         ui.vertical(|ui| {

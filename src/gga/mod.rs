@@ -1,19 +1,22 @@
-use crate::gga::audio::{APUREG_END, APUREG_START};
-use crate::gga::cpu::{CPUMode, Regs};
-use crate::gga::dma::{DMA, DMA_END, DMA_START, DMA_WIDTH};
+use crate::common::EmulateOptions;
+use crate::gga::audio::{APU_REG_END, APU_REG_START};
+use crate::gga::cpu::{CpuMode, FiqReg, ModeReg, Regs};
+use crate::gga::dma::{Dma, DMA_END, DMA_START, DMA_WIDTH};
 use crate::gga::graphics::{
-    GPUREG_END, GPUREG_START, OAM_END, OAM_START, PALETTE_END, PALETTE_START, VRAM_END, VRAM_START,
+    OAM_END, OAM_START, PALETTE_END, PALETTE_START, PPU_REG_END, PPU_REG_START, VRAM_END,
+    VRAM_START,
 };
 use crate::gga::input::{Input, INPUT_END, INPUT_START};
 use crate::gga::memory::{
     BIOS_END, BIOS_START, KB, WRAM1_END, WRAM1_START, WRAM2_END, WRAM2_START,
 };
 use crate::gga::timer::{Timer, TIMER_END, TIMER_START, TIMER_WIDTH};
+use crate::ggc::GGConfig;
 use crate::numutil::{hword, word, U16Ext, U32Ext};
-use audio::APU;
+use audio::Apu;
 use cartridge::Cartridge;
-use cpu::CPU;
-use graphics::GPU;
+use cpu::Cpu;
+use graphics::Ppu;
 use memory::Memory;
 
 mod audio;
@@ -27,16 +30,18 @@ mod timer;
 
 /// Console struct representing a GGA. Contains all state and is generally used for system emulation.
 /// Use [GameGirlAdv::step] to advance the emulation.
-#[derive(Debug, Clone)]
 pub struct GameGirlAdv {
-    pub cpu: CPU,
+    pub cpu: Cpu,
     pub memory: Memory,
-    pub gpu: GPU,
-    pub apu: APU,
-    pub dma: [DMA; 4],
+    pub gpu: Ppu,
+    pub apu: Apu,
+    pub dma: [Dma; 4],
     pub timers: [Timer; 4],
     pub input: Input,
     pub cart: Cartridge,
+
+    pub options: EmulateOptions,
+    pub config: GGConfig,
 }
 
 impl GameGirlAdv {
@@ -52,12 +57,12 @@ impl GameGirlAdv {
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START],
             WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START],
 
-            GPUREG_START..=GPUREG_END => self.gpu.regs[addr - GPUREG_START],
+            PPU_REG_START..=PPU_REG_END => self.gpu.regs[addr - PPU_REG_START],
             PALETTE_START..=PALETTE_END => self.gpu.palette[addr - PALETTE_START],
             VRAM_START..=VRAM_END => self.gpu.vram[addr - VRAM_START],
             OAM_START..=OAM_END => self.gpu.oam[addr - OAM_START],
 
-            APUREG_START..=APUREG_END => self.apu.regs[addr - APUREG_START],
+            APU_REG_START..=APU_REG_END => self.apu.regs[addr - APU_REG_START],
             DMA_START..=DMA_END => {
                 let dma_idx = (addr - DMA_START) / DMA_WIDTH;
                 self.dma[dma_idx].regs[addr - DMA_START - (dma_idx * DMA_WIDTH)]
@@ -68,11 +73,11 @@ impl GameGirlAdv {
             }
             INPUT_START..=INPUT_END => self.input.regs[addr - INPUT_START],
 
-            0x04000200 => self.cpu.IE.low(),
-            0x04000201 => self.cpu.IE.high(),
-            0x04000202 => self.cpu.IF.low(),
-            0x04000203 => self.cpu.IF.high(),
-            0x04000208 => self.cpu.IME as u8,
+            0x04000200 => self.cpu.ie.low(),
+            0x04000201 => self.cpu.ie.high(),
+            0x04000202 => self.cpu.if_.low(),
+            0x04000203 => self.cpu.if_.high(),
+            0x04000208 => self.cpu.ime as u8,
             0x04000209 => 0, // High unused bits of IME
 
             _ => 0xFF,
@@ -98,12 +103,12 @@ impl GameGirlAdv {
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START] = value,
             WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START] = value,
 
-            GPUREG_START..=GPUREG_END => self.gpu.regs[addr - GPUREG_START] = value,
+            PPU_REG_START..=PPU_REG_END => self.gpu.regs[addr - PPU_REG_START] = value,
             PALETTE_START..=PALETTE_END => self.gpu.palette[addr - PALETTE_START] = value,
             VRAM_START..=VRAM_END => self.gpu.vram[addr - VRAM_START] = value,
             OAM_START..=OAM_END => self.gpu.oam[addr - OAM_START] = value,
 
-            APUREG_START..=APUREG_END => self.apu.regs[addr - APUREG_START] = value,
+            APU_REG_START..=APU_REG_END => self.apu.regs[addr - APU_REG_START] = value,
             DMA_START..=DMA_END => {
                 let dma_idx = (addr - DMA_START) / DMA_WIDTH;
                 self.dma[dma_idx].regs[addr - DMA_START - (dma_idx * DMA_WIDTH)] = value;
@@ -114,11 +119,11 @@ impl GameGirlAdv {
             }
             INPUT_START..=INPUT_END => self.input.regs[addr - INPUT_START] = value,
 
-            0x04000201 => self.cpu.IE = self.cpu.IE.set_low(value),
-            0x04000202 => self.cpu.IF = self.cpu.IF.set_high(value),
-            0x04000203 => self.cpu.IF = self.cpu.IF.set_low(value),
-            0x04000200 => self.cpu.IE = self.cpu.IE.set_high(value),
-            0x04000208 => self.cpu.IME = value & 1 != 0,
+            0x04000201 => self.cpu.ie = self.cpu.ie.set_low(value),
+            0x04000202 => self.cpu.if_ = self.cpu.if_.set_high(value),
+            0x04000203 => self.cpu.if_ = self.cpu.if_.set_low(value),
+            0x04000200 => self.cpu.ie = self.cpu.ie.set_high(value),
+            0x04000208 => self.cpu.ime = value & 1 != 0,
 
             _ => (),
         }
@@ -137,45 +142,46 @@ impl GameGirlAdv {
         self.write_hword(addr, value.low());
         self.write_hword(addr + 2, value.high());
     }
+}
 
-    /// Create a new console.
-    pub fn new() -> Self {
+impl Default for GameGirlAdv {
+    fn default() -> Self {
         Self {
-            cpu: CPU {
-                mode: CPUMode::Arm,
+            cpu: Cpu {
+                mode: CpuMode::Arm,
                 regs: Regs {
                     low: [0; 8],
-                    high: [Default::default(); 5],
-                    sp: Default::default(),
-                    lr: Default::default(),
+                    high: [FiqReg::default(); 5],
+                    sp: ModeReg::default(),
+                    lr: ModeReg::default(),
                     pc: 0,
                     cpsr: 0,
-                    spsr: Default::default(),
+                    spsr: ModeReg::default(),
                 },
-                IE: 0,
-                IF: 0,
-                IME: false,
+                ie: 0,
+                if_: 0,
+                ime: false,
             },
             memory: Memory {
                 bios: [0; 16 * KB],
                 wram1: [0; 256 * KB],
                 wram2: [0; 32 * KB],
             },
-            gpu: GPU {
+            gpu: Ppu {
                 regs: [0; 56],
                 palette: [0; KB],
                 vram: [0; 96 * KB],
                 oam: [0; KB],
             },
-            apu: APU {
-                regs: [0; APUREG_END - APUREG_START],
+            apu: Apu {
+                regs: [0; APU_REG_END - APU_REG_START],
             },
             // Meh...
             dma: [
-                DMA { regs: [0; 10] },
-                DMA { regs: [0; 10] },
-                DMA { regs: [0; 10] },
-                DMA { regs: [0; 10] },
+                Dma { regs: [0; 10] },
+                Dma { regs: [0; 10] },
+                Dma { regs: [0; 10] },
+                Dma { regs: [0; 10] },
             ],
             timers: [
                 Timer { regs: [0; 4] },
@@ -185,6 +191,9 @@ impl GameGirlAdv {
             ],
             input: Input { regs: [0; 4] },
             cart: Cartridge {},
+
+            options: EmulateOptions::default(),
+            config: GGConfig::default(),
         }
     }
 }

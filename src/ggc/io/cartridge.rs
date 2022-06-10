@@ -164,7 +164,7 @@ impl Cartridge {
 
     pub fn ram_bank_count(&self) -> u8 {
         match self.rom[RAM_BANKS.us()] {
-            0 if self.kind == MBC2 => 1,
+            0 if matches!(self.kind, MBC2) => 1,
             0 => 0,
             2 => 1,
             3 => 4,
@@ -219,7 +219,7 @@ impl Cartridge {
     }
 
     pub fn make_save(&self) -> Option<GameSave> {
-        if self.rom.len() > 0 && self.ram_bank_count() > 0 {
+        if !self.rom.is_empty() && self.ram_bank_count() > 0 {
             Some(GameSave {
                 ram: self.ram.to_vec(),
                 rtc: if let MBC3RTC { rtc, .. } = &self.kind {
@@ -237,7 +237,7 @@ impl Cartridge {
     pub fn load_save(&mut self, save: GameSave) {
         self.ram = save.ram;
         if let MBC3RTC { rtc, .. } = &mut self.kind {
-            rtc.start = save.rtc.unwrap_or_else(|| Rtc::since_unix());
+            rtc.start = save.rtc.unwrap_or_else(Rtc::since_unix);
         }
     }
 
@@ -255,7 +255,7 @@ impl Cartridge {
 }
 
 /// Various MBCs supported by GG.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum MBCKind {
     NoMBC,
     MBC1 {
@@ -272,7 +272,7 @@ pub enum MBCKind {
     MBC5,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Rtc {
     pub(crate) start: u64,
     latched_at: Option<u64>,

@@ -113,7 +113,7 @@ impl Input {
 /// An action that is to be performed when the user hits a key.
 /// Can be a button or a hotkey, the latter is stored
 /// as an index into an array of functions.
-#[derive(Copy, Clone, PartialEq, Hash, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum InputAction {
     Button(Button),
     Hotkey(u8),

@@ -1,14 +1,14 @@
 //! This file contains common structures shared by GGC and GGA.
 
+use crate::gga::GameGirlAdv;
 use crate::ggc::io::cartridge::Cartridge;
 use crate::ggc::io::joypad::Joypad;
-use crate::ggc::GGOptions;
+use crate::ggc::GGConfig;
 use crate::storage::Storage;
 use crate::{ggc::GameGirl, Colour};
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::path::PathBuf;
-use crate::gga::GameGirlAdv;
 
 /// Macro for forwarding functions on the main system enum to individual systems.
 macro_rules! forward {
@@ -70,15 +70,15 @@ impl System {
     pub fn options(&mut self) -> &mut EmulateOptions {
         match self {
             System::GGC(gg) => &mut gg.options,
-            System::GGA(_gg) => todo!(),
+            System::GGA(gg) => &mut gg.options,
         }
     }
 
     /// Get emulation config.
-    pub fn config(&mut self) -> &mut GGOptions {
+    pub fn config(&mut self) -> &mut GGConfig {
         match self {
             System::GGC(gg) => &mut gg.config,
-            System::GGA(_gg) => todo!(),
+            System::GGA(gg) => &mut gg.config,
         }
     }
 
@@ -102,14 +102,8 @@ impl System {
         }
     }
 
-    /// Create a new system.
-    pub fn new() -> Self {
-        // We start with a GGC, will be changed later if user loads a GGA cart.
-        Self::GGC(GameGirl::new())
-    }
-
     /// Load a cart.
-    pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &GGOptions) {
+    pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &GGConfig) {
         let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
         if is_ggc {
             let mut cart = Cartridge::from_rom(cart);
@@ -117,8 +111,8 @@ impl System {
                 cart.load_save(save);
             }
 
-            let mut ggc = GameGirl::new();
-            ggc.load_cart(cart, &config, false);
+            let mut ggc = GameGirl::default();
+            ggc.load_cart(cart, config, false);
             ggc.options.frame_finished = mem::replace(
                 &mut self.options().frame_finished,
                 EmulateOptions::serde_frame_finished(),
@@ -127,6 +121,13 @@ impl System {
         } else {
             todo!()
         }
+    }
+}
+
+impl Default for System {
+    fn default() -> Self {
+        // We start with a GGC, will be changed later if user loads a GGA cart.
+        Self::GGC(GameGirl::default())
     }
 }
 
@@ -151,7 +152,13 @@ pub struct EmulateOptions {
 }
 
 impl EmulateOptions {
-    pub fn new() -> Self {
+    fn serde_frame_finished() -> Box<dyn Fn(&GameGirl) + Send> {
+        Box::new(|_| ())
+    }
+}
+
+impl Default for EmulateOptions {
+    fn default() -> Self {
         Self {
             running: false,
             rom_loaded: false,
@@ -160,14 +167,10 @@ impl EmulateOptions {
             frame_finished: Box::new(|_| ()),
         }
     }
-
-    fn serde_frame_finished() -> Box<dyn Fn(&GameGirl) + Send> {
-        Box::new(|_| ())
-    }
 }
 
 /// Buttons on a system. For GGC, L/R are unused.
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Button {
     A,
     B,

@@ -1,7 +1,6 @@
-pub const APUREG_START: usize = 0x04000060;
-pub const APUREG_END: usize = 0x040000A9;
+pub const APU_REG_START: usize = 0x04000060;
+pub const APU_REG_END: usize = 0x040000A9;
 
-#[derive(Debug, Clone)]
-pub struct APU {
-    pub regs: [u8; APUREG_END - APUREG_START],
+pub struct Apu {
+    pub regs: [u8; APU_REG_END - APU_REG_START],
 }

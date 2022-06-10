@@ -135,7 +135,7 @@ impl Ppu {
 
             PpuKind::Cgb(cgb) => {
                 // Emulate DMG behavior in DMG mode.
-                if !cgb.dmg_used_x_obj_cords.is_some() || gg.lcdc(BG_EN) {
+                if cgb.dmg_used_x_obj_cords.is_none() || gg.lcdc(BG_EN) {
                     Self::render_bg(gg);
                     if gg.lcdc(WIN_EN) {
                         Self::render_window(gg);

@@ -7,7 +7,6 @@ pub const WRAM1_END: usize = 0x0203FFFF;
 pub const WRAM2_START: usize = 0x03000000;
 pub const WRAM2_END: usize = 0x03007FFF;
 
-#[derive(Debug, Clone)]
 pub struct Memory {
     pub bios: [u8; 16 * KB],
     pub wram1: [u8; 256 * KB],

@@ -36,7 +36,7 @@ impl Storage {
         let path = Self::get_path(path.unwrap(), "rtc");
         let rtc = std::fs::read_to_string(path)
             .ok()
-            .and_then(|s| u64::from_str_radix(&s, 10).ok());
+            .and_then(|s| s.parse::<u64>().ok());
 
         Some(GameSave { ram, rtc, title })
     }
@@ -80,7 +80,7 @@ impl Storage {
             .get(&format!("{}-rtc", &title))
             .ok()
             .flatten();
-        let rtc = stor.and_then(|s| u64::from_str_radix(&s, 10).ok());
+        let rtc = stor.and_then(|s| s.parse::<u64>().ok());
 
         Some(GameSave { ram, rtc, title })
     }

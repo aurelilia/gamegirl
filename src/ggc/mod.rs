@@ -29,7 +29,7 @@ pub struct GameGirl {
     #[serde(skip)]
     #[serde(default)]
     pub debugger: Arc<Debugger>,
-    pub config: GGOptions,
+    pub config: GGConfig,
 
     /// Shift of t-clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
@@ -217,26 +217,11 @@ impl GameGirl {
         self.mmu.bootrom = old_self.mmu.bootrom;
     }
 
-    /// Create a new console with no cartridge loaded.
-    pub fn new() -> Self {
-        let debugger = Arc::new(Debugger::default());
-        Self {
-            cpu: Cpu::default(),
-            mmu: Mmu::new(debugger.clone()),
-            debugger,
-            config: GGOptions::default(),
-
-            t_shift: 2,
-            clock: 0,
-            options: EmulateOptions::new(),
-        }
-    }
-
     /// Load the given cartridge.
     /// `reset` indicates if the system should be reset before loading.
-    pub fn load_cart(&mut self, cart: Cartridge, config: &GGOptions, reset: bool) {
+    pub fn load_cart(&mut self, cart: Cartridge, config: &GGConfig, reset: bool) {
         if reset {
-            let old_self = mem::replace(self, Self::new());
+            let old_self = mem::take(self);
             self.debugger = old_self.debugger.clone();
             self.mmu.debugger = old_self.debugger;
             self.options.frame_finished = old_self.options.frame_finished;
@@ -249,15 +234,31 @@ impl GameGirl {
 
     /// Create a system with a cart already loaded.
     pub fn with_cart(rom: Vec<u8>) -> Self {
-        let mut gg = Self::new();
-        gg.load_cart(Cartridge::from_rom(rom), &GGOptions::default(), false);
+        let mut gg = Self::default();
+        gg.load_cart(Cartridge::from_rom(rom), &GGConfig::default(), false);
         gg
+    }
+}
+
+impl Default for GameGirl {
+    fn default() -> Self {
+        let debugger = Arc::new(Debugger::default());
+        Self {
+            cpu: Cpu::default(),
+            mmu: Mmu::new(debugger.clone()),
+            debugger,
+            config: GGConfig::default(),
+
+            t_shift: 2,
+            clock: 0,
+            options: EmulateOptions::default(),
+        }
     }
 }
 
 /// Configuration used when initializing the system.
 #[derive(Clone, Serialize, Deserialize)]
-pub struct GGOptions {
+pub struct GGConfig {
     /// How to handle CGB mode.
     pub mode: CgbMode,
     /// If save states should be compressed.
@@ -268,7 +269,7 @@ pub struct GGOptions {
     pub volume: f32,
 }
 
-impl Default for GGOptions {
+impl Default for GGConfig {
     fn default() -> Self {
         Self {
             mode: CgbMode::Prefer,
@@ -280,7 +281,7 @@ impl Default for GGOptions {
 }
 
 /// How to handle CGB mode depending on cart compatibility.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CgbMode {
     /// Always run in CGB mode, even when the cart does not support it.
     /// If it does not, it is run in DMG compatibility mode, just like on a
