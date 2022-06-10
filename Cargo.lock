@@ -240,10 +240,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bitmatch"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a53e105d41966c9b4594b8e3b7cf8e81ae63cc83664880b049af8a11381a3ad"
+dependencies = [
+ "boolean_expression",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
+
+[[package]]
+name = "boolean_expression"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c33ef624481a2d2252fd352266c050e83203343d0884622f7ba09782abbfa83"
+dependencies = [
+ "itertools",
+ "smallvec",
+]
 
 [[package]]
 name = "bumpalo"
@@ -1042,6 +1064,7 @@ dependencies = [
  "base64",
  "bincode",
  "bitflags",
+ "bitmatch",
  "console_error_panic_hook",
  "cpal",
  "eframe",
@@ -1351,6 +1374,15 @@ checksum = "7789f7f3c9686f96164f5109d69152de759e76e284f736bd57661c6df5091919"
 dependencies = [
  "core-foundation-sys 0.8.3",
  "mach",
+]
+
+[[package]]
+name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
 ]
 
 [[package]]

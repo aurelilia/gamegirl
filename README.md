@@ -1,11 +1,13 @@
 # GameGirl
-A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.angm.xyz/ellie/gamelin).  
+A Gameboy (Color/Advance) emulator written in Rust, whose GG/GGC core is a rewrite of 
+[gamelin](https://git.angm.xyz/ellie/gamelin).  
 [Try it in your browser!](https://gamegirl.angm.xyz)
 
 
 ## Status
-The emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
-enough to make most commercial games run perfectly.
+The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
+enough to make most commercial games run perfectly.  
+AGB support is very very early with nothing really working yet; still working on implementing the CPU.
 
 ### Features
 - Complete DMG/CGB implementation, including running DMG games on CGB
@@ -27,7 +29,7 @@ enough to make most commercial games run perfectly.
 - [ ] Controller support
 - [ ] Save export on Web/WASM
 - [ ] Fix savestates/rewinding on WASM
-- [ ] GBA support, someday?
+- [ ] Proper GBA support, someday?
 
 
 ## Screenshots
@@ -79,6 +81,12 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 
 
 ## Thanks To
+### General
+- [emilk, for creating egui](https://github.com/emilk/egui)
+- The wider Rust community, for its awesome ecosystem
+- You, for reading this :)
+
+### GG/GGC
 - [Imran Nazar, for their series of blog posts on GB emulation](http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-The-CPU)
 - [Michael Steil, for The Ultimate Game Boy Talk](https://media.ccc.de/v/33c3-8029-the_ultimate_game_boy_talk)
 - [kotcrab, for creating the xgbc emulator I often used to confirm/understand fine behavior](https://github.com/kotcrab/xgbc)
@@ -86,4 +94,7 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 - [Megan Sullivan, for her list of GB opcodes](https://meganesulli.com/blog/game-boy-opcodes)
 - [gbdev.io for a list of useful resources and the Pan Docs](https://gbdev.io)
 - blargg, Gekkio and mattcurie for their test ROMs and retrio for hosting blargg's ROMs
-- You, for reading this :)
+
+### GGA
+- [GBATEK, as a technical reference](https://problemkaputt.de/gbatek.htm)
+- [mj-hd, for rgba, which I used to properly understand ARM7 emulation details](https://github.com/mj-hd/rgba/)

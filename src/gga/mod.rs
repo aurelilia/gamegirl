@@ -1,6 +1,5 @@
 use crate::common::EmulateOptions;
 use crate::gga::audio::{APU_REG_END, APU_REG_START};
-use crate::gga::cpu::{CpuMode, FiqReg, ModeReg, Regs};
 use crate::gga::dma::{Dma, DMA_END, DMA_START, DMA_WIDTH};
 use crate::gga::graphics::{
     OAM_END, OAM_START, PALETTE_END, PALETTE_START, PPU_REG_END, PPU_REG_START, VRAM_END,
@@ -46,8 +45,13 @@ pub struct GameGirlAdv {
 
 impl GameGirlAdv {
     /// Step forward the emulated console including all subsystems.
-    pub fn step(&mut self) {
+    pub fn advance(&mut self) {
         todo!()
+    }
+
+    /// Advance everything but the CPU by a clock cycle.
+    fn advance_clock(&mut self) {
+        todo!();
     }
 
     /// Read a byte from the bus. Does no timing-related things; simply fetches the value.
@@ -101,7 +105,6 @@ impl GameGirlAdv {
     fn write_byte(&mut self, addr: u32, value: u8) {
         let addr = addr.us();
         match addr {
-            BIOS_START..=BIOS_END => self.memory.bios[addr - BIOS_START] = value,
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START] = value,
             WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START] = value,
 
@@ -144,28 +147,22 @@ impl GameGirlAdv {
         self.write_hword(addr, value.low());
         self.write_hword(addr + 2, value.high());
     }
+
+    fn reg(&self, idx: u32) -> u32 {
+        self.cpu.reg(idx)
+    }
+
+    fn low(&self, idx: u16) -> u32 {
+        self.cpu.low(idx)
+    }
 }
 
 impl Default for GameGirlAdv {
     fn default() -> Self {
         Self {
-            cpu: Cpu {
-                mode: CpuMode::Arm,
-                regs: Regs {
-                    low: [0; 8],
-                    high: [FiqReg::default(); 5],
-                    sp: ModeReg::default(),
-                    lr: ModeReg::default(),
-                    pc: 0,
-                    cpsr: 0,
-                    spsr: ModeReg::default(),
-                },
-                ie: 0,
-                if_: 0,
-                ime: false,
-            },
+            cpu: Cpu::default(),
             memory: Memory {
-                bios: [0; 16 * KB],
+                bios: include_bytes!("bios.bin"),
                 wram1: [0; 256 * KB],
                 wram2: [0; 32 * KB],
             },

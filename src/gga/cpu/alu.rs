@@ -1,5 +1,5 @@
 use crate::{
-    gga::cpu::{Cpu, Flag},
+    gga::cpu::{registers::Flag, Cpu},
     numutil::NumExt,
 };
 

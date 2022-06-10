@@ -8,7 +8,7 @@ pub const WRAM2_START: usize = 0x03000000;
 pub const WRAM2_END: usize = 0x03007FFF;
 
 pub struct Memory {
-    pub bios: [u8; 16 * KB],
+    pub bios: &'static [u8],
     pub wram1: [u8; 256 * KB],
     pub wram2: [u8; 32 * KB],
 }
