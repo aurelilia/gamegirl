@@ -8,6 +8,7 @@ use crate::{ggc::GameGirl, Colour};
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::path::PathBuf;
+use crate::gga::GameGirlAdv;
 
 /// Macro for forwarding functions on the main system enum to individual systems.
 macro_rules! forward {
@@ -37,7 +38,7 @@ pub enum System {
     /// A GGC. Is also used for DMG games.
     GGC(GameGirl),
     /// A GGA. Only used for GGA games.
-    GGA(()),
+    GGA(GameGirlAdv),
 }
 
 impl System {

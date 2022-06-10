@@ -3,6 +3,7 @@
 #![feature(mixed_integer_ops)]
 
 pub mod common;
+pub mod gga;
 pub mod ggc;
 pub mod gui;
 pub mod numutil;

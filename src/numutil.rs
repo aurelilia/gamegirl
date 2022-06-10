@@ -77,51 +77,56 @@ pub fn word(lo: u16, hi: u16) -> u32 {
 }
 
 pub trait U16Ext {
-    fn low(&self) -> u8;
-    fn high(&self) -> u8;
-    fn set_low(&self, low: u8) -> u16;
-    fn set_high(&self, high: u8) -> u16;
+    fn low(self) -> u8;
+    fn high(self) -> u8;
+    fn set_low(self, low: u8) -> u16;
+    fn set_high(self, high: u8) -> u16;
 }
 
 impl U16Ext for u16 {
-    fn low(&self) -> u8 {
+    fn low(self) -> u8 {
         self.u8()
     }
 
-    fn high(&self) -> u8 {
+    fn high(self) -> u8 {
         (self >> 8).u8()
     }
 
-    fn set_low(&self, low: u8) -> u16 {
+    fn set_low(self, low: u8) -> u16 {
         (self & 0xFF00) | low.u16()
     }
 
-    fn set_high(&self, high: u8) -> u16 {
+    fn set_high(self, high: u8) -> u16 {
         (self & 0x00FF) | (high.u16() << 8)
     }
 }
 
 pub trait U32Ext {
-    fn low(&self) -> u16;
-    fn high(&self) -> u16;
-    fn set_low(&self, low: u16) -> u32;
-    fn set_high(&self, high: u16) -> u32;
+    fn low(self) -> u16;
+    fn high(self) -> u16;
+    fn set_low(self, low: u16) -> u32;
+    fn set_high(self, high: u16) -> u32;
+    fn bits(self, start: u32, len: u32) -> u32;
 }
 
 impl U32Ext for u32 {
-    fn low(&self) -> u16 {
+    fn low(self) -> u16 {
         self.u16()
     }
 
-    fn high(&self) -> u16 {
+    fn high(self) -> u16 {
         (self >> 16).u16()
     }
 
-    fn set_low(&self, low: u16) -> u32 {
+    fn set_low(self, low: u16) -> u32 {
         (self & 0xFFFF0000) | low.u32()
     }
 
-    fn set_high(&self, high: u16) -> u32 {
+    fn set_high(self, high: u16) -> u32 {
         (self & 0x0000FFFF) | (high.u32() << 16)
+    }
+
+    fn bits(self, start: u32, len: u32) -> u32 {
+        (self >> start) & ((1 << len) - 1)
     }
 }
