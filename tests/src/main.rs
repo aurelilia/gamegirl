@@ -4,7 +4,7 @@ mod blargg;
 mod mooneye;
 
 use ansi_term::Colour;
-use gamegirl::system::GameGirl;
+use gamegirl::ggc::GameGirl;
 use rayon::prelude::*;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};

@@ -16,7 +16,7 @@ pub struct File {
 /// sending a [Message] once the user has picked a file.
 pub fn open(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
-        .add_filter("GameGirl games", &["gb", "gbc"])
+        .add_filter("GameGirl games", &["gb", "gbc", "gba"])
         .pick_file();
 
     execute(async move {

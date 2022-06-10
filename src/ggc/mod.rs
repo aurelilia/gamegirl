@@ -1,14 +1,15 @@
+use crate::common::EmulateOptions;
 use crate::Colour;
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::ggc::cpu::{Cpu, Interrupt};
+use crate::ggc::io::addr::{IF, KEY1};
+use crate::ggc::io::cartridge::Cartridge;
+use crate::ggc::io::Mmu;
 use crate::numutil::NumExt;
-use crate::system::cpu::{Cpu, Interrupt};
-use crate::system::io::addr::{IF, KEY1};
-use crate::system::io::cartridge::Cartridge;
-use crate::system::io::Mmu;
 
 use self::debugger::Debugger;
 
@@ -34,21 +35,8 @@ pub struct GameGirl {
     t_shift: u8,
     /// Temporary for keeping track of how many clocks elapsed in [advance_delta].
     clock: usize,
-    /// If the system is running. If false, any calls to [advance_delta] and [produce_samples] do nothing.
-    pub running: bool,
-    /// If there is a ROM loaded / cartridge inserted.
-    pub rom_loaded: bool,
-    /// If the audio samples produced by [produce_samples] should be in reversed order.
-    /// `true` while rewinding.
-    pub invert_audio_samples: bool,
-    /// Speed multiplier the system should run at.
-    /// ex. 1x is regular speed, 2x is double speed.
-    /// Affects [advance_delta] and sound sample output.
-    pub speed_multiplier: usize,
-    /// Called when a frame is finished rendering. (End of VBlank)
-    #[serde(skip)]
-    #[serde(default = "frame_finished")]
-    pub frame_finished: Box<dyn Fn(&GameGirl) + Send>,
+    /// Emulation options.
+    pub options: EmulateOptions,
 }
 
 impl GameGirl {
@@ -56,15 +44,15 @@ impl GameGirl {
     /// Might advance a few clocks more; especially if a GDMA transfer
     /// occurs at the wrong time.
     pub fn advance_delta(&mut self, delta: f32) {
-        if !self.running {
+        if !self.options.running {
             return;
         }
         self.clock = 0;
-        let target = (M_CLOCK_HZ * delta * self.speed_multiplier as f32) as usize;
+        let target = (M_CLOCK_HZ * delta * self.options.speed_multiplier as f32) as usize;
         while self.clock < target {
             if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
                 self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
-                self.running = false;
+                self.options.running = false;
                 break;
             }
             self.advance();
@@ -74,14 +62,14 @@ impl GameGirl {
     /// Step until the PPU has finished producing the current frame.
     /// Only used for rewinding since it causes audio desync very easily.
     pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
-        if !self.running {
+        if !self.options.running {
             return None;
         }
 
         while self.mmu.ppu.last_frame == None {
             if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
                 self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
-                self.running = false;
+                self.options.running = false;
                 return None;
             }
             self.advance();
@@ -94,16 +82,16 @@ impl GameGirl {
     /// Writes zeroes if the system is not currently running
     /// and no audio should be played.
     pub fn produce_samples(&mut self, samples: &mut [f32]) {
-        if !self.running {
+        if !self.options.running {
             samples.fill(0.0);
             return;
         }
 
-        let target = samples.len() * self.speed_multiplier;
+        let target = samples.len() * self.options.speed_multiplier;
         while self.mmu.apu.buffer.len() < target {
             if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
                 self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
-                self.running = false;
+                self.options.running = false;
                 samples.fill(0.0);
                 return;
             }
@@ -111,7 +99,7 @@ impl GameGirl {
         }
 
         let mut buffer = mem::take(&mut self.mmu.apu.buffer);
-        if self.invert_audio_samples {
+        if self.options.invert_audio_samples {
             // If rewinding, truncate and get rid of any excess samples to prevent
             // audio samples getting backed up
             for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
@@ -130,7 +118,7 @@ impl GameGirl {
 
             for (src, dst) in buffer
                 .into_iter()
-                .step_by(self.speed_multiplier)
+                .step_by(self.options.speed_multiplier)
                 .zip(samples.iter_mut())
             {
                 *dst = src * self.config.volume;
@@ -225,7 +213,7 @@ impl GameGirl {
         let old_self = mem::replace(self, new_self);
         self.debugger = old_self.debugger;
         self.mmu.cart.rom = old_self.mmu.cart.rom;
-        self.frame_finished = old_self.frame_finished;
+        self.options.frame_finished = old_self.options.frame_finished;
         self.mmu.bootrom = old_self.mmu.bootrom;
     }
 
@@ -240,11 +228,7 @@ impl GameGirl {
 
             t_shift: 2,
             clock: 0,
-            running: false,
-            rom_loaded: false,
-            invert_audio_samples: false,
-            speed_multiplier: 1,
-            frame_finished: Box::new(|_| ()),
+            options: EmulateOptions::new(),
         }
     }
 
@@ -255,12 +239,12 @@ impl GameGirl {
             let old_self = mem::replace(self, Self::new());
             self.debugger = old_self.debugger.clone();
             self.mmu.debugger = old_self.debugger;
-            self.frame_finished = old_self.frame_finished;
+            self.options.frame_finished = old_self.options.frame_finished;
         }
         self.mmu.load_cart(cart, config);
         self.config = config.clone();
-        self.running = true;
-        self.rom_loaded = true;
+        self.options.running = true;
+        self.options.rom_loaded = true;
     }
 
     /// Create a system with a cart already loaded.
@@ -306,8 +290,4 @@ pub enum CgbMode {
     Prefer,
     /// Never run the cart in CGB mode unless it requires it.
     Never,
-}
-
-fn frame_finished() -> Box<dyn Fn(&GameGirl) + Send> {
-    Box::new(|_| ())
 }

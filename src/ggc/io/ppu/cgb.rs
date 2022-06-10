@@ -1,7 +1,7 @@
+use crate::ggc::io::addr::*;
+use crate::ggc::io::ppu::{Ppu, PpuKind, BG_EN};
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::io::addr::*;
-use crate::system::io::ppu::{Ppu, PpuKind, BG_EN};
-use crate::system::GameGirl;
 use crate::Colour;
 use serde::{Deserialize, Serialize};
 

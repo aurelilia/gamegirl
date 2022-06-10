@@ -1,19 +1,17 @@
-mod debugger;
+mod debugger_ggc;
 mod file_dialog;
 mod input;
 mod options;
 mod rewind;
 
-use crate::gui::debugger::VisualDebugState;
+use crate::common::System;
+use crate::ggc::GameGirl;
+use crate::gui::debugger_ggc::VisualDebugState;
 use crate::gui::file_dialog::File;
 use crate::gui::input::InputAction;
 use crate::gui::options::Options;
 use crate::gui::rewind::Rewinding;
-use crate::storage::Storage as CartStore;
-use crate::system::io::cartridge::Cartridge;
-use crate::system::io::joypad::Joypad;
 use crate::Colour;
-use crate::GameGirl;
 use eframe::egui::util::History;
 use eframe::egui::{self, widgets, Context, Event, ImageData, Layout, Ui};
 use eframe::egui::{vec2, TextureFilter, Vec2};
@@ -31,17 +29,18 @@ use std::time::Duration;
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
 /// Total count of windows in GUI.
-const WINDOW_COUNT: usize = GG_WINDOW_COUNT + APP_WINDOW_COUNT;
+const WINDOW_COUNT: usize = GGC_WINDOW_COUNT + APP_WINDOW_COUNT;
 
-/// Count of GUI windows that take the GG as a parameter.
+/// Count of GUI windows that take a GGC as a parameter.
 /// For now, this is only the debugger's windows.
-const GG_WINDOW_COUNT: usize = 4;
-/// GUI windows that take the GG as parameter.
-const GG_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GG_WINDOW_COUNT] = [
-    ("Debugger", debugger::debugger),
-    ("Breakpoints", debugger::breakpoints),
-    ("Memory", debugger::memory),
-    ("Cartridge", debugger::cart_info),
+/// If a GGA is active, windows are hidden.
+const GGC_WINDOW_COUNT: usize = 4;
+/// GUI windows that take a GGC as parameter.
+const GGC_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GGC_WINDOW_COUNT] = [
+    ("Debugger", debugger_ggc::debugger),
+    ("Breakpoints", debugger_ggc::breakpoints),
+    ("Memory", debugger_ggc::memory),
+    ("Cartridge", debugger_ggc::cart_info),
 ];
 
 /// Count of GUI windows that take the App as a parameter.
@@ -50,13 +49,13 @@ const APP_WINDOW_COUNT: usize = 4;
 const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] = [
     ("Options", options::options),
     ("About", options::about),
-    ("VRAM", debugger::vram_viewer),
-    ("Background Map", debugger::bg_map_viewer),
+    ("VRAM", debugger_ggc::vram_viewer),
+    ("Background Map", debugger_ggc::bg_map_viewer),
 ];
 
 /// Start the GUI. Since this is native, this call will never return.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn start(gg: Arc<Mutex<GameGirl>>) {
+pub fn start(gg: Arc<Mutex<System>>) {
     let options = eframe::NativeOptions {
         transparent: true,
         ..Default::default()
@@ -66,14 +65,11 @@ pub fn start(gg: Arc<Mutex<GameGirl>>) {
 
 /// Start the GUI. Since this is WASM, this call will return.
 #[cfg(target_arch = "wasm32")]
-pub fn start(
-    gg: Arc<Mutex<GameGirl>>,
-    canvas_id: &str,
-) -> Result<(), eframe::wasm_bindgen::JsValue> {
+pub fn start(gg: Arc<Mutex<System>>, canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
     eframe::start_web(canvas_id, Box::new(make_app(gg)))
 }
 
-fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
+fn make_app(gg: Arc<Mutex<System>>) -> App {
     App {
         gg,
         current_rom_path: None,
@@ -96,7 +92,7 @@ fn make_app(gg: Arc<Mutex<GameGirl>>) -> App {
 /// The App state.
 struct App {
     /// The GG currently running.
-    gg: Arc<Mutex<GameGirl>>,
+    gg: Arc<Mutex<System>>,
     /// The path to the ROM currently running, if any. Always None on WASM.
     current_rom_path: Option<PathBuf>,
     /// Rewinder state.
@@ -148,7 +144,7 @@ impl epi::App for App {
         let mut states = self.window_states.clone();
         for ((name, runner), state) in APP_WINDOWS
             .iter()
-            .zip(states.iter_mut().skip(GG_WINDOW_COUNT))
+            .zip(states.iter_mut().skip(GGC_WINDOW_COUNT))
         {
             egui::Window::new(*name)
                 .open(state)
@@ -157,10 +153,12 @@ impl epi::App for App {
         self.window_states = states;
 
         let mut gg = self.gg.lock().unwrap();
-        for ((name, runner), state) in GG_WINDOWS.iter().zip(self.window_states.iter_mut()) {
-            egui::Window::new(*name)
-                .open(state)
-                .show(ctx, |ui| runner(&mut gg, ui));
+        if let System::GGC(gg) = &mut *gg {
+            for ((name, runner), state) in GGC_WINDOWS.iter().zip(self.window_states.iter_mut()) {
+                egui::Window::new(*name)
+                    .open(state)
+                    .show(ctx, |ui| runner(gg, ui));
+            }
         }
 
         // Immediately repaint, since the GG will have a new frame.
@@ -173,14 +171,14 @@ impl epi::App for App {
             self.state = state;
         }
 
-        self.texture = Self::make_screen_texture(ctx, self.state.options.tex_filter);
+        self.texture = Self::make_screen_texture(ctx, [160, 144], self.state.options.tex_filter);
 
         self.rewinder
             .set_rw_buf_size(self.state.options.rewind_buffer_size);
         let buffer = self.rewinder.rewind_buffer.clone();
         if self.state.options.enable_rewind {
-            self.gg.lock().unwrap().frame_finished = Box::new(move |gg| {
-                if !gg.invert_audio_samples {
+            self.gg.lock().unwrap().options().frame_finished = Box::new(move |gg| {
+                if !gg.options.invert_audio_samples {
                     buffer.lock().unwrap().push(gg.save_state());
                 }
             });
@@ -205,18 +203,19 @@ impl App {
     /// Update the system's state
     fn update_gg(&mut self, ctx: &Context, advance_by: Duration) {
         let frame = self.get_gg_frame(ctx, advance_by);
-        if let Some(data) = frame {
-            let img = ImageDelta::full(ImageData::Color(ColorImage {
-                size: [160, 144],
-                pixels: data,
-            }));
+        if let Some((pixels, size)) = frame {
+            let img = ImageDelta::full(ImageData::Color(ColorImage { size, pixels }));
             let manager = ctx.tex_manager();
             manager.write().set(self.texture, img);
         }
     }
 
     /// Process keyboard inputs and return the GG's next frame, if one was produced.
-    fn get_gg_frame(&mut self, ctx: &Context, advance_by: Duration) -> Option<Vec<Colour>> {
+    fn get_gg_frame(
+        &mut self,
+        ctx: &Context,
+        advance_by: Duration,
+    ) -> Option<(Vec<Colour>, [usize; 2])> {
         for event in &ctx.input().events {
             if let Event::Key { key, pressed, .. } = event {
                 if let Some(action) = self.state.options.input.pending.take() {
@@ -226,7 +225,7 @@ impl App {
 
                 match self.state.options.input.get_key(*key) {
                     Some(InputAction::Button(btn)) => {
-                        Joypad::set(&mut self.gg.lock().unwrap(), btn, *pressed)
+                        self.gg.lock().unwrap().set_button(btn, *pressed)
                     }
                     Some(InputAction::Hotkey(idx)) => {
                         input::HOTKEYS[idx as usize].1(self, *pressed)
@@ -237,19 +236,20 @@ impl App {
         }
 
         let mut gg = self.gg.lock().unwrap();
+        let size = gg.screen_size();
         if self.rewinder.rewinding {
             if let Some(state) = self.rewinder.rewind_buffer.lock().unwrap().pop() {
                 gg.load_state(state);
-                gg.invert_audio_samples = true;
-                return gg.produce_frame();
+                gg.options().invert_audio_samples = true;
+                return gg.produce_frame().map(|p| (p, size));
             } else {
                 self.rewinder.rewinding = false;
-                gg.invert_audio_samples = false;
+                gg.options().invert_audio_samples = false;
             }
         } else {
             gg.advance_delta(advance_by.as_secs_f32());
         }
-        gg.mmu.ppu.last_frame.take()
+        gg.last_frame().map(|p| (p, size))
     }
 
     /// Process all async messages that came in during this frame.
@@ -258,12 +258,11 @@ impl App {
             match self.message_channel.1.try_recv() {
                 Ok(Message::FileOpen(file)) => {
                     self.save_game();
-                    let mut cart = Cartridge::from_rom(file.content);
-                    CartStore::load(file.path.clone(), &mut cart);
-                    self.gg
-                        .lock()
-                        .unwrap()
-                        .load_cart(cart, &self.state.options.gg, true);
+                    self.gg.lock().unwrap().load_cart(
+                        file.content,
+                        file.path.clone(),
+                        &self.state.options.gg,
+                    );
 
                     self.current_rom_path = file.path.clone();
                     if let Some(path) = file.path {
@@ -284,10 +283,10 @@ impl App {
 
     /// Save the system cart RAM, if a cart is loaded and it has RAM.
     fn save_game(&self) {
-        let gg = self.gg.lock().unwrap();
-        if gg.mmu.cart.rom.len() > 0 && gg.mmu.cart.ram_bank_count() > 0 {
-            CartStore::save(self.current_rom_path.clone(), &gg.mmu.cart);
-        }
+        self.gg
+            .lock()
+            .unwrap()
+            .save_game(self.current_rom_path.clone());
     }
 
     /// Paint the navbar.
@@ -327,7 +326,7 @@ impl App {
             }
             if ui.button("Pause").clicked() {
                 let mut gg = self.gg.lock().unwrap();
-                gg.running = !gg.running && gg.rom_loaded;
+                gg.options().running = !gg.options().running && gg.options().rom_loaded;
                 ui.close_menu();
             }
             if ui.button("Reset").clicked() {
@@ -403,11 +402,11 @@ impl App {
     }
 
     /// Create the screen texture.
-    fn make_screen_texture(ctx: &Context, filter: TextureFilter) -> TextureId {
+    fn make_screen_texture(ctx: &Context, size: [usize; 2], filter: TextureFilter) -> TextureId {
         let manager = ctx.tex_manager();
         let id = manager.write().alloc(
             "screen".into(),
-            ColorImage::new([160, 144], Colour::BLACK).into(),
+            ColorImage::new(size, Colour::BLACK).into(),
             filter,
         );
         id

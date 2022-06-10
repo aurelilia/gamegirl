@@ -1,6 +1,6 @@
+use crate::ggc::io::addr::{IE, IF};
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::io::addr::{IE, IF};
-use crate::system::GameGirl;
 use serde::{Deserialize, Serialize};
 
 mod alu;

@@ -1,9 +1,9 @@
+use crate::ggc::cpu::Interrupt;
+use crate::ggc::io::addr::*;
+use crate::ggc::io::ppu::cgb::Cgb;
+use crate::ggc::io::Mmu;
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::cpu::Interrupt;
-use crate::system::io::addr::*;
-use crate::system::io::ppu::cgb::Cgb;
-use crate::system::io::Mmu;
-use crate::system::GameGirl;
 use crate::Colour;
 use serde::Deserialize;
 use serde::Serialize;
@@ -97,7 +97,7 @@ impl Ppu {
                 if gg.mmu[LY] > 153 {
                     gg.mmu[LY] = 0;
                     gg.mmu.ppu.window_line = 0;
-                    (gg.frame_finished)(gg);
+                    (gg.options.frame_finished)(gg);
                     Self::stat_interrupt(gg, 5);
                     Mode::OAMScan
                 } else {

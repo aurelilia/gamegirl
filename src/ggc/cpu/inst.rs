@@ -1,10 +1,10 @@
+use crate::ggc::cpu::DReg::*;
+use crate::ggc::cpu::Flag::*;
+use crate::ggc::cpu::Reg::*;
+use crate::ggc::cpu::{data, DReg, Reg};
+use crate::ggc::io::addr::{IE, IF, KEY1};
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::cpu::DReg::*;
-use crate::system::cpu::Flag::*;
-use crate::system::cpu::Reg::*;
-use crate::system::cpu::{data, DReg, Reg};
-use crate::system::io::addr::{IE, IF, KEY1};
-use crate::system::GameGirl;
 
 const EXT: u8 = 0xCB;
 

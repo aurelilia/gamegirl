@@ -1,8 +1,8 @@
+use crate::ggc::io::addr::{BGP, LY};
+use crate::ggc::io::ppu::cgb::Cgb;
+use crate::ggc::io::ppu::{Ppu, PpuKind};
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::io::addr::{BGP, LY};
-use crate::system::io::ppu::cgb::Cgb;
-use crate::system::io::ppu::{Ppu, PpuKind};
-use crate::system::GameGirl;
 use crate::Colour;
 
 pub const COLOURS: [u8; 4] = [255, 191, 63, 0];

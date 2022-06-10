@@ -1,5 +1,6 @@
+use crate::ggc::io::cartridge::MBCKind::*;
 use crate::numutil::NumExt;
-use crate::system::io::cartridge::MBCKind::*;
+use crate::storage::GameSave;
 use serde::Deserialize;
 use serde::Serialize;
 use std::iter;
@@ -217,12 +218,27 @@ impl Cartridge {
         cart
     }
 
-    pub fn load_ram(&mut self, ram: Vec<u8>) {
-        self.ram = ram;
+    pub fn make_save(&self) -> Option<GameSave> {
+        if self.rom.len() > 0 && self.ram_bank_count() > 0 {
+            Some(GameSave {
+                ram: self.ram.to_vec(),
+                rtc: if let MBC3RTC { rtc, .. } = &self.kind {
+                    Some(rtc.start)
+                } else {
+                    None
+                },
+                title: self.title(true),
+            })
+        } else {
+            None
+        }
     }
 
-    pub fn ram(&self) -> &[u8] {
-        &self.ram
+    pub fn load_save(&mut self, save: GameSave) {
+        self.ram = save.ram;
+        if let MBC3RTC { rtc, .. } = &mut self.kind {
+            rtc.start = save.rtc.unwrap_or_else(|| Rtc::since_unix());
+        }
     }
 
     pub fn dummy() -> Self {

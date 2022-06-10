@@ -1,10 +1,8 @@
+use crate::ggc::io::addr::{DMA, HDMA_DEST_HIGH, HDMA_DEST_LOW, HDMA_SRC_HIGH, HDMA_SRC_LOW, LCDC};
+use crate::ggc::io::ppu::DISP_EN;
+use crate::ggc::io::Mmu;
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::io::addr::{
-    DMA, HDMA_DEST_HIGH, HDMA_DEST_LOW, HDMA_SRC_HIGH, HDMA_SRC_LOW, LCDC,
-};
-use crate::system::io::ppu::DISP_EN;
-use crate::system::io::Mmu;
-use crate::system::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
 

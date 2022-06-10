@@ -1,6 +1,6 @@
+use crate::common::Button;
+use crate::common::Button::*;
 use crate::gui::{file_dialog, App};
-use crate::system::io::joypad::Button;
-use crate::system::io::joypad::Button::*;
 use eframe::egui::Key;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,16 +16,16 @@ pub(super) const HOTKEYS: &[(&str, fn(&mut App, bool))] = &[
     ("Pause", |a, p| {
         pressed(a, p, |app| {
             let mut gg = app.gg.lock().unwrap();
-            gg.running = !gg.running && gg.rom_loaded;
+            gg.options().running = !gg.options().running && gg.options().rom_loaded;
         })
     }),
     ("Save", |a, p| pressed(a, p, |app| app.save_game())),
     ("Fast Forward (Hold)", |app, pressed| {
         let mut gg = app.gg.lock().unwrap();
         if pressed {
-            gg.speed_multiplier = app.state.options.fast_forward_hold_speed;
+            gg.options().speed_multiplier = app.state.options.fast_forward_hold_speed;
         } else {
-            gg.speed_multiplier = 1;
+            gg.options().speed_multiplier = 1;
         }
     }),
     ("Fast Forward (Toggle)", |a, p| {
@@ -33,15 +33,15 @@ pub(super) const HOTKEYS: &[(&str, fn(&mut App, bool))] = &[
             let mut gg = app.gg.lock().unwrap();
             app.fast_forward_toggled = !app.fast_forward_toggled;
             if app.fast_forward_toggled {
-                gg.speed_multiplier = app.state.options.fast_forward_toggle_speed;
+                gg.options().speed_multiplier = app.state.options.fast_forward_toggle_speed;
             } else {
-                gg.speed_multiplier = 1;
+                gg.options().speed_multiplier = 1;
             }
         });
     }),
     ("Rewind (Hold)", |app, pressed| {
         app.rewinder.rewinding = pressed;
-        app.gg.lock().unwrap().invert_audio_samples = pressed;
+        app.gg.lock().unwrap().options().invert_audio_samples = pressed;
     }),
 ];
 
@@ -101,6 +101,8 @@ impl Input {
                 (Key::ArrowUp, Button(Up)),
                 (Key::ArrowLeft, Button(Left)),
                 (Key::ArrowRight, Button(Right)),
+                (Key::A, Button(L)),
+                (Key::S, Button(R)),
                 (Key::R, Hotkey(4)),
             ]),
             pending: None,

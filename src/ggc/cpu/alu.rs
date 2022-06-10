@@ -1,9 +1,9 @@
 //! This file contains a bunch of math operations that are out of scope for
 //! the GameGirl module file.
 
+use crate::ggc::cpu::{DReg, Flag, Reg};
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::cpu::{DReg, Flag, Reg};
-use crate::system::GameGirl;
 
 impl GameGirl {
     // c is the value of the carry, only used by ADC

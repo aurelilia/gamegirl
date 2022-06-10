@@ -1,7 +1,7 @@
+use crate::common::Button;
+use crate::ggc::{CgbMode, GGOptions};
 use crate::gui::input::{Input, InputAction};
 use crate::gui::{input::HOTKEYS, App};
-use crate::system::io::joypad::Button;
-use crate::system::{CgbMode, GGOptions};
 use eframe::egui;
 use eframe::egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui};
 use serde::{Deserialize, Serialize};
@@ -99,7 +99,8 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                     .selectable_value(&mut opt.tex_filter, TextureFilter::Linear, "Linear")
                     .changed();
                 if a || b {
-                    app.texture = App::make_screen_texture(ctx, opt.tex_filter);
+                    let size = app.gg.lock().unwrap().screen_size();
+                    app.texture = App::make_screen_texture(ctx, size, opt.tex_filter);
                 }
             });
 
@@ -114,7 +115,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
     CollapsingHeader::new("Audio").show(ui, |ui| {
         ui.horizontal(|ui| {
             if ui.add(Slider::new(&mut opt.gg.volume, 0.0..=1.0)).changed() {
-                app.gg.lock().unwrap().config.volume = opt.gg.volume;
+                app.gg.lock().unwrap().config().volume = opt.gg.volume;
             }
             ui.label("Volume");
         });

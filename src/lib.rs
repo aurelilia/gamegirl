@@ -2,13 +2,14 @@
 #![feature(exclusive_range_pattern)]
 #![feature(mixed_integer_ops)]
 
+pub mod common;
+pub mod ggc;
 pub mod gui;
 pub mod numutil;
 mod storage;
-pub mod system;
 
-use crate::system::io::apu::SAMPLE_RATE;
-use crate::system::GameGirl;
+use crate::ggc::io::apu::SAMPLE_RATE;
+use common::System;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, SampleRate, Stream, StreamConfig};
 use eframe::egui::Color32;
@@ -31,7 +32,7 @@ pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
-    let gg = GameGirl::new();
+    let gg = System::new();
     let gg = Arc::new(Mutex::new(gg));
     let stream = setup_cpal(gg.clone());
     gui::start(gg, canvas_id).map(|_| Handle(stream))
@@ -43,7 +44,7 @@ pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
 /// 60 times per second, which would lead to choppy display.
 /// Make sure to keep the returned Stream around to prevent the audio playback
 /// thread from closing.
-pub fn setup_cpal(gg: Arc<Mutex<GameGirl>>) -> Stream {
+pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Stream {
     let device = cpal::default_host().default_output_device().unwrap();
     let stream = device
         .build_output_stream(

@@ -1,5 +1,5 @@
-use gamegirl::system::cpu::DReg::{BC, DE, HL};
-use gamegirl::system::cpu::Reg::A;
+use gamegirl::ggc::cpu::DReg::{BC, DE, HL};
+use gamegirl::ggc::cpu::Reg::A;
 use std::ops::ControlFlow::{Break, Continue};
 
 pub fn exec(subdir: &str) {

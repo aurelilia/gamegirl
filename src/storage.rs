@@ -1,4 +1,3 @@
-use crate::system::io::cartridge::{Cartridge, MBCKind};
 use std::path::PathBuf;
 
 /// Empty struct holding methods used for interacting with the file system,
@@ -12,13 +11,13 @@ impl Storage {
     /// Path should always be Some and point to the game ROM path,
     /// since this is on native.
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn save(path: Option<PathBuf>, cart: &Cartridge) {
+    pub fn save(path: Option<PathBuf>, save: GameSave) {
         let sav_path = Self::get_path(path.clone().unwrap(), "sav");
-        std::fs::write(sav_path, &cart.ram()).ok(); // TODO handle error
+        std::fs::write(sav_path, save.ram).ok(); // TODO handle error
 
-        if let MBCKind::MBC3RTC { rtc, .. } = &cart.kind {
+        if let Some(rtc) = save.rtc {
             let path = Self::get_path(path.unwrap(), "rtc");
-            std::fs::write(path, format!("{}", rtc.start)).ok(); // TODO handle error
+            std::fs::write(path, format!("{}", rtc)).ok(); // TODO handle error
         }
     }
 
@@ -26,21 +25,20 @@ impl Storage {
     /// Path should always be Some and point to the game ROM path,
     /// since this is on native.
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn load(path: Option<PathBuf>, cart: &mut Cartridge) {
+    pub fn load(path: Option<PathBuf>, title: String) -> Option<GameSave> {
         let sav_path = Self::get_path(path.clone().unwrap(), "sav");
-        if let Ok(ram) = std::fs::read(sav_path) {
-            cart.load_ram(ram);
-        }
+        let ram = if let Ok(ram) = std::fs::read(sav_path) {
+            ram
+        } else {
+            return None;
+        };
 
-        if let MBCKind::MBC3RTC { rtc, .. } = &mut cart.kind {
-            let path = Self::get_path(path.unwrap(), "rtc");
-            if let Some(val) = std::fs::read_to_string(path)
-                .ok()
-                .and_then(|s| u64::from_str_radix(&s, 10).ok())
-            {
-                rtc.start = val;
-            }
-        }
+        let path = Self::get_path(path.unwrap(), "rtc");
+        let rtc = std::fs::read_to_string(path)
+            .ok()
+            .and_then(|s| u64::from_str_radix(&s, 10).ok());
+
+        Some(GameSave { ram, rtc, title })
     }
 
     /// "hello/my/rom.gb" -> "hello/my/rom.$ext"
@@ -56,16 +54,13 @@ impl Storage {
     /// Save the given cart's RAM to local storage.
     /// Path will always be None, since this is WASM.
     #[cfg(target_arch = "wasm32")]
-    pub fn save(_path: Option<PathBuf>, cart: &Cartridge) {
-        let content = base64::encode(cart.ram());
-        Self::local_storage().set(&cart.title(true), &content).ok();
+    pub fn save(_path: Option<PathBuf>, save: GameSave) {
+        let content = base64::encode(save.ram);
+        Self::local_storage().set(&save.title, &content).ok();
 
-        if let MBCKind::MBC3RTC { rtc, .. } = &cart.kind {
+        if let Some(rtc) = save.rtc {
             Self::local_storage()
-                .set(
-                    &format!("{}-rtc", cart.title(true)),
-                    &format!("{}", rtc.start),
-                )
+                .set(&format!("{}-rtc", save.title), &format!("{}", rtc))
                 .ok();
         }
     }
@@ -73,22 +68,21 @@ impl Storage {
     /// Load the given cart's RAM from disk, replacing existing RAM.
     /// Path will always be None, since this is WASM.
     #[cfg(target_arch = "wasm32")]
-    pub fn load(_path: Option<PathBuf>, cart: &mut Cartridge) {
-        let title = cart.title(true);
+    pub fn load(_path: Option<PathBuf>, title: String) -> Option<GameSave> {
         let base64 = Self::local_storage().get(&title).ok().flatten();
-        if let Some(ram) = base64.and_then(|ram| base64::decode(ram).ok()) {
-            cart.load_ram(ram);
-        }
+        let ram = if let Some(ram) = base64.and_then(|ram| base64::decode(ram).ok()) {
+            ram
+        } else {
+            return None;
+        };
 
-        if let MBCKind::MBC3RTC { rtc, .. } = &mut cart.kind {
-            let stor = Self::local_storage()
-                .get(&format!("{}-rtc", title))
-                .ok()
-                .flatten();
-            if let Some(val) = stor.and_then(|s| u64::from_str_radix(&s, 10).ok()) {
-                rtc.start = val;
-            }
-        }
+        let stor = Self::local_storage()
+            .get(&format!("{}-rtc", &title))
+            .ok()
+            .flatten();
+        let rtc = stor.and_then(|s| u64::from_str_radix(&s, 10).ok());
+
+        Some(GameSave { ram, rtc, title })
     }
 
     /// Get the browser's local storage.
@@ -96,4 +90,14 @@ impl Storage {
     fn local_storage() -> web_sys::Storage {
         web_sys::window().unwrap().local_storage().unwrap().unwrap()
     }
+}
+
+/// Abstract game save that can be loaded by a cartridge.
+pub struct GameSave {
+    /// The game's RAM.
+    pub ram: Vec<u8>,
+    /// RTC time, for GGC games.
+    pub rtc: Option<u64>,
+    /// Game title.
+    pub title: String,
 }

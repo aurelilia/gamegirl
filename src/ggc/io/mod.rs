@@ -1,12 +1,12 @@
+use crate::ggc::io::addr::*;
+use crate::ggc::io::apu::Apu;
+use crate::ggc::io::cartridge::Cartridge;
+use crate::ggc::io::dma::{Dma, Hdma};
+use crate::ggc::io::joypad::Joypad;
+use crate::ggc::io::ppu::Ppu;
+use crate::ggc::io::timer::Timer;
+use crate::ggc::{CgbMode, GGOptions, GameGirl};
 use crate::numutil::NumExt;
-use crate::system::io::addr::*;
-use crate::system::io::apu::Apu;
-use crate::system::io::cartridge::Cartridge;
-use crate::system::io::dma::{Dma, Hdma};
-use crate::system::io::joypad::Joypad;
-use crate::system::io::ppu::Ppu;
-use crate::system::io::timer::Timer;
-use crate::system::{CgbMode, GGOptions, GameGirl};
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Index, IndexMut},

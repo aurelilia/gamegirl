@@ -1,6 +1,7 @@
-use crate::system::cpu::Interrupt;
-use crate::system::io::addr::JOYP;
-use crate::system::GameGirl;
+use crate::common::Button;
+use crate::ggc::cpu::Interrupt;
+use crate::ggc::io::addr::JOYP;
+use crate::ggc::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -33,29 +34,4 @@ impl Joypad {
             gg.request_interrupt(Interrupt::Joypad);
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Deserialize, Serialize)]
-pub enum Button {
-    A,
-    B,
-    Select,
-    Start,
-    Right,
-    Left,
-    Up,
-    Down,
-}
-
-impl Button {
-    pub const BUTTONS: [Self; 8] = [
-        Self::A,
-        Self::B,
-        Self::Select,
-        Self::Start,
-        Self::Right,
-        Self::Left,
-        Self::Up,
-        Self::Down,
-    ];
 }

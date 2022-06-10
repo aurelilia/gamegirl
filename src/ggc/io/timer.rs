@@ -1,8 +1,8 @@
+use crate::ggc::cpu::Interrupt;
+use crate::ggc::io::addr::*;
+use crate::ggc::io::Mmu;
+use crate::ggc::GameGirl;
 use crate::numutil::NumExt;
-use crate::system::cpu::Interrupt;
-use crate::system::io::addr::*;
-use crate::system::io::Mmu;
-use crate::system::GameGirl;
 use serde::Deserialize;
 use serde::Serialize;
 

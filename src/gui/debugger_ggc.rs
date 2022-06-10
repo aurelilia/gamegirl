@@ -1,10 +1,11 @@
+use crate::common::System;
+use crate::ggc::cpu::{inst, DReg};
+use crate::ggc::debugger::Breakpoint;
+use crate::ggc::io::ppu;
+use crate::ggc::io::ppu::Ppu;
+use crate::ggc::GameGirl;
 use crate::gui::App;
 use crate::numutil::NumExt;
-use crate::system::cpu::{inst, DReg};
-use crate::system::debugger::Breakpoint;
-use crate::system::io::ppu;
-use crate::system::io::ppu::Ppu;
-use crate::system::GameGirl;
 use crate::Colour;
 use eframe::egui::{
     vec2, Align, ColorImage, Context, ImageData, Label, RichText, ScrollArea, TextEdit,
@@ -17,7 +18,7 @@ use std::iter;
 /// Debugger window with instruction view, stack inspection and register inspection.
 /// Allows for inst-by-inst advancing.
 pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
-    if !gg.rom_loaded {
+    if !gg.options.rom_loaded {
         ui.label("No ROM loaded yet!");
         return;
     }
@@ -89,7 +90,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             gg.advance();
         }
 
-        ui.checkbox(&mut gg.running, "Running");
+        ui.checkbox(&mut gg.options.running, "Running");
     });
 }
 
@@ -151,7 +152,7 @@ pub fn memory(gg: &mut GameGirl, ui: &mut Ui) {
     ui.separator();
 
     ScrollArea::vertical().show(ui, |ui| {
-        if !gg.rom_loaded {
+        if !gg.options.rom_loaded {
             ui.label("No ROM loaded yet!");
             return;
         }
@@ -175,7 +176,7 @@ pub fn memory(gg: &mut GameGirl, ui: &mut Ui) {
 
 /// Window showing information about the loaded ROM/cart.
 pub fn cart_info(gg: &mut GameGirl, ui: &mut Ui) {
-    if !gg.rom_loaded {
+    if !gg.options.rom_loaded {
         ui.label("No ROM loaded yet!");
         return;
     }
@@ -214,7 +215,13 @@ pub struct VisualDebugState {
 /// Window showing current VRAM contents rendered as tiles.
 pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
     let gg = app.gg.lock().unwrap();
-    if !gg.rom_loaded {
+    let gg = if let System::GGC(gg) = &*gg {
+        gg
+    } else {
+        ui.label("Only available on GG/GGC!");
+        return;
+    };
+    if !gg.options.rom_loaded {
         ui.label("No ROM loaded yet!");
         return;
     }
@@ -267,7 +274,13 @@ pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
     }
 
     let gg = app.gg.lock().unwrap();
-    if !gg.rom_loaded {
+    let gg = if let System::GGC(gg) = &*gg {
+        gg
+    } else {
+        ui.label("Only available on GG/GGC!");
+        return;
+    };
+    if !gg.options.rom_loaded {
         ui.label("No ROM loaded yet!");
         return;
     }
@@ -333,5 +346,5 @@ fn draw_tile(gg: &GameGirl, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u16) {
 
 /// Get or create the given texture ID.
 fn get_or_make_texture(ctx: &Context, tex: &mut Option<TextureId>) -> TextureId {
-    *tex.get_or_insert_with(|| App::make_screen_texture(ctx, TextureFilter::Nearest))
+    *tex.get_or_insert_with(|| App::make_screen_texture(ctx, [0, 0], TextureFilter::Nearest))
 }
