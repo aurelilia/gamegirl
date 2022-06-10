@@ -1,11 +1,11 @@
 # GameGirl
-A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.angm.xyz/ellie/gamelin).
+A Gameboy (Color) emulator written in Rust, rewrite of [gamelin](https://git.angm.xyz/ellie/gamelin).  
+[Try it in your browser!](https://gamegirl.angm.xyz)
 
 
 ## Status
 The emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
-enough to make most commercial games run perfectly.  
-A few features are still missing but being worked on.
+enough to make most commercial games run perfectly.
 
 ### Features
 - Complete DMG/CGB implementation, including running DMG games on CGB
@@ -23,6 +23,12 @@ A few features are still missing but being worked on.
     - Visual debugging tools: VRAM and map viewers
 - Automated running of blargg and mooneye tests
 
+### Planned Features
+- [ ] Controller support
+- [ ] Save export on Web/WASM
+- [ ] Fix savestates/rewinding on WASM
+- [ ] GBA support, someday?
+
 
 ## Screenshots
 ##### Playing Pokemon Crystal Clear
@@ -37,8 +43,7 @@ A few features are still missing but being worked on.
 The main goals of this emulator is to create a nice-to-use emulator with many comfort features that should be able
 to run well in the browser. Accuracy is only a goal when it fixes issues encountered
 by actual games; implementing complex but ultimately useless hardware details that aren't used by (almost any) games
-(like the OAM bug or MBC1 multicarts) is not a goal of this emulator, particularly considering
-the speed requirements needed to make it work in the browser.
+(like the OAM bug or MBC1 multicarts) is not a goal of this emulator.
 
 ### Missing console features
 - Some MBC3 controllers have a built-in RTC for keeping track of time; gamegirl implements it,
@@ -51,6 +56,7 @@ the speed requirements needed to make it work in the browser.
 ## Build
 ``` bash
 cargo build --release
+# Release binary now in target/release/gamegirl_bin.
 ```
 
 
@@ -69,15 +75,15 @@ All tests except for `oam_bug` (which will not be implemented) pass.
 - `emulator-only`: All pass (except MBC1 multicart; will not be supported)
 
 ### Acid2
-mattcurrie's dmg-acid2 and cgb-acid2 are both corre, including CGB compatibility mode on dmg-acid2.
+mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibility mode on dmg-acid2.
 
 
 ## Thanks To
 - [Imran Nazar, for their series of blog posts on GB emulation](http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-The-CPU)
 - [Michael Steil, for The Ultimate Game Boy Talk](https://media.ccc.de/v/33c3-8029-the_ultimate_game_boy_talk)
 - [kotcrab, for creating the xgbc emulator I often used to confirm/understand fine behavior](https://github.com/kotcrab/xgbc)
-- [stan-roelofs, for their emulator, which I abridged the sound implementation from](https://github.com/stan-roelofs/Kotlin-Gameboy-Emulator)
+- [Amjad50, for their emulator mizu, which I abridged the sound implementation from](https://github.com/Amjad50/mizu/)
 - [Megan Sullivan, for her list of GB opcodes](https://meganesulli.com/blog/game-boy-opcodes)
-- [gbdev.io for a list of useful resources](https://gbdev.io)
+- [gbdev.io for a list of useful resources and the Pan Docs](https://gbdev.io)
 - blargg, Gekkio and mattcurie for their test ROMs and retrio for hosting blargg's ROMs
 - You, for reading this :)
