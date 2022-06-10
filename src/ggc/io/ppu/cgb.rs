@@ -172,7 +172,7 @@ impl Ppu {
         };
         let mut tile_data_addr = Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()])
             + (tile_y.u16() * 2)
-            + attributes.bit(3) * 0x2000;
+            + attributes.bit(3).u16() * 0x2000;
         let mut high = gg.mmu.vram[tile_data_addr.us() + 1];
         let mut low = gg.mmu.vram[tile_data_addr.us()];
 
@@ -211,7 +211,7 @@ impl Ppu {
                 };
                 tile_data_addr = Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()])
                     + (tile_y.u16() * 2)
-                    + attributes.bit(3) * 0x2000;
+                    + attributes.bit(3).u16() * 0x2000;
                 high = gg.mmu.vram[tile_data_addr.us() + 1];
                 low = gg.mmu.vram[tile_data_addr.us()];
             }

@@ -88,7 +88,7 @@ impl Ppu {
         ]
     }
 
-    pub fn get_colour(palette: u8, colour: u16) -> Colour {
+    pub fn get_colour(palette: u8, colour: u8) -> Colour {
         Colour::from_gray(COLOURS[((palette >> (colour * 2)) & 0b11).us()])
     }
 }

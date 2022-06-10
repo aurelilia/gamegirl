@@ -247,7 +247,7 @@ impl Ppu {
 
     fn render_obj(gg: &mut GameGirl, line: i16, sprite: Sprite) {
         // OBP0/OBP1 are right next to each other, make use of it
-        let dmg_palette = gg.mmu[OBP0 + sprite.opt.bit(DMG_PAL)];
+        let dmg_palette = gg.mmu[OBP0 + sprite.opt.bit(DMG_PAL).u16()];
         let tile_y_op = (line - sprite.y) & 0x07;
         let tile_y = if sprite.opt.is_bit(Y_FLIP) {
             7 - tile_y_op
@@ -296,7 +296,7 @@ impl Ppu {
         gg: &mut GameGirl,
         x: u8,
         y: u8,
-        colour_idx: u16,
+        colour_idx: u8,
         dmg_palette: u8,
         cgb_palette: u8,
     ) {

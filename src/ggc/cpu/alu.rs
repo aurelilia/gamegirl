@@ -12,10 +12,10 @@ impl GameGirl {
         self.cpu.set_fl(Flag::Zero, (result & 0xFF) == 0);
         self.cpu.set_fl(Flag::Negative, false);
         self.cpu
-            .set_fli(Flag::HalfCarry, ((a & 0xF) + (b & 0xF) + c) & 0x10);
+            .set_fli16(Flag::HalfCarry, ((a & 0xF) + (b & 0xF) + c) & 0x10);
         if set_carry {
             self.cpu
-                .set_fli(Flag::Carry, ((a & 0xFF) + (b & 0xFF) + c) & 0x100);
+                .set_fli16(Flag::Carry, ((a & 0xFF) + (b & 0xFF) + c) & 0x100);
         }
         result & 0xFF
     }
@@ -25,12 +25,12 @@ impl GameGirl {
         let result = a.wrapping_sub(b).wrapping_sub(c);
         self.cpu.set_fl(Flag::Zero, (result & 0xFF) == 0);
         self.cpu.set_fl(Flag::Negative, true);
-        self.cpu.set_fli(
+        self.cpu.set_fli16(
             Flag::HalfCarry,
             ((a & 0xF).wrapping_sub(b & 0xF).wrapping_sub(c)) & 0x10,
         );
         if set_carry {
-            self.cpu.set_fli(
+            self.cpu.set_fli16(
                 Flag::Carry,
                 ((a & 0xFF).wrapping_sub(b & 0xFF).wrapping_sub(c)) & 0x100,
             );
@@ -43,7 +43,7 @@ impl GameGirl {
         let result = hl.wrapping_add(other);
         self.cpu.set_fl(Flag::Negative, false);
         self.cpu
-            .set_fli(Flag::HalfCarry, ((hl & 0xFFF) + (other & 0xFFF)) & 0x1000);
+            .set_fli16(Flag::HalfCarry, ((hl & 0xFFF) + (other & 0xFFF)) & 0x1000);
         self.cpu
             .set_fl(Flag::Carry, ((hl as u32 + other as u32) & 0x10000) != 0);
         self.cpu.set_dreg(DReg::HL, result)
@@ -61,11 +61,11 @@ impl GameGirl {
         let value = self.mmu.read_signed(self.cpu.pc + 1) as i16;
         self.cpu.set_fl(Flag::Zero, false);
         self.cpu.set_fl(Flag::Negative, false);
-        self.cpu.set_fli(
+        self.cpu.set_fli16(
             Flag::HalfCarry,
             ((self.cpu.sp & 0xF).wrapping_add_signed(value & 0xF)) & 0x10,
         );
-        self.cpu.set_fli(
+        self.cpu.set_fli16(
             Flag::Carry,
             ((self.cpu.sp & 0xFF).wrapping_add_signed(value & 0xFF)) & 0x100,
         );

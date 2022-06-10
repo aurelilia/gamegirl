@@ -72,7 +72,11 @@ impl Cpu {
         self.reg(Reg::F).is_bit(flag.bit())
     }
 
-    pub fn set_fli(&mut self, flag: Flag, val: u16) {
+    pub fn set_fli(&mut self, flag: Flag, val: u8) {
+        self.set_fl(flag, val != 0)
+    }
+
+    pub fn set_fli16(&mut self, flag: Flag, val: u16) {
         self.set_fl(flag, val != 0)
     }
 
@@ -168,7 +172,7 @@ impl Flag {
         1 << self as u8
     }
 
-    pub fn from(self, value: u16) -> u8 {
+    pub fn from(self, value: u8) -> u8 {
         if value != 0 {
             self.mask().u8()
         } else {

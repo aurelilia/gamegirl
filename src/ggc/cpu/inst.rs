@@ -32,7 +32,7 @@ const MATH: [fn(&mut GameGirl, u8) -> u8; 8] = [
     |gg, v| {
         let val = gg.cpu.reg(A) & v;
         gg.cpu
-            .set_reg(F, HalfCarry.mask() + (Zero.from(val.u16()) ^ Zero.mask()));
+            .set_reg(F, HalfCarry.mask() + (Zero.from(val) ^ Zero.mask()));
         val
     },
     |gg, v| gg.z_flag_only(gg.cpu.reg(A) ^ v),
