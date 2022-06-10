@@ -3,6 +3,7 @@ use crate::system::io::cartridge::MBCKind::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::iter;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const CGB_FLAG: u16 = 0x0143;
 const CGB_ONLY: u8 = 0xC0;
@@ -35,13 +36,18 @@ impl Cartridge {
         match addr {
             0x0000..=0x3FFF => self.rom[a + (0x4000 * self.rom0_bank as usize)],
             0x4000..=0x7FFF => self.rom[(a & 0x3FFF) + (0x4000 * self.rom1_bank as usize)],
-            0xA000..=0xBFFF if !self.ram.is_empty() && self.ram_enable => {
-                if let MBC2 = self.kind {
-                    self.ram[a & 0x1FF]
-                } else {
+            0xA000..=0xBFFF => match &self.kind {
+                MBC2 if self.ram_enable => self.ram[a & 0x1FF],
+                MBC3RTC {
+                    rtc_reg: Some(reg),
+                    rtc,
+                    ..
+                } => rtc.get(*reg).u8(),
+                _ if !self.ram.is_empty() && self.ram_enable => {
                     self.ram[(a & 0x1FFF) + (0x2000 * self.ram_bank.us())]
                 }
-            }
+                _ => 0xFF,
+            },
             _ => 0xFF,
         }
     }
@@ -57,7 +63,38 @@ impl Cartridge {
                 self.ram[addr.us() & 0x1FF] = value | 0xF0
             }
 
-            // Shared between all (except MBC2...)
+            // MBC3 with RTC
+            (MBC3RTC { rtc_reg, .. }, 0x4000..=0x5FFF) if (0x08..=0x0C).contains(&value) => {
+                *rtc_reg = Some(4.min(value - 0x08));
+            }
+            (MBC3RTC { rtc_reg, .. }, 0x4000..=0x5FFF) => {
+                *rtc_reg = None;
+                self.ram_bank = (value & 0x03) % self.ram_bank_count();
+            }
+            (
+                MBC3RTC {
+                    latch_prepare, rtc, ..
+                },
+                0x6000..=0x7FFF,
+            ) => {
+                if value == 1 && *latch_prepare {
+                    *latch_prepare = false;
+                    rtc.latch();
+                }
+                *latch_prepare |= value == 0;
+            }
+            (
+                MBC3RTC {
+                    rtc,
+                    rtc_reg: Some(reg),
+                    ..
+                },
+                0xA000..=0xBFFF,
+            ) => {
+                rtc.set(*reg, value);
+            }
+
+            // Shared between all (except MBC2 and RTCs...)
             (_, 0x0000..=0x1FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
             (_, 0xA000..=0xBFFF) if !self.ram.is_empty() && self.ram_enable => {
                 self.ram[(addr & 0x1FFF).us() + (0x2000 * self.ram_bank.us())] = value
@@ -205,8 +242,52 @@ impl Cartridge {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum MBCKind {
     NoMBC,
-    MBC1 { ram_mode: bool, bank2: u8 },
+    MBC1 {
+        ram_mode: bool,
+        bank2: u8,
+    },
     MBC2,
     MBC3,
+    MBC3RTC {
+        rtc: Rtc,
+        rtc_reg: Option<u8>,
+        latch_prepare: bool,
+    },
     MBC5,
 }
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Rtc {
+    pub(crate) start: u64,
+    latched_at: Option<u64>,
+}
+
+impl Rtc {
+    fn latch(&mut self) {
+        self.latched_at = Some(Self::since_unix());
+    }
+
+    fn get(&self, idx: u8) -> u16 {
+        ((self.diff() / RTC_DIVIDERS[idx.us()]) % RTC_MODULO[idx.us()]) as u16
+    }
+
+    fn set(&mut self, _idx: u8, _value: u8) {
+        // TODO this is not how MBC3RTC works
+        self.start = Self::since_unix();
+    }
+
+    fn diff(&self) -> u64 {
+        self.latched_at
+            .unwrap_or_else(|| Self::since_unix() - self.start)
+    }
+
+    fn since_unix() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+}
+
+const RTC_DIVIDERS: &[u64] = &[1, 60, 3600, 86400];
+const RTC_MODULO: &[u64] = &[60, 60, 24, 511];

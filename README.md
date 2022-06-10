@@ -11,7 +11,7 @@ A few features are still missing but being worked on.
 - Complete DMG/CGB implementation, including running DMG games on CGB
 - Colour correction for CGB
 - Highly configurable, including input
-- Savegame support in common `.sav` format (No RTC yet.)
+- Savegame support in common `.sav` format (Basic RTC support)
 - Support for creating and loading save states with "undo last load" function
 - Fast forwarding hotkeys, both toggle and hold
 - Rewinding support with little memory use (~1MB per second of rewinding at 60fps)
@@ -39,6 +39,13 @@ to run well in the browser. Accuracy is only a goal when it fixes issues encount
 by actual games; implementing complex but ultimately useless hardware details that aren't used by (almost any) games
 (like the OAM bug or MBC1 multicarts) is not a goal of this emulator, particularly considering
 the speed requirements needed to make it work in the browser.
+
+### Missing console features
+- Some MBC3 controllers have a built-in RTC for keeping track of time; gamegirl implements it,
+  but in a very simple format incompatible with other emulators that has a high chance of
+  not working with most games (it was tested with Pokemon Crystal and successfully kept time
+  after turning the game off overnight - needs more testing).
+  It is the same format used by Gamelin.
 
 
 ## Build
