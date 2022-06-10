@@ -12,7 +12,7 @@ use crate::gga::memory::{
 };
 use crate::gga::timer::{Timer, TIMER_END, TIMER_START, TIMER_WIDTH};
 use crate::ggc::GGConfig;
-use crate::numutil::{hword, word, U16Ext, U32Ext};
+use crate::numutil::{hword, word, NumExt, U16Ext, U32Ext};
 use audio::Apu;
 use cartridge::Cartridge;
 use cpu::Cpu;
@@ -51,7 +51,8 @@ impl GameGirlAdv {
     }
 
     /// Read a byte from the bus. Does no timing-related things; simply fetches the value.
-    fn read_byte(&self, addr: usize) -> u8 {
+    fn read_byte(&self, addr: u32) -> u8 {
+        let addr = addr.us();
         match addr {
             BIOS_START..=BIOS_END => self.memory.bios[addr - BIOS_START],
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START],
@@ -78,7 +79,7 @@ impl GameGirlAdv {
             0x04000202 => self.cpu.if_.low(),
             0x04000203 => self.cpu.if_.high(),
             0x04000208 => self.cpu.ime as u8,
-            0x04000209 => 0, // High unused bits of IME
+            0x04000209..=0x0400020B => 0, // High unused bits of IME
 
             _ => 0xFF,
         }
@@ -86,18 +87,19 @@ impl GameGirlAdv {
 
     /// Read a half-word from the bus (LE). Does no timing-related things; simply fetches the value.
     /// Also does not handle unaligned reads (yet)
-    fn read_hword(&self, addr: usize) -> u16 {
+    fn read_hword(&self, addr: u32) -> u16 {
         hword(self.read_byte(addr), self.read_byte(addr + 1))
     }
 
     /// Read a word from the bus (LE). Does no timing-related things; simply fetches the value.
     /// Also does not handle unaligned reads (yet)
-    fn read_word(&self, addr: usize) -> u32 {
+    fn read_word(&self, addr: u32) -> u32 {
         word(self.read_hword(addr), self.read_hword(addr + 2))
     }
 
     /// Write a byte to the bus. Does no timing-related things; simply sets the value.
-    fn write_byte(&mut self, addr: usize, value: u8) {
+    fn write_byte(&mut self, addr: u32, value: u8) {
+        let addr = addr.us();
         match addr {
             BIOS_START..=BIOS_END => self.memory.bios[addr - BIOS_START] = value,
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START] = value,
@@ -131,14 +133,14 @@ impl GameGirlAdv {
 
     /// Write a half-word from the bus (LE). Does no timing-related things; simply sets the value.
     /// Also does not handle unaligned writes (yet)
-    fn write_hword(&mut self, addr: usize, value: u16) {
+    fn write_hword(&mut self, addr: u32, value: u16) {
         self.write_byte(addr, value.low());
         self.write_byte(addr + 1, value.high());
     }
 
     /// Write a word from the bus (LE). Does no timing-related things; simply sets the value.
     /// Also does not handle unaligned writes (yet)
-    fn write_word(&mut self, addr: usize, value: u32) {
+    fn write_word(&mut self, addr: u32, value: u32) {
         self.write_hword(addr, value.low());
         self.write_hword(addr + 2, value.high());
     }
