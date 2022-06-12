@@ -54,30 +54,31 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
 
         ui.vertical(|ui| {
             for reg in 0..=12 {
-                ui.monospace(format!("R{reg} = {:08X}", gg.cpu.reg(reg)));
+                ui.monospace(format!("R{:02} = {:08X}", reg, gg.cpu.reg(reg)));
             }
-            ui.monospace(format!("SP = {:08X}", gg.cpu.sp()));
-            ui.monospace(format!("LR = {:08X}", gg.cpu.lr()));
-            ui.monospace(format!("PC = {:08X}", gg.cpu.pc));
-            ui.monospace(format!("CPSR = {:32b}", gg.cpu.cpsr));
-            ui.monospace(format!("SPSR = {:32b}", gg.cpu.spsr()));
-            ui.add(
-                Label::new(RichText::new(format!("HALT = {}", gg.cpu.halt)).monospace())
-                    .wrap(false),
-            );
-            ui.add(
-                Label::new(RichText::new(format!("IME = {}", gg.cpu.ime)).monospace()).wrap(false),
-            );
+            ui.monospace(format!("SP  = {:08X}", gg.cpu.sp()));
+            ui.monospace(format!("LR  = {:08X}", gg.cpu.lr()));
+            ui.monospace(format!("PC  = {:08X}", gg.cpu.pc));
         });
     });
+    ui.separator();
+
+    ui.monospace(format!("CPSR = {:032b}", gg.cpu.cpsr));
+    ui.monospace(format!("SPSR = {:032b}", gg.cpu.spsr()));
     ui.separator();
 
     ui.horizontal(|ui| {
         if ui.button("Advance").clicked() {
             gg.advance();
         }
-
         ui.checkbox(&mut gg.options.running, "Running");
+
+        if gg.cpu.halt {
+            ui.label("(CPU is halted)");
+        }
+        if gg.cpu.ime {
+            ui.label("(IME on)");
+        }
     });
 }
 
@@ -119,5 +120,6 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui) {
         ui.label("No ROM loaded yet!");
         return;
     }
-    ui.label("This is a ROM for sure!");
+    ui.label(format!("Reported Title: {}", gg.cart.title()));
+    ui.label(format!("Reported Game Code: AGB-{}", gg.cart.game_code()));
 }

@@ -215,14 +215,14 @@ impl GameGirl {
         }
         self.mmu.load_cart(cart, config);
         self.config = config.clone();
-        self.options.running = true;
-        self.options.rom_loaded = true;
     }
 
     /// Create a system with a cart already loaded.
     pub fn with_cart(rom: Vec<u8>) -> Self {
         let mut gg = Self::default();
         gg.load_cart(Cartridge::from_rom(rom), &GGConfig::default(), false);
+        gg.options.running = true;
+        gg.options.rom_loaded = true;
         gg
     }
 }

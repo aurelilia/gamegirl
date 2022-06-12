@@ -110,7 +110,7 @@ impl System {
                     Storage::save(path, save);
                 }
             }
-            System::GGA(_) => todo!(),
+            System::GGA(_) => (), // TODO
         }
     }
 
@@ -139,6 +139,9 @@ impl System {
             );
             *self = Self::GGA(gga);
         }
+
+        // self.options().running = true;
+        self.options().rom_loaded = true;
     }
 }
 

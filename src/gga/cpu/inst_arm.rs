@@ -2,7 +2,7 @@ use crate::gga::cpu::{registers::Flag::*, Cpu};
 use crate::gga::GameGirlAdv;
 use crate::numutil::{NumExt, U32Ext};
 use bitmatch::bitmatch;
-use std::fmt::Display;
+use std::fmt::UpperHex;
 
 impl GameGirlAdv {
     #[bitmatch]
@@ -51,8 +51,8 @@ impl GameGirlAdv {
         }
     }
 
-    pub fn log_unknown_opcode<T: Display>(code: T) {
-        eprintln!("Unknown opcode '{}'", code);
+    pub fn log_unknown_opcode<T: UpperHex>(code: T) {
+        eprintln!("Unknown opcode '{:08X}'", code);
     }
 }
 

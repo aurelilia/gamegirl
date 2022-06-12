@@ -32,6 +32,10 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn exec_next_inst(gg: &mut GameGirlAdv) {
+        if !gg.debugger.should_execute(gg.cpu.pc) {
+            return;
+        }
+
         if gg.cpu.pc_just_changed {
             Self::fix_prefetch(gg);
             gg.cpu.pc_just_changed = false;
