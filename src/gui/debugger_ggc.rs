@@ -1,6 +1,6 @@
 use crate::common::System;
+use crate::debugger::Breakpoint;
 use crate::ggc::cpu::{inst, DReg};
-use crate::ggc::debugger::Breakpoint;
 use crate::ggc::io::ppu;
 use crate::ggc::io::ppu::Ppu;
 use crate::ggc::GameGirl;
@@ -79,7 +79,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
                     .wrap(false),
             );
             ui.add(
-                Label::new(RichText::new(format!("IME = {}", gg.cpu.halt)).monospace()).wrap(false),
+                Label::new(RichText::new(format!("IME = {}", gg.cpu.ime)).monospace()).wrap(false),
             );
         });
     });

@@ -22,7 +22,7 @@ pub struct Cpu {
     pub ie: u16,
     pub if_: u16,
     pub ime: bool,
-    halt: bool,
+    pub halt: bool,
     pc_just_changed: bool,
     prefetch: [u32; 2],
 }
@@ -99,7 +99,7 @@ impl Cpu {
         self.pc = self.pc.wrapping_add(count);
     }
 
-    fn inst_size(&self) -> u32 {
+    pub fn inst_size(&self) -> u32 {
         // 4 on ARM, 2 on THUMB
         4 - ((self.flag(Thumb) as u32) << 1)
     }

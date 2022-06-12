@@ -11,14 +11,15 @@ use crate::ggc::io::cartridge::Cartridge;
 use crate::ggc::io::Mmu;
 use crate::numutil::NumExt;
 
-use self::debugger::Debugger;
+use crate::debugger::Debugger;
 
 pub mod cpu;
-pub mod debugger;
 pub mod io;
 
 const T_CLOCK_HZ: usize = 4194304;
 const M_CLOCK_HZ: f32 = T_CLOCK_HZ as f32 / 4.0;
+
+pub type GGDebugger = Debugger<u16>;
 
 /// The system and it's state.
 /// Represents the entire console.
@@ -28,7 +29,7 @@ pub struct GameGirl {
     pub mmu: Mmu,
     #[serde(skip)]
     #[serde(default)]
-    pub debugger: Arc<Debugger>,
+    pub debugger: Arc<GGDebugger>,
     pub config: GGConfig,
 
     /// Shift of t-clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
@@ -242,7 +243,7 @@ impl GameGirl {
 
 impl Default for GameGirl {
     fn default() -> Self {
-        let debugger = Arc::new(Debugger::default());
+        let debugger = Arc::new(GGDebugger::default());
         Self {
             cpu: Cpu::default(),
             mmu: Mmu::new(debugger.clone()),

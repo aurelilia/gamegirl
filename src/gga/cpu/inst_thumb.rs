@@ -1,4 +1,5 @@
 use crate::gga::cpu::registers::Flag::*;
+use crate::gga::cpu::Cpu;
 use crate::gga::GameGirlAdv;
 use crate::numutil::NumExt;
 use bitmatch::bitmatch;
@@ -219,6 +220,105 @@ impl GameGirlAdv {
             }
 
             _ => Self::log_unknown_opcode(inst),
+        }
+    }
+
+    #[bitmatch]
+    pub fn get_mnemonic_thumb(inst: u16) -> String {
+        #[bitmatch]
+        match inst {
+            "000_00nnnnnsssddd" => format!("lsl r{d}, r{s}, #{n}"),
+            "000_01nnnnnsssddd" => format!("lsr r{d}, r{s}, #{n}"),
+            "000_10nnnnnsssddd" => format!("asr r{d}, r{s}, #{n}"),
+            "00011_00nnnsssddd" => format!("add r{d}, r{s}, r{n}"),
+            "00011_01nnnsssddd" => format!("sub r{d}, r{s}, r{n}"),
+            "00011_10nnnsssddd" => format!("add r{d}, r{s}, #{n}"),
+            "00011_11nnnsssddd" => format!("sub r{d}, r{s}, #{n}"),
+
+            "001_00dddnnnnnnnn" => format!("mov r{d}, #{n}"),
+            "001_01dddnnnnnnnn" => format!("cmp r{d}, #{n}"),
+            "001_10dddnnnnnnnn" => format!("add r{d}, #{n}"),
+            "001_11dddnnnnnnnn" => format!("sub r{d}, #{n}"),
+
+            "010000_oooosssddd" => {
+                let op = match o {
+                    0x0 => "and",
+                    0x1 => "xor",
+                    0x2 => "lsl",
+                    0x3 => "lsr",
+                    0x4 => "asr",
+                    0x5 => "add",
+                    0x6 => "sub",
+                    0x7 => "ror",
+                    0x8 => "tst",
+                    0x9 => "neg",
+                    0xA => "cmp",
+                    0xB => "cmn",
+                    0xC => "or",
+                    0xD => "mul",
+                    0xE => "bic",
+                    _ => "mvn",
+                };
+                format!("{op} r{d}, r{s}")
+            }
+
+            "010001_00dssssddd" => format!("add r{d}, r{s}"),
+            "010001_01dssssddd" => format!("cmp r{d}, r{s}"),
+            "010001_10dssssddd" => format!("mov r{d}, r{s}"),
+            "010001_110ssss???" => format!("bx r{s}"),
+            "010001_111ssss???" => format!("blx r{s}"),
+            "01001_dddnnnnnnnn" => format!("ldr r{d}, [PC, #{n}]"),
+            "0101_ooosssbbbddd" => {
+                let op = match o {
+                    0 => "str",
+                    1 => "strh",
+                    2 => "strb",
+                    3 => "ldsb",
+                    4 => "ldr",
+                    5 => "ldrh",
+                    6 => "ldrb",
+                    _ => "ldsh",
+                };
+                format!("{op} r{d}, [r{b}, r{s}]")
+            }
+            "011_oonnnnnbbbddd" => {
+                let op = match o {
+                    0 => "str",
+                    1 => "ldr",
+                    2 => "strb",
+                    _ => "ldrb",
+                };
+                format!("{op} r{d}, [r{b}, #{n}]")
+            }
+            "1000_0nnnnnbbbddd" => format!("strh r{d}, [r{b}, #{}]", n << 1),
+            "1000_1nnnnnbbbddd" => format!("ldrh r{d}, [r{b}, #{}]", n << 1),
+            "1001_0dddnnnnnnnn" => format!("str r{d}, [sp, #{}]", n << 2),
+            "1001_1dddnnnnnnnn" => format!("ldr r{d}, [sp, #{}]", n << 2),
+
+            "1010_0dddnnnnnnnn" => format!("add r{d}, pc, #{}", n << 2),
+            "1010_1dddnnnnnnnn" => format!("add r{d}, sp, #{}", n << 2),
+
+            "10110000_0nnnnnnn" => format!("add sp, #{}", n << 2),
+            "10110000_1nnnnnnn" => format!("add sp, #-{}", n << 2),
+
+            "1011_0100rrrrrrrr" => format!("push {:08b}", r),
+            "1011_0101rrrrrrrr" => format!("push {:08b}, lr", r),
+            "1011_1100rrrrrrrr" => format!("pop {:08b}", r),
+            "1011_1101rrrrrrrr" => format!("pop {:08b}, lr", r),
+            "1100_0bbbrrrrrrrr" => format!("stmia r{b}!, {:08b}", r),
+            "1100_1bbbrrrrrrrr" => format!("ldmia r{b}!, {:08b}", r),
+
+            "1101_ccccnnnnnnnn" => format!(
+                "{} {}",
+                Cpu::condition_mnemonic(c).to_ascii_lowercase(),
+                n << 1
+            ),
+            "11100_nnnnnnnnnnn" => format!("b {}", n << 1),
+            "11110_nnnnnnnnnnn" => format!("mov lr, (pc + 4 + {})", n << 12),
+            "11100_nnnnnnnnnnn" => format!("bl lr + {}", n << 1),
+            "11101_nnnnnnnnnnn" => format!("blx lr + {}", n << 1),
+
+            _ => format!("{:04X}??", inst),
         }
     }
 }

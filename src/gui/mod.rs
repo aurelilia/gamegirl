@@ -1,3 +1,4 @@
+mod debugger_gga;
 mod debugger_ggc;
 mod file_dialog;
 mod input;
@@ -5,6 +6,7 @@ mod options;
 mod rewind;
 
 use crate::common::System;
+use crate::gga::GameGirlAdv;
 use crate::ggc::GameGirl;
 use crate::gui::debugger_ggc::VisualDebugState;
 use crate::gui::file_dialog::File;
@@ -29,18 +31,28 @@ use std::time::Duration;
 const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 
 /// Total count of windows in GUI.
-const WINDOW_COUNT: usize = GGC_WINDOW_COUNT + APP_WINDOW_COUNT;
+const WINDOW_COUNT: usize = DBG_WINDOW_COUNT + APP_WINDOW_COUNT;
 
-/// Count of GUI windows that take a GGC as a parameter.
-/// For now, this is only the debugger's windows.
-/// If a GGA is active, windows are hidden.
-const GGC_WINDOW_COUNT: usize = 4;
-/// GUI windows that take a GGC as parameter.
-const GGC_WINDOWS: [(&str, fn(&mut GameGirl, &mut Ui)); GGC_WINDOW_COUNT] = [
-    ("Debugger", debugger_ggc::debugger),
-    ("Breakpoints", debugger_ggc::breakpoints),
-    ("Memory", debugger_ggc::memory),
-    ("Cartridge", debugger_ggc::cart_info),
+/// Count of debugger GUI windows that take a system as a parameter.
+const DBG_WINDOW_COUNT: usize = 4;
+/// Debugger GUI windows. Both GGC and GGA versions for each.
+const DBG_WINDOWS: [(
+    &str,
+    fn(&mut GameGirl, &mut Ui),
+    fn(&mut GameGirlAdv, &mut Ui),
+); DBG_WINDOW_COUNT] = [
+    ("Debugger", debugger_ggc::debugger, debugger_gga::debugger),
+    (
+        "Breakpoints",
+        debugger_ggc::breakpoints,
+        debugger_gga::breakpoints,
+    ),
+    ("Memory", debugger_ggc::memory, debugger_gga::memory),
+    (
+        "Cartridge",
+        debugger_ggc::cart_info,
+        debugger_gga::cart_info,
+    ),
 ];
 
 /// Count of GUI windows that take the App as a parameter.
@@ -140,11 +152,10 @@ impl epi::App for App {
                 );
             });
 
-        // TODO cloning the window states is a little eh but it works ig
         let mut states = self.window_states;
         for ((name, runner), state) in APP_WINDOWS
             .iter()
-            .zip(states.iter_mut().skip(GGC_WINDOW_COUNT))
+            .zip(states.iter_mut().skip(DBG_WINDOW_COUNT))
         {
             egui::Window::new(*name)
                 .open(state)
@@ -153,12 +164,12 @@ impl epi::App for App {
         self.window_states = states;
 
         let mut gg = self.gg.lock().unwrap();
-        if let System::GGC(gg) = &mut *gg {
-            for ((name, runner), state) in GGC_WINDOWS.iter().zip(self.window_states.iter_mut()) {
-                egui::Window::new(*name)
-                    .open(state)
-                    .show(ctx, |ui| runner(gg, ui));
-            }
+        for ((name, ggc, gga), state) in DBG_WINDOWS.iter().zip(self.window_states.iter_mut()) {
+            let win = egui::Window::new(*name).open(state);
+            match &mut *gg {
+                System::GGC(gg) => win.show(ctx, |ui| ggc(gg, ui)),
+                System::GGA(gg) => win.show(ctx, |ui| gga(gg, ui)),
+            };
         }
 
         // Immediately repaint, since the GG will have a new frame.
@@ -187,7 +198,7 @@ impl epi::App for App {
 
     fn save(&mut self, storage: &mut dyn Storage) {
         self.save_game();
-        epi::set_value(storage, "gamelin_data", &self.state);
+        epi::set_value(storage, "gamegirl_data", &self.state);
     }
 
     fn name(&self) -> &str {

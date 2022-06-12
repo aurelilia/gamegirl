@@ -13,7 +13,7 @@ use std::{
     sync::Arc,
 };
 
-use super::debugger::Debugger;
+use super::GGDebugger;
 
 pub(super) mod addr;
 pub(crate) mod apu;
@@ -47,7 +47,7 @@ pub struct Mmu {
     pub(crate) cgb: bool,
     #[serde(skip)]
     #[serde(default)]
-    pub(super) debugger: Arc<Debugger>,
+    pub(super) debugger: Arc<GGDebugger>,
 
     pub cart: Cartridge,
     timer: Timer,
@@ -191,7 +191,7 @@ impl Mmu {
         new
     }
 
-    pub(super) fn new(debugger: Arc<Debugger>) -> Self {
+    pub(super) fn new(debugger: Arc<GGDebugger>) -> Self {
         Self {
             vram: [0; 16384],
             vram_bank: 0,

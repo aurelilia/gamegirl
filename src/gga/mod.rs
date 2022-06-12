@@ -1,5 +1,7 @@
 use crate::common::EmulateOptions;
+use crate::debugger::Debugger;
 use crate::gga::audio::{APU_REG_END, APU_REG_START};
+use crate::gga::cpu::registers::Flag;
 use crate::gga::dma::{Dma, DMA_END, DMA_START, DMA_WIDTH};
 use crate::gga::graphics::{
     OAM_END, OAM_START, PALETTE_END, PALETTE_START, PPU_REG_END, PPU_REG_START, VRAM_END,
@@ -17,6 +19,7 @@ use cartridge::Cartridge;
 use cpu::Cpu;
 use graphics::Ppu;
 use memory::Memory;
+use std::sync::Arc;
 
 mod audio;
 mod cartridge;
@@ -26,6 +29,8 @@ mod graphics;
 mod input;
 mod memory;
 mod timer;
+
+pub type GGADebugger = Debugger<u32>;
 
 /// Console struct representing a GGA. Contains all state and is generally used for system emulation.
 /// Use [GameGirlAdv::step] to advance the emulation.
@@ -41,6 +46,7 @@ pub struct GameGirlAdv {
 
     pub options: EmulateOptions,
     pub config: GGConfig,
+    pub debugger: Arc<GGADebugger>,
 }
 
 impl GameGirlAdv {
@@ -97,7 +103,7 @@ impl GameGirlAdv {
 
     /// Read a word from the bus (LE). Does no timing-related things; simply fetches the value.
     /// Also does not handle unaligned reads (yet)
-    fn read_word(&self, addr: u32) -> u32 {
+    pub fn read_word(&self, addr: u32) -> u32 {
         word(self.read_hword(addr), self.read_hword(addr + 2))
     }
 
@@ -155,6 +161,16 @@ impl GameGirlAdv {
     fn low(&self, idx: u16) -> u32 {
         self.cpu.low(idx)
     }
+
+    pub fn get_inst_mnemonic(&self, ptr: u32) -> String {
+        if self.cpu.flag(Flag::Thumb) {
+            let inst = self.read_hword(ptr);
+            Self::get_mnemonic_thumb(inst)
+        } else {
+            let inst = self.read_word(ptr);
+            Self::get_mnemonic_arm(inst)
+        }
+    }
 }
 
 impl Default for GameGirlAdv {
@@ -193,6 +209,7 @@ impl Default for GameGirlAdv {
 
             options: EmulateOptions::default(),
             config: GGConfig::default(),
+            debugger: Arc::new(GGADebugger::default()),
         }
     }
 }
