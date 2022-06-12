@@ -87,9 +87,9 @@ impl GameGirlAdv {
                 self.exec_alu(o, self.cpu.reg(n), second_op, d, c == 1);
             }
 
-            "001_oooocnnnnddddssssnnnnnnnn" => {
+            "001_oooocnnnnddddssssmmmmmmmm" => {
                 // ALU with immediate
-                let second_op = self.cpu.ror(n, s << 1);
+                let second_op = self.cpu.ror(m, s << 1);
                 self.exec_alu(o, self.cpu.reg(n), second_op, d, c == 1);
             }
 
@@ -173,11 +173,22 @@ impl GameGirlAdv {
                     _ => format!("({ty} r{})", a >> 1),
                 };
                 let op = Self::alu_mnemonic(o);
-                format!("{op}{c} r{d}, r{n}, r{m} {shift} ({c})")
+                match o {
+                    0x8..=0xB => format!("{op}{c} r{n}, r{m} {shift} ({c})"),
+                    0xD | 0xF => format!("{op}{c} r{d}, r{m} {shift} ({c})"),
+                    _ => format!("{op}{c} r{d}, r{n}, r{m} {shift} ({c})"),
+                }
             }
-            "001_oooocnnnnddddssssnnnnnnnn" => {
+            "001_oooocnnnnddddssssmmmmmmmm" => {
                 let op = Self::alu_mnemonic(o);
-                format!("{op}{co} r{d}, r{n}, (#{n} ROR {s}) ({c})")
+                match (o, s) {
+                    (0x8..=0xB, 0) => format!("{op}{co} r{d}, r{n}, #{m} ({c})"),
+                    (0x8..=0xB, _) => format!("{op}{co} r{d}, r{n}, (#{m} ROR {s}) ({c})"),
+                    (0xD | 0xF, 0) => format!("{op}{co} r{d}, #{m} ({c})"),
+                    (0xD | 0xF, _) => format!("{op}{co} r{d}, (#{m} ROR {s}) ({c})"),
+                    (_, 0) => format!("{op}{co} r{d}, r{n}, #{m} ({c})"),
+                    _ => format!("{op}{co} r{d}, r{n}, (#{m} ROR {s}) ({c})"),
+                }
             }
 
             _ => format!("{:08X}??", inst),
@@ -199,7 +210,7 @@ impl GameGirlAdv {
             0xA => "cmp",
             0xB => "cmn",
             0xC => "orr",
-            0xD => "mul",
+            0xD => "mov",
             0xE => "bic",
             _ => "mvn",
         }

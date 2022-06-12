@@ -259,7 +259,11 @@ impl GameGirlAdv {
                     0xE => "bic",
                     _ => "mvn",
                 };
-                format!("{op} r{d}, r{s}")
+                if o == 0x8 || o == 0xA || o == 0xB {
+                    format!("{op} r{s}")
+                } else {
+                    format!("{op} r{d}, r{s}")
+                }
             }
 
             "010001_00dssssddd" => format!("add r{d}, r{s}"),
