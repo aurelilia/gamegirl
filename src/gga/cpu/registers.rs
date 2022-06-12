@@ -145,7 +145,7 @@ impl Cpu {
         }
     }
 
-    pub fn set_reg(&mut self, idx: u16, val: u32) {
+    pub fn set_reg(&mut self, idx: u32, val: u32) {
         match idx {
             0..=7 => self.low[idx.us()] = val,
             8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq = val,

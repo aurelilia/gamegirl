@@ -243,7 +243,7 @@ impl GameGirlAdv {
             "010000_oooosssddd" => {
                 let op = match o {
                     0x0 => "and",
-                    0x1 => "xor",
+                    0x1 => "eor",
                     0x2 => "lsl",
                     0x3 => "lsr",
                     0x4 => "asr",
@@ -254,7 +254,7 @@ impl GameGirlAdv {
                     0x9 => "neg",
                     0xA => "cmp",
                     0xB => "cmn",
-                    0xC => "or",
+                    0xC => "orr",
                     0xD => "mul",
                     0xE => "bic",
                     _ => "mvn",
@@ -309,7 +309,7 @@ impl GameGirlAdv {
             "1100_1bbbrrrrrrrr" => format!("ldmia r{b}!, {:08b}", r),
 
             "1101_ccccnnnnnnnn" => format!(
-                "{} {}",
+                "b{} {}",
                 Cpu::condition_mnemonic(c).to_ascii_lowercase(),
                 n << 1
             ),
