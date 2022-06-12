@@ -71,12 +71,12 @@ impl GameGirlAdv {
             // THUMB.5
             "010001_00dssssddd" => {
                 let res = self.cpu.add(self.reg(d.u32()), self.reg(s.u32()), 0);
-                self.cpu.set_reg(d, res);
+                self.cpu.set_reg(d.u32(), res);
             }
             "010001_01dssssddd" => {
                 self.cpu.sub(self.reg(d.u32()), self.reg(s.u32()), 0);
             } // CMP
-            "010001_10dssssddd" => self.cpu.set_reg(d, self.reg(s.u32())),
+            "010001_10dssssddd" => self.cpu.set_reg(d.u32(), self.reg(s.u32())),
             "010001_1101111???" => self.cpu.set_flag(Thumb, false), // BX ARM switch
             "010001_110ssss???" => self.cpu.set_pc(self.reg(s.u32())), // BX
             "010001_111ssss???" => self.cpu.set_pc(self.reg(s.u32())), // BLX
