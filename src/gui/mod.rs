@@ -5,7 +5,7 @@ mod input;
 mod options;
 mod rewind;
 
-use crate::common::System;
+use crate::common::{BorrowedSystem, System};
 use crate::gga::GameGirlAdv;
 use crate::ggc::GameGirl;
 use crate::gui::debugger_ggc::VisualDebugState;
@@ -189,8 +189,15 @@ impl epi::App for App {
         let buffer = self.rewinder.rewind_buffer.clone();
         if self.state.options.enable_rewind {
             self.gg.lock().unwrap().options().frame_finished = Box::new(move |gg| {
-                if !gg.options.invert_audio_samples {
-                    buffer.lock().unwrap().push(gg.save_state());
+                // Kinda ugly duplication but it works ig?
+                match gg {
+                    BorrowedSystem::GGC(gg) if !gg.options.invert_audio_samples => {
+                        buffer.lock().unwrap().push(gg.save_state())
+                    }
+                    BorrowedSystem::GGA(gg) if !gg.options.invert_audio_samples => {
+                        buffer.lock().unwrap().push(gg.save_state())
+                    }
+                    _ => (),
                 }
             });
         }

@@ -1,4 +1,4 @@
-use crate::common::EmulateOptions;
+use crate::common::{self, EmulateOptions};
 use crate::Colour;
 use serde::{Deserialize, Serialize};
 use std::mem;
@@ -35,6 +35,8 @@ pub struct GameGirl {
     /// Shift of t-clocks, which is different in CGB double speed mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
     /// Temporary for keeping track of how many clocks elapsed in [advance_delta].
+    #[serde(skip)]
+    #[serde(default)]
     clock: usize,
     /// Emulation options.
     pub options: EmulateOptions,
@@ -180,22 +182,8 @@ impl GameGirl {
     }
 
     /// Create a save state that can be loaded with [load_state].
-    /// It is zstd-compressed bincode.
-    /// PPU display output and the cartridge are not stored.
     pub fn save_state(&self) -> Vec<u8> {
-        if cfg!(target_arch = "wasm32") {
-            // Currently crashes when loading...
-            return vec![];
-        }
-        if self.config.compress_savestates {
-            let mut dest = vec![];
-            let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
-            bincode::serialize_into(&mut writer, self).unwrap();
-            writer.finish().unwrap();
-            dest
-        } else {
-            bincode::serialize(self).unwrap()
-        }
+        common::serialize(self, self.config.compress_savestates)
     }
 
     /// Load a state produced by [save_state].
@@ -205,13 +193,11 @@ impl GameGirl {
             // Currently crashes...
             return;
         }
-        let new_self = if self.config.compress_savestates {
-            let decoder = zstd::stream::Decoder::new(state).unwrap();
-            bincode::deserialize_from(decoder).unwrap()
-        } else {
-            bincode::deserialize(state).unwrap()
-        };
-        let old_self = mem::replace(self, new_self);
+
+        let old_self = mem::replace(
+            self,
+            common::deserialize(state, self.config.compress_savestates),
+        );
         self.debugger = old_self.debugger;
         self.mmu.cart.rom = old_self.mmu.cart.rom;
         self.options.frame_finished = old_self.options.frame_finished;

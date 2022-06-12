@@ -3,6 +3,8 @@ mod inst_arm;
 mod inst_thumb;
 pub mod registers;
 
+use serde::{Deserialize, Serialize};
+
 use crate::gga::cpu::registers::Flag::{FiqDisable, IrqDisable, Thumb};
 use crate::gga::cpu::registers::{Context, FiqReg, ModeReg};
 use crate::gga::GameGirlAdv;
@@ -10,6 +12,7 @@ use crate::numutil::NumExt;
 use std::mem;
 
 /// Represents the CPU of the console - an ARM7TDMI.
+#[derive(Deserialize, Serialize)]
 pub struct Cpu {
     pub low: [u32; 8],
     pub fiqs: [FiqReg; 5],

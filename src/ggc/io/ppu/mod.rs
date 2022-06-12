@@ -1,3 +1,4 @@
+use crate::common::BorrowedSystem;
 use crate::ggc::cpu::Interrupt;
 use crate::ggc::io::addr::*;
 use crate::ggc::io::ppu::cgb::Cgb;
@@ -97,7 +98,7 @@ impl Ppu {
                 if gg.mmu[LY] > 153 {
                     gg.mmu[LY] = 0;
                     gg.mmu.ppu.window_line = 0;
-                    (gg.options.frame_finished)(gg);
+                    (gg.options.frame_finished)(BorrowedSystem::GGC(gg));
                     Self::stat_interrupt(gg, 5);
                     Mode::OAMScan
                 } else {

@@ -1,4 +1,4 @@
-use crate::common::EmulateOptions;
+use crate::common::{self, EmulateOptions};
 use crate::debugger::Debugger;
 use crate::gga::audio::{APU_REG_END, APU_REG_START};
 use crate::gga::cpu::registers::Flag;
@@ -14,11 +14,15 @@ use crate::gga::memory::{
 use crate::gga::timer::{Timer, TIMER_END, TIMER_START, TIMER_WIDTH};
 use crate::ggc::GGConfig;
 use crate::numutil::{hword, word, NumExt, U16Ext, U32Ext};
+use crate::Colour;
 use audio::Apu;
 use cartridge::Cartridge;
 use cpu::Cpu;
 use graphics::Ppu;
 use memory::Memory;
+use serde::{Deserialize, Serialize};
+use std::mem;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 mod audio;
@@ -30,14 +34,16 @@ mod input;
 mod memory;
 mod timer;
 
+pub const CPU_CLOCK: f32 = (2 ^ 24) as f32;
+
 pub type GGADebugger = Debugger<u32>;
 
-/// Console struct representing a GGA. Contains all state and is generally used for system emulation.
-/// Use [GameGirlAdv::step] to advance the emulation.
+/// Console struct representing a GGA. Contains all state and is used for system emulation.
+#[derive(Deserialize, Serialize)]
 pub struct GameGirlAdv {
     pub cpu: Cpu,
     pub memory: Memory,
-    pub gpu: Ppu,
+    pub ppu: Ppu,
     pub apu: Apu,
     pub dma: [Dma; 4],
     pub timers: [Timer; 4],
@@ -46,10 +52,100 @@ pub struct GameGirlAdv {
 
     pub options: EmulateOptions,
     pub config: GGConfig,
+    #[serde(skip)]
+    #[serde(default)]
     pub debugger: Arc<GGADebugger>,
+    #[serde(skip)]
+    #[serde(default)]
+    clock: usize,
 }
 
 impl GameGirlAdv {
+    /// Advance the system clock by the given delta in seconds.
+    /// Might advance a few clocks more.
+    pub fn advance_delta(&mut self, delta: f32) {
+        if !self.options.running {
+            return;
+        }
+        self.clock = 0;
+        let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as usize;
+        while self.clock < target {
+            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
+                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+                self.options.running = false;
+                break;
+            }
+            self.advance();
+        }
+    }
+
+    /// Step until the PPU has finished producing the current frame.
+    /// Only used for rewinding since it causes audio desync very easily.
+    pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
+        if !self.options.running {
+            return None;
+        }
+
+        while self.ppu.last_frame == None {
+            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
+                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+                self.options.running = false;
+                return None;
+            }
+            self.advance();
+        }
+
+        self.ppu.last_frame.take()
+    }
+
+    /// Produce the next audio samples and write them to the given buffer.
+    /// Writes zeroes if the system is not currently running
+    /// and no audio should be played.
+    pub fn produce_samples(&mut self, samples: &mut [f32]) {
+        if !self.options.running {
+            samples.fill(0.0);
+            return;
+        }
+
+        let target = samples.len() * self.options.speed_multiplier;
+        while self.apu.buffer.len() < target {
+            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
+                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+                self.options.running = false;
+                samples.fill(0.0);
+                return;
+            }
+            self.advance();
+        }
+
+        let mut buffer = mem::take(&mut self.apu.buffer);
+        if self.options.invert_audio_samples {
+            // If rewinding, truncate and get rid of any excess samples to prevent
+            // audio samples getting backed up
+            for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
+                *dst = src * self.config.volume;
+            }
+        } else {
+            // Otherwise, store any excess samples back in the buffer for next time
+            // while again not storing too many to avoid backing up.
+            // This way can cause clipping if the console produces audio too fast,
+            // however this is preferred to audio falling behind and eating
+            // a lot of memory.
+            for sample in buffer.drain(target..) {
+                self.apu.buffer.push(sample);
+            }
+            self.apu.buffer.truncate(5_000);
+
+            for (src, dst) in buffer
+                .into_iter()
+                .step_by(self.options.speed_multiplier)
+                .zip(samples.iter_mut())
+            {
+                *dst = src * self.config.volume;
+            }
+        }
+    }
+
     /// Step forward the emulated console including all subsystems.
     pub fn advance(&mut self) {
         todo!()
@@ -57,7 +153,7 @@ impl GameGirlAdv {
 
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
-        todo!();
+        self.clock += 1;
     }
 
     /// Read a byte from the bus. Does no timing-related things; simply fetches the value.
@@ -68,10 +164,10 @@ impl GameGirlAdv {
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START],
             WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START],
 
-            PPU_REG_START..=PPU_REG_END => self.gpu.regs[addr - PPU_REG_START],
-            PALETTE_START..=PALETTE_END => self.gpu.palette[addr - PALETTE_START],
-            VRAM_START..=VRAM_END => self.gpu.vram[addr - VRAM_START],
-            OAM_START..=OAM_END => self.gpu.oam[addr - OAM_START],
+            PPU_REG_START..=PPU_REG_END => self.ppu.regs[addr - PPU_REG_START],
+            PALETTE_START..=PALETTE_END => self.ppu.palette[addr - PALETTE_START],
+            VRAM_START..=VRAM_END => self.ppu.vram[addr - VRAM_START],
+            OAM_START..=OAM_END => self.ppu.oam[addr - OAM_START],
 
             APU_REG_START..=APU_REG_END => self.apu.regs[addr - APU_REG_START],
             DMA_START..=DMA_END => {
@@ -114,10 +210,10 @@ impl GameGirlAdv {
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START] = value,
             WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START] = value,
 
-            PPU_REG_START..=PPU_REG_END => self.gpu.regs[addr - PPU_REG_START] = value,
-            PALETTE_START..=PALETTE_END => self.gpu.palette[addr - PALETTE_START] = value,
-            VRAM_START..=VRAM_END => self.gpu.vram[addr - VRAM_START] = value,
-            OAM_START..=OAM_END => self.gpu.oam[addr - OAM_START] = value,
+            PPU_REG_START..=PPU_REG_END => self.ppu.regs[addr - PPU_REG_START] = value,
+            PALETTE_START..=PALETTE_END => self.ppu.palette[addr - PALETTE_START] = value,
+            VRAM_START..=VRAM_END => self.ppu.vram[addr - VRAM_START] = value,
+            OAM_START..=OAM_END => self.ppu.oam[addr - OAM_START] = value,
 
             APU_REG_START..=APU_REG_END => self.apu.regs[addr - APU_REG_START] = value,
             DMA_START..=DMA_END => {
@@ -171,6 +267,41 @@ impl GameGirlAdv {
             Self::get_mnemonic_arm(inst)
         }
     }
+
+    /// Create a save state that can be loaded with [load_state].
+    pub fn save_state(&self) -> Vec<u8> {
+        common::serialize(self, self.config.compress_savestates)
+    }
+
+    /// Load a state produced by [save_state].
+    /// Will restore the current cartridge and debugger.
+    pub fn load_state(&mut self, state: &[u8]) {
+        if cfg!(target_arch = "wasm32") {
+            // Currently crashes...
+            return;
+        }
+
+        let old_self = mem::replace(
+            self,
+            common::deserialize(state, self.config.compress_savestates),
+        );
+        self.restore_from(old_self);
+    }
+
+    /// Restore state after a savestate load. `old_self` should be the
+    /// system state before the state was loaded.
+    pub fn restore_from(&mut self, old_self: Self) {
+        self.cart.rom = old_self.cart.rom;
+        self.options = old_self.options;
+        self.config = old_self.config;
+        self.debugger = old_self.debugger;
+    }
+
+    /// Reset the console; like power-cycling a real one.
+    pub fn reset(&mut self) {
+        let old_self = mem::take(self);
+        self.restore_from(old_self);
+    }
 }
 
 impl Default for GameGirlAdv {
@@ -182,14 +313,16 @@ impl Default for GameGirlAdv {
                 wram1: [0; 256 * KB],
                 wram2: [0; 32 * KB],
             },
-            gpu: Ppu {
+            ppu: Ppu {
                 regs: [0; 56],
                 palette: [0; KB],
                 vram: [0; 96 * KB],
                 oam: [0; KB],
+                last_frame: None,
             },
             apu: Apu {
                 regs: [0; APU_REG_END - APU_REG_START],
+                buffer: Vec::with_capacity(1000),
             },
             // Meh...
             dma: [
@@ -205,11 +338,12 @@ impl Default for GameGirlAdv {
                 Timer { regs: [0; 4] },
             ],
             input: Input { regs: [0; 4] },
-            cart: Cartridge {},
+            cart: Cartridge::default(),
 
             options: EmulateOptions::default(),
             config: GGConfig::default(),
             debugger: Arc::new(GGADebugger::default()),
+            clock: 0,
         }
     }
 }

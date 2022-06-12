@@ -2,6 +2,7 @@ use crate::gga::cpu::registers::Flag::Thumb;
 use crate::gga::cpu::Cpu;
 use crate::numutil::NumExt;
 use bitmatch::bitmatch;
+use serde::{Deserialize, Serialize};
 
 /// Macro for creating accessors for mode-dependent registers.
 macro_rules! mode_reg {
@@ -17,7 +18,7 @@ macro_rules! mode_reg {
 }
 
 /// A register with values for FIQ and all other modes
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Deserialize, Serialize)]
 pub struct FiqReg {
     pub reg: u32,
     pub fiq: u32,

@@ -6,6 +6,7 @@ use crate::ggc::io::joypad::Joypad;
 use crate::ggc::GGConfig;
 use crate::storage::Storage;
 use crate::{ggc::GameGirl, Colour};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ macro_rules! forward {
         pub fn $name(&mut self, arg: $arg) -> $ret {
             match self {
                 System::GGC(gg) => gg.$name(arg),
-                System::GGA(_gg) => todo!(),
+                System::GGA(gg) => gg.$name(arg),
             }
         }
     };
@@ -24,7 +25,7 @@ macro_rules! forward {
         pub fn $name(&mut self) -> $ret {
             match self {
                 System::GGC(gg) => gg.$name(),
-                System::GGA(_gg) => todo!(),
+                System::GGA(gg) => gg.$name(),
             }
         }
     };
@@ -34,6 +35,7 @@ macro_rules! forward {
 }
 
 /// Enum for the system currently loaded.
+#[derive(Deserialize, Serialize)]
 pub enum System {
     /// A GGC. Is also used for DMG games.
     GGC(GameGirl),
@@ -42,13 +44,15 @@ pub enum System {
 }
 
 impl System {
+    // TODO These 5 functions are heavily duplicated, not nice.
     forward!(advance_delta, (), f32);
     forward!(produce_frame, Option<Vec<Colour>>);
     forward!(produce_samples, (), &mut [f32]);
-    forward!(advance);
-    forward!(reset);
     forward!(save_state, Vec<u8>);
     forward!(load_state, (), &[u8]);
+
+    forward!(advance);
+    forward!(reset);
 
     /// Set a button on the joypad.
     pub fn set_button(&mut self, btn: Button, pressed: bool) {
@@ -62,7 +66,7 @@ impl System {
     pub fn last_frame(&mut self) -> Option<Vec<Colour>> {
         match self {
             System::GGC(gg) => gg.mmu.ppu.last_frame.take(),
-            System::GGA(_gg) => todo!(),
+            System::GGA(gg) => gg.ppu.last_frame.take(),
         }
     }
 
@@ -75,7 +79,15 @@ impl System {
     }
 
     /// Get emulation config.
-    pub fn config(&mut self) -> &mut GGConfig {
+    pub fn config(&self) -> &GGConfig {
+        match self {
+            System::GGC(gg) => &gg.config,
+            System::GGA(gg) => &gg.config,
+        }
+    }
+
+    /// Get emulation config.
+    pub fn config_mut(&mut self) -> &mut GGConfig {
         match self {
             System::GGC(gg) => &mut gg.config,
             System::GGA(gg) => &mut gg.config,
@@ -119,7 +131,13 @@ impl System {
             );
             *self = Self::GGC(ggc);
         } else {
-            todo!()
+            let mut gga = GameGirlAdv::default();
+            gga.cart.rom = cart;
+            gga.options.frame_finished = mem::replace(
+                &mut self.options().frame_finished,
+                EmulateOptions::serde_frame_finished(),
+            );
+            *self = Self::GGA(gga);
         }
     }
 }
@@ -148,11 +166,11 @@ pub struct EmulateOptions {
     /// Called when a frame is finished rendering. (End of VBlank)
     #[serde(skip)]
     #[serde(default = "EmulateOptions::serde_frame_finished")]
-    pub frame_finished: Box<dyn Fn(&GameGirl) + Send>,
+    pub frame_finished: Box<dyn Fn(BorrowedSystem) + Send>,
 }
 
 impl EmulateOptions {
-    fn serde_frame_finished() -> Box<dyn Fn(&GameGirl) + Send> {
+    fn serde_frame_finished() -> Box<dyn Fn(BorrowedSystem) + Send> {
         Box::new(|_| ())
     }
 }
@@ -167,6 +185,11 @@ impl Default for EmulateOptions {
             frame_finished: Box::new(|_| ()),
         }
     }
+}
+
+pub enum BorrowedSystem<'s> {
+    GGC(&'s GameGirl),
+    GGA(&'s GameGirlAdv),
 }
 
 /// Buttons on a system. For GGC, L/R are unused.
@@ -197,4 +220,33 @@ impl Button {
         Self::L,
         Self::R,
     ];
+}
+
+/// Serialize an object that can be loaded with [deserialize].
+/// It is optionally zstd-compressed bincode.
+pub fn serialize<T: Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
+    if cfg!(target_arch = "wasm32") {
+        // Currently crashes when loading...
+        return vec![];
+    }
+    if with_zstd {
+        let mut dest = vec![];
+        let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
+        bincode::serialize_into(&mut writer, thing).unwrap();
+        writer.finish().unwrap();
+        dest
+    } else {
+        bincode::serialize(thing).unwrap()
+    }
+}
+
+/// Deserialize an object that was made with [serialize].
+/// It is optionally zstd-compressed bincode.
+pub fn deserialize<T: DeserializeOwned>(state: &[u8], with_zstd: bool) -> T {
+    if with_zstd {
+        let decoder = zstd::stream::Decoder::new(state).unwrap();
+        bincode::deserialize_from(decoder).unwrap()
+    } else {
+        bincode::deserialize(state).unwrap()
+    }
 }
