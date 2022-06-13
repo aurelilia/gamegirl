@@ -1,5 +1,5 @@
 use crate::gga::cpu::registers::Flag::*;
-use crate::gga::cpu::Cpu;
+use crate::gga::cpu::{Cpu, Exception};
 use crate::gga::GameGirlAdv;
 use crate::numutil::NumExt;
 use bitmatch::bitmatch;
@@ -9,6 +9,9 @@ impl GameGirlAdv {
     pub fn execute_inst_thumb(&mut self, inst: u16) {
         #[bitmatch]
         match inst {
+            // SWI
+            "11011111_????????" => self.cpu.exception_occurred(Exception::Swi),
+
             // THUMB.1
             "000_00nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.lsl(self.low(s), n.u32()),
             "000_01nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.lsr(self.low(s), n.u32()),
@@ -227,6 +230,8 @@ impl GameGirlAdv {
     pub fn get_mnemonic_thumb(inst: u16) -> String {
         #[bitmatch]
         match inst {
+            "11011111_nnnnnnnn" => format!("swi 0x{:02X}", n),
+
             "000_00nnnnnsssddd" => format!("lsl r{d}, r{s}, #{n}"),
             "000_01nnnnnsssddd" => format!("lsr r{d}, r{s}, #{n}"),
             "000_10nnnnnsssddd" => format!("asr r{d}, r{s}, #{n}"),

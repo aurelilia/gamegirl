@@ -1,5 +1,5 @@
 use crate::gga::cpu::registers::Context;
-use crate::gga::cpu::{registers::Flag::*, Cpu};
+use crate::gga::cpu::{registers::Flag::*, Cpu, Exception};
 use crate::gga::GameGirlAdv;
 use crate::numutil::{NumExt, U32Ext};
 use bitmatch::bitmatch;
@@ -35,7 +35,7 @@ impl GameGirlAdv {
             }
 
             "1111_????????????????????????" => {
-                // TODO: what the fuck is a SWI
+                self.cpu.exception_occurred(Exception::Swi);
             }
 
             "00010_0001111dddd000000000000" => self.cpu.set_reg(d, self.cpu.cpsr),
@@ -99,6 +99,22 @@ impl GameGirlAdv {
                 self.alu(o, self.cpu.reg(n), second_op, d, c == 1);
             }
 
+            "100_puswlnnnnrrrrrrrrrrrrrrrr" => {
+                // STM/LDM
+                // TODO what exactly is S?
+                let mut offs = 0;
+                for reg in 0..15 {
+                    if r.is_bit(reg) {
+                        self.ldrstr(p == 0, u == 1, 4, false, l == 0, n, reg.u32(), offs);
+                        offs += 4;
+                    }
+                }
+                if w == 1 {
+                    self.cpu
+                        .set_reg(n, Self::mod_with_offs(self.reg(n), offs, u == 1));
+                }
+            }
+
             "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
                 // LDR/STR with imm
                 let width = if b == 1 { 1 } else { 4 };
@@ -122,12 +138,12 @@ impl GameGirlAdv {
 
             "000_pu1wlnnnnddddiiii1011iiii" => {
                 // LDRH/STRH with imm
-                self.ldrstr(p == 1, u == 1, 2, (p == 1) || (w == 1), l == 0, n, d, i);
+                self.ldrstr(p == 0, u == 1, 2, (p == 1) || (w == 1), l == 0, n, d, i);
             }
             "000_pu0wlnnnndddd00001011mmmm" => {
                 // LDRH/STRH with reg
                 self.ldrstr(
-                    p == 1,
+                    p == 0,
                     u == 1,
                     2,
                     (p == 1) || (w == 1),
@@ -140,13 +156,13 @@ impl GameGirlAdv {
 
             "000_pu1w1nnnnddddiiii1101iiii" => {
                 // LDRSB with imm
-                self.ldrstr(p == 1, u == 1, 1, (p == 1) || (w == 1), false, n, d, i);
+                self.ldrstr(p == 0, u == 1, 1, (p == 1) || (w == 1), false, n, d, i);
                 self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001101mmmm" => {
                 // LDRSB with reg
                 self.ldrstr(
-                    p == 1,
+                    p == 0,
                     u == 1,
                     1,
                     (p == 1) || (w == 1),
@@ -159,13 +175,13 @@ impl GameGirlAdv {
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
-                self.ldrstr(p == 1, u == 1, 1, (p == 1) || (w == 1), false, n, d, i);
+                self.ldrstr(p == 0, u == 1, 1, (p == 1) || (w == 1), false, n, d, i);
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
                 // LDRSH with reg
                 self.ldrstr(
-                    p == 1,
+                    p == 0,
                     u == 1,
                     1,
                     (p == 1) || (w == 1),
@@ -313,10 +329,10 @@ impl GameGirlAdv {
         let co = Cpu::condition_mnemonic(inst.bits(28, 4).u16());
         #[bitmatch]
         match inst {
-            "101_0nnnnnnnnnnnnnnnnnnnnnnnn" => format!("b{co} +{}", (n << 2) + 8),
-            "101_1nnnnnnnnnnnnnnnnnnnnnnnn" => format!("bl{co} +{}", (n << 2) + 8),
-            "000100101111111111110001_nnnn" => format!("bx{co} +{}", (n << 2) + 8),
-            "1111_nnnnnnnnnnnnnnnnnnnnnnnn" => format!("swi{co} {n}"),
+            "101_0nnnnnnnnnnnnnnnnnnnnnnnn" => format!("b{co} +0x{:8X}", (n << 2) + 8),
+            "101_1nnnnnnnnnnnnnnnnnnnnnnnn" => format!("bl{co} +0x{:8X}", (n << 2) + 8),
+            "000100101111111111110001_nnnn" => format!("bx{co} +0x{:8X}", (n << 2) + 8),
+            "1111_nnnnnnnnnnnnnnnnnnnnnnnn" => format!("swi{co} 0x{:07X}", n),
 
             "00010_000nnnndddd00001001mmmm" => format!("swp{co} r{d}, r{m}, [r{n}]"),
             "00010_100nnnndddd00001001mmmm" => format!("swpb{co} r{d}, r{m}, [r{n}]"),
@@ -349,22 +365,31 @@ impl GameGirlAdv {
                 }
             }
 
-            "01_0000?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n} -{m}]"),
-            "01_0100?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n}], -{m}"),
-            "01_0010?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n} +{m}]"),
-            "01_0110?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n}], +{m}"),
-            "01_0001?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n} -{m}]"),
-            "01_0101?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n}], -{m}"),
-            "01_0011?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n} +{m}]"),
-            "01_0111?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n}], +{m}"),
-            "01_0000?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n} -{m}]"),
-            "01_0100?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n}], -{m}"),
-            "01_0010?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n} +{m}]"),
-            "01_0110?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n}], +{m}"),
-            "01_0001?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n} -{m}]"),
-            "01_0101?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n}], -{m}"),
-            "01_0011?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n} +{m}]"),
-            "01_0111?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n}], +{m}"),
+            "100_11??0nnnnrrrrrrrrrrrrrrrr" => format!("stmib r{n}!, {:016b}", r),
+            "100_01??0nnnnrrrrrrrrrrrrrrrr" => format!("stmia r{n}!, {:016b}", r),
+            "100_10??0nnnnrrrrrrrrrrrrrrrr" => format!("stmdb r{n}!, {:016b}", r),
+            "100_00??0nnnnrrrrrrrrrrrrrrrr" => format!("stmda r{n}!, {:016b}", r),
+            "100_11??1nnnnrrrrrrrrrrrrrrrr" => format!("ldmib r{n}!, {:016b}", r),
+            "100_01??1nnnnrrrrrrrrrrrrrrrr" => format!("ldmia r{n}!, {:016b}", r),
+            "100_10??1nnnnrrrrrrrrrrrrrrrr" => format!("ldmdb r{n}!, {:016b}", r),
+            "100_00??1nnnnrrrrrrrrrrrrrrrr" => format!("ldmda r{n}!, {:016b}", r),
+
+            "01_0100?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n} -{m}]"),
+            "01_0000?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n}], -{m}"),
+            "01_0110?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n} +{m}]"),
+            "01_0010?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n}], +{m}"),
+            "01_0101?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n} -{m}]"),
+            "01_0001?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n}], -{m}"),
+            "01_0111?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n} +{m}]"),
+            "01_0011?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n}], +{m}"),
+            "01_0100?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n} -{m}]"),
+            "01_0000?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n}], -{m}"),
+            "01_0110?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n} +{m}]"),
+            "01_0010?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n}], +{m}"),
+            "01_0101?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n} -{m}]"),
+            "01_0001?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n}], -{m}"),
+            "01_0111?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n} +{m}]"),
+            "01_0011?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n}], +{m}"),
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 let shift = Self::shift_type_mnemonic(t);
                 let u = if u == 1 { "+" } else { "-" };
@@ -377,22 +402,22 @@ impl GameGirlAdv {
                 }
             }
 
-            "000_001?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n} -{i}]"),
-            "000_101?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n}], -{i}"),
-            "000_011?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n} +{i}]"),
-            "000_111?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n}], +{i}"),
-            "000_001?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n} -{i}]"),
-            "000_101?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n}], -{i}"),
-            "000_011?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n} +{n}]"),
-            "000_111?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n}], +{i}"),
-            "000_001?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n} -{i}]"),
-            "000_101?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n}], -{i}"),
-            "000_011?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n} +{n}]"),
-            "000_111?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n}], +{i}"),
-            "000_001?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n} -{i}]"),
-            "000_101?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n}], -{i}"),
-            "000_011?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n} +{n}]"),
-            "000_111?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n}], +{i}"),
+            "000_101?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n} -{i}]"),
+            "000_001?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n}], -{i}"),
+            "000_111?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n} +{i}]"),
+            "000_011?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n}], +{i}"),
+            "000_101?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n} -{i}]"),
+            "000_001?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n}], -{i}"),
+            "000_111?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n} +{n}]"),
+            "000_011?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n}], +{i}"),
+            "000_101?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n} -{i}]"),
+            "000_001?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n}], -{i}"),
+            "000_111?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n} +{n}]"),
+            "000_011?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n}], +{i}"),
+            "000_101?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n} -{i}]"),
+            "000_001?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n}], -{i}"),
+            "000_111?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n} +{n}]"),
+            "000_011?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n}], +{i}"),
             "000_pu0wlnnnndddd00001oo1mmmm" => {
                 let u = if u == 1 { "+" } else { "-" };
                 let op = if l == 1 {
