@@ -11,7 +11,7 @@ impl Cpu {
             value
         } else {
             let res = value.wrapping_shl(by);
-            self.set_znc(res, value.wrapping_shr(by) != 0);
+            self.set_znc(res, value.wrapping_shr(32 - by) & 1 != 0);
             res
         }
     }
@@ -104,7 +104,9 @@ impl Cpu {
     }
 
     pub fn not(&mut self, value: u32) -> u32 {
-        value ^ u32::MAX
+        let val = value ^ u32::MAX;
+        self.set_zn(val);
+        val
     }
 
     /// Negate

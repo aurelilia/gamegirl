@@ -185,7 +185,7 @@ impl GameGirlAdv {
                 for reg in 0..8 {
                     if r.is_bit(reg) {
                         self.write_word(self.cpu.low(b), self.cpu.low[reg.us()]);
-                        self.cpu.low[b.us()] += 4;
+                        self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
                     }
                 }
             }
@@ -194,7 +194,7 @@ impl GameGirlAdv {
                 for reg in 0..8 {
                     if r.is_bit(reg) {
                         self.cpu.low[reg.us()] = self.read_word(self.cpu.low(b));
-                        self.cpu.low[b.us()] += 4;
+                        self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
                     }
                 }
             }
@@ -323,9 +323,9 @@ impl GameGirlAdv {
             "1101_ccccnnnnnnnn" => format!(
                 "b{} 0x{:X}",
                 Cpu::condition_mnemonic(c).to_ascii_lowercase(),
-                (n as i8 as i16) * 2
+                ((n as i8 as i16) * 2) + 2
             ),
-            "11100_nnnnnnnnnnn" => format!("b 0x{:X}", n << 1),
+            "11100_nnnnnnnnnnn" => format!("b 0x{:X}", (n.i10() << 1) + 2),
             "11110_nnnnnnnnnnn" => format!("mov lr, (pc + 0x{:X})", n << 12),
             "11111_nnnnnnnnnnn" => format!("bl lr + 0x{:X}", n << 1),
             "11101_nnnnnnnnnnn" => format!("blx lr + 0x{:X}", n << 1),

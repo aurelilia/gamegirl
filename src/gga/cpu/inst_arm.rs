@@ -18,7 +18,7 @@ impl GameGirlAdv {
                 let nn = n.i24() * 4; // Step 4
                 if l == 1 {
                     // BL
-                    self.cpu.set_lr(self.cpu.pc + 4);
+                    self.cpu.set_lr(self.cpu.pc - 4);
                 } // else: B
                 self.cpu.set_pc(self.cpu.pc.wrapping_add_signed(nn));
             }

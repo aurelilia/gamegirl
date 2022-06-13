@@ -34,7 +34,7 @@ mod input;
 mod memory;
 mod timer;
 
-pub const CPU_CLOCK: f32 = (2 ^ 24) as f32;
+pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 
 pub type GGADebugger = Debugger<u32>;
 

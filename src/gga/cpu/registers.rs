@@ -125,7 +125,7 @@ impl Cpu {
     }
 
     pub fn adj_pc(&self) -> u32 {
-        self.pc & !2
+        self.pc
     }
 
     mode_reg!(sp, set_sp);
@@ -134,7 +134,8 @@ impl Cpu {
 
     pub fn set_pc(&mut self, val: u32) {
         self.pc_just_changed = true;
-        self.pc = val;
+        // Align to 2/4 depending on mode
+        self.pc = val & (!(self.inst_size() - 1));
     }
 
     pub fn low(&self, idx: u16) -> u32 {

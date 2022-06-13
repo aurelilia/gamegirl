@@ -7,7 +7,7 @@ A Gameboy (Color/Advance) emulator written in Rust, whose GG/GGC core is a rewri
 ## Status
 The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
-AGB support is very very early with nothing really working yet; still working on implementing the CPU.
+AGB support is very early with nothing really working yet; still working on making the CPU accurate.
 
 ### Features
 - Complete DMG/CGB implementation, including running DMG games on CGB
@@ -69,15 +69,19 @@ Blargg and mooneye ROMs can be run automatically:
 cargo run -p tests --release
 ```
 
-### Blargg test results
+### GG/GGC
+#### Blargg test results
 All tests except for `oam_bug` (which will not be implemented) pass.
-
-### Mooneye test results
+#### Mooneye test results
 - `acceptance`: 30 out of 71 pass
 - `emulator-only`: All pass (except MBC1 multicart; will not be supported)
-
-### Acid2
+#### Acid2
 mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibility mode on dmg-acid2.
+
+### GGA
+#### jsmolka's gba-tests
+- Thumb fails at test 53 (LSL 32)
+- Everything else untested
 
 
 ## Thanks To
@@ -98,3 +102,4 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 ### GGA
 - [GBATEK, as a technical reference](https://problemkaputt.de/gbatek.htm)
 - [mj-hd, for rgba, which I used to properly understand ARM7 emulation details](https://github.com/mj-hd/rgba/)
+- [jsmolka, for their testing ROMs](https://github.com/jsmolka/gba-tests)
