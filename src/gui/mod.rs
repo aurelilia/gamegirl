@@ -178,7 +178,7 @@ impl epi::App for App {
     }
 
     fn setup(&mut self, ctx: &Context, _frame: &Frame, storage: Option<&dyn Storage>) {
-        if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamelin_data")) {
+        if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamegirl_data")) {
             self.state = state;
         }
 
