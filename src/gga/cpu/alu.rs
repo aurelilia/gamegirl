@@ -39,9 +39,15 @@ impl Cpu {
     /// Rotate right
     /// TODO: Carry behavior correct?
     pub fn ror(&mut self, value: u32, by: u32) -> u32 {
-        let res = (value >> by) | (value << (32 - by));
+        let res = self.ror_s0(value, by);
         self.set_znc(res, (value << by) != 0);
         res
+    }
+
+    /// Rotate right, without setting CPSR
+    /// TODO: Carry behavior correct/
+    pub fn ror_s0(&mut self, value: u32, by: u32) -> u32 {
+        (value >> by) | (value << (32 - by))
     }
 
     /// Addition (c -> Carry)
