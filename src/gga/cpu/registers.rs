@@ -8,11 +8,21 @@ use serde::{Deserialize, Serialize};
 macro_rules! mode_reg {
     ($reg:ident, $set:ident) => {
         pub fn $reg(&self) -> u32 {
-            self.$reg[self.context() as usize]
+            let ctx = self.context();
+            if ctx == Context::System {
+                self.$reg[0]
+            } else {
+                self.$reg[self.context() as usize]
+            }
         }
 
         pub fn $set(&mut self, val: u32) {
-            self.$reg[self.context() as usize] = val;
+            let ctx = self.context();
+            if ctx == Context::System {
+                self.$reg[0] = val;
+            } else {
+                self.$reg[self.context() as usize] = val;
+            }
         }
     };
 }
@@ -115,7 +125,7 @@ impl Cpu {
     }
 
     pub fn adj_pc(&self) -> u32 {
-        (self.pc + 4) & !2
+        self.pc & !2
     }
 
     mode_reg!(sp, set_sp);
@@ -139,6 +149,7 @@ impl Cpu {
         match idx {
             0..=7 => self.low[idx.us()],
             8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq,
+            8..=12 => self.fiqs[(idx - 8).us()].reg,
             13 => self.sp(),
             14 => self.lr(),
             _ => self.pc,
@@ -149,6 +160,7 @@ impl Cpu {
         match idx {
             0..=7 => self.low[idx.us()] = val,
             8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq = val,
+            8..=12 => self.fiqs[(idx - 8).us()].reg = val,
             13 => self.set_sp(val),
             14 => self.set_lr(val),
             _ => self.set_pc(val),

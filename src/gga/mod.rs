@@ -27,7 +27,7 @@ use std::sync::Arc;
 
 mod audio;
 mod cartridge;
-mod cpu;
+pub mod cpu;
 mod dma;
 mod graphics;
 mod input;
@@ -102,7 +102,8 @@ impl GameGirlAdv {
     /// Writes zeroes if the system is not currently running
     /// and no audio should be played.
     pub fn produce_samples(&mut self, samples: &mut [f32]) {
-        if !self.options.running {
+        // Disable this for now, we don't have a working APU yet.
+        if true || !self.options.running {
             samples.fill(0.0);
             return;
         }
@@ -163,6 +164,8 @@ impl GameGirlAdv {
             BIOS_START..=BIOS_END => self.memory.bios[addr - BIOS_START],
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START],
             WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START],
+
+            0x0800_0000..=0x0DFF_FFFF => self.cart.rom[addr & 0x01FF_FFFF],
 
             PPU_REG_START..=PPU_REG_END => self.ppu.regs[addr - PPU_REG_START],
             PALETTE_START..=PALETTE_END => self.ppu.palette[addr - PALETTE_START],
@@ -306,7 +309,7 @@ impl GameGirlAdv {
 
 impl Default for GameGirlAdv {
     fn default() -> Self {
-        Self {
+        let mut gg = Self {
             cpu: Cpu::default(),
             memory: Memory {
                 bios: include_bytes!("bios.bin"),
@@ -314,7 +317,7 @@ impl Default for GameGirlAdv {
                 wram2: [0; 32 * KB],
             },
             ppu: Ppu {
-                regs: [0; 56],
+                regs: [0; 0x56],
                 palette: [0; KB],
                 vram: [0; 96 * KB],
                 oam: [0; KB],
@@ -344,6 +347,13 @@ impl Default for GameGirlAdv {
             config: GGConfig::default(),
             debugger: Arc::new(GGADebugger::default()),
             clock: 0,
-        }
+        };
+
+        // Skip bootrom for now
+        gg.cpu.pc = 0x0800_0000;
+        gg.cpu.sp[1] = 0x0300_7F00;
+        gg.cpu.sp[3] = 0x0300_7F00;
+        gg.cpu.sp[5] = 0x0300_7F00;
+        gg
     }
 }

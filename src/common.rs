@@ -1,5 +1,6 @@
 //! This file contains common structures shared by GGC and GGA.
 
+use crate::gga::cpu::Cpu;
 use crate::gga::GameGirlAdv;
 use crate::ggc::io::cartridge::Cartridge;
 use crate::ggc::io::joypad::Joypad;
@@ -58,7 +59,7 @@ impl System {
     pub fn set_button(&mut self, btn: Button, pressed: bool) {
         match self {
             System::GGC(gg) => Joypad::set(gg, btn, pressed),
-            System::GGA(_gg) => todo!(),
+            System::GGA(_gg) => (),
         }
     }
 
@@ -137,6 +138,8 @@ impl System {
                 &mut self.options().frame_finished,
                 EmulateOptions::serde_frame_finished(),
             );
+            // Fill the prefetch
+            Cpu::fix_prefetch(&mut gga);
             *self = Self::GGA(gga);
         }
 

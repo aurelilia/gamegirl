@@ -10,8 +10,8 @@ impl Cpu {
             self.set_zn(value);
             value
         } else {
-            let res = value << by;
-            self.set_znc(res, (value >> by) != 0);
+            let res = value.wrapping_shl(by);
+            self.set_znc(res, value.wrapping_shr(by) != 0);
             res
         }
     }
@@ -21,8 +21,8 @@ impl Cpu {
         if by == 0 {
             by = 32;
         }
-        let res = value >> by;
-        self.set_znc(res, (value << by) != 0);
+        let res = value.wrapping_shr(by);
+        self.set_znc(res, value.wrapping_shl(by) != 0);
         res
     }
 
@@ -31,23 +31,23 @@ impl Cpu {
         if by == 0 {
             by = 32;
         }
-        let res = ((value as i32) >> by) as u32;
-        self.set_znc(res, (value << by) != 0);
+        let res = (value as i32).wrapping_shr(by) as u32;
+        self.set_znc(res, value.wrapping_shl(by) != 0);
         res
     }
 
     /// Rotate right
     /// TODO: Carry behavior correct?
     pub fn ror(&mut self, value: u32, by: u32) -> u32 {
-        let res = self.ror_s0(value, by);
-        self.set_znc(res, (value << by) != 0);
+        let res = Self::ror_s0(value, by);
+        self.set_znc(res, value.wrapping_shl(by) != 0);
         res
     }
 
     /// Rotate right, without setting CPSR
-    /// TODO: Carry behavior correct/
-    pub fn ror_s0(&mut self, value: u32, by: u32) -> u32 {
-        (value >> by) | (value << (32 - by))
+    /// TODO: Carry behavior correct?
+    pub fn ror_s0(value: u32, by: u32) -> u32 {
+        value.wrapping_shl(by) | (value.wrapping_shl(32 - by))
     }
 
     /// Addition (c -> Carry)
@@ -71,7 +71,7 @@ impl Cpu {
 
     /// Multiplication
     pub fn mul(&mut self, a: u32, b: u32) -> u32 {
-        let res = a * b;
+        let res = a.wrapping_mul(b);
         self.set_znc(res, false);
         res
     }

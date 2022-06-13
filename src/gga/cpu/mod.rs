@@ -36,11 +36,6 @@ impl Cpu {
             return;
         }
 
-        if gg.cpu.pc_just_changed {
-            Self::fix_prefetch(gg);
-            gg.cpu.pc_just_changed = false;
-        }
-
         gg.advance_clock();
         if gg.cpu.halt || gg.cpu.check_interrupt_occurs() {
             return;
@@ -51,6 +46,11 @@ impl Cpu {
             gg.execute_inst_thumb(inst.u16());
         } else {
             gg.execute_inst_arm(inst);
+        }
+
+        if gg.cpu.pc_just_changed {
+            Self::fix_prefetch(gg);
+            gg.cpu.pc_just_changed = false;
         }
     }
 
@@ -92,7 +92,7 @@ impl Cpu {
         }
     }
 
-    fn fix_prefetch(gg: &mut GameGirlAdv) {
+    pub(crate) fn fix_prefetch(gg: &mut GameGirlAdv) {
         gg.cpu.prefetch[0] = Self::inst_at_pc(gg);
         gg.cpu.inc_pc();
         gg.cpu.prefetch[1] = Self::inst_at_pc(gg);
@@ -117,10 +117,10 @@ impl Default for Cpu {
         Self {
             low: [0; 8],
             fiqs: [FiqReg::default(); 5],
-            sp: ModeReg::default(),
+            sp: [0x0300_7F00, 0x0, 0x0300_7FE0, 0x0, 0x0300_7FA0, 0x0],
             lr: ModeReg::default(),
             pc: 0,
-            cpsr: 0,
+            cpsr: 0x1F,
             spsr: ModeReg::default(),
             ie: 0,
             if_: 0,

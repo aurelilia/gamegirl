@@ -36,7 +36,7 @@ macro_rules! num_ext_impl {
 
             #[inline(always)]
             fn set_bit(self, bit: u16, state: bool) -> $ty {
-                (self & ((1 << bit) ^ 0xFF)) | ((state as $ty) << bit)
+                (self & ((1 << bit) ^ Self::MAX)) | ((state as $ty) << bit)
             }
 
             #[inline(always)]
@@ -81,6 +81,7 @@ pub trait U16Ext {
     fn high(self) -> u8;
     fn set_low(self, low: u8) -> u16;
     fn set_high(self, high: u8) -> u16;
+    fn i10(self) -> i16;
 }
 
 impl U16Ext for u16 {
@@ -99,6 +100,14 @@ impl U16Ext for u16 {
     fn set_high(self, high: u8) -> u16 {
         (self & 0x00FF) | (high.u16() << 8)
     }
+
+    fn i10(self) -> i16 {
+        let mut result = self & 0x3FF;
+        if (self & 0x0400) > 1 {
+            result |= 0xFC00;
+        }
+        result as i16
+    }
 }
 
 pub trait U32Ext {
@@ -107,6 +116,7 @@ pub trait U32Ext {
     fn set_low(self, low: u16) -> u32;
     fn set_high(self, high: u16) -> u32;
     fn bits(self, start: u32, len: u32) -> u32;
+    fn i24(self) -> i32;
 }
 
 impl U32Ext for u32 {
@@ -128,5 +138,13 @@ impl U32Ext for u32 {
 
     fn bits(self, start: u32, len: u32) -> u32 {
         (self >> start) & ((1 << len) - 1)
+    }
+
+    fn i24(self) -> i32 {
+        let mut result = self & 0xFF_FFFF;
+        if (self & 0x80_0000) > 0 {
+            result |= 0xFF00_0000;
+        }
+        result as i32
     }
 }

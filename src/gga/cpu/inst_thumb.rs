@@ -1,7 +1,7 @@
 use crate::gga::cpu::registers::Flag::*;
 use crate::gga::cpu::{Cpu, Exception};
 use crate::gga::GameGirlAdv;
-use crate::numutil::NumExt;
+use crate::numutil::{NumExt, U16Ext};
 use bitmatch::bitmatch;
 
 impl GameGirlAdv {
@@ -86,7 +86,7 @@ impl GameGirlAdv {
 
             // THUMB.6
             "01001_dddnnnnnnnn" => {
-                self.cpu.low[d.us()] = self.read_word(self.cpu.adj_pc() + n.u32())
+                self.cpu.low[d.us()] = self.read_word(self.cpu.adj_pc() + (n.u32() << 2))
             }
 
             // THUMB.7/8
@@ -210,15 +210,18 @@ impl GameGirlAdv {
 
             // THUMB.18
             "11100_nnnnnnnnnnn" => {
-                let nn = (n as i16 as i32) * 2; // Step 2
+                let nn = (n.i10() as i32) * 2; // Step 2
                 self.cpu.set_pc(self.cpu.adj_pc().wrapping_add_signed(nn));
             }
 
             // THUMB.19
-            "11110_nnnnnnnnnnn" => self.cpu.set_lr(self.cpu.pc + 4 + (n.u32() << 12)),
-            "111t0_nnnnnnnnnnn" => {
-                self.cpu.set_lr((self.cpu.pc + 2) | 1);
+            "11110_nnnnnnnnnnn" => self
+                .cpu
+                .set_lr(self.cpu.pc.wrapping_add_signed((n.i10() as i32) << 12)),
+            "111t1_nnnnnnnnnnn" => {
+                let pc = self.cpu.pc;
                 self.cpu.set_pc(self.cpu.lr() + (n.u32() << 1));
+                self.cpu.set_lr(pc - 1);
                 self.cpu.set_flag(Thumb, t == 1);
             }
 
@@ -232,13 +235,13 @@ impl GameGirlAdv {
         match inst {
             "11011111_nnnnnnnn" => format!("swi 0x{:02X}", n),
 
-            "000_00nnnnnsssddd" => format!("lsl r{d}, r{s}, #{n}"),
-            "000_01nnnnnsssddd" => format!("lsr r{d}, r{s}, #{n}"),
-            "000_10nnnnnsssddd" => format!("asr r{d}, r{s}, #{n}"),
+            "000_00nnnnnsssddd" => format!("lsl r{d}, r{s}, #0x{:X}", n),
+            "000_01nnnnnsssddd" => format!("lsr r{d}, r{s}, #0x{:X}", n),
+            "000_10nnnnnsssddd" => format!("asr r{d}, r{s}, #0x{:X}", n),
             "00011_00nnnsssddd" => format!("add r{d}, r{s}, r{n}"),
             "00011_01nnnsssddd" => format!("sub r{d}, r{s}, r{n}"),
-            "00011_10nnnsssddd" => format!("add r{d}, r{s}, #{n}"),
-            "00011_11nnnsssddd" => format!("sub r{d}, r{s}, #{n}"),
+            "00011_10nnnsssddd" => format!("add r{d}, r{s}, #0x{:X}", n),
+            "00011_11nnnsssddd" => format!("sub r{d}, r{s}, #0x{:X}", n),
 
             "001_00dddnnnnnnnn" => format!("mov r{d}, #{n}"),
             "001_01dddnnnnnnnn" => format!("cmp r{d}, #{n}"),
@@ -276,7 +279,7 @@ impl GameGirlAdv {
             "010001_10dssssddd" => format!("mov r{d}, r{s}"),
             "010001_110ssss???" => format!("bx r{s}"),
             "010001_111ssss???" => format!("blx r{s}"),
-            "01001_dddnnnnnnnn" => format!("ldr r{d}, [PC, #{n}]"),
+            "01001_dddnnnnnnnn" => format!("ldr r{d}, [PC, #0x{:X}]", (n.u32() << 2)),
             "0101_ooosssbbbddd" => {
                 let op = match o {
                     0 => "str",
@@ -297,18 +300,18 @@ impl GameGirlAdv {
                     2 => "strb",
                     _ => "ldrb",
                 };
-                format!("{op} r{d}, [r{b}, #{n}]")
+                format!("{op} r{d}, [r{b}, #0x{:X}]", n)
             }
-            "1000_0nnnnnbbbddd" => format!("strh r{d}, [r{b}, #{}]", n << 1),
-            "1000_1nnnnnbbbddd" => format!("ldrh r{d}, [r{b}, #{}]", n << 1),
-            "1001_0dddnnnnnnnn" => format!("str r{d}, [sp, #{}]", n << 2),
-            "1001_1dddnnnnnnnn" => format!("ldr r{d}, [sp, #{}]", n << 2),
+            "1000_0nnnnnbbbddd" => format!("strh r{d}, [r{b}, #0x{:X}]", n << 1),
+            "1000_1nnnnnbbbddd" => format!("ldrh r{d}, [r{b}, #0x{:X}]", n << 1),
+            "1001_0dddnnnnnnnn" => format!("str r{d}, [sp, #0x{:X}]", n << 2),
+            "1001_1dddnnnnnnnn" => format!("ldr r{d}, [sp, #0x{:X}]", n << 2),
 
-            "1010_0dddnnnnnnnn" => format!("add r{d}, pc, #{}", n << 2),
-            "1010_1dddnnnnnnnn" => format!("add r{d}, sp, #{}", n << 2),
+            "1010_0dddnnnnnnnn" => format!("add r{d}, pc, #0x{:X}", n << 2),
+            "1010_1dddnnnnnnnn" => format!("add r{d}, sp, #0x{:X}", n << 2),
 
-            "10110000_0nnnnnnn" => format!("add sp, #{}", n << 2),
-            "10110000_1nnnnnnn" => format!("add sp, #-{}", n << 2),
+            "10110000_0nnnnnnn" => format!("add sp, #0x{:X}", n << 2),
+            "10110000_1nnnnnnn" => format!("add sp, #-0x{:X}", n << 2),
 
             "1011_0100rrrrrrrr" => format!("push {:08b}", r),
             "1011_0101rrrrrrrr" => format!("push {:08b}, lr", r),
@@ -318,14 +321,14 @@ impl GameGirlAdv {
             "1100_1bbbrrrrrrrr" => format!("ldmia r{b}!, {:08b}", r),
 
             "1101_ccccnnnnnnnn" => format!(
-                "b{} {}",
+                "b{} 0x{:X}",
                 Cpu::condition_mnemonic(c).to_ascii_lowercase(),
-                n << 1
+                (n as i8 as i16) * 2
             ),
-            "11100_nnnnnnnnnnn" => format!("b {}", n << 1),
-            "11110_nnnnnnnnnnn" => format!("mov lr, (pc + 4 + {})", n << 12),
-            "11100_nnnnnnnnnnn" => format!("bl lr + {}", n << 1),
-            "11101_nnnnnnnnnnn" => format!("blx lr + {}", n << 1),
+            "11100_nnnnnnnnnnn" => format!("b 0x{:X}", n << 1),
+            "11110_nnnnnnnnnnn" => format!("mov lr, (pc + 0x{:X})", n << 12),
+            "11111_nnnnnnnnnnn" => format!("bl lr + 0x{:X}", n << 1),
+            "11101_nnnnnnnnnnn" => format!("blx lr + 0x{:X}", n << 1),
 
             _ => format!("{:04X}??", inst),
         }

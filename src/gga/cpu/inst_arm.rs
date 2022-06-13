@@ -15,13 +15,12 @@ impl GameGirlAdv {
         #[bitmatch]
         match inst {
             "101_lnnnnnnnnnnnnnnnnnnnnnnnn" => {
-                // TODO sign extend properly i think?
-                let nn = n as i32 * 4; // Step 4
+                let nn = n.i24() * 4; // Step 4
                 if l == 1 {
                     // BL
                     self.cpu.set_lr(self.cpu.pc + 4);
                 } // else: B
-                self.cpu.set_pc(self.cpu.pc.wrapping_add_signed(8 + nn));
+                self.cpu.set_pc(self.cpu.pc.wrapping_add_signed(nn));
             }
 
             "000100101111111111110001_nnnn" => {
@@ -43,7 +42,7 @@ impl GameGirlAdv {
 
             "00010_d10f??c111100000000mmmm" => self.msr(self.cpu.reg(m), f == 1, c == 1, d == 1),
             "00110_d10f??c1111mmmmnnnnnnnn" => {
-                let imm = self.cpu.ror_s0(n, m << 1);
+                let imm = Cpu::ror_s0(n, m << 1);
                 self.msr(imm, f == 1, c == 1, d == 1);
             }
 
@@ -79,34 +78,24 @@ impl GameGirlAdv {
                 }
             }
 
-            "000_oooocnnnnddddaaaaattrmmmm" => {
-                // ALU with register
-                let rm = self.cpu.reg(m);
-                let shift_amount = if r == 0 {
-                    // Shift by imm
-                    a
-                } else {
-                    // Shift by reg
-                    self.cpu.reg(a >> 1)
-                };
-                let second_op = self.shifted_op(rm, t, shift_amount);
-                self.alu(o, self.cpu.reg(n), second_op, d, c == 1);
-            }
-
-            "001_oooocnnnnddddssssmmmmmmmm" => {
-                // ALU with immediate
-                let second_op = self.cpu.ror(m, s << 1);
-                self.alu(o, self.cpu.reg(n), second_op, d, c == 1);
-            }
-
             "100_puswlnnnnrrrrrrrrrrrrrrrr" => {
                 // STM/LDM
-                // TODO what exactly is S?
+                let _s = s; // TODO implement S
                 let mut offs = 0;
-                for reg in 0..15 {
+                // TODO mehhh
+                let mut regs = (0..=15).collect::<Vec<u16>>();
+                if u == 0 {
+                    regs.reverse();
+                }
+                for reg in regs {
                     if r.is_bit(reg) {
-                        self.ldrstr(p == 0, u == 1, 4, false, l == 0, n, reg.u32(), offs);
-                        offs += 4;
+                        if p == 1 {
+                            offs += 4;
+                        }
+                        self.ldrstr(false, u == 1, 4, false, l == 0, n, reg.u32(), offs);
+                        if p == 0 {
+                            offs += 4;
+                        }
                     }
                 }
                 if w == 1 {
@@ -118,17 +107,17 @@ impl GameGirlAdv {
             "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
                 // LDR/STR with imm
                 let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr(p == 1, u == 1, width, (p == 1) || (w == 1), l == 0, n, d, m);
+                self.ldrstr(p == 0, u == 1, width, (p == 0) || (w == 1), l == 0, n, d, m);
             }
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 // LDR/STR with reg
                 let offs = self.shifted_op(self.cpu.reg(m), t, s);
                 let width = if b == 1 { 1 } else { 4 };
                 self.ldrstr(
-                    p == 1,
+                    p == 0,
                     u == 1,
                     width,
-                    (p == 1) || (w == 1),
+                    (p == 0) || (w == 1),
                     l == 0,
                     n,
                     d,
@@ -138,7 +127,7 @@ impl GameGirlAdv {
 
             "000_pu1wlnnnnddddiiii1011iiii" => {
                 // LDRH/STRH with imm
-                self.ldrstr(p == 0, u == 1, 2, (p == 1) || (w == 1), l == 0, n, d, i);
+                self.ldrstr(p == 0, u == 1, 2, (p == 0) || (w == 1), l == 0, n, d, i);
             }
             "000_pu0wlnnnndddd00001011mmmm" => {
                 // LDRH/STRH with reg
@@ -146,7 +135,7 @@ impl GameGirlAdv {
                     p == 0,
                     u == 1,
                     2,
-                    (p == 1) || (w == 1),
+                    (p == 0) || (w == 1),
                     l == 0,
                     n,
                     d,
@@ -156,7 +145,7 @@ impl GameGirlAdv {
 
             "000_pu1w1nnnnddddiiii1101iiii" => {
                 // LDRSB with imm
-                self.ldrstr(p == 0, u == 1, 1, (p == 1) || (w == 1), false, n, d, i);
+                self.ldrstr(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
                 self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001101mmmm" => {
@@ -165,7 +154,7 @@ impl GameGirlAdv {
                     p == 0,
                     u == 1,
                     1,
-                    (p == 1) || (w == 1),
+                    (p == 0) || (w == 1),
                     false,
                     n,
                     d,
@@ -175,7 +164,7 @@ impl GameGirlAdv {
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
-                self.ldrstr(p == 0, u == 1, 1, (p == 1) || (w == 1), false, n, d, i);
+                self.ldrstr(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
@@ -184,7 +173,7 @@ impl GameGirlAdv {
                     p == 0,
                     u == 1,
                     1,
-                    (p == 1) || (w == 1),
+                    (p == 0) || (w == 1),
                     false,
                     n,
                     d,
@@ -193,46 +182,72 @@ impl GameGirlAdv {
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
 
+            "000_oooocnnnnddddaaaaattrmmmm" => {
+                // ALU with register
+                let rm = self.cpu.reg(m);
+                let shift_amount = if r == 0 {
+                    // Shift by imm
+                    a
+                } else {
+                    // Shift by reg
+                    self.cpu.reg(a >> 1)
+                };
+                let second_op = self.shifted_op(rm, t, shift_amount);
+                self.alu(o, n, second_op, d, c == 1);
+            }
+
+            "001_oooocnnnnddddssssmmmmmmmm" => {
+                // ALU with immediate
+                let second_op = Cpu::ror_s0(m, s << 1);
+                self.alu(o, n, second_op, d, c == 1);
+            }
+
             _ => Self::log_unknown_opcode(inst),
         }
     }
 
-    fn alu(&mut self, op: u32, a: u32, b: u32, dest: u32, flags: bool) {
+    fn alu(&mut self, op: u32, reg_a: u32, b: u32, dest: u32, flags: bool) {
         let cpsr = self.cpu.cpsr;
         let d = self.cpu.reg(dest);
 
         let value = match op {
-            0x0 => self.cpu.and(a, b),
-            0x1 => self.cpu.xor(a, b),
-            0x2 => self.cpu.sub(a, b, 0),
-            0x3 => self.cpu.sub(b, a, 0),
-            0x4 => self.cpu.add(a, b, 0),
-            0x5 => self.cpu.add(a, b, self.cpu.flag(Carry) as u32),
-            0x6 => self.cpu.sub(a, b, self.cpu.flag(Carry) as u32),
-            0x7 => self.cpu.sub(b, a, self.cpu.flag(Carry) as u32),
+            0x0 => self.cpu.and(self.reg(reg_a), b),
+            0x1 => self.cpu.xor(self.reg(reg_a), b),
+            0x2 => self.cpu.sub(self.reg(reg_a), b, 0),
+            0x3 => self.cpu.sub(b, self.reg(reg_a), 0),
+            0x4 => self.cpu.add(self.reg(reg_a), b, 0),
+            0x5 => self
+                .cpu
+                .add(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
+            0x6 => self
+                .cpu
+                .sub(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
+            0x7 => self
+                .cpu
+                .sub(b, self.reg(reg_a), self.cpu.flag(Carry) as u32),
             0x8 => {
                 // TST
-                self.cpu.and(a, b);
+                self.cpu.and(self.reg(reg_a), b);
                 d
             }
             0x9 => {
                 // TEQ
-                self.cpu.xor(a, b);
+                self.cpu.xor(self.reg(reg_a), b);
                 d
             }
             0xA => {
                 // CMP
-                self.cpu.sub(a, b, 0);
+                self.cpu.sub(self.reg(reg_a), b, 0);
                 d
             }
             0xB => {
                 // CMN
-                self.cpu.add(a, b, 0);
+                self.cpu.add(self.reg(reg_a), b, 0);
                 d
             }
-            0xC => self.cpu.or(a, b),
+            0xC => self.cpu.or(self.reg(reg_a), b),
             0xD => b, // MOV
-            0xE => self.cpu.bit_clear(a, b),
+            0xE => self.cpu.bit_clear(self.reg(reg_a), b),
             _ => self.cpu.not(b),
         };
 
@@ -277,6 +292,9 @@ impl GameGirlAdv {
         if !post {
             addr = Self::mod_with_offs(addr, offs, up);
         }
+        if writeback {
+            self.cpu.set_reg(n, addr);
+        }
 
         let mut value = match (str, width) {
             (true, 4) => self.reg(d),
@@ -288,9 +306,6 @@ impl GameGirlAdv {
         };
         if post {
             value = Self::mod_with_offs(value, offs, up);
-        }
-        if writeback {
-            self.cpu.set_reg(n, value);
         }
 
         match (str, width) {
@@ -329,9 +344,9 @@ impl GameGirlAdv {
         let co = Cpu::condition_mnemonic(inst.bits(28, 4).u16());
         #[bitmatch]
         match inst {
-            "101_0nnnnnnnnnnnnnnnnnnnnnnnn" => format!("b{co} +0x{:8X}", (n << 2) + 8),
-            "101_1nnnnnnnnnnnnnnnnnnnnnnnn" => format!("bl{co} +0x{:8X}", (n << 2) + 8),
-            "000100101111111111110001_nnnn" => format!("bx{co} +0x{:8X}", (n << 2) + 8),
+            "101_0nnnnnnnnnnnnnnnnnnnnnnnn" => format!("b{co} +0x{:X}", (n.i24() << 2) + 8),
+            "101_1nnnnnnnnnnnnnnnnnnnnnnnn" => format!("bl{co} +0x{:X}", (n.i24() << 2) + 8),
+            "000100101111111111110001_nnnn" => format!("bx{co} r{n}"),
             "1111_nnnnnnnnnnnnnnnnnnnnnnnn" => format!("swi{co} 0x{:07X}", n),
 
             "00010_000nnnndddd00001001mmmm" => format!("swp{co} r{d}, r{m}, [r{n}]"),
@@ -344,26 +359,6 @@ impl GameGirlAdv {
 
             "000_0000cdddd????ssss1001mmmm" => format!("mul{co} r{d}, r{m}, r{s}, ({c})"),
             "000_0001cddddnnnnssss1001mmmm" => format!("mul{co} r{d}, r{m}, r{s}, r{n} ({c})"),
-            "000_oooocnnnnddddaaaaattrmmmm" => {
-                let shift = Self::shift_mnemonic(r, t, a);
-                let op = Self::alu_mnemonic(o);
-                match o {
-                    0x8..=0xB => format!("{op}{c} r{n}, r{m} {shift} ({c})"),
-                    0xD | 0xF => format!("{op}{c} r{d}, r{m} {shift} ({c})"),
-                    _ => format!("{op}{c} r{d}, r{n}, r{m} {shift} ({c})"),
-                }
-            }
-            "001_oooocnnnnddddssssmmmmmmmm" => {
-                let op = Self::alu_mnemonic(o);
-                match (o, s) {
-                    (0x8..=0xB, 0) => format!("{op}{co} r{d}, r{n}, #{m} ({c})"),
-                    (0x8..=0xB, _) => format!("{op}{co} r{d}, r{n}, (#{m} ROR {s}) ({c})"),
-                    (0xD | 0xF, 0) => format!("{op}{co} r{d}, #{m} ({c})"),
-                    (0xD | 0xF, _) => format!("{op}{co} r{d}, (#{m} ROR {s}) ({c})"),
-                    (_, 0) => format!("{op}{co} r{d}, r{n}, #{m} ({c})"),
-                    _ => format!("{op}{co} r{d}, r{n}, (#{m} ROR {s}) ({c})"),
-                }
-            }
 
             "100_11??0nnnnrrrrrrrrrrrrrrrr" => format!("stmib r{n}!, {:016b}", r),
             "100_01??0nnnnrrrrrrrrrrrrrrrr" => format!("stmia r{n}!, {:016b}", r),
@@ -374,50 +369,46 @@ impl GameGirlAdv {
             "100_10??1nnnnrrrrrrrrrrrrrrrr" => format!("ldmdb r{n}!, {:016b}", r),
             "100_00??1nnnnrrrrrrrrrrrrrrrr" => format!("ldmda r{n}!, {:016b}", r),
 
-            "01_0100?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n} -{m}]"),
-            "01_0000?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n}], -{m}"),
-            "01_0110?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n} +{m}]"),
-            "01_0010?0nnnnddddmmmmmmmmmmmm" => format!("str{co} r{d}, [r{n}], +{m}"),
-            "01_0101?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n} -{m}]"),
-            "01_0001?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n}], -{m}"),
-            "01_0111?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n} +{m}]"),
-            "01_0011?0nnnnddddmmmmmmmmmmmm" => format!("strb{co} r{d}, [r{n}], +{m}"),
-            "01_0100?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n} -{m}]"),
-            "01_0000?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n}], -{m}"),
-            "01_0110?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n} +{m}]"),
-            "01_0010?1nnnnddddmmmmmmmmmmmm" => format!("ldr{co} r{d}, [r{n}], +{m}"),
-            "01_0101?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n} -{m}]"),
-            "01_0001?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n}], -{m}"),
-            "01_0111?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n} +{m}]"),
-            "01_0011?1nnnnddddmmmmmmmmmmmm" => format!("ldrb{co} r{d}, [r{n}], +{m}"),
+            "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
+                let u = if u == 1 { "+" } else { "-" };
+                let b = if b == 1 { "b" } else { "" };
+                let op = if l == 1 { "ldr" } else { "str" };
+                if p == 1 {
+                    format!("{op}{b}{co} r{d}, [r{n}{u}0x{:X}]", m)
+                } else {
+                    format!("{op}{b}{co} r{d}, [r{n}], {u}0x{:X}", m)
+                }
+            }
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 let shift = Self::shift_type_mnemonic(t);
                 let u = if u == 1 { "+" } else { "-" };
                 let b = if b == 1 { "b" } else { "" };
                 let op = if l == 1 { "ldr" } else { "str" };
                 if p == 1 {
-                    format!("{op}{b}{co} r{d}, [r{n} {u}(r{m} {shift} {s})]")
+                    format!("{op}{b}{co} r{d}, [r{n}{u}(r{m} {shift} {s})]")
                 } else {
                     format!("{op}{b}{co} r{d}, [r{n}], {u}(r{m} {shift} {s})")
                 }
             }
 
-            "000_101?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n} -{i}]"),
-            "000_001?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n}], -{i}"),
-            "000_111?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n} +{i}]"),
-            "000_011?0nnnnddddiiii1011iiii" => format!("strh{co} r{d}, [r{n}], +{i}"),
-            "000_101?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n} -{i}]"),
-            "000_001?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n}], -{i}"),
-            "000_111?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n} +{n}]"),
-            "000_011?1nnnnddddiiii1011iiii" => format!("ldrh{co} r{d}, [r{n}], +{i}"),
-            "000_101?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n} -{i}]"),
-            "000_001?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n}], -{i}"),
-            "000_111?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n} +{n}]"),
-            "000_011?1nnnnddddiiii1101iiii" => format!("ldrsb{co} r{d}, [r{n}], +{i}"),
-            "000_101?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n} -{i}]"),
-            "000_001?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n}], -{i}"),
-            "000_111?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n} +{n}]"),
-            "000_011?1nnnnddddiiii1111iiii" => format!("ldrsh{co} r{d}, [r{n}], +{i}"),
+            "000_pu1?lnnnnddddiiii1oo1iiii" => {
+                let u = if u == 1 { "+" } else { "-" };
+                let op = if l == 1 {
+                    match o {
+                        1 => "ldrh",
+                        2 => "ldrsb",
+                        3 => "ldrsh",
+                        _ => "?",
+                    }
+                } else {
+                    "strh"
+                };
+                if p == 1 {
+                    format!("{op}{co} r{d}, [r{n} {u}0x{:X}]", i)
+                } else {
+                    format!("{op}{co} r{d}, [r{n}], {u}0x{:X}", i)
+                }
+            }
             "000_pu0wlnnnndddd00001oo1mmmm" => {
                 let u = if u == 1 { "+" } else { "-" };
                 let op = if l == 1 {
@@ -434,6 +425,27 @@ impl GameGirlAdv {
                     format!("{op}{co} r{d}, [r{n} {u}r{m}]")
                 } else {
                     format!("{op}{co} r{d}, [r{n}], {u}r{m}")
+                }
+            }
+
+            "000_oooocnnnnddddaaaaattrmmmm" => {
+                let shift = Self::shift_mnemonic(r, t, a);
+                let op = Self::alu_mnemonic(o);
+                match o {
+                    0x8..=0xB => format!("{op}{co} r{n}, r{m} {shift} ({c})"),
+                    0xD | 0xF => format!("{op}{co} r{d}, r{m} {shift} ({c})"),
+                    _ => format!("{op}{co} r{d}, r{n}, r{m} {shift} ({c})"),
+                }
+            }
+            "001_oooocnnnnddddssssmmmmmmmm" => {
+                let op = Self::alu_mnemonic(o);
+                match (o, s) {
+                    (0x8..=0xB, 0) => format!("{op}{co} r{n}, #{:X} ({c})", m),
+                    (0x8..=0xB, _) => format!("{op}{co} r{n}, #{:X} ({c})", Cpu::ror_s0(m, s)),
+                    (0xD | 0xF, 0) => format!("{op}{co} r{d}, #{:X} ({c})", m),
+                    (0xD | 0xF, _) => format!("{op}{co} r{d}, #{:X} ({c})", Cpu::ror_s0(m, s)),
+                    (_, 0) => format!("{op}{co} r{d}, r{n}, #{:X} ({c})", m),
+                    _ => format!("{op}{co} r{d}, r{n}, #{:X} ({c})", Cpu::ror_s0(m, s)),
                 }
             }
 

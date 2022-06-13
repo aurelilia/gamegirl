@@ -63,7 +63,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
                     )
                     .wrap(false),
                 );
-                sp -= 2;
+                sp = sp.wrapping_add(2);
             }
         });
         ui.separator();

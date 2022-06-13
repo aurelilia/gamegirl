@@ -14,7 +14,7 @@ pub const OAM_END: usize = 0x070003FF;
 #[derive(Deserialize, Serialize)]
 pub struct Ppu {
     #[serde(with = "serde_arrays")]
-    pub regs: [u8; 56],
+    pub regs: [u8; 0x56],
     #[serde(with = "serde_arrays")]
     pub palette: [u8; KB],
     #[serde(with = "serde_arrays")]

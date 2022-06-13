@@ -13,8 +13,9 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
 
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
-            ui.set_min_width(150.0);
-            let mut pc = gg.cpu.pc;
+            ui.set_min_width(200.0);
+            // Account for prefetch
+            let mut pc = gg.cpu.pc.wrapping_sub(gg.cpu.inst_size());
             ui.add(
                 Label::new(
                     RichText::new(format!("0x{:08X} {}", pc, gg.get_inst_mnemonic(pc)))
@@ -47,7 +48,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
                     )
                     .wrap(false),
                 );
-                sp -= 4;
+                sp = sp.wrapping_add(4);
             }
         });
         ui.separator();
@@ -58,11 +59,15 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
             }
             ui.monospace(format!("SP  = {:08X}", gg.cpu.sp()));
             ui.monospace(format!("LR  = {:08X}", gg.cpu.lr()));
-            ui.monospace(format!("PC  = {:08X}", gg.cpu.pc));
+            ui.add(
+                Label::new(RichText::new(format!("PC  = {:08X} ", gg.cpu.pc)).monospace())
+                    .wrap(false),
+            );
         });
     });
     ui.separator();
 
+    ui.monospace("       SNCO                    IFT");
     ui.monospace(format!("CPSR = {:032b}", gg.cpu.cpsr));
     ui.monospace(format!("SPSR = {:032b}", gg.cpu.spsr()));
     ui.separator();
