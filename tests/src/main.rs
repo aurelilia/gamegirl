@@ -1,16 +1,22 @@
 #![feature(is_some_with)]
 
 mod blargg;
+mod gba;
 mod mooneye;
 
 use ansi_term::Colour;
-use gamegirl::ggc::GameGirl;
+use core::{
+    ggc::{GGConfig, GameGirl},
+    System,
+};
 use rayon::prelude::*;
-use std::ops::ControlFlow;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Instant;
-use std::{env, fs};
+use std::{
+    env, fs,
+    ops::ControlFlow,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Instant,
+};
 
 const TIMEOUT: usize = 30;
 
@@ -21,16 +27,20 @@ fn main() {
             gg.advance_delta(1.0);
         }
     } else {
-        println!("Executing blargg tests");
-        blargg::exec();
-        blargg::exec_sound();
-        println!("\nExecuting mooneye tests");
-        mooneye::exec("acceptance");
-        mooneye::exec("emulator-only");
+        if env::args().any(|a| a == "--gg") {
+            println!("Executing blargg tests");
+            blargg::exec();
+            blargg::exec_sound();
+            println!("\nExecuting mooneye tests");
+            mooneye::exec("acceptance");
+            mooneye::exec("emulator-only");
+        }
+        println!("\nExecuting gba-tests");
+        gba::exec();
     }
 }
 
-pub fn run_dir(dir: &str, cond: fn(&GameGirl) -> ControlFlow<bool>) {
+pub fn run_dir(dir: &str, cond: fn(&System) -> ControlFlow<Status>) {
     let total = AtomicUsize::new(0);
     let success = AtomicUsize::new(0);
     run_inner(
@@ -52,7 +62,7 @@ fn run_inner(
     name: &str,
     total: &AtomicUsize,
     success: &AtomicUsize,
-    cond: fn(&GameGirl) -> ControlFlow<bool>,
+    cond: fn(&System) -> ControlFlow<Status>,
 ) {
     let mut entries = dir
         .read_dir()
@@ -75,7 +85,7 @@ fn run_inner(
         .filter(|e| {
             e.path()
                 .extension()
-                .is_some_and(|s| s.to_str().unwrap() == "gb")
+                .is_some_and(|s| s.to_str().unwrap() == "gb" || s.to_str().unwrap() == "gba")
         })
         .for_each(|entry| {
             let rn = Instant::now();
@@ -90,11 +100,11 @@ fn run_inner(
                     );
                     success.fetch_add(1, Ordering::Relaxed);
                 }
-                Err(_) => {
+                Err(err) => {
                     println!(
                         "Ran {name}/{}... {} in {}ms",
                         entry.file_name().to_str().unwrap(),
-                        Colour::Red.bold().paint("FAIL"),
+                        Colour::Red.bold().paint(err),
                         rn.elapsed().as_micros() as f64 / 1000.0
                     );
                 }
@@ -102,18 +112,25 @@ fn run_inner(
         });
 }
 
-fn run(test: Vec<u8>, cond: fn(&GameGirl) -> ControlFlow<bool>) -> Result<(), String> {
-    let mut gg = GameGirl::with_cart(test);
+fn run(test: Vec<u8>, cond: fn(&System) -> ControlFlow<Status>) -> Result<(), String> {
+    let mut gg = System::default();
+    gg.load_cart(test, None, &GGConfig::default());
 
     for _ in 0..TIMEOUT {
         gg.advance_delta(1.0);
         match cond(&gg) {
-            ControlFlow::Break(s) if s => return Ok(()),
-            ControlFlow::Break(_) => break,
+            ControlFlow::Break(Status::Success) => return Ok(()),
+            ControlFlow::Break(Status::Fail) => return Err("FAILED".to_string()),
+            ControlFlow::Break(Status::FailAt(pos)) => return Err(format!("FAILED AT {pos}")),
             _ => (),
         }
     }
 
-    let ret = Err(gg.debugger.serial_output.lock().unwrap().clone());
-    ret
+    Err("TIMEOUT".to_string())
+}
+
+pub enum Status {
+    Success,
+    Fail,
+    FailAt(String),
 }

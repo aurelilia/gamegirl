@@ -1,5 +1,5 @@
 /target
 .idea
-/web/gamegirl*
+/gamegirl/web/gamegirl*
 *.sav
 bench.gb
