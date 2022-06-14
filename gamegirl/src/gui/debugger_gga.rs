@@ -42,7 +42,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
             for _ in 0..0xF {
                 ui.add(
                     Label::new(
-                        RichText::new(format!("0x{:08X} - {:08X}", sp, gg.read_word(sp)))
+                        RichText::new(format!("0x{:08X} - {:08X}", sp, gg.get_word(sp)))
                             .monospace(),
                     )
                     .wrap(false),

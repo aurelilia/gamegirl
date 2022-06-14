@@ -40,7 +40,7 @@ macro_rules! forward {
 #[derive(Deserialize, Serialize)]
 pub enum System {
     /// A GGC. Is also used for DMG games.
-    GGC(GameGirl),
+    GGC(Box<GameGirl>),
     /// A GGA. Only used for GGA games.
     GGA(Box<GameGirlAdv>),
 }
@@ -139,7 +139,7 @@ impl System {
                 cart.load_save(save);
             }
 
-            let mut ggc = GameGirl::default();
+            let mut ggc = Box::new(GameGirl::default());
             ggc.load_cart(cart, config, false);
             ggc.options.frame_finished = mem::replace(
                 &mut self.options().frame_finished,
@@ -166,7 +166,7 @@ impl System {
 impl Default for System {
     fn default() -> Self {
         // We start with a GGC, will be changed later if user loads a GGA cart.
-        Self::GGC(GameGirl::default())
+        Self::GGC(Box::default())
     }
 }
 

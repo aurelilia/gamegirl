@@ -56,12 +56,20 @@ pub struct GameGirlAdv {
 
     pub options: EmulateOptions,
     pub config: GGConfig,
+
     #[serde(skip)]
     #[serde(default)]
     pub debugger: Arc<GGADebugger>,
+
+    /// Temporary for counting cycles in `advance_delta`.
     #[serde(skip)]
     #[serde(default)]
     clock: usize,
+
+    /// Temporary used during instruction execution that counts
+    /// the amount of cycles the CPU has to wait until it can
+    /// execute the next instruction.
+    wait_cycles: usize,
 }
 
 impl GameGirlAdv {
@@ -158,12 +166,42 @@ impl GameGirlAdv {
 
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
-        self.clock += 1;
+        self.clock += self.wait_cycles;
+        // TODO Advance the system
+        self.wait_cycles = 0;
+    }
+
+    /// Add wait cycles, which advance the system besides the CPU.
+    fn add_wait_cycles(&mut self, count: usize) {
+        self.wait_cycles += count;
+    }
+
+    /// Read a byte from the bus. Also enforces timing.
+    fn read_byte(&mut self, addr: u32, kind: Access) -> u8 {
+        self.add_wait_cycles(self.cart.wait_time(addr, kind));
+        self.get_byte(addr)
+    }
+
+    /// Read a half-word from the bus (LE). Also enforces timing.
+    fn read_hword(&mut self, addr: u32, kind: Access) -> u16 {
+        self.add_wait_cycles(self.cart.wait_time(addr, kind));
+        self.get_hword(addr)
+    }
+
+    /// Read a word from the bus (LE). Also enforces timing.
+    fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
+        self.add_wait_cycles(self.cart.wait_time(addr, kind));
+        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
+            // Cart bus is 16bit, word reads cause 2 stalls
+            self.add_wait_cycles(self.cart.wait_time(addr, Access::Seq));
+        }
+
+        self.get_word(addr)
     }
 
     /// Read a byte from the bus. Does no timing-related things; simply fetches
     /// the value.
-    fn read_byte(&self, addr: u32) -> u8 {
+    fn get_byte(&self, addr: u32) -> u8 {
         let addr = addr.us();
         match addr {
             BIOS_START..=BIOS_END => self.memory.bios[addr - BIOS_START],
@@ -194,6 +232,8 @@ impl GameGirlAdv {
             0x04000201 => self.cpu.ie.high(),
             0x04000202 => self.cpu.if_.low(),
             0x04000203 => self.cpu.if_.high(),
+            0x04000204 => self.cart.waitcnt.low(),
+            0x04000205 => self.cart.waitcnt.high(),
             0x04000208 => self.cpu.ime as u8,
             0x04000209..=0x0400020B => 0, // High unused bits of IME
 
@@ -203,19 +243,42 @@ impl GameGirlAdv {
 
     /// Read a half-word from the bus (LE). Does no timing-related things;
     /// simply fetches the value. Also does not handle unaligned reads (yet)
-    fn read_hword(&self, addr: u32) -> u16 {
-        hword(self.read_byte(addr), self.read_byte(addr + 1))
+    fn get_hword(&self, addr: u32) -> u16 {
+        hword(self.get_byte(addr), self.get_byte(addr + 1))
     }
 
     /// Read a word from the bus (LE). Does no timing-related things; simply
     /// fetches the value. Also does not handle unaligned reads (yet)
-    pub fn read_word(&self, addr: u32) -> u32 {
-        word(self.read_hword(addr), self.read_hword(addr + 2))
+    pub fn get_word(&self, addr: u32) -> u32 {
+        word(self.get_hword(addr), self.get_hword(addr + 2))
+    }
+
+    /// Write a byte to the bus. Handles timing.
+    fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
+        self.add_wait_cycles(self.cart.wait_time(addr, kind));
+        self.set_byte(addr, value)
+    }
+
+    /// Write a half-word from the bus (LE). Handles timing.
+    fn write_hword(&mut self, addr: u32, value: u16, kind: Access) {
+        self.add_wait_cycles(self.cart.wait_time(addr, kind));
+        self.set_hword(addr, value)
+    }
+
+    /// Write a word from the bus (LE). Handles timing.
+    fn write_word(&mut self, addr: u32, value: u32, kind: Access) {
+        self.add_wait_cycles(self.cart.wait_time(addr, kind));
+        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
+            // Cart bus is 16bit, word writes cause 2 stalls
+            self.add_wait_cycles(self.cart.wait_time(addr, Access::Seq));
+        }
+
+        self.set_word(addr, value)
     }
 
     /// Write a byte to the bus. Does no timing-related things; simply sets the
     /// value.
-    fn write_byte(&mut self, addr: u32, value: u8) {
+    fn set_byte(&mut self, addr: u32, value: u8) {
         let addr = addr.us();
         match addr {
             WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START] = value,
@@ -241,6 +304,8 @@ impl GameGirlAdv {
             0x04000202 => self.cpu.if_ = self.cpu.if_.set_high(value),
             0x04000203 => self.cpu.if_ = self.cpu.if_.set_low(value),
             0x04000200 => self.cpu.ie = self.cpu.ie.set_high(value),
+            0x04000204 => self.cart.waitcnt = self.cart.waitcnt.set_low(value),
+            0x04000205 => self.cart.waitcnt = self.cart.waitcnt.set_high(value),
             0x04000208 => self.cpu.ime = value & 1 != 0,
 
             _ => (),
@@ -249,16 +314,16 @@ impl GameGirlAdv {
 
     /// Write a half-word from the bus (LE). Does no timing-related things;
     /// simply sets the value. Also does not handle unaligned writes (yet)
-    fn write_hword(&mut self, addr: u32, value: u16) {
-        self.write_byte(addr, value.low());
-        self.write_byte(addr + 1, value.high());
+    fn set_hword(&mut self, addr: u32, value: u16) {
+        self.set_byte(addr, value.low());
+        self.set_byte(addr + 1, value.high());
     }
 
     /// Write a word from the bus (LE). Does no timing-related things; simply
     /// sets the value. Also does not handle unaligned writes (yet)
-    fn write_word(&mut self, addr: u32, value: u32) {
-        self.write_hword(addr, value.low());
-        self.write_hword(addr + 2, value.high());
+    fn set_word(&mut self, addr: u32, value: u32) {
+        self.set_hword(addr, value.low());
+        self.set_hword(addr + 2, value.high());
     }
 
     fn reg(&self, idx: u32) -> u32 {
@@ -271,10 +336,10 @@ impl GameGirlAdv {
 
     pub fn get_inst_mnemonic(&self, ptr: u32) -> String {
         if self.cpu.flag(Flag::Thumb) {
-            let inst = self.read_hword(ptr);
+            let inst = self.get_hword(ptr);
             Self::get_mnemonic_thumb(inst)
         } else {
-            let inst = self.read_word(ptr);
+            let inst = self.get_word(ptr);
             Self::get_mnemonic_arm(inst)
         }
     }
@@ -355,6 +420,7 @@ impl Default for GameGirlAdv {
             config: GGConfig::default(),
             debugger: Arc::new(GGADebugger::default()),
             clock: 0,
+            wait_cycles: 0,
         };
 
         // Skip bootrom for now
@@ -364,4 +430,12 @@ impl Default for GameGirlAdv {
         gg.cpu.sp[5] = 0x0300_7F00;
         gg
     }
+}
+
+/// Enum for the types of memory accesses; either sequential
+/// or non-sequential.
+#[derive(Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum Access {
+    Seq,
+    NonSeq,
 }

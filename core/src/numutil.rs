@@ -81,6 +81,7 @@ pub trait U16Ext {
     fn high(self) -> u8;
     fn set_low(self, low: u8) -> u16;
     fn set_high(self, high: u8) -> u16;
+    fn bits(self, start: u16, len: u16) -> u16;
     fn i10(self) -> i16;
 }
 
@@ -99,6 +100,10 @@ impl U16Ext for u16 {
 
     fn set_high(self, high: u8) -> u16 {
         (self & 0x00FF) | (high.u16() << 8)
+    }
+
+    fn bits(self, start: u16, len: u16) -> u16 {
+        (self >> start) & ((1 << len) - 1)
     }
 
     fn i10(self) -> i16 {

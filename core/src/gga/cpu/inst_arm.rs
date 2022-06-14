@@ -2,9 +2,10 @@ use crate::{
     gga::{
         cpu::{
             registers::{Context, Flag::*},
+            Access::*,
             Cpu, Exception,
         },
-        GameGirlAdv,
+        Access, GameGirlAdv,
     },
     numutil::{NumExt, U32Ext},
 };
@@ -55,17 +56,18 @@ impl GameGirlAdv {
             "00010_b00nnnndddd00001001mmmm" => {
                 let addr = self.reg(n);
                 let mem_value = if b == 1 {
-                    self.read_byte(addr).u32()
+                    self.read_byte(addr, NonSeq).u32()
                 } else {
-                    self.read_word(addr)
+                    self.read_word(addr, NonSeq)
                 };
                 let reg = self.reg(m);
                 if b == 1 {
-                    self.write_byte(addr, reg.u8())
+                    self.write_byte(addr, reg.u8(), NonSeq)
                 } else {
-                    self.write_word(addr, reg)
+                    self.write_word(addr, reg, NonSeq)
                 }
                 self.cpu.set_reg(d, mem_value);
+                self.add_wait_cycles(1);
             }
 
             "000_000lcddddnnnnssss1001mmmm" => {
@@ -75,6 +77,7 @@ impl GameGirlAdv {
                 if l == 1 {
                     // MLA
                     res += self.cpu.reg(n);
+                    self.add_wait_cycles(1);
                 }
 
                 self.cpu.set_reg(d, res);
@@ -82,6 +85,9 @@ impl GameGirlAdv {
                     // Restore CPSR if we weren't supposed to set flags
                     self.cpu.cpsr = cpsr;
                 }
+
+                // TODO proper stall
+                self.add_wait_cycles(1);
             }
 
             "100_puswlnnnnrrrrrrrrrrrrrrrr" => {
@@ -93,12 +99,14 @@ impl GameGirlAdv {
                 if u == 0 {
                     regs.reverse();
                 }
+                let mut kind = NonSeq;
                 for reg in regs {
                     if r.is_bit(reg) {
                         if p == 1 {
                             offs += 4;
                         }
-                        self.ldrstr(false, u == 1, 4, false, l == 0, n, reg.u32(), offs);
+                        self.ldrstr(false, u == 1, 4, false, l == 0, n, reg.u32(), offs, kind);
+                        kind = Seq;
                         if p == 0 {
                             offs += 4;
                         }
@@ -113,7 +121,17 @@ impl GameGirlAdv {
             "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
                 // LDR/STR with imm
                 let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr(p == 0, u == 1, width, (p == 0) || (w == 1), l == 0, n, d, m);
+                self.ldrstr(
+                    p == 0,
+                    u == 1,
+                    width,
+                    (p == 0) || (w == 1),
+                    l == 0,
+                    n,
+                    d,
+                    m,
+                    NonSeq,
+                );
             }
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 // LDR/STR with reg
@@ -128,12 +146,23 @@ impl GameGirlAdv {
                     n,
                     d,
                     offs,
+                    NonSeq,
                 );
             }
 
             "000_pu1wlnnnnddddiiii1011iiii" => {
                 // LDRH/STRH with imm
-                self.ldrstr(p == 0, u == 1, 2, (p == 0) || (w == 1), l == 0, n, d, i);
+                self.ldrstr(
+                    p == 0,
+                    u == 1,
+                    2,
+                    (p == 0) || (w == 1),
+                    l == 0,
+                    n,
+                    d,
+                    i,
+                    NonSeq,
+                );
             }
             "000_pu0wlnnnndddd00001011mmmm" => {
                 // LDRH/STRH with reg
@@ -146,12 +175,23 @@ impl GameGirlAdv {
                     n,
                     d,
                     self.cpu.reg(m),
+                    NonSeq,
                 );
             }
 
             "000_pu1w1nnnnddddiiii1101iiii" => {
                 // LDRSB with imm
-                self.ldrstr(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
+                self.ldrstr(
+                    p == 0,
+                    u == 1,
+                    1,
+                    (p == 0) || (w == 1),
+                    false,
+                    n,
+                    d,
+                    i,
+                    NonSeq,
+                );
                 self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001101mmmm" => {
@@ -165,12 +205,23 @@ impl GameGirlAdv {
                     n,
                     d,
                     self.cpu.reg(m),
+                    NonSeq,
                 );
                 self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
-                self.ldrstr(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
+                self.ldrstr(
+                    p == 0,
+                    u == 1,
+                    1,
+                    (p == 0) || (w == 1),
+                    false,
+                    n,
+                    d,
+                    i,
+                    NonSeq,
+                );
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
@@ -184,6 +235,7 @@ impl GameGirlAdv {
                     n,
                     d,
                     self.cpu.reg(m),
+                    NonSeq,
                 );
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
@@ -200,6 +252,7 @@ impl GameGirlAdv {
                 };
                 let second_op = self.shifted_op(rm, t, shift_amount);
                 self.alu(o, n, second_op, d, c == 1);
+                self.add_wait_cycles(1);
             }
 
             "001_oooocnnnnddddssssmmmmmmmm" => {
@@ -293,6 +346,7 @@ impl GameGirlAdv {
         n: u32,
         d: u32,
         offs: u32,
+        kind: Access,
     ) {
         let mut addr = self.cpu.reg(n);
         if !post {
@@ -306,20 +360,28 @@ impl GameGirlAdv {
             (true, 4) => self.reg(d),
             (true, 2) => self.reg(d) & 0xFFFF,
             (true, _) => self.reg(d) & 0xFF,
-            (false, 4) => self.read_word(addr),
-            (false, 2) => self.read_hword(addr).u32(),
-            (false, _) => self.read_byte(addr).u32(),
+            (false, 4) => self.read_word(addr, kind),
+            (false, 2) => self.read_hword(addr, kind).u32(),
+            (false, _) => self.read_byte(addr, kind).u32(),
         };
         if post {
             value = Self::mod_with_offs(value, offs, up);
         }
 
         match (str, width) {
-            (true, 4) => self.write_word(addr, value),
-            (true, 2) => self.write_hword(addr, value.u16()),
-            (true, _) => self.write_byte(addr, value.u8()),
+            (true, 4) => self.write_word(addr, value, kind),
+            (true, 2) => self.write_hword(addr, value.u16(), kind),
+            (true, _) => self.write_byte(addr, value.u8(), kind),
             (false, _) => self.cpu.set_reg(d, value),
         };
+
+        if !str && kind == NonSeq {
+            // All LDR stall by 1I; the only Seq access is after the first LD of an
+            // LDM. Since that also stalls 1 total, this works:
+            // On all other LDRs, we stall because they are NonSeq,
+            // on LDM, we only stall once on first access which is the only NonSeq.
+            self.add_wait_cycles(1);
+        }
     }
 
     fn mod_with_offs(value: u32, offs: u32, up: bool) -> u32 {

@@ -12,7 +12,7 @@ use crate::{
             Flag::{FiqDisable, IrqDisable, Thumb},
             ModeReg,
         },
-        GameGirlAdv,
+        Access, GameGirlAdv,
     },
     numutil::NumExt,
 };
@@ -33,7 +33,9 @@ pub struct Cpu {
     pub if_: u16,
     pub ime: bool,
     pub halt: bool,
+
     pc_just_changed: bool,
+    last_access_type: Access,
     prefetch: [u32; 2],
 }
 
@@ -54,6 +56,8 @@ impl Cpu {
         } else {
             gg.execute_inst_arm(inst);
         }
+        // All instructions take at least one cycle.
+        gg.add_wait_cycles(1);
 
         if gg.cpu.pc_just_changed {
             Self::fix_prefetch(gg);
@@ -92,14 +96,17 @@ impl Cpu {
     }
 
     fn inst_at_pc(gg: &mut GameGirlAdv) -> u32 {
-        if gg.cpu.flag(Thumb) {
-            gg.read_hword(gg.cpu.pc).u32()
+        let inst = if gg.cpu.flag(Thumb) {
+            gg.read_hword(gg.cpu.pc, gg.cpu.last_access_type).u32()
         } else {
-            gg.read_word(gg.cpu.pc)
-        }
+            gg.read_word(gg.cpu.pc, gg.cpu.last_access_type)
+        };
+        gg.cpu.last_access_type = Access::Seq;
+        inst
     }
 
     pub fn fix_prefetch(gg: &mut GameGirlAdv) {
+        gg.cpu.last_access_type = Access::NonSeq;
         gg.cpu.prefetch[0] = Self::inst_at_pc(gg);
         gg.cpu.inc_pc();
         gg.cpu.prefetch[1] = Self::inst_at_pc(gg);
@@ -134,6 +141,7 @@ impl Default for Cpu {
             ime: false,
             halt: false,
             pc_just_changed: false,
+            last_access_type: Access::NonSeq,
             prefetch: [0, 0],
         }
     }

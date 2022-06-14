@@ -1,6 +1,7 @@
 use crate::{
     gga::{
         cpu::{registers::Flag::*, Cpu, Exception},
+        Access::*,
         GameGirlAdv,
     },
     numutil::{NumExt, U16Ext},
@@ -45,12 +46,24 @@ impl GameGirlAdv {
                 self.cpu.low[d.us()] = match o {
                     0x0 => self.cpu.and(rd, rs),
                     0x1 => self.cpu.xor(rd, rs),
-                    0x2 => self.cpu.lsl(rd, rs & 0xFF),
-                    0x3 => self.cpu.lsr(rd, rs & 0xFF),
-                    0x4 => self.cpu.asr(rd, rs & 0xFF),
+                    0x2 => {
+                        self.add_wait_cycles(1);
+                        self.cpu.lsl(rd, rs & 0xFF)
+                    }
+                    0x3 => {
+                        self.add_wait_cycles(1);
+                        self.cpu.lsr(rd, rs & 0xFF)
+                    }
+                    0x4 => {
+                        self.add_wait_cycles(1);
+                        self.cpu.asr(rd, rs & 0xFF)
+                    }
                     0x5 => self.cpu.add(rd, rs, self.cpu.flag(Carry) as u32),
                     0x6 => self.cpu.sub(rd, rs, self.cpu.flag(Carry) as u32),
-                    0x7 => self.cpu.ror(rd, rs & 0xFF),
+                    0x7 => {
+                        self.add_wait_cycles(1);
+                        self.cpu.ror(rd, rs & 0xFF)
+                    }
                     0x8 => {
                         // TST
                         self.cpu.and(rd, rs);
@@ -68,7 +81,11 @@ impl GameGirlAdv {
                         rd
                     }
                     0xC => self.cpu.or(rd, rs),
-                    0xD => self.cpu.mul(rd, rs),
+                    0xD => {
+                        // TODO proper stall amount
+                        self.add_wait_cycles(1);
+                        self.cpu.mul(rd, rs)
+                    }
                     0xE => self.cpu.bit_clear(rd, rs),
                     _ => self.cpu.not(rs),
                 }
@@ -89,7 +106,9 @@ impl GameGirlAdv {
 
             // THUMB.6
             "01001_dddnnnnnnnn" => {
-                self.cpu.low[d.us()] = self.read_word(self.cpu.adj_pc() + (n.u32() << 2))
+                // LDR has +1I
+                self.add_wait_cycles(1);
+                self.cpu.low[d.us()] = self.read_word(self.cpu.adj_pc() + (n.u32() << 2), NonSeq)
             }
 
             // THUMB.7/8
@@ -100,14 +119,18 @@ impl GameGirlAdv {
                 let addr = rb + ro;
 
                 match o {
-                    0 => self.write_word(addr, rd),        // STR
-                    1 => self.write_hword(addr, rd.u16()), // STRH
-                    2 => self.write_byte(addr, rd.u8()),   // STRB
-                    3 => self.cpu.low[d.us()] = self.read_byte(addr) as i8 as i32 as u32, // LDSB
-                    4 => self.cpu.low[d.us()] = self.read_word(addr), // LDR
-                    5 => self.cpu.low[d.us()] = self.read_hword(addr).u32(), // LDRH
-                    6 => self.cpu.low[d.us()] = self.read_byte(addr).u32(), // LDRB
-                    _ => self.cpu.low[d.us()] = self.read_hword(addr) as i16 as i32 as u32, // LDSH
+                    0 => self.write_word(addr, rd, NonSeq),        // STR
+                    1 => self.write_hword(addr, rd.u16(), NonSeq), // STRH
+                    2 => self.write_byte(addr, rd.u8(), NonSeq),   // STRB
+                    3 => self.cpu.low[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32, /* LDSB */
+                    4 => self.cpu.low[d.us()] = self.read_word(addr, NonSeq), // LDR
+                    5 => self.cpu.low[d.us()] = self.read_hword(addr, NonSeq).u32(), // LDRH
+                    6 => self.cpu.low[d.us()] = self.read_byte(addr, NonSeq).u32(), // LDRB
+                    _ => self.cpu.low[d.us()] = self.read_hword(addr, NonSeq) as i16 as i32 as u32, /* LDSH */
+                }
+                if o > 2 {
+                    // LDR has +1I
+                    self.add_wait_cycles(1);
                 }
             }
 
@@ -117,10 +140,15 @@ impl GameGirlAdv {
                 let rd = self.cpu.low(d);
 
                 match o {
-                    0 => self.write_word(rb + (n.u32() << 2), rd), // STR
-                    1 => self.cpu.low[d.us()] = self.read_word(rb + (n.u32() << 2)), // LDR
-                    2 => self.write_byte(rb + n.u32(), rd.u8()),   // STRB
-                    _ => self.cpu.low[d.us()] = self.read_byte(rb + n.u32()).u32(), // LDRB
+                    0 => self.write_word(rb + (n.u32() << 2), rd, NonSeq), // STR
+                    1 => self.cpu.low[d.us()] = self.read_word(rb + (n.u32() << 2), NonSeq), // LDR
+                    2 => self.write_byte(rb + n.u32(), rd.u8(), NonSeq),   // STRB
+                    _ => self.cpu.low[d.us()] = self.read_byte(rb + n.u32(), NonSeq).u32(), // LDRB
+                }
+
+                if o.is_bit(0) {
+                    // LDR has +1I
+                    self.add_wait_cycles(1);
                 }
             }
 
@@ -132,15 +160,23 @@ impl GameGirlAdv {
                 let addr = rb + ro;
 
                 if o == 0 {
-                    self.write_hword(addr, rd.u16());
+                    self.write_hword(addr, rd.u16(), NonSeq);
                 } else {
-                    self.cpu.low[d.us()] = self.read_hword(addr).u32();
+                    // LDR has +1I
+                    self.add_wait_cycles(1);
+                    self.cpu.low[d.us()] = self.read_hword(addr, NonSeq).u32();
                 }
             }
 
             // THUMB.11
-            "1001_0dddnnnnnnnn" => self.write_word(self.cpu.sp() + n.u32(), self.cpu.low(d)),
-            "1001_1dddnnnnnnnn" => self.cpu.low[d.us()] = self.read_word(self.cpu.sp() + n.u32()),
+            "1001_0dddnnnnnnnn" => {
+                self.write_word(self.cpu.sp() + n.u32(), self.cpu.low(d), NonSeq)
+            }
+            "1001_1dddnnnnnnnn" => {
+                // LDR has +1I
+                self.add_wait_cycles(1);
+                self.cpu.low[d.us()] = self.read_word(self.cpu.sp() + n.u32(), NonSeq);
+            }
 
             // THUMB.12
             "1010_0dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.adj_pc() + (n.u32() << 2),
@@ -153,30 +189,35 @@ impl GameGirlAdv {
             // THUMB.14
             "1011_010brrrrrrrr" => {
                 let mut sp = self.cpu.sp();
+                let mut kind = NonSeq;
                 // PUSH
                 for reg in 0..8 {
                     if r.is_bit(reg) {
-                        self.write_word(sp, self.cpu.low[reg.us()]);
+                        self.write_word(sp, self.cpu.low[reg.us()], kind);
                         sp -= 4;
+                        kind = Seq;
                     }
                 }
                 if b == 1 {
-                    self.write_word(sp, self.cpu.lr());
+                    self.write_word(sp, self.cpu.lr(), kind);
                     sp -= 4;
                 }
                 self.cpu.set_sp(sp);
             }
             "1011_110brrrrrrrr" => {
                 let mut sp = self.cpu.sp();
+                let mut kind = NonSeq;
                 // POP
                 for reg in 0..8 {
                     if r.is_bit(reg) {
-                        self.cpu.low[reg.us()] = self.read_word(sp);
+                        self.cpu.low[reg.us()] = self.read_word(sp, kind);
                         sp -= 4;
+                        kind = Seq;
                     }
                 }
                 if b == 1 {
-                    self.cpu.set_pc(self.read_word(sp));
+                    let pc = self.read_word(sp, kind);
+                    self.cpu.set_pc(pc);
                     sp -= 4;
                 }
                 self.cpu.set_sp(sp);
@@ -185,21 +226,26 @@ impl GameGirlAdv {
             // THUMB.15
             "1100_0bbbrrrrrrrr" => {
                 // STMIA
+                let mut kind = NonSeq;
                 for reg in 0..8 {
                     if r.is_bit(reg) {
-                        self.write_word(self.cpu.low(b), self.cpu.low[reg.us()]);
+                        self.write_word(self.cpu.low(b), self.cpu.low[reg.us()], kind);
                         self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
+                        kind = Seq;
                     }
                 }
             }
             "1100_1bbbrrrrrrrr" => {
                 // LDMIA
+                let mut kind = NonSeq;
                 for reg in 0..8 {
                     if r.is_bit(reg) {
-                        self.cpu.low[reg.us()] = self.read_word(self.cpu.low(b));
+                        self.cpu.low[reg.us()] = self.read_word(self.cpu.low(b), kind);
                         self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
+                        kind = Seq;
                     }
                 }
+                self.add_wait_cycles(1);
             }
 
             // THUMB.16
