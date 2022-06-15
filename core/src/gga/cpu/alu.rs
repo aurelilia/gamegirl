@@ -56,14 +56,20 @@ impl Cpu {
     }
 
     /// Rotate right
-    pub fn ror(&mut self, value: u32, by: u32) -> u32 {
-        let res = Self::ror_s0(value, by);
-        if by == 0 {
-            self.set_zn(res);
+    pub fn ror<const COERCE: bool>(&mut self, value: u32, by: u32) -> u32 {
+        if by == 0 && COERCE {
+            let res = Self::ror_s0(value, 1).set_bit(31, self.flag(Flag::Carry));
+            self.set_znc(res, value.is_bit(0));
+            res
         } else {
-            self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
+            let res = Self::ror_s0(value, by);
+            if by == 0 {
+                self.set_zn(res);
+            } else {
+                self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
+            }
+            res
         }
-        res
     }
 
     /// Rotate right, without setting CPSR

@@ -144,7 +144,7 @@ impl GameGirlAdv {
             }
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 // LDR/STR with reg
-                let offs = self.shifted_op(self.cpu.reg(m), t, s);
+                let offs = self.shifted_op::<true>(self.cpu.reg(m), t, s);
                 let width = if b == 1 { 1 } else { 4 };
                 self.ldrstr::<false>(
                     p == 0,
@@ -254,14 +254,13 @@ impl GameGirlAdv {
             "000_oooocnnnnddddaaaaattrmmmm" => {
                 // ALU with register
                 let rm = self.cpu.reg(m);
-                let shift_amount = if r == 0 {
+                let second_op = if r == 0 {
                     // Shift by imm
-                    a
+                    self.shifted_op::<true>(rm, t, a)
                 } else {
                     // Shift by reg
-                    self.cpu.reg(a >> 1)
+                    self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF)
                 };
-                let second_op = self.shifted_op(rm, t, shift_amount);
                 self.alu(o, n, second_op, d, c == 1);
                 self.add_wait_cycles(1);
             }
@@ -399,16 +398,16 @@ impl GameGirlAdv {
         }
     }
 
-    fn shifted_op(&mut self, nn: u32, op: u32, shift_amount: u32) -> u32 {
+    fn shifted_op<const IMM: bool>(&mut self, nn: u32, op: u32, shift_amount: u32) -> u32 {
         if op + shift_amount == 0 {
             // Special case: no shift
             nn
         } else {
             match op {
                 0 => self.cpu.lsl(nn, shift_amount),
-                1 => self.cpu.lsr::<false>(nn, shift_amount),
-                2 => self.cpu.asr::<false>(nn, shift_amount),
-                _ => self.cpu.ror(nn, shift_amount),
+                1 => self.cpu.lsr::<IMM>(nn, shift_amount),
+                2 => self.cpu.asr::<IMM>(nn, shift_amount),
+                _ => self.cpu.ror::<IMM>(nn, shift_amount),
             }
         }
     }
