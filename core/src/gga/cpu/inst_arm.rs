@@ -291,10 +291,10 @@ impl GameGirlAdv {
                 .adc(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
             0x6 => self
                 .cpu
-                .sbc(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
+                .sbc(self.reg(reg_a), b, !(self.cpu.flag(Carry)) as u32),
             0x7 => self
                 .cpu
-                .sbc(b, self.reg(reg_a), self.cpu.flag(Carry) as u32),
+                .sbc(b, self.reg(reg_a), !(self.cpu.flag(Carry)) as u32),
             0x8 => {
                 // TST
                 self.cpu.and(self.reg(reg_a), b);

@@ -103,11 +103,11 @@ impl Cpu {
 
     /// Subtraction (c -> Carry)
     pub fn sbc(&mut self, rs: u32, rn: u32, c: u32) -> u32 {
-        let ab = self.add(rs, rn);
+        let ab = self.sub(rs, rn);
         let res = ab.wrapping_sub(c);
         let (_, carry) = ab.overflowing_sub(c);
         self.set_zn(res);
-        self.set_flag(Flag::Carry, self.flag(Flag::Carry) | carry);
+        self.set_flag(Flag::Carry, self.flag(Flag::Carry) | !carry);
         self.set_flag(
             Flag::Overflow,
             self.flag(Flag::Overflow) | Self::is_v::<true>(ab, c, res),
