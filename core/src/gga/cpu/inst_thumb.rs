@@ -18,14 +18,18 @@ impl GameGirlAdv {
 
             // THUMB.1
             "000_00nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.lsl(self.low(s), n.u32()),
-            "000_01nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.lsr(self.low(s), n.u32()),
-            "000_10nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.asr(self.low(s), n.u32()),
+            "000_01nnnnnsssddd" => {
+                self.cpu.low[d.us()] = self.cpu.lsr::<true>(self.low(s), n.u32())
+            }
+            "000_10nnnnnsssddd" => {
+                self.cpu.low[d.us()] = self.cpu.asr::<true>(self.low(s), n.u32())
+            }
 
             // THUMB.2
-            "00011_00nnnsssddd" => self.cpu.low[d.us()] = self.cpu.add(self.low(s), self.low(n), 0),
-            "00011_01nnnsssddd" => self.cpu.low[d.us()] = self.cpu.sub(self.low(s), self.low(n), 0),
-            "00011_10nnnsssddd" => self.cpu.low[d.us()] = self.cpu.add(self.low(s), n.u32(), 0),
-            "00011_11nnnsssddd" => self.cpu.low[d.us()] = self.cpu.sub(self.low(s), n.u32(), 0),
+            "00011_00nnnsssddd" => self.cpu.low[d.us()] = self.cpu.add(self.low(s), self.low(n)),
+            "00011_01nnnsssddd" => self.cpu.low[d.us()] = self.cpu.sub(self.low(s), self.low(n)),
+            "00011_10nnnsssddd" => self.cpu.low[d.us()] = self.cpu.add(self.low(s), n.u32()),
+            "00011_11nnnsssddd" => self.cpu.low[d.us()] = self.cpu.sub(self.low(s), n.u32()),
 
             // THUMB.3
             "001_00dddnnnnnnnn" => {
@@ -34,10 +38,10 @@ impl GameGirlAdv {
             } // MOV
             "001_01dddnnnnnnnn" => {
                 let rd = self.low(d);
-                self.cpu.sub(rd, n.u32(), 0);
+                self.cpu.sub(rd, n.u32());
             } // CMP
-            "001_10dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.add(self.low(d), n.u32(), 0),
-            "001_11dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.sub(self.low(d), n.u32(), 0),
+            "001_10dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.add(self.low(d), n.u32()),
+            "001_11dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.sub(self.low(d), n.u32()),
 
             // THUMB.4
             "010000_oooosssddd" => {
@@ -52,14 +56,14 @@ impl GameGirlAdv {
                     }
                     0x3 => {
                         self.add_wait_cycles(1);
-                        self.cpu.lsr(rd, rs & 0xFF)
+                        self.cpu.lsr::<false>(rd, rs & 0xFF)
                     }
                     0x4 => {
                         self.add_wait_cycles(1);
-                        self.cpu.asr(rd, rs & 0xFF)
+                        self.cpu.asr::<false>(rd, rs & 0xFF)
                     }
-                    0x5 => self.cpu.add(rd, rs, self.cpu.flag(Carry) as u32),
-                    0x6 => self.cpu.sub(rd, rs, self.cpu.flag(Carry) as u32),
+                    0x5 => self.cpu.adc(rd, rs, self.cpu.flag(Carry) as u32),
+                    0x6 => self.cpu.sbc(rd, rs, self.cpu.flag(Carry) as u32),
                     0x7 => {
                         self.add_wait_cycles(1);
                         self.cpu.ror(rd, rs & 0xFF)
@@ -72,12 +76,12 @@ impl GameGirlAdv {
                     0x9 => self.cpu.neg(rs),
                     0xA => {
                         // CMP
-                        self.cpu.sub(rd, rs, 0);
+                        self.cpu.sub(rd, rs);
                         rd
                     }
                     0xB => {
                         // CMN
-                        self.cpu.add(rd, rs, 0);
+                        self.cpu.add(rd, rs);
                         rd
                     }
                     0xC => self.cpu.or(rd, rs),
@@ -93,11 +97,11 @@ impl GameGirlAdv {
 
             // THUMB.5
             "010001_00dssssddd" => {
-                let res = self.cpu.add(self.reg(d.u32()), self.reg(s.u32()), 0);
+                let res = self.cpu.add(self.reg(d.u32()), self.reg(s.u32()));
                 self.cpu.set_reg(d.u32(), res);
             }
             "010001_01dssssddd" => {
-                self.cpu.sub(self.reg(d.u32()), self.reg(s.u32()), 0);
+                self.cpu.sub(self.reg(d.u32()), self.reg(s.u32()));
             } // CMP
             "010001_10dssssddd" => self.cpu.set_reg(d.u32(), self.reg(s.u32())),
             "010001_1101111???" => self.cpu.set_flag(Thumb, false), // BX ARM switch
@@ -193,7 +197,7 @@ impl GameGirlAdv {
             }
 
             // THUMB.12
-            "1010_0dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.pc + (n.u32() << 2),
+            "1010_0dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.adj_pc() + (n.u32() << 2),
             "1010_1dddnnnnnnnn" => self.cpu.low[d.us()] = self.cpu.sp() + (n.u32() << 2),
 
             // THUMB.13
@@ -347,7 +351,7 @@ impl GameGirlAdv {
                     0xE => "bic",
                     _ => "mvn",
                 };
-                if o == 0x8 || o == 0xA || o == 0xB {
+                if o == 0x8 {
                     format!("{op} r{s}")
                 } else {
                     format!("{op} r{d}, r{s}")

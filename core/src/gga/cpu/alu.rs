@@ -17,36 +17,52 @@ impl Cpu {
     }
 
     /// Logical shift right
-    pub fn lsr(&mut self, value: u32, mut by: u32) -> u32 {
-        if by == 0 {
-            by = 32;
+    pub fn lsr<const COERCE: bool>(&mut self, value: u32, by: u32) -> u32 {
+        if by == 0 && COERCE {
+            let res = value.wshr(32);
+            self.set_znc(res, value.wshr(31).is_bit(0));
+            res
+        } else if by == 0 {
+            self.set_zn(value);
+            value
+        } else {
+            let res = value.wshr(by);
+            self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
+            res
         }
-        let res = value.wshr(by);
-        self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
-        res
     }
 
     /// Arithmetic shift right
-    pub fn asr(&mut self, value: u32, mut by: u32) -> u32 {
-        if by == 0 {
-            by = 32;
+    pub fn asr<const COERCE: bool>(&mut self, value: u32, by: u32) -> u32 {
+        if by == 0 && COERCE {
+            let res = (value as i32).checked_shr(32).unwrap_or(value as i32 >> 31) as u32;
+            self.set_znc(res, (value as i32).checked_shr(31).unwrap_or(0) & 1 == 1);
+            res
+        } else if by == 0 {
+            self.set_zn(value);
+            value
+        } else {
+            let res = (value as i32).checked_shr(by).unwrap_or(value as i32 >> 31) as u32;
+            self.set_znc(
+                res,
+                (value as i32)
+                    .checked_shr(by.saturating_sub(1))
+                    .unwrap_or(0)
+                    & 1
+                    == 1,
+            );
+            res
         }
-        let res = (value as i32).checked_shr(by).unwrap_or(0) as u32;
-        self.set_znc(
-            res,
-            (value as i32)
-                .checked_shr(by.saturating_sub(1))
-                .unwrap_or(0)
-                & 1
-                == 1,
-        );
-        res
     }
 
     /// Rotate right
     pub fn ror(&mut self, value: u32, by: u32) -> u32 {
         let res = Self::ror_s0(value, by);
-        self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
+        if by == 0 {
+            self.set_zn(res);
+        } else {
+            self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
+        }
         res
     }
 
@@ -55,23 +71,48 @@ impl Cpu {
         value.rotate_right(by)
     }
 
+    /// Addition
+    pub fn add(&mut self, rs: u32, rn: u32) -> u32 {
+        let res = rs.wrapping_add(rn);
+        let (_, carry) = rs.overflowing_add(rn);
+        self.set_zncv::<false>(rs, rn, res, carry);
+        res
+    }
+
+    /// Subtraction
+    pub fn sub(&mut self, rs: u32, rn: u32) -> u32 {
+        let res = rs.wrapping_sub(rn);
+        let (_, carry) = rs.overflowing_sub(rn);
+        self.set_zncv::<true>(rs, rn, res, !carry);
+        res
+    }
+
     /// Addition (c -> Carry)
-    /// TODO: Implement carry
-    pub fn add(&mut self, rs: u32, rn: u32, c: u32) -> u32 {
-        let (res, carry) = rs.overflowing_add(rn);
-        self.set_znc(res, carry);
-        self.set_flag(Flag::Overflow, (rs as i32).overflowing_add(rn as i32).1);
+    pub fn adc(&mut self, rs: u32, rn: u32, c: u32) -> u32 {
+        let ab = self.add(rs, rn);
+        let res = ab.wrapping_add(c);
+        let (_, carry) = ab.overflowing_add(c);
+        self.set_zn(res);
+        self.set_flag(Flag::Carry, self.flag(Flag::Carry) | carry);
+        self.set_flag(
+            Flag::Overflow,
+            self.flag(Flag::Overflow) | Self::is_v::<false>(ab, c, res),
+        );
         res
     }
 
     /// Subtraction (c -> Carry)
-    /// TODO: Implement carry
-    /// TODO: pretty sure this carry/overflow flag behavior is wrong
-    pub fn sub(&mut self, rs: u32, rn: u32, c: u32) -> u32 {
-        let (res, carry) = (rs as i32).overflowing_sub(rn as i32);
-        self.set_znc(res as u32, carry);
-        self.set_flag(Flag::Overflow, carry);
-        res as u32
+    pub fn sbc(&mut self, rs: u32, rn: u32, c: u32) -> u32 {
+        let ab = self.add(rs, rn);
+        let res = ab.wrapping_sub(c);
+        let (_, carry) = ab.overflowing_sub(c);
+        self.set_zn(res);
+        self.set_flag(Flag::Carry, self.flag(Flag::Carry) | carry);
+        self.set_flag(
+            Flag::Overflow,
+            self.flag(Flag::Overflow) | Self::is_v::<true>(ab, c, res),
+        );
+        res
     }
 
     /// Multiplication
@@ -116,7 +157,7 @@ impl Cpu {
 
     /// Negate
     pub fn neg(&mut self, value: u32) -> u32 {
-        self.sub(0, value, 0)
+        self.sub(0, value)
     }
 
     pub fn set_zn(&mut self, value: u32) {
@@ -127,5 +168,21 @@ impl Cpu {
     fn set_znc(&mut self, value: u32, carry: bool) {
         self.set_zn(value);
         self.set_flag(Flag::Carry, carry);
+    }
+
+    fn set_zncv<const SUB: bool>(&mut self, a: u32, b: u32, res: u32, carry: bool) {
+        self.set_znc(res, carry);
+        self.set_flag(Flag::Overflow, Self::is_v::<SUB>(a, b, res));
+    }
+
+    fn is_v<const SUB: bool>(a: u32, b: u32, res: u32) -> bool {
+        let s1 = (a >> 31) != 0;
+        let s2 = (b >> 31) != 0;
+        let s3 = (res >> 31) != 0;
+        if SUB {
+            (!s1 && s2 && s3) || (s1 && !s2 && !s3)
+        } else {
+            (s1 && s2 && !s3) || (!s1 && !s2 && s3)
+        }
     }
 }

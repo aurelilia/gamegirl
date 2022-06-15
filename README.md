@@ -80,7 +80,7 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 
 ### GGA
 #### jsmolka's gba-tests
-- `thumb`: All pass
+- `thumb`: Up to 114 passes
 - Everything else untested
 
 

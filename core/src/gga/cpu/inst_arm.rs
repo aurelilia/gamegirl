@@ -283,18 +283,18 @@ impl GameGirlAdv {
         let value = match op {
             0x0 => self.cpu.and(self.reg(reg_a), b),
             0x1 => self.cpu.xor(self.reg(reg_a), b),
-            0x2 => self.cpu.sub(self.reg(reg_a), b, 0),
-            0x3 => self.cpu.sub(b, self.reg(reg_a), 0),
-            0x4 => self.cpu.add(self.reg(reg_a), b, 0),
+            0x2 => self.cpu.sub(self.reg(reg_a), b),
+            0x3 => self.cpu.sub(b, self.reg(reg_a)),
+            0x4 => self.cpu.add(self.reg(reg_a), b),
             0x5 => self
                 .cpu
-                .add(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
+                .adc(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
             0x6 => self
                 .cpu
-                .sub(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
+                .sbc(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
             0x7 => self
                 .cpu
-                .sub(b, self.reg(reg_a), self.cpu.flag(Carry) as u32),
+                .sbc(b, self.reg(reg_a), self.cpu.flag(Carry) as u32),
             0x8 => {
                 // TST
                 self.cpu.and(self.reg(reg_a), b);
@@ -307,12 +307,12 @@ impl GameGirlAdv {
             }
             0xA => {
                 // CMP
-                self.cpu.sub(self.reg(reg_a), b, 0);
+                self.cpu.sub(self.reg(reg_a), b);
                 d
             }
             0xB => {
                 // CMN
-                self.cpu.add(self.reg(reg_a), b, 0);
+                self.cpu.add(self.reg(reg_a), b);
                 d
             }
             0xC => self.cpu.or(self.reg(reg_a), b),
@@ -403,8 +403,8 @@ impl GameGirlAdv {
         } else {
             match op {
                 0 => self.cpu.lsl(nn, shift_amount),
-                1 => self.cpu.lsr(nn, shift_amount),
-                2 => self.cpu.asr(nn, shift_amount),
+                1 => self.cpu.lsr::<false>(nn, shift_amount),
+                2 => self.cpu.asr::<false>(nn, shift_amount),
                 _ => self.cpu.ror(nn, shift_amount),
             }
         }
