@@ -1,5 +1,6 @@
 mod alu;
 mod inst_arm;
+mod inst_generic;
 mod inst_thumb;
 pub mod registers;
 

@@ -101,7 +101,14 @@ impl GameGirlAdv {
             } // CMP
             "010001_10dssssddd" => self.cpu.set_reg(d.u32(), self.reg(s.u32())),
             "010001_1101111???" => self.cpu.set_flag(Thumb, false), // BX ARM switch
-            "010001_110ssss???" => self.cpu.set_pc(self.reg(s.u32())), // BX
+            "010001_110ssss???" => {
+                if !self.reg(s.u32()).is_bit(0) {
+                    self.cpu.set_flag(Thumb, false);
+                    self.cpu.set_pc(self.reg(s.u32()) & !3);
+                } else {
+                    self.cpu.set_pc(self.reg(s.u32()) & !1);
+                }
+            } // BX
             "010001_111ssss???" => self.cpu.set_pc(self.reg(s.u32())), // BLX
 
             // THUMB.6
@@ -236,12 +243,24 @@ impl GameGirlAdv {
             "1100_0bbbrrrrrrrr" => {
                 // STMIA
                 let mut kind = NonSeq;
+                let mut base_rlist_addr = None;
                 for reg in 0..8 {
                     if r.is_bit(reg) {
+                        if reg == b && kind != NonSeq {
+                            base_rlist_addr = Some(self.cpu.low(b))
+                        }
                         self.write_word(self.cpu.low(b), self.cpu.low[reg.us()], kind);
                         self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
                         kind = Seq;
                     }
+                }
+                if let Some(addr) = base_rlist_addr {
+                    // If base was in Rlist and not the first, write final address to that location.
+                    // We ignore timing since this was already (wrongly) written in the loop above.
+                    self.set_word(addr, self.cpu.low[b.us()]);
+                }
+                if kind == NonSeq {
+                    self.on_empty_rlist(b.u32(), true, true);
                 }
             }
             "1100_1bbbrrrrrrrr" => {
@@ -253,6 +272,9 @@ impl GameGirlAdv {
                         self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
                         kind = Seq;
                     }
+                }
+                if kind == NonSeq {
+                    self.on_empty_rlist(b.u32(), false, true);
                 }
                 self.add_wait_cycles(1);
             }

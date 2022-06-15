@@ -80,7 +80,7 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 
 ### GGA
 #### jsmolka's gba-tests
-- Thumb fails at test 227 (Everything but STMIA/LDMIA edge cases passes)
+- `thumb`: All pass
 - Everything else untested
 
 
