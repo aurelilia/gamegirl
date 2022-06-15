@@ -1,5 +1,12 @@
 use crate::Colour;
-use core::{debugger::Breakpoint, gga::GameGirlAdv};
+use core::{
+    debugger::Breakpoint,
+    gga::{
+        addr::{HALTCNT, IME},
+        GameGirlAdv,
+    },
+    numutil::NumExt,
+};
 use eframe::egui::{Label, RichText, TextEdit, Ui};
 
 /// Debugger window with instruction view, stack inspection and register
@@ -77,10 +84,10 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
         }
         ui.checkbox(&mut gg.options.running, "Running");
 
-        if gg.cpu.halt {
+        if gg[HALTCNT].is_bit(15) {
             ui.label("(CPU is halted)");
         }
-        if gg.cpu.ime {
+        if gg[IME].is_bit(0) {
             ui.label("(IME on)");
         }
     });

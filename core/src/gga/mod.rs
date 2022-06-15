@@ -1,20 +1,8 @@
 use crate::{
     common::{self, EmulateOptions},
     debugger::Debugger,
-    gga::{
-        audio::{APU_REG_END, APU_REG_START},
-        cpu::registers::Flag,
-        dma::{Dma, DMA_END, DMA_START, DMA_WIDTH},
-        graphics::{
-            OAM_END, OAM_START, PALETTE_END, PALETTE_START, PPU_REG_END, PPU_REG_START, VRAM_END,
-            VRAM_START,
-        },
-        input::{Input, INPUT_END, INPUT_START},
-        memory::{BIOS_END, BIOS_START, KB, WRAM1_END, WRAM1_START, WRAM2_END, WRAM2_START},
-        timer::{Timer, TIMER_END, TIMER_START, TIMER_WIDTH},
-    },
+    gga::{cpu::registers::Flag, dma::Dma, input::Input, memory::KB, timer::Timer},
     ggc::GGConfig,
-    numutil::{hword, word, NumExt, U16Ext, U32Ext},
     Colour,
 };
 use audio::Apu;
@@ -28,6 +16,7 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
+pub mod addr;
 mod audio;
 mod cartridge;
 pub mod cpu;
@@ -176,181 +165,6 @@ impl GameGirlAdv {
         self.wait_cycles += count;
     }
 
-    /// Read a byte from the bus. Also enforces timing.
-    fn read_byte(&mut self, addr: u32, kind: Access) -> u8 {
-        self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        self.get_byte(addr)
-    }
-
-    /// Read a half-word from the bus (LE). Also enforces timing.
-    /// Also handles unaligned reads, which is why ret is u32.
-    fn read_hword(&mut self, addr: u32, kind: Access) -> u32 {
-        self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        if addr.is_bit(0) {
-            // Unaligned
-            let val = self.get_hword(addr - 1);
-            Cpu::ror_s0(val.u32(), 8)
-        } else {
-            // Aligned
-            self.get_hword(addr).u32()
-        }
-    }
-
-    /// Read a word from the bus (LE). Also enforces timing.
-    fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
-        let addr = addr & !3; // Forcibly align
-
-        self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
-            // Cart bus is 16bit, word reads cause 2 stalls
-            self.add_wait_cycles(self.cart.wait_time(addr, Access::Seq));
-        }
-
-        self.get_word(addr)
-    }
-
-    /// Read a word from the bus (LE). Also enforces timing.
-    /// If address is unaligned, do LDR/SWP behavior.
-    fn read_word_ldrswp(&mut self, addr: u32, kind: Access) -> u32 {
-        let val = self.read_word(addr, kind);
-        if addr & 3 != 0 {
-            // Unaligned
-            let by = (addr & 3) << 3;
-            Cpu::ror_s0(val, by)
-        } else {
-            // Aligned
-            val
-        }
-    }
-
-    /// Read a byte from the bus. Does no timing-related things; simply fetches
-    /// the value.
-    fn get_byte(&self, addr: u32) -> u8 {
-        let addr = addr.us();
-        match addr {
-            BIOS_START..=BIOS_END => self.memory.bios[addr - BIOS_START],
-            WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START],
-            WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START],
-
-            0x0800_0000..=0x0DFF_FFFF => {
-                self.cart.rom[(self.cart.rom.len() - 1).min(addr & 0x01FF_FFFF)]
-            }
-
-            PPU_REG_START..=PPU_REG_END => self.ppu.regs[addr - PPU_REG_START],
-            PALETTE_START..=PALETTE_END => self.ppu.palette[addr - PALETTE_START],
-            VRAM_START..=VRAM_END => self.ppu.vram[addr - VRAM_START],
-            OAM_START..=OAM_END => self.ppu.oam[addr - OAM_START],
-
-            APU_REG_START..=APU_REG_END => self.apu.regs[addr - APU_REG_START],
-            DMA_START..=DMA_END => {
-                let dma_idx = (addr - DMA_START) / DMA_WIDTH;
-                self.dma[dma_idx].regs[addr - DMA_START - (dma_idx * DMA_WIDTH)]
-            }
-            TIMER_START..=TIMER_END => {
-                let timer_idx = (addr - TIMER_START) / TIMER_WIDTH;
-                self.timers[timer_idx].regs[addr - TIMER_START - (timer_idx * TIMER_WIDTH)]
-            }
-            INPUT_START..=INPUT_END => self.input.regs[addr - INPUT_START],
-
-            0x04000200 => self.cpu.ie.low(),
-            0x04000201 => self.cpu.ie.high(),
-            0x04000202 => self.cpu.if_.low(),
-            0x04000203 => self.cpu.if_.high(),
-            0x04000204 => self.cart.waitcnt.low(),
-            0x04000205 => self.cart.waitcnt.high(),
-            0x04000208 => self.cpu.ime as u8,
-            0x04000209..=0x0400020B => 0, // High unused bits of IME
-
-            _ => 0xFF,
-        }
-    }
-
-    /// Read a half-word from the bus (LE). Does no timing-related things;
-    /// simply fetches the value.
-    fn get_hword(&self, addr: u32) -> u16 {
-        hword(self.get_byte(addr), self.get_byte(addr.wrapping_add(1)))
-    }
-
-    /// Read a word from the bus (LE). Does no timing-related things; simply
-    /// fetches the value. Also does not handle unaligned reads (yet)
-    pub fn get_word(&self, addr: u32) -> u32 {
-        word(self.get_hword(addr), self.get_hword(addr.wrapping_add(2)))
-    }
-
-    /// Write a byte to the bus. Handles timing.
-    fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
-        self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        self.set_byte(addr, value)
-    }
-
-    /// Write a half-word from the bus (LE). Handles timing.
-    fn write_hword(&mut self, addr: u32, value: u16, kind: Access) {
-        self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        self.set_hword(addr, value)
-    }
-
-    /// Write a word from the bus (LE). Handles timing.
-    fn write_word(&mut self, addr: u32, value: u32, kind: Access) {
-        self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
-            // Cart bus is 16bit, word writes cause 2 stalls
-            self.add_wait_cycles(self.cart.wait_time(addr, Access::Seq));
-        }
-
-        self.set_word(addr, value)
-    }
-
-    /// Write a byte to the bus. Does no timing-related things; simply sets the
-    /// value.
-    fn set_byte(&mut self, addr: u32, value: u8) {
-        let addr = addr.us();
-        match addr {
-            WRAM1_START..=WRAM1_END => self.memory.wram1[addr - WRAM1_START] = value,
-            WRAM2_START..=WRAM2_END => self.memory.wram2[addr - WRAM2_START] = value,
-
-            PPU_REG_START..=PPU_REG_END => self.ppu.regs[addr - PPU_REG_START] = value,
-            PALETTE_START..=PALETTE_END => self.ppu.palette[addr - PALETTE_START] = value,
-            VRAM_START..=VRAM_END => self.ppu.vram[addr - VRAM_START] = value,
-            OAM_START..=OAM_END => self.ppu.oam[addr - OAM_START] = value,
-
-            APU_REG_START..=APU_REG_END => self.apu.regs[addr - APU_REG_START] = value,
-            DMA_START..=DMA_END => {
-                let dma_idx = (addr - DMA_START) / DMA_WIDTH;
-                self.dma[dma_idx].regs[addr - DMA_START - (dma_idx * DMA_WIDTH)] = value;
-            }
-            TIMER_START..=TIMER_END => {
-                let timer_idx = (addr - TIMER_START) / TIMER_WIDTH;
-                self.timers[timer_idx].regs[addr - TIMER_START - (timer_idx * TIMER_WIDTH)] = value;
-            }
-            INPUT_START..=INPUT_END => self.input.regs[addr - INPUT_START] = value,
-
-            0x04000201 => self.cpu.ie = self.cpu.ie.set_low(value),
-            0x04000202 => self.cpu.if_ = self.cpu.if_.set_high(value),
-            0x04000203 => self.cpu.if_ = self.cpu.if_.set_low(value),
-            0x04000200 => self.cpu.ie = self.cpu.ie.set_high(value),
-            0x04000204 => self.cart.waitcnt = self.cart.waitcnt.set_low(value),
-            0x04000205 => self.cart.waitcnt = self.cart.waitcnt.set_high(value),
-            0x04000208 => self.cpu.ime = value & 1 != 0,
-
-            _ => (),
-        }
-    }
-
-    /// Write a half-word from the bus (LE). Does no timing-related things;
-    /// simply sets the value.
-    fn set_hword(&mut self, addr: u32, value: u16) {
-        let addr = addr & !1; // Forcibly align: All write instructions do this
-        self.set_byte(addr, value.low());
-        self.set_byte(addr.wrapping_add(1), value.high());
-    }
-
-    /// Write a word from the bus (LE). Does no timing-related things; simply
-    /// sets the value.
-    fn set_word(&mut self, addr: u32, value: u32) {
-        self.set_hword(addr, value.low());
-        self.set_hword(addr.wrapping_add(2), value.high());
-    }
-
     fn reg(&self, idx: u32) -> u32 {
         self.cpu.reg(idx)
     }
@@ -411,19 +225,17 @@ impl Default for GameGirlAdv {
         let mut gg = Self {
             cpu: Cpu::default(),
             memory: Memory {
-                bios: include_bytes!("bios.bin"),
-                wram1: [0; 256 * KB],
-                wram2: [0; 32 * KB],
+                ewram: [0; 256 * KB],
+                iwram: [0; 32 * KB],
+                mmio: [0; KB / 2],
             },
             ppu: Ppu {
-                regs: [0; 0x56],
                 palette: [0; KB],
                 vram: [0; 96 * KB],
                 oam: [0; KB],
                 last_frame: None,
             },
             apu: Apu {
-                regs: [0; APU_REG_END - APU_REG_START],
                 buffer: Vec::with_capacity(1000),
             },
             // Meh...

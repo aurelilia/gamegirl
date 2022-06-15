@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     gga::{
+        addr::*,
         cpu::registers::{
             Context, FiqReg,
             Flag::{FiqDisable, IrqDisable, Thumb},
@@ -30,11 +31,6 @@ pub struct Cpu {
     pub cpsr: u32,
     pub spsr: ModeReg,
 
-    pub ie: u16,
-    pub if_: u16,
-    pub ime: bool,
-    pub halt: bool,
-
     pc_just_changed: bool,
     last_access_type: Access,
     prefetch: [u32; 2],
@@ -47,7 +43,7 @@ impl Cpu {
         }
 
         gg.advance_clock();
-        if gg.cpu.halt || gg.cpu.check_interrupt_occurs() {
+        if gg[HALTCNT].is_bit(15) || Self::check_interrupt_occurs(gg) {
             return;
         }
 
@@ -73,11 +69,12 @@ impl Cpu {
         mem::replace(&mut gg.cpu.prefetch[0], next)
     }
 
-    fn check_interrupt_occurs(&mut self) -> bool {
-        let int = self.ime && !self.flag(IrqDisable) && (self.ie & self.if_) != 0;
-        if self.ime && !self.flag(IrqDisable) && (self.ie & self.if_) != 0 {
-            self.inc_pc_by(4);
-            self.exception_occurred(Exception::Irq);
+    fn check_interrupt_occurs(gg: &mut GameGirlAdv) -> bool {
+        let ime = gg[IME] == 1;
+        let int = ime && !gg.cpu.flag(IrqDisable) && (gg[IE] & gg[IF]) != 0;
+        if int {
+            gg.cpu.inc_pc_by(4);
+            gg.cpu.exception_occurred(Exception::Irq);
         }
         int
     }
@@ -137,10 +134,6 @@ impl Default for Cpu {
             pc: 0,
             cpsr: 0x1F,
             spsr: ModeReg::default(),
-            ie: 0,
-            if_: 0,
-            ime: false,
-            halt: false,
             pc_just_changed: false,
             last_access_type: Access::NonSeq,
             prefetch: [0, 0],
