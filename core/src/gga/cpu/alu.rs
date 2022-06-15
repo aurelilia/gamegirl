@@ -10,8 +10,8 @@ impl Cpu {
             self.set_zn(value);
             value
         } else {
-            let res = value.wrapping_shl(by);
-            self.set_znc(res, value.wrapping_shr(32 - by) & 1 != 0);
+            let res = value.wshl(by);
+            self.set_znc(res, value.wshr(32u32.wrapping_sub(by)).is_bit(0));
             res
         }
     }
@@ -21,8 +21,8 @@ impl Cpu {
         if by == 0 {
             by = 32;
         }
-        let res = value.wrapping_shr(by);
-        self.set_znc(res, value.wrapping_shl(by) != 0);
+        let res = value.wshr(by);
+        self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
         res
     }
 
@@ -31,23 +31,28 @@ impl Cpu {
         if by == 0 {
             by = 32;
         }
-        let res = (value as i32).wrapping_shr(by) as u32;
-        self.set_znc(res, value.wrapping_shl(by) != 0);
+        let res = (value as i32).checked_shr(by).unwrap_or(0) as u32;
+        self.set_znc(
+            res,
+            (value as i32)
+                .checked_shr(by.saturating_sub(1))
+                .unwrap_or(0)
+                & 1
+                == 1,
+        );
         res
     }
 
     /// Rotate right
-    /// TODO: Carry behavior correct?
     pub fn ror(&mut self, value: u32, by: u32) -> u32 {
         let res = Self::ror_s0(value, by);
-        self.set_znc(res, value.wrapping_shl(by) != 0);
+        self.set_znc(res, value.wshr(by.saturating_sub(1)).is_bit(0));
         res
     }
 
     /// Rotate right, without setting CPSR
-    /// TODO: Carry behavior correct?
     pub fn ror_s0(value: u32, by: u32) -> u32 {
-        value.wrapping_shl(by) | (value.wrapping_shl(32 - by))
+        value.rotate_right(by)
     }
 
     /// Addition (c -> Carry)

@@ -58,7 +58,7 @@ impl GameGirlAdv {
                 let mem_value = if b == 1 {
                     self.read_byte(addr, NonSeq).u32()
                 } else {
-                    self.read_word(addr, NonSeq)
+                    self.read_word_ldrswp(addr, NonSeq)
                 };
                 let reg = self.reg(m);
                 if b == 1 {
@@ -76,7 +76,7 @@ impl GameGirlAdv {
                 let mut res = self.cpu.mul(self.cpu.reg(m), self.cpu.reg(s));
                 if l == 1 {
                     // MLA
-                    res += self.cpu.reg(n);
+                    res = res.wrapping_add(self.cpu.reg(n));
                     self.add_wait_cycles(1);
                 }
 
@@ -105,7 +105,17 @@ impl GameGirlAdv {
                         if p == 1 {
                             offs += 4;
                         }
-                        self.ldrstr(false, u == 1, 4, false, l == 0, n, reg.u32(), offs, kind);
+                        self.ldrstr::<true>(
+                            false,
+                            u == 1,
+                            4,
+                            false,
+                            l == 0,
+                            n,
+                            reg.u32(),
+                            offs,
+                            kind,
+                        );
                         kind = Seq;
                         if p == 0 {
                             offs += 4;
@@ -121,7 +131,7 @@ impl GameGirlAdv {
             "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
                 // LDR/STR with imm
                 let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr(
+                self.ldrstr::<false>(
                     p == 0,
                     u == 1,
                     width,
@@ -137,7 +147,7 @@ impl GameGirlAdv {
                 // LDR/STR with reg
                 let offs = self.shifted_op(self.cpu.reg(m), t, s);
                 let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr(
+                self.ldrstr::<false>(
                     p == 0,
                     u == 1,
                     width,
@@ -152,7 +162,7 @@ impl GameGirlAdv {
 
             "000_pu1wlnnnnddddiiii1011iiii" => {
                 // LDRH/STRH with imm
-                self.ldrstr(
+                self.ldrstr::<true>(
                     p == 0,
                     u == 1,
                     2,
@@ -166,7 +176,7 @@ impl GameGirlAdv {
             }
             "000_pu0wlnnnndddd00001011mmmm" => {
                 // LDRH/STRH with reg
-                self.ldrstr(
+                self.ldrstr::<true>(
                     p == 0,
                     u == 1,
                     2,
@@ -181,7 +191,7 @@ impl GameGirlAdv {
 
             "000_pu1w1nnnnddddiiii1101iiii" => {
                 // LDRSB with imm
-                self.ldrstr(
+                self.ldrstr::<true>(
                     p == 0,
                     u == 1,
                     1,
@@ -196,7 +206,7 @@ impl GameGirlAdv {
             }
             "000_pu0w1nnnndddd00001101mmmm" => {
                 // LDRSB with reg
-                self.ldrstr(
+                self.ldrstr::<true>(
                     p == 0,
                     u == 1,
                     1,
@@ -211,10 +221,11 @@ impl GameGirlAdv {
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
-                self.ldrstr(
+                // TODO unaligned read behavior is not handled
+                self.ldrstr::<true>(
                     p == 0,
                     u == 1,
-                    1,
+                    2,
                     (p == 0) || (w == 1),
                     false,
                     n,
@@ -226,10 +237,11 @@ impl GameGirlAdv {
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
                 // LDRSH with reg
-                self.ldrstr(
+                // TODO unaligned read behavior is not handled
+                self.ldrstr::<true>(
                     p == 0,
                     u == 1,
-                    1,
+                    2,
                     (p == 0) || (w == 1),
                     false,
                     n,
@@ -336,7 +348,7 @@ impl GameGirlAdv {
         }
     }
 
-    fn ldrstr(
+    fn ldrstr<const ALIGN: bool>(
         &mut self,
         post: bool,
         up: bool,
@@ -360,8 +372,9 @@ impl GameGirlAdv {
             (true, 4) => self.reg(d),
             (true, 2) => self.reg(d) & 0xFFFF,
             (true, _) => self.reg(d) & 0xFF,
-            (false, 4) => self.read_word(addr, kind),
-            (false, 2) => self.read_hword(addr, kind).u32(),
+            (false, 4) if ALIGN => self.read_word(addr, kind),
+            (false, 4) => self.read_word_ldrswp(addr, kind),
+            (false, 2) => self.read_hword(addr, kind),
             (false, _) => self.read_byte(addr, kind).u32(),
         };
         if post {
@@ -386,9 +399,9 @@ impl GameGirlAdv {
 
     fn mod_with_offs(value: u32, offs: u32, up: bool) -> u32 {
         if up {
-            value + offs
+            value.wrapping_add(offs)
         } else {
-            value - offs
+            value.wrapping_sub(offs)
         }
     }
 

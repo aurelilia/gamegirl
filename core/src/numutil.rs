@@ -17,6 +17,11 @@ pub trait NumExt {
     fn u32(self) -> u32;
     /// Convert to usize
     fn us(self) -> usize;
+
+    /// Shift to the left, giving 0 if it does not fit.
+    fn wshl(self, by: u32) -> Self::Output;
+    /// Shift to the right, giving 0 if it does not fit.
+    fn wshr(self, by: u32) -> Self::Output;
 }
 
 macro_rules! num_ext_impl {
@@ -57,6 +62,14 @@ macro_rules! num_ext_impl {
             #[inline(always)]
             fn us(self) -> usize {
                 self as usize
+            }
+
+            fn wshl(self, by: u32) -> $ty {
+                self.checked_shl(by).unwrap_or(0)
+            }
+
+            fn wshr(self, by: u32) -> $ty {
+                self.checked_shr(by).unwrap_or(0)
             }
         }
     };

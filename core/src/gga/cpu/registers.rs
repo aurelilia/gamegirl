@@ -126,7 +126,7 @@ impl Cpu {
     }
 
     pub fn adj_pc(&self) -> u32 {
-        self.pc
+        self.pc & !2
     }
 
     mode_reg!(sp, set_sp);

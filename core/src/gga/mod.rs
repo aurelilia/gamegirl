@@ -183,13 +183,23 @@ impl GameGirlAdv {
     }
 
     /// Read a half-word from the bus (LE). Also enforces timing.
-    fn read_hword(&mut self, addr: u32, kind: Access) -> u16 {
+    /// Also handles unaligned reads, which is why ret is u32.
+    fn read_hword(&mut self, addr: u32, kind: Access) -> u32 {
         self.add_wait_cycles(self.cart.wait_time(addr, kind));
-        self.get_hword(addr)
+        if addr.is_bit(0) {
+            // Unaligned
+            let val = self.get_hword(addr - 1);
+            Cpu::ror_s0(val.u32(), 8)
+        } else {
+            // Aligned
+            self.get_hword(addr).u32()
+        }
     }
 
     /// Read a word from the bus (LE). Also enforces timing.
     fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
+        let addr = addr & !3; // Forcibly align
+
         self.add_wait_cycles(self.cart.wait_time(addr, kind));
         if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
             // Cart bus is 16bit, word reads cause 2 stalls
@@ -197,6 +207,20 @@ impl GameGirlAdv {
         }
 
         self.get_word(addr)
+    }
+
+    /// Read a word from the bus (LE). Also enforces timing.
+    /// If address is unaligned, do LDR/SWP behavior.
+    fn read_word_ldrswp(&mut self, addr: u32, kind: Access) -> u32 {
+        let val = self.read_word(addr, kind);
+        if addr & 3 != 0 {
+            // Unaligned
+            let by = (addr & 3) << 3;
+            Cpu::ror_s0(val, by)
+        } else {
+            // Aligned
+            val
+        }
     }
 
     /// Read a byte from the bus. Does no timing-related things; simply fetches
@@ -242,15 +266,15 @@ impl GameGirlAdv {
     }
 
     /// Read a half-word from the bus (LE). Does no timing-related things;
-    /// simply fetches the value. Also does not handle unaligned reads (yet)
+    /// simply fetches the value.
     fn get_hword(&self, addr: u32) -> u16 {
-        hword(self.get_byte(addr), self.get_byte(addr + 1))
+        hword(self.get_byte(addr), self.get_byte(addr.wrapping_add(1)))
     }
 
     /// Read a word from the bus (LE). Does no timing-related things; simply
     /// fetches the value. Also does not handle unaligned reads (yet)
     pub fn get_word(&self, addr: u32) -> u32 {
-        word(self.get_hword(addr), self.get_hword(addr + 2))
+        word(self.get_hword(addr), self.get_hword(addr.wrapping_add(2)))
     }
 
     /// Write a byte to the bus. Handles timing.
@@ -313,17 +337,18 @@ impl GameGirlAdv {
     }
 
     /// Write a half-word from the bus (LE). Does no timing-related things;
-    /// simply sets the value. Also does not handle unaligned writes (yet)
+    /// simply sets the value.
     fn set_hword(&mut self, addr: u32, value: u16) {
+        let addr = addr & !1; // Forcibly align: All write instructions do this
         self.set_byte(addr, value.low());
-        self.set_byte(addr + 1, value.high());
+        self.set_byte(addr.wrapping_add(1), value.high());
     }
 
     /// Write a word from the bus (LE). Does no timing-related things; simply
-    /// sets the value. Also does not handle unaligned writes (yet)
+    /// sets the value.
     fn set_word(&mut self, addr: u32, value: u32) {
         self.set_hword(addr, value.low());
-        self.set_hword(addr + 2, value.high());
+        self.set_hword(addr.wrapping_add(2), value.high());
     }
 
     fn reg(&self, idx: u32) -> u32 {
@@ -377,6 +402,7 @@ impl GameGirlAdv {
     pub fn reset(&mut self) {
         let old_self = mem::take(self);
         self.restore_from(old_self);
+        Cpu::fix_prefetch(self);
     }
 }
 
