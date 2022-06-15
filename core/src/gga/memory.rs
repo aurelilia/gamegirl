@@ -26,14 +26,14 @@ pub struct Memory {
 impl GameGirlAdv {
     /// Read a byte from the bus. Also enforces timing.
     pub(super) fn read_byte(&mut self, addr: u32, kind: Access) -> u8 {
-        self.add_wait_cycles(self.wait_time(addr, kind));
+        self.add_wait_cycles(self.wait_time::<1>(addr, kind));
         self.get_byte(addr)
     }
 
     /// Read a half-word from the bus (LE). Also enforces timing.
     /// Also handles unaligned reads, which is why ret is u32.
     pub(super) fn read_hword(&mut self, addr: u32, kind: Access) -> u32 {
-        self.add_wait_cycles(self.wait_time(addr, kind));
+        self.add_wait_cycles(self.wait_time::<2>(addr, kind));
         if addr.is_bit(0) {
             // Unaligned
             let val = self.get_hword(addr - 1);
@@ -47,13 +47,7 @@ impl GameGirlAdv {
     /// Read a word from the bus (LE). Also enforces timing.
     pub(super) fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
         let addr = addr & !3; // Forcibly align
-
-        self.add_wait_cycles(self.wait_time(addr, kind));
-        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
-            // Cart bus is 16bit, word reads cause 2 stalls
-            self.add_wait_cycles(self.wait_time(addr, Seq));
-        }
-
+        self.add_wait_cycles(self.wait_time::<4>(addr, kind));
         self.get_word(addr)
     }
 
@@ -114,24 +108,19 @@ impl GameGirlAdv {
 
     /// Write a byte to the bus. Handles timing.
     pub(super) fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
-        self.add_wait_cycles(self.wait_time(addr, kind));
+        self.add_wait_cycles(self.wait_time::<1>(addr, kind));
         self.set_byte(addr, value)
     }
 
     /// Write a half-word from the bus (LE). Handles timing.
     pub(super) fn write_hword(&mut self, addr: u32, value: u16, kind: Access) {
-        self.add_wait_cycles(self.wait_time(addr, kind));
+        self.add_wait_cycles(self.wait_time::<2>(addr, kind));
         self.set_hword(addr, value)
     }
 
     /// Write a word from the bus (LE). Handles timing.
     pub(super) fn write_word(&mut self, addr: u32, value: u32, kind: Access) {
-        self.add_wait_cycles(self.wait_time(addr, kind));
-        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
-            // Cart bus is 16bit, word writes cause 2 stalls
-            self.add_wait_cycles(self.wait_time(addr, Seq));
-        }
-
+        self.add_wait_cycles(self.wait_time::<4>(addr, kind));
         self.set_word(addr, value)
     }
 
@@ -188,17 +177,35 @@ impl GameGirlAdv {
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
 
-    fn wait_time(&self, addr: u32, ty: Access) -> usize {
-        match (addr, ty) {
-            // TODO EWRAM?
-            (0x0800_0000..=0x09FF_FFFF, Seq) => 2 - self[WAITCNT].bit(4),
-            (0x0800_0000..=0x09FF_FFFF, NonSeq) => Self::WS_NONSEQ[self[WAITCNT].bits(2, 2).us()],
+    fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> usize {
+        match (addr, W, ty) {
+            (0x0200_0000..=0x02FF_FFFF, 4, _) => 6,
+            (0x0200_0000..=0x02FF_FFFF, _, _) => 3,
+            (0x0500_0000..=0x06FF_FFFF, 4, _) => 2,
 
-            (0x0A00_0000..=0x0BFF_FFFF, Seq) => 4 - (self[WAITCNT].bit(4) * 3),
-            (0x0A00_0000..=0x0BFF_FFFF, NonSeq) => Self::WS_NONSEQ[self[WAITCNT].bits(5, 2).us()],
+            (0x0800_0000..=0x09FF_FFFF, _, Seq) => 2 - self[WAITCNT].bit(4),
+            (0x0800_0000..=0x09FF_FFFF, 4, NonSeq) => {
+                Self::WS_NONSEQ[self[WAITCNT].bits(2, 2).us()] + (2 - self[WAITCNT].bit(4))
+            }
+            (0x0800_0000..=0x09FF_FFFF, _, NonSeq) => {
+                Self::WS_NONSEQ[self[WAITCNT].bits(2, 2).us()]
+            }
 
-            (0x0C00_0000..=0x0DFF_FFFF, Seq) => 8 - (self[WAITCNT].bit(4) * 7),
-            (0x0C00_0000..=0x0DFF_FFFF, NonSeq) => Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()],
+            (0x0A00_0000..=0x0BFF_FFFF, _, Seq) => 4 - (self[WAITCNT].bit(7) * 3),
+            (0x0A00_0000..=0x0BFF_FFFF, 4, NonSeq) => {
+                Self::WS_NONSEQ[self[WAITCNT].bits(5, 2).us()] + (4 - (self[WAITCNT].bit(7) * 3))
+            }
+            (0x0A00_0000..=0x0BFF_FFFF, _, NonSeq) => {
+                Self::WS_NONSEQ[self[WAITCNT].bits(5, 2).us()]
+            }
+
+            (0x0C00_0000..=0x0DFF_FFFF, _, Seq) => 8 - (self[WAITCNT].bit(10) * 7),
+            (0x0C00_0000..=0x0DFF_FFFF, 4, NonSeq) => {
+                Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()] + (8 - (self[WAITCNT].bit(10) * 7))
+            }
+            (0x0C00_0000..=0x0DFF_FFFF, _, NonSeq) => {
+                Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()]
+            }
 
             _ => 1,
         }
