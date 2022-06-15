@@ -73,7 +73,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
     });
     ui.separator();
 
-    ui.monospace("       SNCO                    IFT");
+    ui.monospace("       NZCO                    IFT");
     ui.monospace(format!("CPSR = {:032b}", gg.cpu.cpsr));
     ui.monospace(format!("SPSR = {:032b}", gg.cpu.spsr()));
     ui.separator();

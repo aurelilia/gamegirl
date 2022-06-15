@@ -291,10 +291,10 @@ impl GameGirlAdv {
                 .adc(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
             0x6 => self
                 .cpu
-                .sbc(self.reg(reg_a), b, !(self.cpu.flag(Carry)) as u32),
+                .sbc(self.reg(reg_a), b, (!self.cpu.flag(Carry)) as u32),
             0x7 => self
                 .cpu
-                .sbc(b, self.reg(reg_a), !(self.cpu.flag(Carry)) as u32),
+                .sbc(b, self.reg(reg_a), (!self.cpu.flag(Carry)) as u32),
             0x8 => {
                 // TST
                 self.cpu.and(self.reg(reg_a), b);
@@ -316,7 +316,10 @@ impl GameGirlAdv {
                 d
             }
             0xC => self.cpu.or(self.reg(reg_a), b),
-            0xD => b, // MOV
+            0xD => {
+                self.cpu.set_zn(b);
+                b
+            } // MOV
             0xE => self.cpu.bit_clear(self.reg(reg_a), b),
             _ => self.cpu.not(b),
         };
@@ -332,7 +335,7 @@ impl GameGirlAdv {
         let mut dest = if spsr { self.cpu.spsr() } else { self.cpu.cpsr };
 
         if flags {
-            dest = (dest & 0x00FFFFFF) | (src & 0x00FFFFFF)
+            dest = (dest & 0x00FFFFFF) | (src & 0xFF000000)
         };
         if ctrl && self.cpu.context() != Context::User {
             dest = (dest & 0xFFFFFF00) | (src & 0xFF)

@@ -107,7 +107,7 @@ impl Cpu {
         let res = ab.wrapping_sub(c);
         let (_, carry) = ab.overflowing_sub(c);
         self.set_zn(res);
-        self.set_flag(Flag::Carry, self.flag(Flag::Carry) | !carry);
+        self.set_flag(Flag::Carry, !self.flag(Flag::Carry) | !carry);
         self.set_flag(
             Flag::Overflow,
             self.flag(Flag::Overflow) | Self::is_v::<true>(ab, c, res),
@@ -162,7 +162,7 @@ impl Cpu {
 
     pub fn set_zn(&mut self, value: u32) {
         self.set_flag(Flag::Zero, value == 0);
-        self.set_flag(Flag::Sign, value.is_bit(31));
+        self.set_flag(Flag::Neg, value.is_bit(31));
     }
 
     fn set_znc(&mut self, value: u32, carry: bool) {

@@ -91,7 +91,7 @@ impl Context {
 
 /// Flags inside CPSR.
 pub enum Flag {
-    Sign = 31,
+    Neg = 31,
     Zero = 30,
     Carry = 29,
     Overflow = 28,
