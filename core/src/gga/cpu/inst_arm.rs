@@ -347,8 +347,12 @@ impl GameGirlAdv {
             // Restore CPSR if we weren't supposed to set flags
             self.cpu.cpsr = cpsr;
             self.cpu.set_flag(Carry, carry);
-        } else if dest == 15 && self.cpu.context() != Context::User {
-            // If S=1, not in user mode and the dest is the PC, set CPSR to current SPSR
+        } else if dest == 15
+            && self.cpu.context() != Context::User
+            && self.cpu.context() != Context::System
+        {
+            // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
+            // SPSR
             self.cpu.cpsr = self.cpu.spsr();
         }
     }
