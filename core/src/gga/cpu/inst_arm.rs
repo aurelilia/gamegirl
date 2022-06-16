@@ -253,80 +253,103 @@ impl GameGirlAdv {
 
             "000_oooocnnnnddddaaaaattrmmmm" => {
                 // ALU with register
+                let carry = self.cpu.flag(Carry);
                 let rm = self.cpu.reg(m);
-                let second_op = if r == 0 {
+                if r == 0 {
                     // Shift by imm
-                    self.shifted_op::<true>(rm, t, a)
+                    let second_op = self.shifted_op::<true>(rm, t, a);
+                    self.alu::<false>(o, n, second_op, d, c == 1, carry);
+                } else if m == 15 {
+                    // Shift by reg with PC
+                    let second_op =
+                        self.shifted_op::<false>(rm + 4, t, self.cpu.reg(a >> 1) & 0xFF);
+                    self.alu::<true>(o, n, second_op, d, c == 1, carry);
                 } else {
                     // Shift by reg
-                    self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF)
-                };
-                self.alu(o, n, second_op, d, c == 1);
+                    let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF);
+                    self.alu::<true>(o, n, second_op, d, c == 1, carry);
+                }
                 self.add_wait_cycles(1);
             }
 
             "001_oooocnnnnddddssssmmmmmmmm" => {
                 // ALU with immediate
-                let second_op = Cpu::ror_s0(m, s << 1);
-                self.alu(o, n, second_op, d, c == 1);
+                let carry = self.cpu.flag(Carry);
+                let second_op = self.cpu.ror::<false>(m, s << 1);
+                self.alu::<false>(o, n, second_op, d, c == 1, carry);
             }
 
             _ => Self::log_unknown_opcode(inst),
         }
     }
 
-    fn alu(&mut self, op: u32, reg_a: u32, b: u32, dest: u32, flags: bool) {
+    fn alu<const SHIFT_REG: bool>(
+        &mut self,
+        op: u32,
+        reg_a: u32,
+        b: u32,
+        dest: u32,
+        flags: bool,
+        carry: bool,
+    ) {
         let cpsr = self.cpu.cpsr;
         let d = self.cpu.reg(dest);
 
+        let reg_a = if SHIFT_REG && reg_a == 15 {
+            self.cpu.pc + 4
+        } else {
+            self.reg(reg_a)
+        };
         let value = match op {
-            0x0 => self.cpu.and(self.reg(reg_a), b),
-            0x1 => self.cpu.xor(self.reg(reg_a), b),
-            0x2 => self.cpu.sub(self.reg(reg_a), b),
-            0x3 => self.cpu.sub(b, self.reg(reg_a)),
-            0x4 => self.cpu.add(self.reg(reg_a), b),
-            0x5 => self
-                .cpu
-                .adc(self.reg(reg_a), b, self.cpu.flag(Carry) as u32),
-            0x6 => self
-                .cpu
-                .sbc(self.reg(reg_a), b, (!self.cpu.flag(Carry)) as u32),
-            0x7 => self
-                .cpu
-                .sbc(b, self.reg(reg_a), (!self.cpu.flag(Carry)) as u32),
+            0x0 => self.cpu.and(reg_a, b),
+            0x1 => self.cpu.xor(reg_a, b),
+            0x2 => self.cpu.sub(reg_a, b),
+            0x3 => self.cpu.sub(b, reg_a),
+            0x4 => self.cpu.add(reg_a, b),
+            0x5 => self.cpu.adc(reg_a, b, carry as u32),
+            0x6 => self.cpu.sbc(reg_a, b, (!carry) as u32),
+            0x7 => self.cpu.sbc(b, reg_a, (!carry) as u32),
             0x8 => {
                 // TST
-                self.cpu.and(self.reg(reg_a), b);
+                self.cpu.and(reg_a, b);
                 d
             }
             0x9 => {
                 // TEQ
-                self.cpu.xor(self.reg(reg_a), b);
+                self.cpu.xor(reg_a, b);
                 d
             }
             0xA => {
                 // CMP
-                self.cpu.sub(self.reg(reg_a), b);
+                self.cpu.sub(reg_a, b);
                 d
             }
             0xB => {
                 // CMN
-                self.cpu.add(self.reg(reg_a), b);
+                self.cpu.add(reg_a, b);
                 d
             }
-            0xC => self.cpu.or(self.reg(reg_a), b),
+            0xC => self.cpu.or(reg_a, b),
             0xD => {
                 self.cpu.set_zn(b);
                 b
             } // MOV
-            0xE => self.cpu.bit_clear(self.reg(reg_a), b),
+            0xE => self.cpu.bit_clear(reg_a, b),
             _ => self.cpu.not(b),
         };
 
-        self.cpu.set_reg(dest, value);
+        if !(0x8..=0xB).contains(&op) {
+            // Only write if needed - 8-B should not
+            // since they might set PC when they should not
+            self.cpu.set_reg(dest, value);
+        }
         if !flags {
             // Restore CPSR if we weren't supposed to set flags
             self.cpu.cpsr = cpsr;
+            self.cpu.set_flag(Carry, carry);
+        } else if dest == 15 && self.cpu.context() != Context::User {
+            // If S=1, not in user mode and the dest is the PC, set CPSR to current SPSR
+            self.cpu.cpsr = self.cpu.spsr();
         }
     }
 
