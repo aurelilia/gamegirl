@@ -1,7 +1,7 @@
 use crate::{
     gga::{
         cpu::{
-            registers::{Context, Flag::*},
+            registers::{Context, Flag, Flag::*},
             Access::*,
             Cpu, Exception,
         },
@@ -80,6 +80,37 @@ impl GameGirlAdv {
                 }
 
                 self.cpu.set_reg(d, res);
+                if c == 0 {
+                    // Restore CPSR if we weren't supposed to set flags
+                    self.cpu.cpsr = cpsr;
+                }
+
+                // TODO proper stall
+                self.add_wait_cycles(1);
+            }
+
+            "000_0ooocddddnnnnssss1001mmmm" => {
+                // MULL/MLAL
+                let cpsr = self.cpu.cpsr;
+                let a = self.reg(m) as u64;
+                let b = self.reg(s) as u64;
+                let dhi = self.reg(d) as u64;
+                let dlo = self.reg(n) as u64;
+
+                let out: u64 = match o {
+                    0b010 => a.wrapping_mul(b).wrapping_add(dhi).wrapping_add(dlo), // UMAAL
+                    0b100 => a.wrapping_mul(b),                                     // UMULL
+                    0b101 => a.wrapping_mul(b).wrapping_add(dlo | (dhi << 32)),     // UMLAL
+                    0b110 => (a as i32 as i64).wrapping_mul(b as i32 as i64) as u64, // SMULL
+                    _ => (a as i32 as i64)
+                        .wrapping_mul(b as i32 as i64)
+                        .wrapping_add((dlo | (dhi << 32)) as i64) as u64, // SMLAL
+                };
+
+                self.cpu.set_flag(Flag::Zero, out == 0);
+                self.cpu.set_flag(Flag::Neg, out.is_bit(63));
+                self.cpu.set_reg(d, (out >> 32).u32());
+                self.cpu.set_reg(n, out.u32());
                 if c == 0 {
                     // Restore CPSR if we weren't supposed to set flags
                     self.cpu.cpsr = cpsr;
@@ -459,7 +490,18 @@ impl GameGirlAdv {
             "00110_d10fsxc1111mmmmnnnnnnnn" => format!("msr{co} imm (todo)"),
 
             "000_0000cdddd????ssss1001mmmm" => format!("mul{co} r{d}, r{m}, r{s}, ({c})"),
-            "000_0001cddddnnnnssss1001mmmm" => format!("mul{co} r{d}, r{m}, r{s}, r{n} ({c})"),
+            "000_0001cddddnnnnssss1001mmmm" => format!("mla{co} r{d}, r{m}, r{s}, r{n} ({c})"),
+            "000_0010cddddnnnnssss1001mmmm" => {
+                format!("umaal{co} r{d}r{n}, (r{m} * r{s} + r{d} + r{n}) ({c})")
+            }
+            "000_0100cddddnnnnssss1001mmmm" => format!("umull{co} r{d}r{n}, (r{m} * r{s}) ({c})"),
+            "000_0101cddddnnnnssss1001mmmm" => {
+                format!("umlal{co} r{d}r{n}, (r{m} * r{s} + r{d}r{n}) ({c})")
+            }
+            "000_0110cddddnnnnssss1001mmmm" => format!("smull{co} r{d}r{n}, (r{m} * r{s}) ({c})"),
+            "000_0111cddddnnnnssss1001mmmm" => {
+                format!("smlal{co} r{d}r{n}, (r{m} * r{s} + r{d}r{n}) ({c})")
+            }
 
             "100_11??0nnnnrrrrrrrrrrrrrrrr" => format!("stmib r{n}!, {:016b}", r),
             "100_01??0nnnnrrrrrrrrrrrrrrrr" => format!("stmia r{n}!, {:016b}", r),

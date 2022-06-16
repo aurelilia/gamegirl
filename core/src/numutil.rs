@@ -78,6 +78,7 @@ macro_rules! num_ext_impl {
 num_ext_impl!(u8);
 num_ext_impl!(u16);
 num_ext_impl!(u32);
+num_ext_impl!(u64);
 num_ext_impl!(usize);
 
 // Traits and functions for some more common operations used mainly on GGA.
