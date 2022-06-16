@@ -158,6 +158,17 @@ impl Cpu {
         }
     }
 
+    pub fn reg_pc4(&self, idx: u32) -> u32 {
+        match idx {
+            0..=7 => self.low[idx.us()],
+            8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq,
+            8..=12 => self.fiqs[(idx - 8).us()].reg,
+            13 => self.sp(),
+            14 => self.lr(),
+            _ => self.pc + 4,
+        }
+    }
+
     pub fn set_reg(&mut self, idx: u32, val: u32) {
         match idx {
             0..=7 => self.low[idx.us()] = val,

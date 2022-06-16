@@ -285,18 +285,14 @@ impl GameGirlAdv {
             "000_oooocnnnnddddaaaaattrmmmm" => {
                 // ALU with register
                 let carry = self.cpu.flag(Carry);
-                let rm = self.cpu.reg(m);
                 if r == 0 {
                     // Shift by imm
+                    let rm = self.cpu.reg(m);
                     let second_op = self.shifted_op::<true>(rm, t, a);
                     self.alu::<false>(o, n, second_op, d, c == 1, carry);
-                } else if m == 15 {
-                    // Shift by reg with PC
-                    let second_op =
-                        self.shifted_op::<false>(rm + 4, t, self.cpu.reg(a >> 1) & 0xFF);
-                    self.alu::<true>(o, n, second_op, d, c == 1, carry);
                 } else {
                     // Shift by reg
+                    let rm = self.cpu.reg_pc4(m);
                     let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF);
                     self.alu::<true>(o, n, second_op, d, c == 1, carry);
                 }
@@ -419,33 +415,40 @@ impl GameGirlAdv {
         offs: u32,
         kind: Access,
     ) {
-        let mut addr = self.cpu.reg(n);
+        let mut addr = self.reg(n);
         if !post {
             addr = Self::mod_with_offs(addr, offs, up);
         }
-        if writeback {
-            self.cpu.set_reg(n, addr);
-        }
-
-        let mut value = match (str, width) {
-            (true, 4) => self.reg(d),
-            (true, 2) => self.reg(d) & 0xFFFF,
-            (true, _) => self.reg(d) & 0xFF,
-            (false, 4) if ALIGN => self.read_word(addr, kind),
-            (false, 4) => self.read_word_ldrswp(addr, kind),
-            (false, 2) => self.read_hword(addr, kind),
-            (false, _) => self.read_byte(addr, kind).u32(),
-        };
-        if post {
-            value = Self::mod_with_offs(value, offs, up);
-        }
 
         match (str, width) {
-            (true, 4) => self.write_word(addr, value, kind),
-            (true, 2) => self.write_hword(addr, value.u16(), kind),
-            (true, _) => self.write_byte(addr, value.u8(), kind),
-            (false, _) => self.cpu.set_reg(d, value),
-        };
+            (true, 4) => self.write_word(addr, self.cpu.reg_pc4(d), kind),
+            (true, 2) => self.write_hword(addr, (self.cpu.reg_pc4(d) & 0xFFFF).u16(), kind),
+            (true, _) => self.write_byte(addr, (self.cpu.reg_pc4(d) & 0xFF).u8(), kind),
+            (false, 4) if ALIGN => {
+                let val = self.read_word(addr, kind);
+                self.cpu.set_reg(d, val);
+            }
+            (false, 4) => {
+                let val = self.read_word_ldrswp(addr, kind);
+                self.cpu.set_reg(d, val);
+            }
+            (false, 2) => {
+                let val = self.read_hword(addr, kind);
+                self.cpu.set_reg(d, val);
+            }
+            (false, _) => {
+                let val = self.read_byte(addr, kind).u32();
+                self.cpu.set_reg(d, val);
+            }
+        }
+
+        if post {
+            addr = Self::mod_with_offs(addr, offs, up);
+        }
+        // Edge case: If n == d on an LDR, writeback does nothing
+        if writeback && (str || n != d) {
+            self.cpu.set_reg(n, addr);
+        }
 
         if !str && kind == NonSeq {
             // All LDR stall by 1I; the only Seq access is after the first LD of an

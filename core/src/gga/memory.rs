@@ -171,6 +171,7 @@ impl GameGirlAdv {
     /// Write a word from the bus (LE). Does no timing-related things; simply
     /// sets the value.
     pub(super) fn set_word(&mut self, addr: u32, value: u32) {
+        let addr = addr & !3; // Forcibly align: All write instructions do this
         self.set_hword(addr, value.low());
         self.set_hword(addr.wrapping_add(2), value.high());
     }
