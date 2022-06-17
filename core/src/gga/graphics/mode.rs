@@ -1,7 +1,7 @@
 use crate::{
     gga::{
         addr::DISPCNT,
-        graphics::{Ppu, FRAME_SELECT},
+        graphics::{Ppu, BG2_EN, FRAME_SELECT},
         GameGirlAdv,
     },
     numutil::NumExt,
@@ -9,6 +9,10 @@ use crate::{
 
 impl Ppu {
     pub fn render_mode3(gg: &mut GameGirlAdv, line: u16) {
+        if !gg[DISPCNT].is_bit(BG2_EN) {
+            return;
+        }
+
         let line_start = line.us() * 240;
         for offs in 0..240 {
             let pixel = line_start + offs;
@@ -17,6 +21,10 @@ impl Ppu {
     }
 
     pub fn render_mode4(gg: &mut GameGirlAdv, line: u16) {
+        if !gg[DISPCNT].is_bit(BG2_EN) {
+            return;
+        }
+
         let line_start = line.us() * 240;
         let vram_start = Self::bitmap_start_addr(gg);
         for offs in 0..240 {
@@ -27,7 +35,7 @@ impl Ppu {
     }
 
     pub fn render_mode5(gg: &mut GameGirlAdv, line: u16) {
-        if line > 127 {
+        if line > 127 || !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
 

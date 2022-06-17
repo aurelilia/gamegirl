@@ -75,8 +75,7 @@ impl GameGirlAdv {
             0x0300_0000..=0x03FF_FFFF => self.memory.iwram[a & 0x7FFF],
 
             0x0500_0000..=0x05FF_FFFF => self.ppu.palette[a & 0x3FF],
-            0x0600_0000..=0x06FF_FFFF => self.ppu.vram[a & 0x17FFF], // TODO this mirror is
-            // improper
+            0x0600_0000..=0x0601_7FFF => self.ppu.vram[a & 0x17FFF],
             0x0700_0000..=0x07FF_FFFF => self.ppu.oam[a & 0x3FF],
 
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => self.get_hword(addr).high(),
@@ -86,6 +85,9 @@ impl GameGirlAdv {
                 self.cart.rom[(self.cart.rom.len() - 1).min(a & 0x01FF_FFFF)]
             }
 
+            // VRAM mirror weirdness
+            0x0601_8000..=0x0601_FFFF => self.ppu.vram[0x1_0000 + a - 0x0601_8000],
+            0x0602_0000..=0x06FF_FFFF => self.get_byte(addr & 0x0601_FFFF),
             _ => 0xFF,
         }
     }
@@ -133,8 +135,7 @@ impl GameGirlAdv {
             0x0300_0000..=0x03FF_FFFF => self.memory.iwram[a & 0x7FFF] = value,
 
             0x0500_0000..=0x05FF_FFFF => self.ppu.palette[a & 0x3FF] = value,
-            0x0600_0000..=0x06FF_FFFF => self.ppu.vram[a & 0x17FFF] = value, // TODO this mirror
-            // is improper
+            0x0600_0000..=0x0601_7FFF => self.ppu.vram[a & 0x17FFF] = value,
             0x0700_0000..=0x07FF_FFFF => self.ppu.oam[a & 0x3FF] = value,
 
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
@@ -142,6 +143,9 @@ impl GameGirlAdv {
             }
             0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
+            // VRAM mirror weirdness
+            0x0601_8000..=0x0601_FFFF => self.ppu.vram[0x1_0000 + a & 0x7FFF] = value,
+            0x0602_0000..=0x06FF_FFFF => self.set_byte(addr & 0x0601_FFFF, value),
             _ => (),
         }
     }
@@ -170,7 +174,7 @@ impl GameGirlAdv {
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
             VCOUNT => (),
 
-            _ => self[a >> 1] = value,
+            _ => self[a] = value,
         }
     }
 

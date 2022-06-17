@@ -85,6 +85,7 @@ impl Ppu {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                     gg.ppu.last_frame = Some(Self::correct_colours(gg.ppu.pixels.to_vec()));
+                    gg.ppu.pixels = [[31, 31, 31, 255]; 240 * 160];
                 } else if gg[VCOUNT] > 227 {
                     gg[VCOUNT] = 0;
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false);
@@ -104,14 +105,15 @@ impl Ppu {
     }
 
     fn render_line(gg: &mut GameGirlAdv) {
-        if gg[DISPSTAT].is_bit(VBLANK) {
+        if gg[DISPSTAT].is_bit(VBLANK) || gg[DISPCNT].is_bit(FORCED_BLANK) {
             return;
         }
 
         match gg[DISPCNT] & 7 {
             3 => Self::render_mode3(gg, gg[VCOUNT]),
             4 => Self::render_mode4(gg, gg[VCOUNT]),
-            _ => (),
+            5 => Self::render_mode5(gg, gg[VCOUNT]),
+            _ => println!("Unimplemented mode {}", gg[DISPCNT] & 7),
         }
     }
 

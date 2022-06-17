@@ -284,26 +284,26 @@ impl GameGirlAdv {
 
             "000_oooocnnnnddddaaaaattrmmmm" => {
                 // ALU with register
-                let carry = self.cpu.flag(Carry);
+                let cpsr = self.cpu.cpsr;
                 if r == 0 {
                     // Shift by imm
                     let rm = self.cpu.reg(m);
                     let second_op = self.shifted_op::<true>(rm, t, a);
-                    self.alu::<false>(o, n, second_op, d, c == 1, carry);
+                    self.alu::<false>(o, n, second_op, d, c == 1, cpsr);
                 } else {
                     // Shift by reg
                     let rm = self.cpu.reg_pc4(m);
                     let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF);
-                    self.alu::<true>(o, n, second_op, d, c == 1, carry);
+                    self.alu::<true>(o, n, second_op, d, c == 1, cpsr);
                 }
                 self.add_wait_cycles(1);
             }
 
             "001_oooocnnnnddddssssmmmmmmmm" => {
                 // ALU with immediate
-                let carry = self.cpu.flag(Carry);
+                let cpsr = self.cpu.cpsr;
                 let second_op = self.cpu.ror::<false>(m, s << 1);
-                self.alu::<false>(o, n, second_op, d, c == 1, carry);
+                self.alu::<false>(o, n, second_op, d, c == 1, cpsr);
             }
 
             _ => Self::log_unknown_opcode(inst),
@@ -317,10 +317,10 @@ impl GameGirlAdv {
         b: u32,
         dest: u32,
         flags: bool,
-        carry: bool,
+        cpsr: u32,
     ) {
-        let cpsr = self.cpu.cpsr;
         let d = self.cpu.reg(dest);
+        let carry = cpsr.is_bit(Carry as u16);
 
         let reg_a = if SHIFT_REG {
             self.cpu.reg_pc4(reg_a)
@@ -373,7 +373,6 @@ impl GameGirlAdv {
         if !flags {
             // Restore CPSR if we weren't supposed to set flags
             self.cpu.cpsr = cpsr;
-            self.cpu.set_flag(Carry, carry);
         } else if dest == 15
             && self.cpu.context() != Context::User
             && self.cpu.context() != Context::System
