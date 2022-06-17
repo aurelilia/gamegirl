@@ -202,7 +202,9 @@ impl GameGirlAdv {
 
             // PPU
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
-            VCOUNT => (),
+
+            // RO registers
+            VCOUNT | KEYINPUT => (),
 
             _ => self[a] = value,
         }

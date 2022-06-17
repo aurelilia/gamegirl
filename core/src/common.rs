@@ -60,7 +60,7 @@ impl System {
     pub fn set_button(&mut self, btn: Button, pressed: bool) {
         match self {
             System::GGC(gg) => Joypad::set(gg, btn, pressed),
-            System::GGA(_gg) => (),
+            System::GGA(gg) => gg.set_button(btn, pressed),
         }
     }
 
@@ -216,6 +216,7 @@ pub enum BorrowedSystem<'s> {
 
 /// Buttons on a system. For GGC, L/R are unused.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[repr(C)]
 pub enum Button {
     A,
     B,
@@ -225,8 +226,8 @@ pub enum Button {
     Left,
     Up,
     Down,
-    L,
     R,
+    L,
 }
 
 impl Button {
@@ -239,8 +240,8 @@ impl Button {
         Self::Left,
         Self::Up,
         Self::Down,
-        Self::L,
         Self::R,
+        Self::L,
     ];
 }
 
