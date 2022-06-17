@@ -9,11 +9,17 @@ impl GameGirlAdv {
     /// Called by multiple load/store instructions when the Rlist was
     /// empty, which causes R15 to be loaded/stored and Rb to be
     /// incremented/decremented by 0x40.
-    pub fn on_empty_rlist(&mut self, rb: u32, str: bool, up: bool) {
+    pub fn on_empty_rlist(&mut self, rb: u32, str: bool, up: bool, before: bool) {
         let addr = self.cpu.reg(rb);
         self.cpu.set_reg(rb, Self::mod_with_offs(addr, 0x40, up));
 
         if str {
+            let addr = match (up, before) {
+                (true, true) => addr + 4,
+                (true, false) => addr,
+                (false, true) => addr - 0x40,
+                (false, false) => addr - 0x3C,
+            };
             self.write_word(addr, self.cpu.pc + self.cpu.inst_size(), NonSeq);
         } else {
             let val = self.read_word(addr, NonSeq);

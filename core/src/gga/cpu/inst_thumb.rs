@@ -264,7 +264,7 @@ impl GameGirlAdv {
                     self.set_word(addr, self.cpu.low[b.us()]);
                 }
                 if kind == NonSeq {
-                    self.on_empty_rlist(b.u32(), true, true);
+                    self.on_empty_rlist(b.u32(), true, true, false);
                 }
             }
             "1100_1bbbrrrrrrrr" => {
@@ -278,7 +278,7 @@ impl GameGirlAdv {
                     }
                 }
                 if kind == NonSeq {
-                    self.on_empty_rlist(b.u32(), false, true);
+                    self.on_empty_rlist(b.u32(), false, true, false);
                 }
                 self.add_wait_cycles(1);
             }

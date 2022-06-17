@@ -129,8 +129,10 @@ impl GameGirlAdv {
                 }
 
                 let mut offs = 0;
-                // TODO mehhh
+                // TODO mehhh, this entire implementation is terrible
                 let mut regs = (0..=15).filter(|b| r.is_bit(*b)).collect::<Vec<u16>>();
+                let first_reg = *regs.get(0).unwrap_or(&12323);
+                let end_offs = regs.len().u32() * 4;
                 if u == 0 {
                     regs.reverse();
                 }
@@ -141,6 +143,10 @@ impl GameGirlAdv {
                     set_n |= reg == n.u16();
                     if p == 1 {
                         offs += 4;
+                    }
+                    if l == 0 && reg == n.u16() && reg != first_reg {
+                        self.cpu
+                            .set_reg(n, Self::mod_with_offs(self.reg(n), end_offs, u == 1));
                     }
                     self.ldrstr::<true>(false, u == 1, 4, false, l == 0, n, reg.u32(), offs, kind);
                     kind = Seq;
@@ -156,7 +162,7 @@ impl GameGirlAdv {
 
                 self.cpu.cpsr = cpsr;
                 if kind == NonSeq {
-                    self.on_empty_rlist(n, l == 0, u == 1);
+                    self.on_empty_rlist(n, l == 0, u == 1, p == 1);
                 }
             }
 
