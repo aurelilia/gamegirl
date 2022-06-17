@@ -10,7 +10,8 @@ use crate::{
 
 impl GameGirlAdv {
     pub fn set_button(&mut self, btn: Button, state: bool) {
-        self[KEYINPUT] = self[KEYINPUT].set_bit(btn as u16, state);
+        self[KEYINPUT] = self[KEYINPUT].set_bit(btn as u16, !state);
+        self.check_cnt();
     }
 
     fn check_cnt(&mut self) {

@@ -1,7 +1,7 @@
 use crate::{
     common::{self, EmulateOptions},
     debugger::Debugger,
-    gga::{cpu::registers::Flag, dma::Dma, memory::KB, timer::Timer},
+    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dma, memory::KB, timer::Timer},
     ggc::GGConfig,
     numutil::NumExt,
     Colour,
@@ -254,6 +254,8 @@ impl Default for GameGirlAdv {
             clock: 0,
             wait_cycles: 0,
         };
+
+        gg[KEYINPUT] = 0x3F;
 
         // Skip bootrom for now
         gg.cpu.pc = 0x0800_0000;

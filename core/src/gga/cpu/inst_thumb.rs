@@ -63,7 +63,7 @@ impl GameGirlAdv {
                         self.cpu.asr::<false>(rd, rs & 0xFF)
                     }
                     0x5 => self.cpu.adc(rd, rs, self.cpu.flag(Carry) as u32),
-                    0x6 => self.cpu.sbc(rd, rs, (!self.cpu.flag(Carry)) as u32),
+                    0x6 => self.cpu.sbc(rd, rs, self.cpu.flag(Carry) as u32),
                     0x7 => {
                         self.add_wait_cycles(1);
                         self.cpu.ror::<false>(rd, rs & 0xFF)

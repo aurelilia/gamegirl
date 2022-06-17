@@ -32,8 +32,8 @@ impl GameGirlAdv {
             "000100101111111111110001_nnnn" => {
                 let rn = self.reg(n);
                 if rn.is_bit(0) {
-                    self.cpu.set_pc(rn - 1);
                     self.cpu.set_flag(Thumb, true);
+                    self.cpu.set_pc(rn - 1);
                 } else {
                     self.cpu.set_pc(rn);
                 }
@@ -341,8 +341,8 @@ impl GameGirlAdv {
             0x3 => self.cpu.sub(b, reg_a),
             0x4 => self.cpu.add(reg_a, b),
             0x5 => self.cpu.adc(reg_a, b, carry as u32),
-            0x6 => self.cpu.sbc(reg_a, b, (!carry) as u32),
-            0x7 => self.cpu.sbc(b, reg_a, (!carry) as u32),
+            0x6 => self.cpu.sbc(reg_a, b, carry as u32),
+            0x7 => self.cpu.sbc(b, reg_a, carry as u32),
             0x8 => {
                 // TST
                 self.cpu.and(reg_a, b);

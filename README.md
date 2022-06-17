@@ -79,10 +79,12 @@ All tests except for `oam_bug` (which will not be implemented) pass.
 mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibility mode on dmg-acid2.
 
 ### GGA
-#### jsmolka's gba-tests
-- `arm`, `memory`, `thumb`: All tests pass
-- Everything else untested
-
+- [ ] jsmolka's gba-tests
+  - [x] `arm`
+  - [x] `memory`
+  - [x] `thumb`
+  - Everything else untested
+- [x] [FuzzARM](https://github.com/DenSinH/FuzzARM)
 
 ## Thanks To
 ### General
@@ -103,3 +105,4 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 - [GBATEK, as a technical reference](https://problemkaputt.de/gbatek.htm)
 - [mj-hd, for rgba, which I used to properly understand ARM7 emulation details](https://github.com/mj-hd/rgba/)
 - [jsmolka, for their testing ROMs](https://github.com/jsmolka/gba-tests)
+- [DenSinH, for FuzzARM](https://github.com/DenSinH/FuzzARM)
