@@ -43,7 +43,7 @@ impl Cpu {
         }
 
         gg.advance_clock();
-        if gg[HALTCNT].is_bit(15) || Self::check_interrupt_occurs(gg) {
+        if Self::check_interrupt_occurs(gg) || gg[HALTCNT].is_bit(15) {
             return;
         }
 
@@ -75,6 +75,7 @@ impl Cpu {
         if int {
             gg.cpu.inc_pc_by(4);
             gg.cpu.exception_occurred(Exception::Irq);
+            gg[HALTCNT] = gg[HALTCNT].set_bit(15, false); // Exit halt state if we were in it
         }
         int
     }
@@ -136,7 +137,7 @@ impl Default for Cpu {
             sp: [0x0300_7F00, 0x0, 0x0300_7FE0, 0x0, 0x0300_7FA0, 0x0],
             lr: ModeReg::default(),
             pc: 0,
-            cpsr: 0x1F,
+            cpsr: 0xD3,
             spsr: ModeReg::default(),
             pc_just_changed: false,
             last_access_type: Access::NonSeq,

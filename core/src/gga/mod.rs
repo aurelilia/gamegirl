@@ -255,7 +255,7 @@ impl Default for GameGirlAdv {
             wait_cycles: 0,
         };
 
-        gg[KEYINPUT] = 0x3F;
+        gg[KEYINPUT] = 0x3FF;
 
         // Skip bootrom for now
         gg.cpu.pc = 0x0800_0000;
