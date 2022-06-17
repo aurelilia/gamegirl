@@ -322,8 +322,8 @@ impl GameGirlAdv {
         let cpsr = self.cpu.cpsr;
         let d = self.cpu.reg(dest);
 
-        let reg_a = if SHIFT_REG && reg_a == 15 {
-            self.cpu.pc + 4
+        let reg_a = if SHIFT_REG {
+            self.cpu.reg_pc4(reg_a)
         } else {
             self.reg(reg_a)
         };
