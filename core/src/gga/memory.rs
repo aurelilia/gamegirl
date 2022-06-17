@@ -170,21 +170,21 @@ impl GameGirlAdv {
             0x0500_0000..=0x05FF_FFFF => {
                 self.ppu.palette[a & 0x3FF] = value.low();
                 self.ppu.palette[(a & 0x3FF) + 1] = value.high();
-            },
+            }
             0x0600_0000..=0x0601_7FFF => {
                 self.ppu.vram[a & 0x17FFF] = value.low();
                 self.ppu.vram[(a & 0x17FFF) + 1] = value.high();
-            },
+            }
             0x0700_0000..=0x07FF_FFFF => {
                 self.ppu.oam[a & 0x3FF] = value.low();
                 self.ppu.oam[(a & 0x3FF) + 1] = value.high();
-            },
+            }
 
             // VRAM mirror weirdness
             0x0601_8000..=0x0601_FFFF => {
                 self.ppu.vram[0x1_0000 + a & 0x7FFF] = value.low();
                 self.ppu.vram[(0x1_0000 + a & 0x7FFF) + 1] = value.high();
-            },
+            }
             0x0602_0000..=0x06FF_FFFF => self.set_hword(addr & 0x0601_FFFF, value),
 
             _ => {

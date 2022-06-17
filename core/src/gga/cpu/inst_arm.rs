@@ -76,6 +76,7 @@ impl GameGirlAdv {
                 if l == 1 {
                     // MLA
                     res = res.wrapping_add(self.cpu.reg(n));
+                    self.cpu.set_zn(res);
                     self.add_wait_cycles(1);
                 }
 
