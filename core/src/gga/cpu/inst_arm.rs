@@ -122,39 +122,41 @@ impl GameGirlAdv {
 
             "100_puswlnnnnrrrrrrrrrrrrrrrr" => {
                 // STM/LDM
-                let _s = s; // TODO implement S
+                let cpsr = self.cpu.cpsr;
+                if s == 1 {
+                    // Use user mode regs
+                    self.cpu.set_context(Context::System);
+                }
+
                 let mut offs = 0;
                 // TODO mehhh
-                let mut regs = (0..=15).collect::<Vec<u16>>();
+                let mut regs = (0..=15).filter(|b| r.is_bit(*b)).collect::<Vec<u16>>();
                 if u == 0 {
                     regs.reverse();
                 }
                 let mut kind = NonSeq;
+                let mut set_n = false;
+
                 for reg in regs {
-                    if r.is_bit(reg) {
-                        if p == 1 {
-                            offs += 4;
-                        }
-                        self.ldrstr::<true>(
-                            false,
-                            u == 1,
-                            4,
-                            false,
-                            l == 0,
-                            n,
-                            reg.u32(),
-                            offs,
-                            kind,
-                        );
-                        kind = Seq;
-                        if p == 0 {
-                            offs += 4;
-                        }
+                    set_n |= reg == n.u16();
+                    if p == 1 {
+                        offs += 4;
+                    }
+                    self.ldrstr::<true>(false, u == 1, 4, false, l == 0, n, reg.u32(), offs, kind);
+                    kind = Seq;
+                    if p == 0 {
+                        offs += 4;
                     }
                 }
-                if w == 1 {
+
+                if w == 1 && (l == 0 || !set_n) {
                     self.cpu
                         .set_reg(n, Self::mod_with_offs(self.reg(n), offs, u == 1));
+                }
+
+                self.cpu.cpsr = cpsr;
+                if kind == NonSeq {
+                    self.on_empty_rlist(n, l == 0, u == 1);
                 }
             }
 
@@ -251,8 +253,7 @@ impl GameGirlAdv {
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
-                // TODO unaligned read behavior is not handled
-                self.ldrstr::<true>(
+                self.ldrstr::<false>(
                     p == 0,
                     u == 1,
                     2,
@@ -267,8 +268,7 @@ impl GameGirlAdv {
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
                 // LDRSH with reg
-                // TODO unaligned read behavior is not handled
-                self.ldrstr::<true>(
+                self.ldrstr::<false>(
                     p == 0,
                     u == 1,
                     2,
@@ -431,8 +431,12 @@ impl GameGirlAdv {
                 let val = self.read_word_ldrswp(addr, kind);
                 self.cpu.set_reg(d, val);
             }
-            (false, 2) => {
+            (false, 2) if ALIGN => {
                 let val = self.read_hword(addr, kind);
+                self.cpu.set_reg(d, val);
+            }
+            (false, 2) => {
+                let val = self.read_hword_ldrsh(addr, kind);
                 self.cpu.set_reg(d, val);
             }
             (false, _) => {

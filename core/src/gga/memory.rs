@@ -44,6 +44,20 @@ impl GameGirlAdv {
         }
     }
 
+    /// Read a half-word from the bus (LE). Also enforces timing.
+    /// If address is unaligned, do LDRSH behavior.
+    pub(super) fn read_hword_ldrsh(&mut self, addr: u32, kind: Access) -> u32 {
+        self.add_wait_cycles(self.wait_time::<2>(addr, kind));
+        if addr.is_bit(0) {
+            // Unaligned
+            let val = self.get_byte(addr);
+            val as i8 as i16 as u32
+        } else {
+            // Aligned
+            self.get_hword(addr).u32()
+        }
+    }
+
     /// Read a word from the bus (LE). Also enforces timing.
     pub(super) fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
         let addr = addr & !3; // Forcibly align
