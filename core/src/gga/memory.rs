@@ -148,18 +148,13 @@ impl GameGirlAdv {
             0x0200_0000..=0x02FF_FFFF => self.memory.ewram[a & 0x3FFFF] = value,
             0x0300_0000..=0x03FF_FFFF => self.memory.iwram[a & 0x7FFF] = value,
 
-            0x0500_0000..=0x05FF_FFFF => self.ppu.palette[a & 0x3FF] = value,
-            0x0600_0000..=0x0601_7FFF => self.ppu.vram[a & 0x17FFF] = value,
-            0x0700_0000..=0x07FF_FFFF => self.ppu.oam[a & 0x3FF] = value,
-
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
             }
             0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
-            // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => self.ppu.vram[0x1_0000 + a & 0x7FFF] = value,
-            0x0602_0000..=0x06FF_FFFF => self.set_byte(addr & 0x0601_FFFF, value),
+            // VRAM weirdness
+            0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
             _ => (),
         }
     }
@@ -171,6 +166,27 @@ impl GameGirlAdv {
         let a = addr.us();
         match a {
             0x0400_0000..=0x04FF_FFFF => self.set_mmio(addr, value),
+
+            0x0500_0000..=0x05FF_FFFF => {
+                self.ppu.palette[a & 0x3FF] = value.low();
+                self.ppu.palette[(a & 0x3FF) + 1] = value.high();
+            },
+            0x0600_0000..=0x0601_7FFF => {
+                self.ppu.vram[a & 0x17FFF] = value.low();
+                self.ppu.vram[(a & 0x17FFF) + 1] = value.high();
+            },
+            0x0700_0000..=0x07FF_FFFF => {
+                self.ppu.oam[a & 0x3FF] = value.low();
+                self.ppu.oam[(a & 0x3FF) + 1] = value.high();
+            },
+
+            // VRAM mirror weirdness
+            0x0601_8000..=0x0601_FFFF => {
+                self.ppu.vram[0x1_0000 + a & 0x7FFF] = value.low();
+                self.ppu.vram[(0x1_0000 + a & 0x7FFF) + 1] = value.high();
+            },
+            0x0602_0000..=0x06FF_FFFF => self.set_hword(addr & 0x0601_FFFF, value),
+
             _ => {
                 self.set_byte(addr, value.low());
                 self.set_byte(addr.wrapping_add(1), value.high());
