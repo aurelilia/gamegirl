@@ -3,6 +3,7 @@ use crate::{
     debugger::Debugger,
     gga::{cpu::registers::Flag, dma::Dma, input::Input, memory::KB, timer::Timer},
     ggc::GGConfig,
+    numutil::NumExt,
     Colour,
 };
 use audio::Apu;
@@ -58,7 +59,7 @@ pub struct GameGirlAdv {
     /// Temporary used during instruction execution that counts
     /// the amount of cycles the CPU has to wait until it can
     /// execute the next instruction.
-    wait_cycles: usize,
+    wait_cycles: u16,
 }
 
 impl GameGirlAdv {
@@ -155,13 +156,13 @@ impl GameGirlAdv {
 
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
-        self.clock += self.wait_cycles;
-        // TODO Advance the system
+        self.clock += self.wait_cycles.us();
+        Ppu::step(self, self.wait_cycles);
         self.wait_cycles = 0;
     }
 
     /// Add wait cycles, which advance the system besides the CPU.
-    fn add_wait_cycles(&mut self, count: usize) {
+    fn add_wait_cycles(&mut self, count: u16) {
         self.wait_cycles += count;
     }
 
@@ -229,12 +230,7 @@ impl Default for GameGirlAdv {
                 iwram: [0; 32 * KB],
                 mmio: [0; KB / 2],
             },
-            ppu: Ppu {
-                palette: [0; KB],
-                vram: [0; 96 * KB],
-                oam: [0; KB],
-                last_frame: None,
-            },
+            ppu: Ppu::default(),
             apu: Apu {
                 buffer: Vec::with_capacity(1000),
             },

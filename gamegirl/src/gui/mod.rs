@@ -137,7 +137,7 @@ struct App {
 
 impl epi::App for App {
     fn update(&mut self, ctx: &Context, frame: &Frame) {
-        self.update_gg(ctx, FRAME_LEN);
+        let size = self.update_gg(ctx, FRAME_LEN);
         self.process_messages();
 
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
@@ -154,8 +154,8 @@ impl epi::App for App {
                 ui.image(
                     self.texture,
                     [
-                        160.0 * self.state.options.display_scale as f32,
-                        144.0 * self.state.options.display_scale as f32,
+                        (size[0] * self.state.options.display_scale) as f32,
+                        (size[1] * self.state.options.display_scale) as f32,
                     ],
                 );
             });
@@ -226,14 +226,16 @@ impl epi::App for App {
 }
 
 impl App {
-    /// Update the system's state
-    fn update_gg(&mut self, ctx: &Context, advance_by: Duration) {
-        let frame = self.get_gg_frame(ctx, advance_by);
-        if let Some((pixels, size)) = frame {
+    /// Update the system's state.
+    /// Returns screen dimensions.
+    fn update_gg(&mut self, ctx: &Context, advance_by: Duration) -> [usize; 2] {
+        let (frame, size) = self.get_gg_frame(ctx, advance_by);
+        if let Some(pixels) = frame {
             let img = ImageDelta::full(ImageData::Color(ColorImage { size, pixels }));
             let manager = ctx.tex_manager();
             manager.write().set(self.texture, img);
         }
+        size
     }
 
     /// Process keyboard inputs and return the GG's next frame, if one was
@@ -242,7 +244,7 @@ impl App {
         &mut self,
         ctx: &Context,
         advance_by: Duration,
-    ) -> Option<(Vec<Colour>, [usize; 2])> {
+    ) -> (Option<Vec<Colour>>, [usize; 2]) {
         for event in &ctx.input().events {
             if let Event::Key { key, pressed, .. } = event {
                 if let Some(action) = self.state.options.input.pending.take() {
@@ -268,9 +270,10 @@ impl App {
             if let Some(state) = self.rewinder.rewind_buffer.lock().unwrap().pop() {
                 gg.load_state(state);
                 gg.options().invert_audio_samples = true;
-                return gg
-                    .produce_frame()
-                    .map(|p| (unsafe { mem::transmute(p) }, size));
+                return (
+                    gg.produce_frame().map(|p| unsafe { mem::transmute(p) }),
+                    size,
+                );
             } else {
                 self.rewinder.rewinding = false;
                 gg.options().invert_audio_samples = false;
@@ -278,8 +281,7 @@ impl App {
         } else {
             gg.advance_delta(advance_by.as_secs_f32());
         }
-        gg.last_frame()
-            .map(|p| (unsafe { mem::transmute(p) }, size))
+        (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size)
     }
 
     /// Process all async messages that came in during this frame.

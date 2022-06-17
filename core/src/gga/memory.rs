@@ -163,7 +163,13 @@ impl GameGirlAdv {
     fn set_mmio(&mut self, addr: u32, value: u16) {
         let a = addr & 0x3FF;
         match addr {
+            // General
             IME => self[IME] = value & 1,
+
+            // PPU
+            DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
+            VCOUNT => (),
+
             _ => self[a >> 1] = value,
         }
     }
@@ -178,7 +184,7 @@ impl GameGirlAdv {
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
 
-    fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> usize {
+    fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         match (addr, W, ty) {
             (0x0200_0000..=0x02FF_FFFF, 4, _) => 6,
             (0x0200_0000..=0x02FF_FFFF, _, _) => 3,
@@ -210,7 +216,6 @@ impl GameGirlAdv {
 
             _ => 1,
         }
-        .us()
     }
 }
 

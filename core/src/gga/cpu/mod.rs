@@ -122,6 +122,10 @@ impl Cpu {
         // 4 on ARM, 2 on THUMB
         4 - ((self.flag(Thumb) as u32) << 1)
     }
+
+    pub fn request_interrupt(gg: &mut GameGirlAdv, int: Interrupt) {
+        gg[IF] = gg[IF].set_bit(int as u16, true);
+    }
 }
 
 impl Default for Cpu {
@@ -142,6 +146,7 @@ impl Default for Cpu {
 }
 
 /// Possible interrupts.
+#[repr(C)]
 pub enum Interrupt {
     VBlank,
     HBlank,
