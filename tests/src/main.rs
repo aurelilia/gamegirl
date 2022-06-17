@@ -36,7 +36,9 @@ fn main() {
             mooneye::exec("emulator-only");
         }
         println!("\nExecuting gba-tests");
-        gba::exec();
+        gba::exec_gba_tests();
+        println!("\nExecuting FuzzARM");
+        gba::exec_fuzzarm();
     }
 }
 
