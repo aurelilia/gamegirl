@@ -85,7 +85,7 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
   - [x] `thumb`
   - Everything else untested
 - [x] [FuzzARM](https://github.com/DenSinH/FuzzARM), all 5 precompiled tests
-- [ ] ARMWrestler (All but LDM/STM pass, grr)
+- [x] ARMWrestler
 
 ## Thanks To
 ### General

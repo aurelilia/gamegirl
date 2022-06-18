@@ -129,8 +129,8 @@ impl GameGirlAdv {
                     self.cpu.set_context(Context::System);
                 }
 
-                let mut offs = 0;
                 // TODO mehhh, this entire implementation is terrible
+                let mut addr = self.reg(n);
                 let mut regs = (0..=15).filter(|b| r.is_bit(*b)).collect::<Vec<u16>>();
                 let first_reg = *regs.get(0).unwrap_or(&12323);
                 let end_offs = regs.len().u32() * 4;
@@ -143,22 +143,28 @@ impl GameGirlAdv {
                 for reg in regs {
                     set_n |= reg == n.u16();
                     if p == 1 {
-                        offs += 4;
+                        addr = Self::mod_with_offs(addr, 4, u == 1);
                     }
                     if l == 0 && reg == n.u16() && reg != first_reg {
                         self.cpu
                             .set_reg(n, Self::mod_with_offs(self.reg(n), end_offs, u == 1));
                     }
-                    self.ldrstr::<true>(false, u == 1, 4, false, l == 0, n, reg.u32(), offs, kind);
+
+                    if l == 0 {
+                        self.write_word(addr, self.reg(reg.u32()), kind);
+                    } else {
+                        let val = self.read_word(addr, kind);
+                        self.cpu.set_reg(reg.u32(), val);
+                    }
+
                     kind = Seq;
                     if p == 0 {
-                        offs += 4;
+                        addr = Self::mod_with_offs(addr, 4, u == 1);
                     }
                 }
 
                 if w == 1 && (l == 0 || !set_n) {
-                    self.cpu
-                        .set_reg(n, Self::mod_with_offs(self.reg(n), offs, u == 1));
+                    self.cpu.set_reg(n, addr);
                 }
 
                 self.cpu.cpsr = cpsr;
@@ -387,8 +393,11 @@ impl GameGirlAdv {
             && self.cpu.context() != Context::System
         {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
-            // SPSR
+            // SPSR, also flush pipeline if switch to Thumb occurred
             self.cpu.cpsr = self.cpu.spsr();
+            if self.cpu.flag(Thumb) {
+                self.cpu.pc_just_changed = true;
+            }
         }
     }
 
