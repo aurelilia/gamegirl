@@ -20,6 +20,8 @@ use crate::{
 };
 use std::mem;
 
+const TRACING: bool = false;
+
 /// Represents the CPU of the console - an ARM7TDMI.
 #[derive(Deserialize, Serialize)]
 pub struct Cpu {
@@ -41,10 +43,18 @@ impl Cpu {
         if !gg.debugger.should_execute(gg.cpu.pc) {
             return;
         }
+        if gg.cpu.pc_just_changed {
+            Self::fix_prefetch(gg);
+            gg.cpu.pc_just_changed = false;
+        }
 
         gg.advance_clock();
         if Self::check_interrupt_occurs(gg) || gg[HALTCNT].is_bit(15) {
             return;
+        }
+
+        if TRACING {
+            println!("0x{:08X} {}", gg.cpu.pc, gg.get_inst_mnemonic(gg.cpu.pc));
         }
 
         let inst = Self::next_inst(gg);
@@ -54,12 +64,8 @@ impl Cpu {
             gg.execute_inst_arm(inst);
         }
         // All instructions take at least one cycle.
-        gg.add_wait_cycles(1);
-
-        if gg.cpu.pc_just_changed {
-            Self::fix_prefetch(gg);
-            gg.cpu.pc_just_changed = false;
-        }
+        // TODO correct? idts due to read already taking time
+        // gg.add_wait_cycles(1);
     }
 
     fn next_inst(gg: &mut GameGirlAdv) -> u32 {
@@ -82,17 +88,18 @@ impl Cpu {
     }
 
     fn exception_occurred(&mut self, kind: Exception) {
+        let cpsr = self.cpsr;
         self.set_context(kind.context());
-
-        self.set_lr(self.pc - self.inst_size());
-        self.set_spsr(self.cpsr);
-        self.set_pc(kind.vector());
 
         self.set_flag(Thumb, false);
         self.set_flag(IrqDisable, true);
         if let Exception::Reset | Exception::Fiq = kind {
             self.set_flag(FiqDisable, true);
         }
+
+        self.set_lr(self.pc - self.inst_size());
+        self.set_spsr(cpsr);
+        self.set_pc(kind.vector());
     }
 
     fn inst_at_pc(gg: &mut GameGirlAdv) -> u32 {
