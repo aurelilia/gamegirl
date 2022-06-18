@@ -1,4 +1,5 @@
 mod mode;
+mod objects;
 mod palette;
 
 use super::memory::KB;
@@ -110,6 +111,7 @@ impl Ppu {
         }
 
         match gg[DISPCNT] & 7 {
+            0 => Self::render_mode0(gg, gg[VCOUNT]),
             3 => Self::render_mode3(gg, gg[VCOUNT]),
             4 => Self::render_mode4(gg, gg[VCOUNT]),
             5 => Self::render_mode5(gg, gg[VCOUNT]),

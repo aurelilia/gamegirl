@@ -18,6 +18,9 @@ pub trait NumExt {
     /// Convert to usize
     fn us(self) -> usize;
 
+    /// Get bits in a certain range
+    fn bits(self, start: Self::Output, len: Self::Output) -> Self::Output;
+
     /// Shift to the left, giving 0 if it does not fit.
     fn wshl(self, by: u32) -> Self::Output;
     /// Shift to the right, giving 0 if it does not fit.
@@ -64,6 +67,10 @@ macro_rules! num_ext_impl {
                 self as usize
             }
 
+            fn bits(self, start: $ty, len: $ty) -> $ty {
+                (self >> start) & ((1 << len) - 1)
+            }
+
             fn wshl(self, by: u32) -> $ty {
                 self.checked_shl(by).unwrap_or(0)
             }
@@ -95,7 +102,6 @@ pub trait U16Ext {
     fn high(self) -> u8;
     fn set_low(self, low: u8) -> u16;
     fn set_high(self, high: u8) -> u16;
-    fn bits(self, start: u16, len: u16) -> u16;
     fn i10(self) -> i16;
 }
 
@@ -116,10 +122,6 @@ impl U16Ext for u16 {
         (self & 0x00FF) | (high.u16() << 8)
     }
 
-    fn bits(self, start: u16, len: u16) -> u16 {
-        (self >> start) & ((1 << len) - 1)
-    }
-
     fn i10(self) -> i16 {
         let mut result = self & 0x3FF;
         if (self & 0x0400) > 1 {
@@ -134,7 +136,6 @@ pub trait U32Ext {
     fn high(self) -> u16;
     fn set_low(self, low: u16) -> u32;
     fn set_high(self, high: u16) -> u32;
-    fn bits(self, start: u32, len: u32) -> u32;
     fn i24(self) -> i32;
 }
 
@@ -153,10 +154,6 @@ impl U32Ext for u32 {
 
     fn set_high(self, high: u16) -> u32 {
         (self & 0x0000FFFF) | (high.u32() << 16)
-    }
-
-    fn bits(self, start: u32, len: u32) -> u32 {
-        (self >> start) & ((1 << len) - 1)
     }
 
     fn i24(self) -> i32 {

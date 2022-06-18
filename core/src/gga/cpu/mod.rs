@@ -75,7 +75,8 @@ impl Cpu {
         if int {
             gg.cpu.inc_pc_by(4);
             gg.cpu.exception_occurred(Exception::Irq);
-            gg[HALTCNT] = gg[HALTCNT].set_bit(15, false); // Exit halt state if we were in it
+            gg[HALTCNT] = gg[HALTCNT].set_bit(15, false); // Exit halt state if
+                                                          // we were in it
         }
         int
     }

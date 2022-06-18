@@ -8,6 +8,10 @@ use crate::{
 };
 
 impl Ppu {
+    pub fn render_mode0(gg: &mut GameGirlAdv, line: u16) {
+        Self::render_objs::<0>(gg, line);
+    }
+
     pub fn render_mode3(gg: &mut GameGirlAdv, line: u16) {
         if !gg[DISPCNT].is_bit(BG2_EN) {
             return;
@@ -18,6 +22,8 @@ impl Ppu {
             let pixel = line_start + offs;
             gg.ppu.pixels[pixel] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
+
+        Self::render_objs::<512>(gg, line);
     }
 
     pub fn render_mode4(gg: &mut GameGirlAdv, line: u16) {
@@ -32,6 +38,8 @@ impl Ppu {
             let palette = gg.ppu.vram[vram_start + pixel];
             gg.ppu.pixels[pixel] = gg.ppu.idx_to_palette::<false>(palette);
         }
+
+        Self::render_objs::<512>(gg, line);
     }
 
     pub fn render_mode5(gg: &mut GameGirlAdv, line: u16) {
@@ -45,6 +53,8 @@ impl Ppu {
             let pixel = (line_start + offs).us();
             gg.ppu.pixels[pixel] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
+
+        Self::render_objs::<512>(gg, line);
     }
 
     fn bitmap_start_addr(gg: &GameGirlAdv) -> usize {
