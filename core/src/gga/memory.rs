@@ -119,7 +119,7 @@ impl GameGirlAdv {
 
     fn get_mmio(&self, addr: u32) -> u16 {
         let a = addr & 0x3FE;
-        match addr {
+        match a {
             // Timers
             TM0CNT_L => self.timers.counters[0],
             TM1CNT_L => self.timers.counters[1],
@@ -210,9 +210,10 @@ impl GameGirlAdv {
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
         let a = addr & 0x3FF;
-        match addr {
+        match a {
             // General
             IME => self[IME] = value & 1,
+            IF => self[IF] &= !value,
 
             // PPU
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),

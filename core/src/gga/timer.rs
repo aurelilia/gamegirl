@@ -50,7 +50,7 @@ impl Timers {
         let was_on = gg[addr].is_bit(7);
         let is_on = value.is_bit(7);
         if !was_on && is_on {
-            gg.timers.counters[idx] = gg[addr - 1];
+            gg.timers.counters[idx] = gg[addr - 2];
             gg.timers.cycle_counters[idx] = 0;
         }
 
