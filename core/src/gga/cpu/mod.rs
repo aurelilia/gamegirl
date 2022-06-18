@@ -53,16 +53,28 @@ impl Cpu {
             return;
         }
 
+        let inst = Self::next_inst(gg);
+
         if TRACING {
-            println!("0x{:08X} {}", gg.cpu.pc, gg.get_inst_mnemonic(gg.cpu.pc));
+            let mnem = if gg.cpu.flag(Thumb) {
+                GameGirlAdv::get_mnemonic_thumb(inst.u16())
+            } else {
+                GameGirlAdv::get_mnemonic_arm(inst)
+            };
+            println!("0x{:08X} {}", gg.cpu.pc, mnem);
         }
 
-        let inst = Self::next_inst(gg);
         if gg.cpu.flag(Thumb) {
             gg.execute_inst_thumb(inst.u16());
         } else {
             gg.execute_inst_arm(inst);
         }
+
+        if gg.cpu.pc_just_changed {
+            Self::fix_prefetch(gg);
+            gg.cpu.pc_just_changed = false;
+        }
+
         // All instructions take at least one cycle.
         // TODO correct? idts due to read already taking time
         // gg.add_wait_cycles(1);

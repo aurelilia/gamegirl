@@ -11,8 +11,8 @@ pub fn exec_gba_tests() {
             let hundreds = gg.cpu.reg(8);
             let test = ones + (tens * 10) + (hundreds * 100);
             Break(Status::FailAt(test.to_string()))
-        } else if gg.cpu.sp() == 0x03007F00 && gg.get_word(gg.cpu.pc) == 0xE92D4003 {
-            // These tests set SP to this value; the current instruction is always 'b 0x0'
+        } else if gg.get_word(gg.cpu.pc) == 0xE92D4003 {
+            // The current instruction is always 'b 0x0'
             Break(Status::Success)
         } else {
             Continue(())
