@@ -1,7 +1,7 @@
 use crate::{
     common::{self, EmulateOptions},
     debugger::Debugger,
-    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dma, memory::KB, timer::Timer},
+    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dma, memory::KB, timer::Timers},
     ggc::GGConfig,
     numutil::NumExt,
     Colour,
@@ -40,7 +40,7 @@ pub struct GameGirlAdv {
     pub ppu: Ppu,
     pub apu: Apu,
     pub dma: [Dma; 4],
-    pub timers: [Timer; 4],
+    pub timers: Timers,
     pub cart: Cartridge,
 
     pub options: EmulateOptions,
@@ -240,12 +240,7 @@ impl Default for GameGirlAdv {
                 Dma { regs: [0; 10] },
                 Dma { regs: [0; 10] },
             ],
-            timers: [
-                Timer { regs: [0; 4] },
-                Timer { regs: [0; 4] },
-                Timer { regs: [0; 4] },
-                Timer { regs: [0; 4] },
-            ],
+            timers: Timers::default(),
             cart: Cartridge::default(),
 
             options: EmulateOptions::default(),

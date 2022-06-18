@@ -2,6 +2,7 @@ use crate::{
     gga::{
         addr::*,
         cpu::Cpu,
+        timer::Timers,
         Access::{self, *},
         GameGirlAdv,
     },
@@ -111,8 +112,21 @@ impl GameGirlAdv {
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         let a = addr.us();
         match a {
-            0x0400_0000..=0x04FF_FFFF => self.memory.mmio[(a & 0x3FF) >> 1],
+            0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr),
             _ => hword(self.get_byte(addr), self.get_byte(addr.wrapping_add(1))),
+        }
+    }
+
+    fn get_mmio(&self, addr: u32) -> u16 {
+        let a = addr & 0x3FF;
+        match addr {
+            // Timers
+            TM0CNT_L => self.timers.counters[0],
+            TM1CNT_L => self.timers.counters[1],
+            TM2CNT_L => self.timers.counters[2],
+            TM3CNT_L => self.timers.counters[3],
+
+            _ => self[a],
         }
     }
 
@@ -203,6 +217,12 @@ impl GameGirlAdv {
             // PPU
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
 
+            // Timers
+            TM0CNT_H => Timers::hi_write(self, 0, value),
+            TM1CNT_H => Timers::hi_write(self, 1, value),
+            TM2CNT_H => Timers::hi_write(self, 2, value),
+            TM3CNT_H => Timers::hi_write(self, 3, value),
+
             // RO registers
             VCOUNT | KEYINPUT => (),
 
@@ -214,8 +234,8 @@ impl GameGirlAdv {
     /// sets the value.
     pub(super) fn set_word(&mut self, addr: u32, value: u32) {
         let addr = addr & !3; // Forcibly align: All write instructions do this
-        self.set_hword(addr, value.low());
         self.set_hword(addr.wrapping_add(2), value.high());
+        self.set_hword(addr, value.low());
     }
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];

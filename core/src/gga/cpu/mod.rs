@@ -126,7 +126,11 @@ impl Cpu {
     }
 
     pub fn request_interrupt(gg: &mut GameGirlAdv, int: Interrupt) {
-        gg[IF] = gg[IF].set_bit(int as u16, true);
+        Self::request_interrupt_idx(gg, int as u16);
+    }
+
+    pub fn request_interrupt_idx(gg: &mut GameGirlAdv, idx: u16) {
+        gg[IF] = gg[IF].set_bit(idx, true);
     }
 }
 
