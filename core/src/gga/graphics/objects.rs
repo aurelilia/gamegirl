@@ -1,5 +1,9 @@
 use crate::{
-    gga::{graphics::Ppu, GameGirlAdv},
+    gga::{
+        addr::DISPCNT,
+        graphics::{Ppu, OBJ_EN},
+        GameGirlAdv,
+    },
     numutil::{hword, NumExt},
     Colour,
 };
@@ -9,6 +13,10 @@ const OBJ_Y_SIZE: [u16; 12] = [8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64];
 
 impl Ppu {
     pub fn render_objs<const _START: u16>(gg: &mut GameGirlAdv, line: u16) {
+        if !gg[DISPCNT].is_bit(OBJ_EN) {
+            return;
+        }
+
         for idx in 0..127 {
             let addr = idx << 3;
             let obj = Object {
