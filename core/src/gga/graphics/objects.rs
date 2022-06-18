@@ -8,8 +8,8 @@ use crate::{
     Colour,
 };
 
-const OBJ_X_SIZE: [u16; 12] = [8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32];
-const OBJ_Y_SIZE: [u16; 12] = [8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64];
+const OBJ_X_SIZE: [u16; 16] = [8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32, 0, 0, 0, 0];
+const OBJ_Y_SIZE: [u16; 16] = [8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64, 0, 0, 0, 0];
 
 impl Ppu {
     pub fn render_objs<const _START: u16>(gg: &mut GameGirlAdv, line: u16) {

@@ -157,10 +157,6 @@ impl U32Ext for u32 {
     }
 
     fn i24(self) -> i32 {
-        let mut result = self & 0xFF_FFFF;
-        if (self & 0x80_0000) > 0 {
-            result |= 0xFF00_0000;
-        }
-        result as i32
+        ((self.bits(0, 24) << 8) as i32) >> 8
     }
 }

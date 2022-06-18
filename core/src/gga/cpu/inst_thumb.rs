@@ -222,6 +222,7 @@ impl GameGirlAdv {
                         kind = Seq;
                     }
                 }
+                assert!(kind == Seq);
                 self.cpu.set_sp(sp);
             }
             "1011_110brrrrrrrr" => {
@@ -239,7 +240,9 @@ impl GameGirlAdv {
                     let pc = self.read_word(sp, kind);
                     self.cpu.set_pc(pc);
                     sp += 4;
+                    kind = Seq;
                 }
+                assert!(kind == Seq);
                 self.cpu.set_sp(sp);
             }
 

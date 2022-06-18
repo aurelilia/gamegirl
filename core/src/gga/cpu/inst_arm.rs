@@ -380,11 +380,6 @@ impl GameGirlAdv {
             _ => self.cpu.not(b),
         };
 
-        if !(0x8..=0xB).contains(&op) {
-            // Only write if needed - 8-B should not
-            // since they might set PC when they should not
-            self.cpu.set_reg(dest, value);
-        }
         if !flags {
             // Restore CPSR if we weren't supposed to set flags
             self.cpu.cpsr = cpsr;
@@ -399,6 +394,12 @@ impl GameGirlAdv {
                 self.cpu.pc_just_changed = true;
             }
         }
+
+        if !(0x8..=0xB).contains(&op) {
+            // Only write if needed - 8-B should not
+            // since they might set PC when they should not
+            self.cpu.set_reg(dest, value);
+        }
     }
 
     fn msr(&mut self, src: u32, flags: bool, ctrl: bool, spsr: bool) {
@@ -410,12 +411,12 @@ impl GameGirlAdv {
         if ctrl && self.cpu.context() != Context::User {
             dest = (dest & 0xFFFFFF00) | (src & 0xFF)
         };
-        // Thumb flag may not be changed
-        dest = dest.set_bit(5, false);
 
         if spsr {
             self.cpu.set_spsr(dest);
         } else {
+            // Thumb flag may not be changed
+            dest = dest.set_bit(5, false);
             self.cpu.cpsr = dest;
         }
     }

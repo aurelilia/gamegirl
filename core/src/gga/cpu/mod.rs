@@ -100,6 +100,10 @@ impl Cpu {
     }
 
     fn exception_occurred(&mut self, kind: Exception) {
+        if self.flag(Thumb) {
+            self.inc_pc_by(2); // ??
+        }
+
         let cpsr = self.cpsr;
         self.set_context(kind.context());
 
