@@ -251,6 +251,7 @@ impl Default for GameGirlAdv {
 
         // Skip bootrom for now
         gg.cpu.pc = 0x0800_0000;
+        gg.cpu.cpsr = 0x1F;
         gg.cpu.sp[1] = 0x0300_7F00;
         gg.cpu.sp[3] = 0x0300_7F00;
         gg.cpu.sp[5] = 0x0300_7F00;

@@ -97,7 +97,7 @@ impl GameGirlAdv {
 
             // THUMB.5
             "010001_00dssssddd" => {
-                let res = self.cpu.add(self.reg(d.u32()), self.reg(s.u32()));
+                let res = self.reg(d.u32()).wrapping_add(self.reg(s.u32()));
                 self.cpu.set_reg(d.u32(), res);
             }
             "010001_01dssssddd" => {

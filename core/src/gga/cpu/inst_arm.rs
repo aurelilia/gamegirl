@@ -184,7 +184,9 @@ impl GameGirlAdv {
             }
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 // LDR/STR with reg
+                let cpsr = self.cpu.cpsr;
                 let offs = self.shifted_op::<true>(self.cpu.reg(m), t, s);
+                self.cpu.cpsr = cpsr;
                 let width = if b == 1 { 1 } else { 4 };
                 self.ldrstr::<false>(
                     p == 0,
