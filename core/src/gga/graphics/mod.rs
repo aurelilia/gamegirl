@@ -30,8 +30,8 @@ const WIN1_EN: u16 = 14;
 const WIN_OBJS: u16 = 15;
 
 // DISPSTAT
-const VBLANK: u16 = 0;
-const HBLANK: u16 = 1;
+pub const VBLANK: u16 = 0;
+pub const HBLANK: u16 = 1;
 const LYC_MATCH: u16 = 2;
 const VBLANK_IRQ: u16 = 3;
 const HBLANK_IRQ: u16 = 4;
@@ -106,15 +106,16 @@ impl Ppu {
     }
 
     fn render_line(gg: &mut GameGirlAdv) {
-        if gg[DISPSTAT].is_bit(VBLANK) || gg[DISPCNT].is_bit(FORCED_BLANK) {
+        let line = gg[VCOUNT];
+        if line >= 160 || gg[DISPCNT].is_bit(FORCED_BLANK) {
             return;
         }
 
         match gg[DISPCNT] & 7 {
-            0 => Self::render_mode0(gg, gg[VCOUNT]),
-            3 => Self::render_mode3(gg, gg[VCOUNT]),
-            4 => Self::render_mode4(gg, gg[VCOUNT]),
-            5 => Self::render_mode5(gg, gg[VCOUNT]),
+            0 => Self::render_mode0(gg, line),
+            3 => Self::render_mode3(gg, line),
+            4 => Self::render_mode4(gg, line),
+            5 => Self::render_mode5(gg, line),
             _ => println!("Unimplemented mode {}", gg[DISPCNT] & 7),
         }
     }

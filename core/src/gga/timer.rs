@@ -68,7 +68,7 @@ impl Timers {
                 // Overflow
                 let addr = Self::hi_addr(idx);
                 // Set to reload value
-                gg.timers.counters[idx] = gg[addr - 1];
+                gg.timers.counters[idx] = gg[addr - 2];
                 // Fire IRQ if enabled
                 if gg[addr].is_bit(6) {
                     Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16())

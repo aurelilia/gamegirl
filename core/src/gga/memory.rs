@@ -118,7 +118,7 @@ impl GameGirlAdv {
     }
 
     fn get_mmio(&self, addr: u32) -> u16 {
-        let a = addr & 0x3FF;
+        let a = addr & 0x3FE;
         match addr {
             // Timers
             TM0CNT_L => self.timers.counters[0],

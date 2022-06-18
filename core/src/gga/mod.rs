@@ -1,7 +1,7 @@
 use crate::{
     common::{self, EmulateOptions},
     debugger::Debugger,
-    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dma, memory::KB, timer::Timers},
+    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dmas, memory::KB, timer::Timers},
     ggc::GGConfig,
     numutil::NumExt,
     Colour,
@@ -39,7 +39,7 @@ pub struct GameGirlAdv {
     pub memory: Memory,
     pub ppu: Ppu,
     pub apu: Apu,
-    pub dma: [Dma; 4],
+    pub dma: Dmas,
     pub timers: Timers,
     pub cart: Cartridge,
 
@@ -157,6 +157,8 @@ impl GameGirlAdv {
     fn advance_clock(&mut self) {
         self.clock += self.wait_cycles.us();
         Ppu::step(self, self.wait_cycles);
+        Timers::step(self, self.wait_cycles);
+        Dmas::step(self);
         self.wait_cycles = 0;
     }
 
@@ -234,12 +236,7 @@ impl Default for GameGirlAdv {
                 buffer: Vec::with_capacity(1000),
             },
             // Meh...
-            dma: [
-                Dma { regs: [0; 10] },
-                Dma { regs: [0; 10] },
-                Dma { regs: [0; 10] },
-                Dma { regs: [0; 10] },
-            ],
+            dma: Dmas::default(),
             timers: Timers::default(),
             cart: Cartridge::default(),
 
