@@ -104,7 +104,10 @@ impl GameGirlAdv {
                 self.cpu.sub(self.reg(d.u32()), self.reg(s.u32()));
             } // CMP
             "010001_10dssssddd" => self.cpu.set_reg(d.u32(), self.reg(s.u32())),
-            "010001_1101111???" => self.cpu.set_flag(Thumb, false), // BX ARM switch
+            "010001_1101111???" => {
+                self.cpu.set_flag(Thumb, false);
+                self.cpu.set_pc(self.cpu.pc); // Align
+            }, // BX ARM switch
             "010001_110ssss???" => {
                 if !self.reg(s.u32()).is_bit(0) {
                     self.cpu.set_flag(Thumb, false);
