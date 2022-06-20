@@ -38,6 +38,11 @@ impl Dmas {
         let src = word(gg[base], gg[base + 2]);
         let dst = word(gg[base + 4], gg[base + 6]);
         let count = gg[base + 8];
+        let count = match count {
+            0 if idx == 3 => 0x1_0000,
+            0 => 0x4000,
+            _ => count.u32()
+        };
         let src_mod = Self::get_step(ctrl.bits(7, 2));
         let dst_mod = Self::get_step(ctrl.bits(5, 2));
         if ctrl.is_bit(10) {
@@ -60,7 +65,7 @@ impl Dmas {
         gg: &mut GameGirlAdv,
         mut src: u32,
         mut dst: u32,
-        count: u16,
+        count: u32,
         src_mod: i32,
         dst_mod: i32,
     ) {
