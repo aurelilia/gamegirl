@@ -86,7 +86,6 @@ impl Ppu {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                     gg.ppu.last_frame = Some(Self::correct_colours(gg.ppu.pixels.to_vec()));
-                    gg.ppu.pixels = [[31, 31, 31, 255]; 240 * 160];
                 } else if gg[VCOUNT] > 227 {
                     gg[VCOUNT] = 0;
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false);

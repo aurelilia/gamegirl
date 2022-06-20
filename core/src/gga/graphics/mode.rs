@@ -32,11 +32,13 @@ impl Ppu {
         }
 
         let line_start = line.us() * 240;
-        let vram_start = Self::bitmap_start_addr(gg);
+        let start_addr = Self::bitmap_start_addr(gg) + line_start;
         for offs in 0..240 {
             let pixel = line_start + offs;
-            let palette = gg.ppu.vram[vram_start + pixel];
-            gg.ppu.pixels[pixel] = gg.ppu.idx_to_palette::<false>(palette);
+            let palette = gg.ppu.vram[start_addr + offs];
+            if palette != 0 {
+                gg.ppu.pixels[pixel] = gg.ppu.idx_to_palette::<false>(palette);
+            }
         }
 
         Self::render_objs::<512>(gg, line);
@@ -59,9 +61,9 @@ impl Ppu {
 
     fn bitmap_start_addr(gg: &GameGirlAdv) -> usize {
         if gg[DISPCNT].is_bit(FRAME_SELECT) {
-            0xA000
-        } else {
             0x0
+        } else {
+            0xA000
         }
     }
 }
