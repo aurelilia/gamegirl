@@ -55,7 +55,7 @@ impl Dmas {
             Self::perform_transfer::<false>(gg, src, dst, count, src_mod, dst_mod);
         }
 
-        if !ctrl.is_bit(9) {
+        if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 {
             // Disable if reload is not enabled
             gg[base + 0xA] = ctrl.set_bit(15, false)
         }
