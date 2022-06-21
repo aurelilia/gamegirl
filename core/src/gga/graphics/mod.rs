@@ -8,6 +8,7 @@ use crate::{
     gga::{
         addr::{DISPCNT, DISPSTAT, VCOUNT},
         cpu::{Cpu, Interrupt},
+        dma::Dmas,
         GameGirlAdv,
     },
     numutil::{NumExt, U16Ext},
@@ -68,8 +69,11 @@ impl Ppu {
         gg.ppu.mode = match gg.ppu.mode {
             Mode::Upload => {
                 Self::render_line(gg);
+
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, true);
+                Dmas::update(gg);
+
                 Mode::HBlank
             }
 
@@ -85,6 +89,7 @@ impl Ppu {
                 if gg[VCOUNT] == 160 {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
+                    Dmas::update(gg);
                     gg.ppu.last_frame = Some(Self::correct_colours(gg.ppu.pixels.to_vec()));
                 } else if gg[VCOUNT] > 227 {
                     gg[VCOUNT] = 0;

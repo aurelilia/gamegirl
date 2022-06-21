@@ -23,7 +23,11 @@ const TIMEOUT: usize = 30;
 fn main() {
     if env::args().any(|a| a == "--bench") {
         let mut gg = System::default();
-        gg.load_cart(include_bytes!("../../bench.gb").to_vec(), None, &GGConfig::default());
+        gg.load_cart(
+            include_bytes!("../../bench.gb").to_vec(),
+            None,
+            &GGConfig::default(),
+        );
         for _ in 0..15 {
             gg.advance_delta(1.0);
         }

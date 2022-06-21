@@ -158,7 +158,6 @@ impl GameGirlAdv {
         self.clock += self.wait_cycles.us();
         Ppu::step(self, self.wait_cycles);
         Timers::step(self, self.wait_cycles);
-        Dmas::step(self);
         self.wait_cycles = 0;
     }
 

@@ -39,9 +39,9 @@ impl<Ptr: PartialEq + Copy> Debugger<Ptr> {
     /// Called before an instruction is executed, which might trigger a BP.
     /// If it does, function returns false and inst should not be executed.
     pub fn should_execute(&self, pc: Ptr) -> bool {
-        // if !self.breakpoints_enabled.load(Ordering::Relaxed) {
-        //     return true;
-        // }
+        if !self.breakpoints_enabled.load(Ordering::Relaxed) {
+            return true;
+        }
         let hit = self
             .breakpoints
             .lock()

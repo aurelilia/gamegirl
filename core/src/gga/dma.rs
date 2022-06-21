@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct Dmas {}
 
 impl Dmas {
-    pub fn step(gg: &mut GameGirlAdv) {
+    pub fn update(gg: &mut GameGirlAdv) {
         for idx in 0..4 {
             Self::step_dma(gg, idx);
         }
@@ -41,7 +41,7 @@ impl Dmas {
         let count = match count {
             0 if idx == 3 => 0x1_0000,
             0 => 0x4000,
-            _ => count.u32()
+            _ => count.u32(),
         };
         let src_mod = Self::get_step(ctrl.bits(7, 2));
         let dst_mod = Self::get_step(ctrl.bits(5, 2));

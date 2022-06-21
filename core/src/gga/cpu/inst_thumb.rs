@@ -107,7 +107,7 @@ impl GameGirlAdv {
             "010001_1101111???" => {
                 self.cpu.set_flag(Thumb, false);
                 self.cpu.set_pc(self.cpu.pc); // Align
-            }, // BX ARM switch
+            } // BX ARM switch
             "010001_110ssss???" => {
                 if !self.reg(s.u32()).is_bit(0) {
                     self.cpu.set_flag(Thumb, false);
