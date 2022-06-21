@@ -7,7 +7,6 @@ use crate::{
     numutil::NumExt,
 };
 use serde::{Deserialize, Serialize};
-use std::mem;
 
 const DIVS: [u16; 4] = [1, 64, 256, 1024];
 

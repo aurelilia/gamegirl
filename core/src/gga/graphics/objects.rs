@@ -1,6 +1,6 @@
 use crate::{
     gga::{
-        addr::DISPCNT,
+        addr::{DISPCNT, MOSAIC},
         graphics::{Ppu, OBJ_EN},
         GameGirlAdv,
     },
@@ -18,9 +18,10 @@ impl Ppu {
 
         for idx in 0..127 {
             let addr = idx << 3;
+            let y = gg.ppu.oam[addr] as i16;
             let obj = Object {
                 x: gg.ppu.oam[addr + 2].u16() + ((gg.ppu.oam[addr + 3].u16() & 1) << 8),
-                y: gg.ppu.oam[addr].u16(),
+                y: if y > 240 { y.wrapping_sub(0x100) } else { y },
                 attr0: gg.ppu.oam[addr + 1],
                 attr1: gg.ppu.oam[addr + 3],
                 attr2: hword(gg.ppu.oam[addr + 4], gg.ppu.oam[addr + 5]),
@@ -30,79 +31,43 @@ impl Ppu {
     }
 
     fn render_obj(gg: &mut GameGirlAdv, line: u16, obj: Object) {
-        let size = obj.size();
-        if obj.y > line || (obj.y + size.1) <= line {
-            return; // Not on this line or disabled
+        if !obj.draw_on(line) {
+            return;
         }
-        let obj_y = line - obj.y;
+        let (mut obj_x, x_step) = obj.signed_x();
+        let obj_y = obj.y_on(line, gg[MOSAIC]);
+        let tile_y = obj_y & 7;
 
-        let tile_line = obj_y & 7;
-        let mut x_pos = obj.x;
+        // TODO: 2D mapping mode, object modes.
+        let size = obj.size();
         let base_tile_idx = obj.attr2.bits(0, 10).us();
         let adj_tile_idx = base_tile_idx + ((obj_y.us() >> 3) * (size.0.us() >> 3));
-        let mut tile_addr = 0x1_0000 + (adj_tile_idx * 32) + (tile_line.us() * 4);
+        let mut tile_addr = 0x1_0000 + (adj_tile_idx * 32) + (tile_y.us() * 4);
+
+        let tile_count = size.0 >> 3;
+        let prio = obj.attr2.bits(10, 2);
+        let mosaic = obj.attr2.is_bit(4);
 
         if obj.attr0.is_bit(5) {
-            for _ in 0..(size.0 >> 3) {
-                Self::render_obj_tile_256pal(gg, line, &mut tile_addr, &mut x_pos);
-                if x_pos >= 240 {
-                    break;
-                }
+            for _ in 0..tile_count {
+                Self::render_tile_8bpp::<true>(gg, prio, obj_x, x_step, tile_addr, mosaic);
+                obj_x += x_step * 8;
+                tile_addr += 64;
             }
         } else {
-            for _ in 0..(size.0 >> 3) {
-                Self::render_obj_tile_16pal(
-                    gg,
-                    line,
-                    &mut tile_addr,
-                    &mut x_pos,
-                    (obj.attr2.bits(12, 4) << 4).u8(),
-                );
-                if x_pos >= 240 {
-                    break;
-                }
+            let palette = obj.attr2.bits(12, 4).u8();
+            for _ in 0..tile_count {
+                Self::render_tile_4bpp::<true>(gg, prio, obj_x, x_step, tile_addr, palette, mosaic);
+                obj_x += x_step * 8;
+                tile_addr += 32;
             }
         }
-    }
-
-    fn render_obj_tile_256pal(
-        gg: &mut GameGirlAdv,
-        line: u16,
-        tile_addr: &mut usize,
-        x_pos: &mut u16,
-    ) {
-        for pix in 0..8 {
-            let dat = gg.ppu.vram[*tile_addr + pix];
-            gg.ppu.set_pixel::<true>(line, *x_pos, 0, dat);
-            *x_pos += 1;
-        }
-
-        *tile_addr += 64;
-    }
-
-    fn render_obj_tile_16pal(
-        gg: &mut GameGirlAdv,
-        line: u16,
-        tile_addr: &mut usize,
-        x_pos: &mut u16,
-        pal_offs: u8,
-    ) {
-        for pair in 0..4 {
-            let dat = gg.ppu.vram[*tile_addr + pair];
-            gg.ppu
-                .set_pixel::<true>(line, *x_pos, pal_offs, dat & 0x0F);
-            gg.ppu
-                .set_pixel::<true>(line, *x_pos + 1, pal_offs, dat >> 4);
-            *x_pos += 2;
-        }
-
-        *tile_addr += 32;
     }
 }
 
 struct Object {
     x: u16,
-    y: u16,
+    y: i16,
     attr0: u8,
     attr1: u8,
     attr2: u16,
@@ -112,5 +77,38 @@ impl Object {
     fn size(&self) -> (u16, u16) {
         let addr = (self.attr1.bits(6, 2) | (self.attr0.bits(6, 2) << 2)).us();
         (OBJ_X_SIZE[addr], OBJ_Y_SIZE[addr])
+    }
+
+    fn draw_on(&self, line: u16) -> bool {
+        self.valid() && !(self.y > line as i16 || (self.y + self.size().1 as i16) <= line as i16)
+    }
+
+    fn valid(&self) -> bool {
+        self.attr0.bits(6, 2) != 3 && self.attr0.bits(10, 2) != 3
+    }
+
+    fn y_on(&self, line: u16, mosaic: u16) -> u16 {
+        let mut pos = line.wrapping_add_signed(-self.y);
+        // Consider VFlip and Mosaic
+        if self.attr0.is_bit(4) {
+            pos &= mosaic.bits(12, 4) - 1;
+        }
+        if self.attr1.is_bit(5) {
+            pos = self.size().1 - pos - 1;
+        }
+        pos
+    }
+
+    fn signed_x(&self) -> (i16, i16) {
+        let x = if self.x.is_bit(8) {
+            self.x as i16 | 0xFF
+        } else {
+            self.x as i16
+        };
+        if self.attr1.is_bit(4) {
+            (x + self.size().0 as i16 - 1, -1)
+        } else {
+            (x, 1)
+        }
     }
 }

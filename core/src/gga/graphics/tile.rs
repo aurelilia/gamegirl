@@ -77,9 +77,10 @@ impl Ppu {
     ) {
         for pair in 0..4 {
             let dat = gg.ppu.vram[tile_addr + pair];
-            gg.ppu.set_pixel::<false>(line, x_pos, pal_offs, dat & 0x0F);
             gg.ppu
-                .set_pixel::<false>(line, x_pos + 1, pal_offs, dat >> 4);
+                .set_pixel_legacy::<false>(line, x_pos, pal_offs, dat & 0x0F);
+            gg.ppu
+                .set_pixel_legacy::<false>(line, x_pos + 1, pal_offs, dat >> 4);
             x_pos += 2;
         }
     }
@@ -87,7 +88,7 @@ impl Ppu {
     fn render_bg_tile_256pal(gg: &mut GameGirlAdv, line: u16, tile_addr: usize, mut x_pos: u16) {
         for pix in 0..8 {
             let dat = gg.ppu.vram[tile_addr + pix];
-            gg.ppu.set_pixel::<false>(line, x_pos, 0, dat);
+            gg.ppu.set_pixel_legacy::<false>(line, x_pos, 0, dat);
             x_pos += 1;
         }
     }

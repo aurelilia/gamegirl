@@ -1,6 +1,7 @@
 mod bitmap;
 mod objects;
 mod palette;
+mod render;
 mod tile;
 
 use super::memory::KB;
@@ -37,6 +38,8 @@ const VBLANK_IRQ: u16 = 3;
 const HBLANK_IRQ: u16 = 4;
 const LYC_IRQ: u16 = 5;
 
+type Layer = [Colour; 240];
+
 #[derive(Deserialize, Serialize)]
 pub struct Ppu {
     #[serde(with = "serde_arrays")]
@@ -52,6 +55,13 @@ pub struct Ppu {
     #[serde(skip)]
     #[serde(default = "serde_colour_arr")]
     pixels: [Colour; 240 * 160],
+    #[serde(skip)]
+    #[serde(default = "serde_layer_arr")]
+    bg_layers: [Layer; 4],
+    #[serde(skip)]
+    #[serde(default = "serde_layer_arr")]
+    obj_layers: [Layer; 4],
+
     #[serde(skip)]
     #[serde(default)]
     pub last_frame: Option<Vec<Colour>>,
@@ -89,7 +99,7 @@ impl Ppu {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                     Dmas::update(gg);
-                    gg.ppu.last_frame = Some(Self::correct_colours(gg.ppu.pixels.to_vec()));
+                    gg.ppu.last_frame = Some(Self::finish_frame(gg.ppu.pixels.to_vec()));
                 } else if gg[VCOUNT] > 227 {
                     gg[VCOUNT] = 0;
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false);
@@ -128,10 +138,25 @@ impl Ppu {
             5 => Self::render_mode5(gg, line),
             _ => println!("Unimplemented mode {}", gg[DISPCNT] & 7),
         }
+
+        Self::finish_line(gg, line);
+    }
+
+    fn finish_line(gg: &mut GameGirlAdv, line: u16) {
+        let start = line.us() * 240;
+        for layer in gg.ppu.obj_layers.iter().rev() {
+            for (x, pix) in layer.iter().enumerate().filter(|(_, p)| p[3] != 0) {
+                gg.ppu.pixels[start + x] = *pix;
+            }
+        }
+
+        // Clear last line buffers
+        gg.ppu.bg_layers = serde_layer_arr();
+        gg.ppu.obj_layers = serde_layer_arr();
     }
 
     /// Map a Vec of colours in 0-31 GGA space to 0-255 RGB.
-    fn correct_colours(mut pixels: Vec<Colour>) -> Vec<Colour> {
+    fn finish_frame(mut pixels: Vec<Colour>) -> Vec<Colour> {
         for pixel in pixels.iter_mut() {
             for col in pixel.iter_mut().take(3) {
                 *col = (*col << 3) | (*col >> 2);
@@ -140,7 +165,7 @@ impl Ppu {
         pixels
     }
 
-    fn set_pixel<const OBJ: bool>(&mut self, y: u16, x: u16, palette: u8, colour_idx: u8) {
+    fn set_pixel_legacy<const OBJ: bool>(&mut self, y: u16, x: u16, palette: u8, colour_idx: u8) {
         if x >= 240 || colour_idx == 0 {
             return;
         }
@@ -158,6 +183,8 @@ impl Default for Ppu {
             mode: Mode::Upload,
             mode_clock: 0,
             pixels: serde_colour_arr(),
+            bg_layers: serde_layer_arr(),
+            obj_layers: serde_layer_arr(),
             last_frame: None,
         }
     }
@@ -171,4 +198,7 @@ enum Mode {
 
 fn serde_colour_arr() -> [Colour; 240 * 160] {
     [[0, 0, 0, 255]; 240 * 160]
+}
+fn serde_layer_arr() -> [Layer; 4] {
+    [[[0, 0, 0, 0]; 240]; 4]
 }
