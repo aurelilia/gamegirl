@@ -152,10 +152,12 @@ impl System {
 
             let mut gga = Box::new(GameGirlAdv::default());
             gga.cart.rom = cart;
+            gga.init_memory();
             gga.options.frame_finished = mem::replace(
                 &mut self.options().frame_finished,
                 EmulateOptions::serde_frame_finished(),
             );
+
             // Fill the prefetch
             Cpu::fix_prefetch(&mut gga);
             *self = Self::GGA(gga);

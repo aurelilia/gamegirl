@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     mem,
     ops::{Index, IndexMut},
+    ptr,
 };
 
 pub const KB: usize = 1024;
@@ -27,6 +28,11 @@ pub struct Memory {
     pub iwram: [u8; 32 * KB],
     #[serde(with = "serde_arrays")]
     pub mmio: [u16; KB / 2],
+
+    open_bus: [u8; 4],
+    #[serde(skip)]
+    #[serde(default = "serde_pages")]
+    pages: [*mut u8; 9],
 }
 
 impl GameGirlAdv {
@@ -277,20 +283,9 @@ impl GameGirlAdv {
     }
 
     fn page(&self, addr: usize) -> *const u8 {
-        let mems = [
-            BIOS,
-            &self.memory.ewram,
-            &self.memory.iwram,
-            &[],
-            &self.ppu.palette,
-            &self.ppu.vram,
-            &self.ppu.oam,
-            &self.cart.rom,
-            &[0, 0, 0, 0], // Need at least 4 due to word reads
-        ];
         let page = Region::PAGES[(addr >> 24) & 0xF] as usize;
         let mask = Region::MASK[page];
-        unsafe { mems[page].as_ptr().add(addr & mask) }
+        unsafe { self.memory.pages[page].add(addr & mask) }
     }
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
@@ -328,6 +323,38 @@ impl GameGirlAdv {
             _ => 1,
         }
     }
+
+    pub fn init_memory(&mut self) {
+        self.memory.pages = [
+            BIOS.as_ptr() as *mut u8,
+            self.memory.ewram.as_ptr() as *mut u8,
+            self.memory.iwram.as_ptr() as *mut u8,
+            self.memory.open_bus.as_ptr() as *mut u8,
+            self.ppu.palette.as_ptr() as *mut u8,
+            self.ppu.vram.as_ptr() as *mut u8,
+            self.ppu.oam.as_ptr() as *mut u8,
+            self.cart.rom.as_ptr() as *mut u8,
+            self.memory.open_bus.as_ptr() as *mut u8,
+        ];
+    }
+}
+
+impl Default for Memory {
+    fn default() -> Self {
+        Self {
+            ewram: [0; 256 * KB],
+            iwram: [0; 32 * KB],
+            mmio: [0; KB / 2],
+            open_bus: [0; 4],
+            pages: serde_pages(),
+        }
+    }
+}
+
+unsafe impl Send for Memory {}
+
+fn serde_pages() -> [*mut u8; 9] {
+    [ptr::null::<u8>() as *mut u8; 9]
 }
 
 impl Index<u32> for GameGirlAdv {

@@ -211,6 +211,7 @@ impl GameGirlAdv {
         self.options = old_self.options;
         self.config = old_self.config;
         self.debugger = old_self.debugger;
+        self.init_memory();
     }
 
     /// Reset the console; like power-cycling a real one.
@@ -225,11 +226,7 @@ impl Default for GameGirlAdv {
     fn default() -> Self {
         let mut gg = Self {
             cpu: Cpu::default(),
-            memory: Memory {
-                ewram: [0; 256 * KB],
-                iwram: [0; 32 * KB],
-                mmio: [0; KB / 2],
-            },
+            memory: Memory::default(),
             ppu: Ppu::default(),
             apu: Apu {
                 buffer: Vec::with_capacity(1000),
