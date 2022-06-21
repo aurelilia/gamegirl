@@ -151,7 +151,7 @@ impl GameGirlAdv {
                     }
 
                     if l == 0 {
-                        self.write_word(addr, self.reg(reg.u32()), kind);
+                        self.write_word(addr, self.cpu.reg_pc4(reg.u32()), kind);
                     } else {
                         let val = self.read_word(addr, kind);
                         self.cpu.set_reg(reg.u32(), val);

@@ -304,8 +304,8 @@ impl GameGirlAdv {
 
     pub fn init_memory(&mut self) {
         for i in 0..self.memory.read_pages.len() {
-            self.memory.read_pages[i] = unsafe { self.get_page::<true>(i) };
-            self.memory.write_pages[i] = unsafe { self.get_page::<false>(i) };
+            self.memory.read_pages[i] = unsafe { self.get_page::<true>(i * PAGE_SIZE) };
+            self.memory.write_pages[i] = unsafe { self.get_page::<false>(i * PAGE_SIZE) };
         }
         self.update_wait_times();
     }
@@ -320,13 +320,12 @@ impl GameGirlAdv {
         }
     }
 
-    unsafe fn get_page<const R: bool>(&self, page: usize) -> *mut u8 {
+    unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
         unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
             let ptr = reg.as_ptr() as *mut u8;
             ptr.add(offs & (reg.len() - 1))
         }
 
-        let a = page * PAGE_SIZE;
         match a {
             0x0000_0000..=0x0000_3FFF if R => offs(BIOS, a),
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
@@ -337,7 +336,7 @@ impl GameGirlAdv {
             0x0800_0000..=0x0DFF_FFFF if R => offs(&self.cart.rom, a - 0x800_0000),
             // VRAM mirror weirdness
             0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
-            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x0601_FFFF),
+            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),
             _ => ptr::null::<u8>() as *mut u8,
         }
     }
