@@ -254,7 +254,7 @@ impl GameGirlAdv {
     #[inline]
     fn set<T>(&mut self, addr: u32, value: T, slow: fn(&mut GameGirlAdv, u32, T)) {
         let ptr = self.page::<true>(addr);
-        if !ptr.is_null() {
+        if ptr as usize > 0x8000 {
             unsafe { ptr::write(mem::transmute::<_, *mut T>(ptr), value) }
         } else {
             slow(self, addr, value)

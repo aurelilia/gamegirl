@@ -10,6 +10,7 @@ pub const DISPCNT: u32 = 0x0;
 pub const GREENSWAP: u32 = 0x2;
 pub const DISPSTAT: u32 = 0x4;
 pub const VCOUNT: u32 = 0x6;
+pub const BG0CNT: u32 = 0x8;
 
 // Input
 pub const KEYINPUT: u32 = 0x130;

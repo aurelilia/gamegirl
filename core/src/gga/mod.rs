@@ -163,7 +163,7 @@ impl GameGirlAdv {
 
     /// Add wait cycles, which advance the system besides the CPU.
     fn add_wait_cycles(&mut self, count: u16) {
-        self.wait_cycles += count;
+        self.wait_cycles = self.wait_cycles.wrapping_add(count);
     }
 
     fn reg(&self, idx: u32) -> u32 {

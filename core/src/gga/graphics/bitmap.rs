@@ -1,6 +1,6 @@
 use crate::{
     gga::{
-        addr::DISPCNT,
+        addr::*,
         graphics::{Ppu, BG2_EN, FRAME_SELECT},
         GameGirlAdv,
     },
@@ -8,10 +8,6 @@ use crate::{
 };
 
 impl Ppu {
-    pub fn render_mode0(gg: &mut GameGirlAdv, line: u16) {
-        Self::render_objs::<0>(gg, line);
-    }
-
     pub fn render_mode3(gg: &mut GameGirlAdv, line: u16) {
         if !gg[DISPCNT].is_bit(BG2_EN) {
             return;
@@ -60,27 +56,10 @@ impl Ppu {
     }
 
     fn bitmap_start_addr(gg: &GameGirlAdv) -> usize {
-        if gg[DISPCNT].is_bit(FRAME_SELECT) {
+        if !gg[DISPCNT].is_bit(FRAME_SELECT) {
             0x0
         } else {
             0xA000
         }
     }
-}
-
-enum RotScal {
-    Yes,
-    Mixed,
-    No,
-}
-
-impl RotScal {
-    const MODES: [RotScal; 6] = [
-        RotScal::No,
-        RotScal::Mixed,
-        RotScal::Yes,
-        RotScal::Yes,
-        RotScal::Yes,
-        RotScal::Yes,
-    ];
 }

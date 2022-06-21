@@ -1,6 +1,7 @@
-mod mode;
+mod bitmap;
 mod objects;
 mod palette;
+mod tile;
 
 use super::memory::KB;
 use crate::{
@@ -22,9 +23,7 @@ const OAM_HBLANK_FREE: u16 = 5;
 const OBJ_MAPPING_1D: u16 = 6;
 const FORCED_BLANK: u16 = 7;
 const BG0_EN: u16 = 8;
-const BG1_EN: u16 = 9;
 const BG2_EN: u16 = 10;
-const BG3_EN: u16 = 11;
 const OBJ_EN: u16 = 12;
 const WIN0_EN: u16 = 13;
 const WIN1_EN: u16 = 14;
@@ -111,7 +110,14 @@ impl Ppu {
 
     fn render_line(gg: &mut GameGirlAdv) {
         let line = gg[VCOUNT];
-        if line >= 160 || gg[DISPCNT].is_bit(FORCED_BLANK) {
+        if line >= 160 {
+            return;
+        }
+        if gg[DISPCNT].is_bit(FORCED_BLANK) {
+            let start = line.us() * 240;
+            for pixel in 0..240 {
+                gg.ppu.pixels[start + pixel] = [31, 31, 31, 255];
+            }
             return;
         }
 
@@ -132,6 +138,14 @@ impl Ppu {
             }
         }
         pixels
+    }
+
+    fn set_pixel<const OBJ: bool>(&mut self, y: u16, x: u16, palette: u8, colour_idx: u8) {
+        if x >= 240 || colour_idx == 0 {
+            return;
+        }
+        let addr = (y * 240) + x;
+        self.pixels[addr.us()] = self.idx_to_palette::<OBJ>(palette + colour_idx);
     }
 }
 

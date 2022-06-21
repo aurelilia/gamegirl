@@ -73,7 +73,7 @@ impl Ppu {
     ) {
         for pix in 0..8 {
             let dat = gg.ppu.vram[*tile_addr + pix];
-            gg.ppu.set_pixel(line, *x_pos, dat);
+            gg.ppu.set_pixel::<true>(line, *x_pos, 0, dat);
             *x_pos += 1;
         }
 
@@ -89,20 +89,14 @@ impl Ppu {
     ) {
         for pair in 0..4 {
             let dat = gg.ppu.vram[*tile_addr + pair];
-            gg.ppu.set_pixel(line, *x_pos, pal_offs + (dat & 0x0F));
-            gg.ppu.set_pixel(line, *x_pos + 1, pal_offs + (dat >> 4));
+            gg.ppu
+                .set_pixel::<true>(line, *x_pos, pal_offs, dat & 0x0F);
+            gg.ppu
+                .set_pixel::<true>(line, *x_pos + 1, pal_offs, dat >> 4);
             *x_pos += 2;
         }
 
         *tile_addr += 32;
-    }
-
-    fn set_pixel(&mut self, y: u16, x: u16, palette: u8) {
-        if x >= 240 || palette == 0 {
-            return;
-        }
-        let addr = (y * 240) + x;
-        self.pixels[addr.us()] = self.idx_to_palette::<true>(palette);
     }
 }
 
