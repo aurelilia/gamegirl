@@ -35,7 +35,7 @@ impl Ppu {
         let bg_y = line.wrapping_add(vofs);
         // TODO: Y-Mosaic
 
-        for tile in -1..30 {
+        for tile in -1..31 {
             let bg_x = (tile << 3) + hofs;
             let map_addr =
                 map_base + Self::get_map_offset((bg_x >> 3) as u32, (bg_y >> 3).u32(), size).us();
