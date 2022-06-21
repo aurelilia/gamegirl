@@ -84,7 +84,7 @@ impl Object {
     }
 
     fn valid(&self) -> bool {
-        self.attr0.bits(6, 2) != 3 && self.attr0.bits(10, 2) != 3
+        self.attr0.bits(3, 2) != 3 && self.attr0.bits(6, 2) != 3
     }
 
     fn y_on(&self, line: u16, mosaic: u16) -> u16 {

@@ -25,8 +25,8 @@ impl Ppu {
         let cnt = gg[BG0CNT + offs];
         let prio = cnt & 3;
         let mosaic = cnt.is_bit(6);
-        let hofs = gg[BG0HOFS + offs] as i16;
-        let vofs = gg[BG0VOFS + offs];
+        let hofs = gg[BG0HOFS + offs * 2] as i16;
+        let vofs = gg[BG0VOFS + offs * 2];
         let tile_base_addr = cnt.bits(2, 2).us() * 0x4000;
         let map_base = cnt.bits(8, 5).us() * 0x800;
 
