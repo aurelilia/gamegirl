@@ -210,10 +210,10 @@ impl GameGirlAdv {
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
 
             // Timers
-            TM0CNT_H => Timers::hi_write(self, 0, value),
-            TM1CNT_H => Timers::hi_write(self, 1, value),
-            TM2CNT_H => Timers::hi_write(self, 2, value),
-            TM3CNT_H => Timers::hi_write(self, 3, value),
+            TM0CNT_H => Timers::hi_write::<0>(self, value),
+            TM1CNT_H => Timers::hi_write::<1>(self, value),
+            TM2CNT_H => Timers::hi_write::<2>(self, value),
+            TM3CNT_H => Timers::hi_write::<3>(self, value),
 
             // DMAs
             0xBA => {
