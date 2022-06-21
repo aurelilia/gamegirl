@@ -144,6 +144,22 @@ impl Ppu {
 
     fn finish_line(gg: &mut GameGirlAdv, line: u16) {
         let start = line.us() * 240;
+        let backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
+        'pixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
+            for prio in 0..4 {
+                if gg.ppu.obj_layers[prio][x] != EMPTY {
+                    *pixel = gg.ppu.obj_layers[prio][x];
+                    continue 'pixels;
+                }
+                if gg.ppu.bg_layers[prio][x] != EMPTY {
+                    *pixel = gg.ppu.bg_layers[prio][x];
+                    continue 'pixels;
+                }
+            }
+
+            // No matching pixel found...
+            *pixel = backdrop;
+        }
         for layer in gg.ppu.obj_layers.iter().rev() {
             for (x, pix) in layer.iter().enumerate().filter(|(_, p)| p[3] != 0) {
                 gg.ppu.pixels[start + x] = *pix;
@@ -163,14 +179,6 @@ impl Ppu {
             }
         }
         pixels
-    }
-
-    fn set_pixel_legacy<const OBJ: bool>(&mut self, y: u16, x: u16, palette: u8, colour_idx: u8) {
-        if x >= 240 || colour_idx == 0 {
-            return;
-        }
-        let addr = (y * 240) + x;
-        self.pixels[addr.us()] = self.idx_to_palette::<OBJ>(palette + colour_idx);
     }
 }
 
@@ -200,5 +208,7 @@ fn serde_colour_arr() -> [Colour; 240 * 160] {
     [[0, 0, 0, 255]; 240 * 160]
 }
 fn serde_layer_arr() -> [Layer; 4] {
-    [[[0, 0, 0, 0]; 240]; 4]
+    [[EMPTY; 240]; 4]
 }
+
+const EMPTY: Colour = [0, 0, 0, 0];

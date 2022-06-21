@@ -11,6 +11,8 @@ pub const GREENSWAP: u32 = 0x2;
 pub const DISPSTAT: u32 = 0x4;
 pub const VCOUNT: u32 = 0x6;
 pub const BG0CNT: u32 = 0x8;
+pub const BG0HOFS: u32 = 0x10;
+pub const BG0VOFS: u32 = 0x12;
 pub const MOSAIC: u32 = 0x4C;
 
 // Input

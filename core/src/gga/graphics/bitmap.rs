@@ -16,7 +16,7 @@ impl Ppu {
         let line_start = line.us() * 240;
         for offs in 0..240 {
             let pixel = line_start + offs;
-            gg.ppu.pixels[pixel] = gg.ppu.hword_to_colour_vram(pixel << 1);
+            gg.ppu.bg_layers[0][offs] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
 
         Self::render_objs::<512>(gg, line);
@@ -30,10 +30,9 @@ impl Ppu {
         let line_start = line.us() * 240;
         let start_addr = Self::bitmap_start_addr(gg) + line_start;
         for offs in 0..240 {
-            let pixel = line_start + offs;
             let palette = gg.ppu.vram[start_addr + offs];
             if palette != 0 {
-                gg.ppu.pixels[pixel] = gg.ppu.idx_to_palette::<false>(palette);
+                gg.ppu.bg_layers[0][offs] = gg.ppu.idx_to_palette::<false>(palette);
             }
         }
 
@@ -49,7 +48,7 @@ impl Ppu {
         let line_start = vram_start + (line.us() * 160);
         for offs in 0..160 {
             let pixel = (line_start + offs).us();
-            gg.ppu.pixels[pixel] = gg.ppu.hword_to_colour_vram(pixel << 1);
+            gg.ppu.bg_layers[0][offs] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
 
         Self::render_objs::<512>(gg, line);
