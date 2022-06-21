@@ -7,7 +7,9 @@ A Gameboy (Color/Advance) emulator written in Rust, whose GG/GGC core is a rewri
 ## Status
 The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
-AGB support is very early with nothing really working yet; still working on making the CPU accurate.
+AGB support is early with many things still missing; still working on the PPU and
+making the emulation overall more accurate and fast. Some games are playable with
+graphical glitches, though.
 
 ### Features
 - Complete DMG/CGB implementation, including running DMG games on CGB
@@ -106,4 +108,4 @@ mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibili
 - [GBATEK, as a technical reference](https://problemkaputt.de/gbatek.htm)
 - [mj-hd, for rgba, which I used to properly understand ARM7 emulation details](https://github.com/mj-hd/rgba/)
 - [jsmolka, for their testing ROMs](https://github.com/jsmolka/gba-tests)
-- [DenSinH, for FuzzARM](https://github.com/DenSinH/FuzzARM)
+- [DenSinH, for FuzzARM and GBAC-](https://github.com/DenSinH)
