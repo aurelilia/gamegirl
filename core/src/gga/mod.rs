@@ -259,6 +259,6 @@ impl Default for GameGirlAdv {
 /// or non-sequential.
 #[derive(Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Access {
-    Seq,
-    NonSeq,
+    Seq = 0,
+    NonSeq = 16,
 }

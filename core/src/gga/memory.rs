@@ -36,6 +36,9 @@ pub struct Memory {
     #[serde(skip)]
     #[serde(default = "serde_pages")]
     write_pages: [*mut u8; 8192],
+
+    wait_word: [u16; 32],
+    wait_other: [u16; 32],
 }
 
 impl GameGirlAdv {
@@ -198,6 +201,10 @@ impl GameGirlAdv {
             // General
             IME => self[IME] = value & 1,
             IF => self[IF] &= !value,
+            WAITCNT => {
+                self[a] = value;
+                self.update_wait_times();
+            }
 
             // PPU
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
@@ -286,9 +293,58 @@ impl GameGirlAdv {
         }
     }
 
+    fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
+        let idx = ((addr.us() >> 24) & 0xF) + ty as usize;
+        if W == 4 {
+            self.memory.wait_word[idx]
+        } else {
+            self.memory.wait_other[idx]
+        }
+    }
+
+    pub fn init_memory(&mut self) {
+        for i in 0..self.memory.read_pages.len() {
+            self.memory.read_pages[i] = unsafe { self.get_page::<true>(i) };
+            self.memory.write_pages[i] = unsafe { self.get_page::<false>(i) };
+        }
+        self.update_wait_times();
+    }
+
+    fn update_wait_times(&mut self) {
+        for i in 0..16 {
+            let addr = i.u32() * 0x100_0000;
+            self.memory.wait_word[i] = self.calc_wait_time::<4>(addr, Seq);
+            self.memory.wait_other[i] = self.calc_wait_time::<2>(addr, Seq);
+            self.memory.wait_word[i + 16] = self.calc_wait_time::<4>(addr, NonSeq);
+            self.memory.wait_other[i + 16] = self.calc_wait_time::<2>(addr, NonSeq);
+        }
+    }
+
+    unsafe fn get_page<const R: bool>(&self, page: usize) -> *mut u8 {
+        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
+            let ptr = reg.as_ptr() as *mut u8;
+            ptr.add(offs & (reg.len() - 1))
+        }
+
+        let a = page * PAGE_SIZE;
+        match a {
+            0x0000_0000..=0x0000_3FFF if R => offs(BIOS, a),
+            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
+            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
+            0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
+            0x0800_0000..=0x0DFF_FFFF if R => offs(&self.cart.rom, a - 0x800_0000),
+            // VRAM mirror weirdness
+            0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
+            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x0601_FFFF),
+            _ => ptr::null::<u8>() as *mut u8,
+        }
+    }
+
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
 
-    fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
+    fn calc_wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         match (addr, W, ty) {
             (0x0200_0000..=0x02FF_FFFF, 4, _) => 6,
             (0x0200_0000..=0x02FF_FFFF, _, _) => 3,
@@ -321,35 +377,6 @@ impl GameGirlAdv {
             _ => 1,
         }
     }
-
-    pub fn init_memory(&mut self) {
-        for i in 0..self.memory.read_pages.len() {
-            self.memory.read_pages[i] = unsafe { self.get_page::<true>(i) };
-            self.memory.write_pages[i] = unsafe { self.get_page::<false>(i) };
-        }
-    }
-
-    unsafe fn get_page<const R: bool>(&self, page: usize) -> *mut u8 {
-        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
-            let ptr = reg.as_ptr() as *mut u8;
-            ptr.add(offs & (reg.len() - 1))
-        }
-
-        let a = page * PAGE_SIZE;
-        match a {
-            0x0000_0000..=0x0000_3FFF if R => offs(BIOS, a),
-            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
-            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
-            0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
-            0x0800_0000..=0x0DFF_FFFF if R => offs(&self.cart.rom, a - 0x800_0000),
-            // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
-            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x0601_FFFF),
-            _ => ptr::null::<u8>() as *mut u8,
-        }
-    }
 }
 
 impl Default for Memory {
@@ -361,6 +388,8 @@ impl Default for Memory {
             open_bus: [0; 4],
             read_pages: serde_pages(),
             write_pages: serde_pages(),
+            wait_word: [0; 32],
+            wait_other: [0; 32],
         }
     }
 }
