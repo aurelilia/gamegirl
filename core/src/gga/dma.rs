@@ -15,13 +15,17 @@ pub struct Dmas {}
 impl Dmas {
     pub fn update(gg: &mut GameGirlAdv) {
         for idx in 0..4 {
-            Self::step_dma(gg, idx);
+            let base = Self::base_addr(idx);
+            Self::step_dma(gg, idx, base, gg[base + 0xA]);
         }
     }
 
-    fn step_dma(gg: &mut GameGirlAdv, idx: u16) {
+    pub fn update_idx(gg: &mut GameGirlAdv, idx: u16, ctrl: u16) {
         let base = Self::base_addr(idx);
-        let ctrl = gg[base + 0xA];
+        Self::step_dma(gg, idx, base, ctrl);
+    }
+
+    fn step_dma(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16) {
         let on = ctrl.is_bit(15)
             && match ctrl.bits(12, 2) {
                 0 => true,

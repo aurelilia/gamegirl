@@ -10,7 +10,7 @@ use crate::{
     Colour,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{mem, path::PathBuf};
+use std::{iter, mem, path::PathBuf};
 
 /// Macro for forwarding functions on the main system enum to individual
 /// systems.
@@ -131,7 +131,7 @@ impl System {
     }
 
     /// Load a cart.
-    pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &GGConfig) {
+    pub fn load_cart(&mut self, mut cart: Vec<u8>, path: Option<PathBuf>, config: &GGConfig) {
         let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
         if is_ggc {
             let mut cart = Cartridge::from_rom(cart);
@@ -147,6 +147,9 @@ impl System {
             );
             *self = Self::GGC(ggc);
         } else {
+            let until_32mb = 0x200_0000 - cart.len();
+            cart.extend(iter::repeat(0).take(until_32mb));
+
             let mut gga = Box::new(GameGirlAdv::default());
             gga.cart.rom = cart;
             gga.options.frame_finished = mem::replace(

@@ -2,14 +2,19 @@ use crate::{
     gga::{
         addr::*,
         cpu::Cpu,
+        dma::Dmas,
         timer::Timers,
         Access::{self, *},
         GameGirlAdv,
     },
+    ggc::cpu::Reg,
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 use serde::{Deserialize, Serialize};
-use std::ops::{Index, IndexMut};
+use std::{
+    mem,
+    ops::{Index, IndexMut},
+};
 
 pub const KB: usize = 1024;
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
@@ -85,25 +90,13 @@ impl GameGirlAdv {
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
         let a = addr.us();
         match a {
-            0x0000_0000..=0x0000_3FFF => BIOS[a & 0x3FFF],
-            0x0200_0000..=0x02FF_FFFF => self.memory.ewram[a & 0x3FFFF],
-            0x0300_0000..=0x03FF_FFFF => self.memory.iwram[a & 0x7FFF],
+            0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => self.get_mmio(addr).high(),
+            0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr).low(),
 
-            0x0500_0000..=0x05FF_FFFF => self.ppu.palette[a & 0x3FF],
-            0x0600_0000..=0x0601_7FFF => self.ppu.vram[a & 0x17FFF],
-            0x0700_0000..=0x07FF_FFFF => self.ppu.oam[a & 0x3FF],
-
-            0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => self.get_hword(addr).high(),
-            0x0400_0000..=0x04FF_FFFF => self.get_hword(addr).low(),
-
-            0x0800_0000..=0x0DFF_FFFF => {
-                self.cart.rom[(self.cart.rom.len() - 1).min(a & 0x01FF_FFFF)]
-            }
-
-            // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => self.ppu.vram[0x1_0000 + a - 0x0601_8000],
+            0x0601_8000..=0x0601_FFFF => self.ppu.vram[0x1_0000 + a & 0x7FFF],
             0x0602_0000..=0x06FF_FFFF => self.get_byte(addr & 0x0601_FFFF),
-            _ => 0xFF,
+
+            _ => unsafe { self.page(a).read() },
         }
     }
 
@@ -113,7 +106,17 @@ impl GameGirlAdv {
         let a = addr.us();
         match a {
             0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr),
-            _ => hword(self.get_byte(addr), self.get_byte(addr.wrapping_add(1))),
+
+            0x0601_8000..=0x0601_FFFF => {
+                hword(self.get_byte(addr), self.get_byte(addr.wrapping_add(1)))
+            }
+            0x0602_0000..=0x06FF_FFFF => self.get_hword(addr & 0x0601_FFFF),
+
+            _ => unsafe {
+                let ptr = self.page(a);
+                let ptr_16 = mem::transmute::<_, *const u16>(ptr);
+                ptr_16.read()
+            },
         }
     }
 
@@ -133,7 +136,23 @@ impl GameGirlAdv {
     /// Read a word from the bus (LE). Does no timing-related things; simply
     /// fetches the value. Also does not handle unaligned reads (yet)
     pub fn get_word(&self, addr: u32) -> u32 {
-        word(self.get_hword(addr), self.get_hword(addr.wrapping_add(2)))
+        let a = addr.us();
+        match a {
+            0x0400_0000..=0x04FF_FFFF => {
+                word(self.get_mmio(addr), self.get_mmio(addr.wrapping_add(2)))
+            }
+
+            0x0601_8000..=0x0601_FFFF => {
+                word(self.get_hword(addr), self.get_hword(addr.wrapping_add(2)))
+            }
+            0x0602_0000..=0x06FF_FFFF => self.get_word(addr & 0x0601_FFFF),
+
+            _ => unsafe {
+                let ptr = self.page(a);
+                let ptr_32 = mem::transmute::<_, *const u32>(ptr);
+                ptr_32.read()
+            },
+        }
     }
 
     /// Write a byte to the bus. Handles timing.
@@ -224,6 +243,24 @@ impl GameGirlAdv {
             TM2CNT_H => Timers::hi_write(self, 2, value),
             TM3CNT_H => Timers::hi_write(self, 3, value),
 
+            // DMAs
+            0xBA => {
+                self[a] = value;
+                Dmas::update_idx(self, 0, value);
+            }
+            0xC6 => {
+                self[a] = value;
+                Dmas::update_idx(self, 1, value);
+            }
+            0xD2 => {
+                self[a] = value;
+                Dmas::update_idx(self, 2, value);
+            }
+            0xDE => {
+                self[a] = value;
+                Dmas::update_idx(self, 3, value);
+            }
+
             // RO registers
             VCOUNT | KEYINPUT => (),
 
@@ -235,8 +272,25 @@ impl GameGirlAdv {
     /// sets the value.
     pub(super) fn set_word(&mut self, addr: u32, value: u32) {
         let addr = addr & !3; // Forcibly align: All write instructions do this
-        self.set_hword(addr.wrapping_add(2), value.high());
         self.set_hword(addr, value.low());
+        self.set_hword(addr.wrapping_add(2), value.high());
+    }
+
+    fn page(&self, addr: usize) -> *const u8 {
+        let mems = [
+            BIOS,
+            &self.memory.ewram,
+            &self.memory.iwram,
+            &[],
+            &self.ppu.palette,
+            &self.ppu.vram,
+            &self.ppu.oam,
+            &self.cart.rom,
+            &[0, 0, 0, 0], // Need at least 4 due to word reads
+        ];
+        let page = Region::PAGES[(addr >> 24) & 0xF] as usize;
+        let mask = Region::MASK[page];
+        unsafe { mems[page].as_ptr().add(addr & mask) }
     }
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
@@ -292,4 +346,42 @@ impl IndexMut<u32> for GameGirlAdv {
         assert_eq!(addr & 1, 0);
         &mut self.memory.mmio[(addr >> 1).us()]
     }
+}
+
+#[derive(Copy, Clone)]
+#[repr(u8)]
+pub enum Region {
+    Bios,
+    EWRam,
+    IWRam,
+    IO,
+    Palette,
+    VRam,
+    Oam,
+    Rom,
+    Unmapped,
+}
+
+impl Region {
+    const PAGES: [Region; 16] = [
+        Region::Bios,
+        Region::Unmapped,
+        Region::EWRam,
+        Region::IWRam,
+        Region::IO,
+        Region::Palette,
+        Region::VRam,
+        Region::Oam,
+        Region::Rom,
+        Region::Rom,
+        Region::Rom,
+        Region::Rom,
+        Region::Rom,
+        Region::Rom,
+        Region::Unmapped,
+        Region::Unmapped,
+    ];
+    const MASK: [usize; 9] = [
+        0x3FFF, 0x3FFFF, 0x7FFF, 0x3FF, 0x3FF, 0x17FFF, 0x3FF, 0x1FF_FFFF, 0,
+    ];
 }
