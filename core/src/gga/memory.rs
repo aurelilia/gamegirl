@@ -11,6 +11,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    fmt::UpperHex,
     mem,
     ops::{Index, IndexMut},
     ptr,
@@ -323,7 +324,7 @@ impl GameGirlAdv {
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
         unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
             let ptr = reg.as_ptr() as *mut u8;
-            ptr.add(offs & (reg.len() - 1))
+            ptr.add(offs % reg.len())
         }
 
         match a {
