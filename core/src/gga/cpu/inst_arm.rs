@@ -5,7 +5,7 @@ use crate::{
             Access::*,
             Cpu, Exception,
         },
-        Access, GameGirlAdv,
+        GameGirlAdv,
     },
     numutil::{NumExt, U32Ext},
 };
@@ -171,22 +171,16 @@ impl GameGirlAdv {
                 if kind == NonSeq {
                     self.on_empty_rlist(n, l == 0, u == 1, p == 1);
                 }
+                if l == 1 {
+                    // All LDR stall by 1I
+                    self.add_wait_cycles(1);
+                }
             }
 
             "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
                 // LDR/STR with imm
                 let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr::<false>(
-                    p == 0,
-                    u == 1,
-                    width,
-                    (p == 0) || (w == 1),
-                    l == 0,
-                    n,
-                    d,
-                    m,
-                    NonSeq,
-                );
+                self.ldrstr::<false>(p == 0, u == 1, width, (p == 0) || (w == 1), l == 0, n, d, m);
             }
             "01_1pubwlnnnnddddssssstt0mmmm" => {
                 // LDR/STR with reg
@@ -203,23 +197,12 @@ impl GameGirlAdv {
                     n,
                     d,
                     offs,
-                    NonSeq,
                 );
             }
 
             "000_pu1wlnnnnddddiiii1011iiii" => {
                 // LDRH/STRH with imm
-                self.ldrstr::<true>(
-                    p == 0,
-                    u == 1,
-                    2,
-                    (p == 0) || (w == 1),
-                    l == 0,
-                    n,
-                    d,
-                    i,
-                    NonSeq,
-                );
+                self.ldrstr::<true>(p == 0, u == 1, 2, (p == 0) || (w == 1), l == 0, n, d, i);
             }
             "000_pu0wlnnnndddd00001011mmmm" => {
                 // LDRH/STRH with reg
@@ -232,23 +215,12 @@ impl GameGirlAdv {
                     n,
                     d,
                     self.cpu.reg(m),
-                    NonSeq,
                 );
             }
 
             "000_pu1w1nnnnddddiiii1101iiii" => {
                 // LDRSB with imm
-                self.ldrstr::<true>(
-                    p == 0,
-                    u == 1,
-                    1,
-                    (p == 0) || (w == 1),
-                    false,
-                    n,
-                    d,
-                    i,
-                    NonSeq,
-                );
+                self.ldrstr::<true>(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
                 self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001101mmmm" => {
@@ -262,23 +234,12 @@ impl GameGirlAdv {
                     n,
                     d,
                     self.cpu.reg(m),
-                    NonSeq,
                 );
                 self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
-                self.ldrstr::<false>(
-                    p == 0,
-                    u == 1,
-                    2,
-                    (p == 0) || (w == 1),
-                    false,
-                    n,
-                    d,
-                    i,
-                    NonSeq,
-                );
+                self.ldrstr::<false>(p == 0, u == 1, 2, (p == 0) || (w == 1), false, n, d, i);
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
@@ -292,7 +253,6 @@ impl GameGirlAdv {
                     n,
                     d,
                     self.cpu.reg(m),
-                    NonSeq,
                 );
                 self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
@@ -431,7 +391,6 @@ impl GameGirlAdv {
         n: u32,
         d: u32,
         offs: u32,
-        kind: Access,
     ) {
         let mut addr = self.reg(n);
         if !post {
@@ -439,27 +398,27 @@ impl GameGirlAdv {
         }
 
         match (str, width) {
-            (true, 4) => self.write_word(addr, self.cpu.reg_pc4(d), kind),
-            (true, 2) => self.write_hword(addr, (self.cpu.reg_pc4(d) & 0xFFFF).u16(), kind),
-            (true, _) => self.write_byte(addr, (self.cpu.reg_pc4(d) & 0xFF).u8(), kind),
+            (true, 4) => self.write_word(addr, self.cpu.reg_pc4(d), NonSeq),
+            (true, 2) => self.write_hword(addr, (self.cpu.reg_pc4(d) & 0xFFFF).u16(), NonSeq),
+            (true, _) => self.write_byte(addr, (self.cpu.reg_pc4(d) & 0xFF).u8(), NonSeq),
             (false, 4) if ALIGN => {
-                let val = self.read_word(addr, kind);
+                let val = self.read_word(addr, NonSeq);
                 self.cpu.set_reg(d, val);
             }
             (false, 4) => {
-                let val = self.read_word_ldrswp(addr, kind);
+                let val = self.read_word_ldrswp(addr, NonSeq);
                 self.cpu.set_reg(d, val);
             }
             (false, 2) if ALIGN => {
-                let val = self.read_hword(addr, kind);
+                let val = self.read_hword(addr, NonSeq);
                 self.cpu.set_reg(d, val);
             }
             (false, 2) => {
-                let val = self.read_hword_ldrsh(addr, kind);
+                let val = self.read_hword_ldrsh(addr, NonSeq);
                 self.cpu.set_reg(d, val);
             }
             (false, _) => {
-                let val = self.read_byte(addr, kind).u32();
+                let val = self.read_byte(addr, NonSeq).u32();
                 self.cpu.set_reg(d, val);
             }
         }
@@ -472,11 +431,8 @@ impl GameGirlAdv {
             self.cpu.set_reg(n, addr);
         }
 
-        if !str && kind == NonSeq {
-            // All LDR stall by 1I; the only Seq access is after the first LD of an
-            // LDM. Since that also stalls 1 total, this works:
-            // On all other LDRs, we stall because they are NonSeq,
-            // on LDM, we only stall once on first access which is the only NonSeq.
+        if !str {
+            // All LDR stall by 1I
             self.add_wait_cycles(1);
         }
     }
