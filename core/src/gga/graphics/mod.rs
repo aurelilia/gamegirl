@@ -11,7 +11,7 @@ use crate::{
         dma::Dmas,
         GameGirlAdv,
     },
-    numutil::{NumExt, U16Ext},
+    numutil::NumExt,
     Colour,
 };
 use serde::{Deserialize, Serialize};

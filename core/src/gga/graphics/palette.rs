@@ -1,6 +1,6 @@
 use crate::{
     gga::graphics::Ppu,
-    numutil::{hword, NumExt, U16Ext},
+    numutil::{hword, NumExt},
     Colour,
 };
 

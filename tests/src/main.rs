@@ -5,10 +5,7 @@ mod gba;
 mod mooneye;
 
 use ansi_term::Colour;
-use core::{
-    ggc::{GGConfig, GameGirl},
-    System,
-};
+use core::{ggc::GGConfig, System};
 use rayon::prelude::*;
 use std::{
     env, fs,

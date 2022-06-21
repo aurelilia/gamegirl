@@ -5,7 +5,6 @@ use crate::{
         GameGirlAdv,
     },
     numutil::{hword, NumExt},
-    Colour,
 };
 
 const OBJ_X_SIZE: [u16; 16] = [8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32, 0, 0, 0, 0];
@@ -33,8 +32,7 @@ impl Ppu {
     fn render_obj(gg: &mut GameGirlAdv, line: u16, obj: Object) {
         let size = obj.size();
         if obj.y > line || (obj.y + size.1) <= line {
-            return; // Not on this line or disabled, or hack to prevent OOB
-                    // pixel writes
+            return; // Not on this line or disabled
         }
         let obj_y = line - obj.y;
 
@@ -75,8 +73,7 @@ impl Ppu {
     ) {
         for pix in 0..8 {
             let dat = gg.ppu.vram[*tile_addr + pix];
-            gg.ppu
-                .set_pixel(line, *x_pos, gg.ppu.idx_to_palette::<true>(dat));
+            gg.ppu.set_pixel(line, *x_pos, dat);
             *x_pos += 1;
         }
 
@@ -92,28 +89,20 @@ impl Ppu {
     ) {
         for pair in 0..4 {
             let dat = gg.ppu.vram[*tile_addr + pair];
-            gg.ppu.set_pixel(
-                line,
-                *x_pos,
-                gg.ppu.idx_to_palette::<true>(pal_offs + (dat & 0x0F)),
-            );
-            gg.ppu.set_pixel(
-                line,
-                *x_pos + 1,
-                gg.ppu.idx_to_palette::<true>(pal_offs + (dat >> 4)),
-            );
+            gg.ppu.set_pixel(line, *x_pos, pal_offs + (dat & 0x0F));
+            gg.ppu.set_pixel(line, *x_pos + 1, pal_offs + (dat >> 4));
             *x_pos += 2;
         }
 
         *tile_addr += 32;
     }
 
-    fn set_pixel(&mut self, y: u16, x: u16, colour: Colour) {
-        if x >= 240 {
+    fn set_pixel(&mut self, y: u16, x: u16, palette: u8) {
+        if x >= 240 || palette == 0 {
             return;
         }
         let addr = (y * 240) + x;
-        self.pixels[addr.us()] = colour;
+        self.pixels[addr.us()] = self.idx_to_palette::<true>(palette);
     }
 }
 

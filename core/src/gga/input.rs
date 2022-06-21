@@ -5,7 +5,7 @@ use crate::{
         cpu::{Cpu, Interrupt},
         GameGirlAdv,
     },
-    numutil::{NumExt, U16Ext},
+    numutil::NumExt,
 };
 
 impl GameGirlAdv {

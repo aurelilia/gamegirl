@@ -1,7 +1,7 @@
 use crate::{
     common::{self, EmulateOptions},
     debugger::Debugger,
-    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dmas, memory::KB, timer::Timers},
+    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dmas, timer::Timers},
     ggc::GGConfig,
     numutil::NumExt,
     Colour,
