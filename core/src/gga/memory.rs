@@ -7,7 +7,6 @@ use crate::{
         Access::{self, *},
         GameGirlAdv,
     },
-    ggc::cpu::Reg,
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 use serde::{Deserialize, Serialize};
@@ -18,6 +17,7 @@ use std::{
 };
 
 pub const KB: usize = 1024;
+pub const PAGE_SIZE: usize = 0x8000; // 32KiB
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
 
 #[derive(Deserialize, Serialize)]
@@ -32,7 +32,7 @@ pub struct Memory {
     open_bus: [u8; 4],
     #[serde(skip)]
     #[serde(default = "serde_pages")]
-    pages: [*mut u8; 9],
+    pages: [*mut u8; 8192],
 }
 
 impl GameGirlAdv {
@@ -94,35 +94,40 @@ impl GameGirlAdv {
     /// Read a byte from the bus. Does no timing-related things; simply fetches
     /// the value.
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
-        let a = addr.us();
-        match a {
-            0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => self.get_mmio(addr).high(),
-            0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr).low(),
-
-            0x0601_8000..=0x0601_FFFF => self.ppu.vram[0x1_0000 + a & 0x7FFF],
-            0x0602_0000..=0x06FF_FFFF => self.get_byte(addr & 0x0601_FFFF),
-
-            _ => unsafe { self.page(a).read() },
-        }
+        self.get(addr, |this, addr| match addr {
+            0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
+            0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
+            _ => 0,
+        })
     }
 
     /// Read a half-word from the bus (LE). Does no timing-related things;
     /// simply fetches the value.
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
-        let a = addr.us();
-        match a {
-            0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr),
+        self.get(addr, |this, addr| match addr {
+            0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
+            _ => 0,
+        })
+    }
 
-            0x0601_8000..=0x0601_FFFF => {
-                hword(self.get_byte(addr), self.get_byte(addr.wrapping_add(1)))
+    /// Read a word from the bus (LE). Does no timing-related things; simply
+    /// fetches the value. Also does not handle unaligned reads (yet)
+    pub fn get_word(&self, addr: u32) -> u32 {
+        self.get(addr, |this, addr| match addr {
+            0x0400_0000..=0x04FF_FFFF => {
+                word(this.get_mmio(addr), this.get_mmio(addr.wrapping_add(2)))
             }
-            0x0602_0000..=0x06FF_FFFF => self.get_hword(addr & 0x0601_FFFF),
+            _ => 0,
+        })
+    }
 
-            _ => unsafe {
-                let ptr = self.page(a);
-                let ptr_16 = mem::transmute::<_, *const u16>(ptr);
-                ptr_16.read()
-            },
+    #[inline]
+    fn get<T>(&self, addr: u32, slow: fn(&GameGirlAdv, u32) -> T) -> T {
+        let ptr = self.page(addr);
+        if !ptr.is_null() {
+            unsafe { mem::transmute::<_, *const T>(ptr).read() }
+        } else {
+            slow(self, addr)
         }
     }
 
@@ -136,28 +141,6 @@ impl GameGirlAdv {
             TM3CNT_L => self.timers.counters[3],
 
             _ => self[a],
-        }
-    }
-
-    /// Read a word from the bus (LE). Does no timing-related things; simply
-    /// fetches the value. Also does not handle unaligned reads (yet)
-    pub fn get_word(&self, addr: u32) -> u32 {
-        let a = addr.us();
-        match a {
-            0x0400_0000..=0x04FF_FFFF => {
-                word(self.get_mmio(addr), self.get_mmio(addr.wrapping_add(2)))
-            }
-
-            0x0601_8000..=0x0601_FFFF => {
-                word(self.get_hword(addr), self.get_hword(addr.wrapping_add(2)))
-            }
-            0x0602_0000..=0x06FF_FFFF => self.get_word(addr & 0x0601_FFFF),
-
-            _ => unsafe {
-                let ptr = self.page(a);
-                let ptr_32 = mem::transmute::<_, *const u32>(ptr);
-                ptr_32.read()
-            },
         }
     }
 
@@ -282,10 +265,9 @@ impl GameGirlAdv {
         self.set_hword(addr.wrapping_add(2), value.high());
     }
 
-    fn page(&self, addr: usize) -> *const u8 {
-        let page = Region::PAGES[(addr >> 24) & 0xF] as usize;
-        let mask = Region::MASK[page];
-        unsafe { self.memory.pages[page].add(addr & mask) }
+    fn page(&self, addr: u32) -> *const u8 {
+        let addr = addr.us();
+        unsafe { self.memory.pages[(addr >> 15) & 8191].add(addr & 0x7FFF) }
     }
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
@@ -325,17 +307,31 @@ impl GameGirlAdv {
     }
 
     pub fn init_memory(&mut self) {
-        self.memory.pages = [
-            BIOS.as_ptr() as *mut u8,
-            self.memory.ewram.as_ptr() as *mut u8,
-            self.memory.iwram.as_ptr() as *mut u8,
-            self.memory.open_bus.as_ptr() as *mut u8,
-            self.ppu.palette.as_ptr() as *mut u8,
-            self.ppu.vram.as_ptr() as *mut u8,
-            self.ppu.oam.as_ptr() as *mut u8,
-            self.cart.rom.as_ptr() as *mut u8,
-            self.memory.open_bus.as_ptr() as *mut u8,
-        ];
+        for i in 0..self.memory.pages.len() {
+            self.memory.pages[i] = unsafe { self.get_page(i) };
+        }
+    }
+
+    unsafe fn get_page(&self, page: usize) -> *mut u8 {
+        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
+            let ptr = reg.as_ptr() as *mut u8;
+            ptr.add(offs & (reg.len() - 1))
+        }
+
+        let a = page * PAGE_SIZE;
+        match a {
+            0x0000_0000..=0x0000_3FFF => offs(BIOS, a),
+            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
+            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
+            0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
+            0x0800_0000..=0x0DFF_FFFF => offs(&self.cart.rom, a - 0x800_0000),
+            // VRAM mirror weirdness
+            0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
+            0x0602_0000..=0x06FF_FFFF => self.get_page(a & 0x0601_FFFF),
+            _ => ptr::null::<u8>() as *mut u8,
+        }
     }
 }
 
@@ -352,10 +348,6 @@ impl Default for Memory {
 }
 
 unsafe impl Send for Memory {}
-
-fn serde_pages() -> [*mut u8; 9] {
-    [ptr::null::<u8>() as *mut u8; 9]
-}
 
 impl Index<u32> for GameGirlAdv {
     type Output = u16;
@@ -375,40 +367,6 @@ impl IndexMut<u32> for GameGirlAdv {
     }
 }
 
-#[derive(Copy, Clone)]
-#[repr(u8)]
-pub enum Region {
-    Bios,
-    EWRam,
-    IWRam,
-    IO,
-    Palette,
-    VRam,
-    Oam,
-    Rom,
-    Unmapped,
-}
-
-impl Region {
-    const PAGES: [Region; 16] = [
-        Region::Bios,
-        Region::Unmapped,
-        Region::EWRam,
-        Region::IWRam,
-        Region::IO,
-        Region::Palette,
-        Region::VRam,
-        Region::Oam,
-        Region::Rom,
-        Region::Rom,
-        Region::Rom,
-        Region::Rom,
-        Region::Rom,
-        Region::Rom,
-        Region::Unmapped,
-        Region::Unmapped,
-    ];
-    const MASK: [usize; 9] = [
-        0x3FFF, 0x3FFFF, 0x7FFF, 0x3FF, 0x3FF, 0x17FFF, 0x3FF, 0x1FF_FFFF, 0,
-    ];
+fn serde_pages() -> [*mut u8; 8192] {
+    [ptr::null::<u8>() as *mut u8; 8192]
 }
