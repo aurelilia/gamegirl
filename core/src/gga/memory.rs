@@ -32,7 +32,10 @@ pub struct Memory {
     open_bus: [u8; 4],
     #[serde(skip)]
     #[serde(default = "serde_pages")]
-    pages: [*mut u8; 8192],
+    read_pages: [*mut u8; 8192],
+    #[serde(skip)]
+    #[serde(default = "serde_pages")]
+    write_pages: [*mut u8; 8192],
 }
 
 impl GameGirlAdv {
@@ -121,16 +124,6 @@ impl GameGirlAdv {
         })
     }
 
-    #[inline]
-    fn get<T>(&self, addr: u32, slow: fn(&GameGirlAdv, u32) -> T) -> T {
-        let ptr = self.page(addr);
-        if !ptr.is_null() {
-            unsafe { mem::transmute::<_, *const T>(ptr).read() }
-        } else {
-            slow(self, addr)
-        }
-    }
-
     fn get_mmio(&self, addr: u32) -> u16 {
         let a = addr & 0x3FE;
         match a {
@@ -167,9 +160,6 @@ impl GameGirlAdv {
     pub(super) fn set_byte(&mut self, addr: u32, value: u8) {
         let a = addr.us();
         match a {
-            0x0200_0000..=0x02FF_FFFF => self.memory.ewram[a & 0x3FFFF] = value,
-            0x0300_0000..=0x03FF_FFFF => self.memory.iwram[a & 0x7FFF] = value,
-
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
             }
@@ -177,7 +167,8 @@ impl GameGirlAdv {
 
             // VRAM weirdness
             0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
-            _ => (),
+
+            _ => self.set(addr, value, |_this, _addr, _value| ()),
         }
     }
 
@@ -185,35 +176,20 @@ impl GameGirlAdv {
     /// simply sets the value.
     pub(super) fn set_hword(&mut self, addr: u32, value: u16) {
         let addr = addr & !1; // Forcibly align: All write instructions do this
-        let a = addr.us();
-        match a {
-            0x0400_0000..=0x04FF_FFFF => self.set_mmio(addr, value),
+        self.set(addr, value, |this, addr, value| match addr {
+            0x0400_0000..=0x04FF_FFFF => this.set_mmio(addr, value),
+            _ => (),
+        });
+    }
 
-            0x0500_0000..=0x05FF_FFFF => {
-                self.ppu.palette[a & 0x3FF] = value.low();
-                self.ppu.palette[(a & 0x3FF) + 1] = value.high();
-            }
-            0x0600_0000..=0x0601_7FFF => {
-                self.ppu.vram[a & 0x17FFF] = value.low();
-                self.ppu.vram[(a & 0x17FFF) + 1] = value.high();
-            }
-            0x0700_0000..=0x07FF_FFFF => {
-                self.ppu.oam[a & 0x3FF] = value.low();
-                self.ppu.oam[(a & 0x3FF) + 1] = value.high();
-            }
-
-            // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => {
-                self.ppu.vram[0x1_0000 + a & 0x7FFF] = value.low();
-                self.ppu.vram[(0x1_0000 + a & 0x7FFF) + 1] = value.high();
-            }
-            0x0602_0000..=0x06FF_FFFF => self.set_hword(addr & 0x0601_FFFF, value),
-
-            _ => {
-                self.set_byte(addr, value.low());
-                self.set_byte(addr.wrapping_add(1), value.high());
-            }
-        }
+    /// Write a word from the bus (LE). Does no timing-related things; simply
+    /// sets the value.
+    pub(super) fn set_word(&mut self, addr: u32, value: u32) {
+        let addr = addr & !3; // Forcibly align: All write instructions do this
+        self.set(addr, value, |this, addr, value| {
+            this.set_hword(addr, value.low());
+            this.set_hword(addr.wrapping_add(2), value.high());
+        });
     }
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
@@ -257,17 +233,57 @@ impl GameGirlAdv {
         }
     }
 
-    /// Write a word from the bus (LE). Does no timing-related things; simply
-    /// sets the value.
-    pub(super) fn set_word(&mut self, addr: u32, value: u32) {
-        let addr = addr & !3; // Forcibly align: All write instructions do this
-        self.set_hword(addr, value.low());
-        self.set_hword(addr.wrapping_add(2), value.high());
+    // Unsafe corner!
+    #[inline]
+    fn get<T>(&self, addr: u32, slow: fn(&GameGirlAdv, u32) -> T) -> T {
+        let ptr = self.page::<false>(addr);
+        if !ptr.is_null() {
+            unsafe { mem::transmute::<_, *const T>(ptr).read() }
+        } else {
+            slow(self, addr)
+        }
     }
 
-    fn page(&self, addr: u32) -> *const u8 {
+    #[inline]
+    fn set<T>(&mut self, addr: u32, value: T, slow: fn(&mut GameGirlAdv, u32, T)) {
+        let ptr = self.page::<true>(addr);
+        if !ptr.is_null() {
+            unsafe { ptr::write(mem::transmute::<_, *mut T>(ptr), value) }
+        } else {
+            slow(self, addr, value)
+        }
+    }
+
+    fn page<const WRITE: bool>(&self, addr: u32) -> *mut u8 {
+        const MASK: [usize; 16] = [
+            0x3FFF, // BIOS
+            0,      // Unmapped
+            0x7FFF, // EWRAM
+            0x7FFF, // IWRAM
+            0,      // MMIO
+            0x3FF,  // Palette
+            0x7FFF, // VRAM
+            0x3FF,  // OAM
+            0x7FFF, // ROM
+            0x7FFF, // ROM
+            0x7FFF, // ROM
+            0x7FFF, // ROM
+            0x7FFF, // ROM
+            0x7FFF, // ROM
+            0,      // Unmapped
+            0,      // Unmapped
+        ];
         let addr = addr.us();
-        unsafe { self.memory.pages[(addr >> 15) & 8191].add(addr & 0x7FFF) }
+        unsafe {
+            let mask = MASK.get_unchecked((addr >> 24) & 0xF);
+            let page_idx = (addr >> 15) & 8191;
+            let page = if WRITE {
+                self.memory.write_pages.get_unchecked(page_idx)
+            } else {
+                self.memory.read_pages.get_unchecked(page_idx)
+            };
+            page.add(addr & mask)
+        }
     }
 
     const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
@@ -307,12 +323,13 @@ impl GameGirlAdv {
     }
 
     pub fn init_memory(&mut self) {
-        for i in 0..self.memory.pages.len() {
-            self.memory.pages[i] = unsafe { self.get_page(i) };
+        for i in 0..self.memory.read_pages.len() {
+            self.memory.read_pages[i] = unsafe { self.get_page::<true>(i) };
+            self.memory.write_pages[i] = unsafe { self.get_page::<false>(i) };
         }
     }
 
-    unsafe fn get_page(&self, page: usize) -> *mut u8 {
+    unsafe fn get_page<const R: bool>(&self, page: usize) -> *mut u8 {
         unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
             let ptr = reg.as_ptr() as *mut u8;
             ptr.add(offs & (reg.len() - 1))
@@ -320,16 +337,16 @@ impl GameGirlAdv {
 
         let a = page * PAGE_SIZE;
         match a {
-            0x0000_0000..=0x0000_3FFF => offs(BIOS, a),
+            0x0000_0000..=0x0000_3FFF if R => offs(BIOS, a),
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
             0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
             0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
             0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
-            0x0800_0000..=0x0DFF_FFFF => offs(&self.cart.rom, a - 0x800_0000),
+            0x0800_0000..=0x0DFF_FFFF if R => offs(&self.cart.rom, a - 0x800_0000),
             // VRAM mirror weirdness
             0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
-            0x0602_0000..=0x06FF_FFFF => self.get_page(a & 0x0601_FFFF),
+            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x0601_FFFF),
             _ => ptr::null::<u8>() as *mut u8,
         }
     }
@@ -342,7 +359,8 @@ impl Default for Memory {
             iwram: [0; 32 * KB],
             mmio: [0; KB / 2],
             open_bus: [0; 4],
-            pages: serde_pages(),
+            read_pages: serde_pages(),
+            write_pages: serde_pages(),
         }
     }
 }
