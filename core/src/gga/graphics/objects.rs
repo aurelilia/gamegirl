@@ -113,9 +113,10 @@ impl Object {
 
     fn signed_x(&self) -> (i16, i16) {
         let x = if self.x.is_bit(8) {
-            self.x as i16 | 0xFF
+            // i didn't pay attention in math class
+            -(0xFF - (self.x as i16 & 0xFF))
         } else {
-            self.x as i16
+            self.x as i16 & 0xFF
         };
         if self.attr1.is_bit(4) {
             (x + self.size().0 as i16 - 1, -1)
