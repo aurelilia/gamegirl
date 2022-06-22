@@ -16,6 +16,19 @@ impl Ppu {
         Self::render_objs::<0>(gg, line);
     }
 
+    pub fn render_mode1(gg: &mut GameGirlAdv, line: u16) {
+        Self::render_bg_text::<0>(gg, line);
+        Self::render_bg_text::<1>(gg, line);
+        Self::render_bg_affine::<2>(gg, line);
+        Self::render_objs::<0>(gg, line);
+    }
+
+    pub fn render_mode2(gg: &mut GameGirlAdv, line: u16) {
+        Self::render_bg_affine::<2>(gg, line);
+        Self::render_bg_affine::<3>(gg, line);
+        Self::render_objs::<0>(gg, line);
+    }
+
     fn render_bg_text<const IDX: u16>(gg: &mut GameGirlAdv, line: u16) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
@@ -63,6 +76,15 @@ impl Ppu {
                 Self::render_tile_4bpp::<false>(gg, prio, x, x_step, tile_addr, palette, mosaic);
             }
         }
+    }
+
+    fn render_bg_affine<const IDX: u16>(gg: &mut GameGirlAdv, line: u16) {
+        if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
+            return;
+        }
+
+        // TODO, for now just pretend it's a text mode BG
+        Self::render_bg_text::<IDX>(gg, line)
     }
 
     // Adapted from https://github.com/DenSinH/GBAC-/blob/f460ad61fcd4c90429f47435d49b23310185f916/GBAEmulator/PPU/PPU.Render.BG.cs#L49

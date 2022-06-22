@@ -133,10 +133,12 @@ impl Ppu {
 
         match gg[DISPCNT] & 7 {
             0 => Self::render_mode0(gg, line),
+            1 => Self::render_mode1(gg, line),
+            2 => Self::render_mode2(gg, line),
             3 => Self::render_mode3(gg, line),
             4 => Self::render_mode4(gg, line),
             5 => Self::render_mode5(gg, line),
-            _ => println!("Unimplemented mode {}", gg[DISPCNT] & 7),
+            _ => println!("Invalid mode {}", gg[DISPCNT] & 7),
         }
 
         Self::finish_line(gg, line);
