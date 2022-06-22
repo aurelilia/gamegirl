@@ -55,6 +55,7 @@ impl System {
 
     forward!(advance);
     forward!(reset);
+    forward!(skip_bootrom);
 
     /// Set a button on the joypad.
     pub fn set_button(&mut self, btn: Button, pressed: bool) {

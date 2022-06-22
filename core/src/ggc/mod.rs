@@ -236,6 +236,11 @@ impl GameGirl {
         gg.options.rom_loaded = true;
         gg
     }
+
+    pub fn skip_bootrom(&mut self) {
+        self.cpu.pc = 0x100;
+        self.mmu.bootrom = None;
+    }
 }
 
 impl Default for GameGirl {

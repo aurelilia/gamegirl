@@ -26,7 +26,7 @@ impl Storage {
     /// since this is on native.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn load(path: Option<PathBuf>, title: String) -> Option<GameSave> {
-        let sav_path = Self::get_path(path.clone().unwrap(), "sav");
+        let sav_path = Self::get_path(path.clone()?, "sav");
         let ram = if let Ok(ram) = std::fs::read(sav_path) {
             ram
         } else {

@@ -225,6 +225,14 @@ impl GameGirlAdv {
         self.restore_from(old_self);
         Cpu::fix_prefetch(self);
     }
+
+    pub fn skip_bootrom(&mut self) {
+        self.cpu.pc = 0x0800_0000;
+        self.cpu.cpsr = 0x1F;
+        self.cpu.sp[1] = 0x0300_7F00;
+        self.cpu.sp[3] = 0x0300_7F00;
+        self.cpu.sp[5] = 0x0300_7F00;
+    }
 }
 
 impl Default for GameGirlAdv {
@@ -246,15 +254,10 @@ impl Default for GameGirlAdv {
             wait_cycles: 0,
         };
 
+        // Initialize various IO registers
         gg[KEYINPUT] = 0x3FF;
         gg[SOUNDBIAS] = 0x200;
 
-        // Skip bootrom for now
-        gg.cpu.pc = 0x0800_0000;
-        gg.cpu.cpsr = 0x1F;
-        gg.cpu.sp[1] = 0x0300_7F00;
-        gg.cpu.sp[3] = 0x0300_7F00;
-        gg.cpu.sp[5] = 0x0300_7F00;
         gg
     }
 }

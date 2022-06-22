@@ -25,6 +25,7 @@ fn main() {
             None,
             &GGConfig::default(),
         );
+        gg.skip_bootrom();
         for _ in 0..15 {
             gg.advance_delta(1.0);
         }
@@ -44,10 +45,10 @@ fn main() {
     }
 }
 
-pub fn run_dir(dir: &str, cond: fn(&System) -> ControlFlow<Status>) {
+pub fn run_dir<const SKIP: bool>(dir: &str, cond: fn(&System) -> ControlFlow<Status>) {
     let total = AtomicUsize::new(0);
     let success = AtomicUsize::new(0);
-    run_inner(
+    run_inner::<SKIP>(
         &PathBuf::from("tests").join(dir),
         dir,
         &total,
@@ -61,7 +62,7 @@ pub fn run_dir(dir: &str, cond: fn(&System) -> ControlFlow<Status>) {
     );
 }
 
-fn run_inner(
+fn run_inner<const SKIP: bool>(
     dir: &Path,
     name: &str,
     total: &AtomicUsize,
@@ -81,7 +82,7 @@ fn run_inner(
         .filter(|e| e.path().is_dir())
         .for_each(|entry| {
             let name = format!("{name}/{}", entry.file_name().to_str().unwrap());
-            run_inner(&entry.path(), &name, total, success, cond);
+            run_inner::<SKIP>(&entry.path(), &name, total, success, cond);
         });
 
     entries
@@ -94,7 +95,7 @@ fn run_inner(
         .for_each(|entry| {
             let rn = Instant::now();
             total.fetch_add(1, Ordering::Relaxed);
-            match run(fs::read(entry.path()).unwrap(), cond) {
+            match run::<SKIP>(fs::read(entry.path()).unwrap(), cond) {
                 Ok(_) => {
                     println!(
                         "Ran {name}/{}... {} in {}ms",
@@ -116,9 +117,15 @@ fn run_inner(
         });
 }
 
-fn run(test: Vec<u8>, cond: fn(&System) -> ControlFlow<Status>) -> Result<(), String> {
+fn run<const SKIP: bool>(
+    test: Vec<u8>,
+    cond: fn(&System) -> ControlFlow<Status>,
+) -> Result<(), String> {
     let mut gg = System::default();
     gg.load_cart(test, None, &GGConfig::default());
+    if SKIP {
+        gg.skip_bootrom();
+    }
 
     for _ in 0..TIMEOUT {
         gg.advance_delta(1.0);

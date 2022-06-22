@@ -1,7 +1,7 @@
 use crate::{
     gga::{
         addr::{BG0CNT, BG0HOFS, BG0VOFS, DISPCNT},
-        graphics::{Ppu, BG0_EN, WIN0_EN, WIN1_EN},
+        graphics::{Ppu, BG0_EN},
         GameGirlAdv,
     },
     numutil::{hword, NumExt},
@@ -21,7 +21,7 @@ impl Ppu {
             return;
         }
 
-        let offs = (IDX.u32() * 2);
+        let offs = IDX.u32() * 2;
         let cnt = gg[BG0CNT + offs];
         let prio = cnt & 3;
         let mosaic = cnt.is_bit(6);

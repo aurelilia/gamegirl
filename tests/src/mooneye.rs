@@ -7,7 +7,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use crate::Status;
 
 pub fn exec(subdir: &str) {
-    crate::run_dir(&format!("mooneye/{subdir}"), |gg| {
+    crate::run_dir::<false>(&format!("mooneye/{subdir}"), |gg| {
         let gg = gg.as_ggc();
         if gg.cpu.reg(A) == 0
             && gg.cpu.dreg(BC) == 0x0305
