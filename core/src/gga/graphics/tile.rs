@@ -59,7 +59,7 @@ impl Ppu {
                 Self::render_tile_8bpp::<false>(gg, prio, x, x_step, tile_addr, mosaic);
             } else {
                 let tile_addr = tile_base_addr + (tile_idx.us() * 32) + (tile_y.us() * 4);
-                let palette = map.bits(12, 4).u8() << 4;
+                let palette = map.bits(12, 4).u8();
                 Self::render_tile_4bpp::<false>(gg, prio, x, x_step, tile_addr, palette, mosaic);
             }
         }

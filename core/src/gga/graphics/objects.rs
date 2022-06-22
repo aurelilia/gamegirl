@@ -1,7 +1,7 @@
 use crate::{
     gga::{
         addr::{DISPCNT, MOSAIC},
-        graphics::{Ppu, OBJ_EN},
+        graphics::{Ppu, OBJ_EN, OBJ_MAPPING_1D},
         GameGirlAdv,
     },
     numutil::{hword, NumExt},
@@ -16,6 +16,7 @@ impl Ppu {
             return;
         }
 
+        let is_2d = !gg[DISPCNT].is_bit(OBJ_MAPPING_1D);
         for idx in 0..127 {
             let addr = idx << 3;
             let y = gg.ppu.oam[addr] as i16;
@@ -26,11 +27,11 @@ impl Ppu {
                 attr1: gg.ppu.oam[addr + 3],
                 attr2: hword(gg.ppu.oam[addr + 4], gg.ppu.oam[addr + 5]),
             };
-            Self::render_obj(gg, line, obj);
+            Self::render_obj(gg, line, obj, is_2d);
         }
     }
 
-    fn render_obj(gg: &mut GameGirlAdv, line: u16, obj: Object) {
+    fn render_obj(gg: &mut GameGirlAdv, line: u16, obj: Object, is_2d: bool) {
         if !obj.draw_on(line) {
             return;
         }
@@ -38,28 +39,39 @@ impl Ppu {
         let obj_y = obj.y_on(line, gg[MOSAIC]);
         let tile_y = obj_y & 7;
 
-        // TODO: 2D mapping mode, object modes.
+        // TODO: Object modes.
         let size = obj.size();
         let base_tile_idx = obj.attr2.bits(0, 10).us();
-        let adj_tile_idx = base_tile_idx + ((obj_y.us() >> 3) * (size.0.us() >> 3));
-        let mut tile_addr = 0x1_0000 + (adj_tile_idx * 32) + (tile_y.us() * 4);
+        let adj_tile_idx =
+            base_tile_idx + ((obj_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 32 });
+        let tile_addr = 0x1_0000 + (adj_tile_idx * 32);
 
         let tile_count = size.0 >> 3;
         let prio = obj.attr2.bits(10, 2);
         let mosaic = obj.attr2.is_bit(4);
 
         if obj.attr0.is_bit(5) {
+            let mut tile_line_addr = tile_addr + (tile_y.us() * 8);
             for _ in 0..tile_count {
-                Self::render_tile_8bpp::<true>(gg, prio, obj_x, x_step, tile_addr, mosaic);
+                Self::render_tile_8bpp::<true>(gg, prio, obj_x, x_step, tile_line_addr, mosaic);
                 obj_x += x_step * 8;
-                tile_addr += 64;
+                tile_line_addr += 64;
             }
         } else {
+            let mut tile_line_addr = tile_addr + (tile_y.us() * 4);
             let palette = obj.attr2.bits(12, 4).u8();
             for _ in 0..tile_count {
-                Self::render_tile_4bpp::<true>(gg, prio, obj_x, x_step, tile_addr, palette, mosaic);
+                Self::render_tile_4bpp::<true>(
+                    gg,
+                    prio,
+                    obj_x,
+                    x_step,
+                    tile_line_addr,
+                    palette,
+                    mosaic,
+                );
                 obj_x += x_step * 8;
-                tile_addr += 32;
+                tile_line_addr += 32;
             }
         }
     }
