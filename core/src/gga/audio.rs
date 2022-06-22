@@ -78,6 +78,10 @@ impl Apu {
         self.buffers[CH].push_back(samples.high() as i8);
     }
 
+    pub fn push_sample<const CH: usize>(&mut self, samples: u8) {
+        self.buffers[CH].push_back(samples as i8);
+    }
+
     fn bias(mut sample: i16, bias: i16) -> i16 {
         sample += bias;
         if sample > 0x3ff {

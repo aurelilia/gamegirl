@@ -164,7 +164,10 @@ impl GameGirlAdv {
     pub(super) fn set_byte(&mut self, addr: u32, value: u8) {
         let a = addr.us();
         match a {
-            0x0400_00A0..=0x0400_00A7 => panic!("unimplemented"),
+            // DMA channel edge case, why do games do this
+            0x0400_00A0..=0x0400_00A3 => self.apu.push_sample::<0>(value),
+            0x0400_00A4..=0x0400_00A7 => self.apu.push_sample::<1>(value),
+
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
             }
