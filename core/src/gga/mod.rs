@@ -1,7 +1,12 @@
 use crate::{
     common::{self, EmulateOptions},
     debugger::Debugger,
-    gga::{addr::KEYINPUT, cpu::registers::Flag, dma::Dmas, timer::Timers},
+    gga::{
+        addr::{KEYINPUT, SOUNDBIAS},
+        cpu::registers::Flag,
+        dma::Dmas,
+        timer::Timers,
+    },
     ggc::GGConfig,
     numutil::NumExt,
     Colour,
@@ -103,11 +108,10 @@ impl GameGirlAdv {
     /// Writes zeroes if the system is not currently running
     /// and no audio should be played.
     pub fn produce_samples(&mut self, samples: &mut [f32]) {
-        // Disable this for now, we don't have a working APU yet.
-        // if !self.options.running {
-        samples.fill(0.0);
-        return;
-        // }
+        if !self.options.running {
+            samples.fill(0.0);
+            return;
+        }
 
         let target = samples.len() * self.options.speed_multiplier;
         while self.apu.buffer.len() < target {
@@ -158,6 +162,7 @@ impl GameGirlAdv {
         self.clock += self.wait_cycles.us();
         Ppu::step(self, self.wait_cycles);
         Timers::step(self, self.wait_cycles);
+        Apu::step(self, self.wait_cycles);
         self.wait_cycles = 0;
     }
 
@@ -228,9 +233,7 @@ impl Default for GameGirlAdv {
             cpu: Cpu::default(),
             memory: Memory::default(),
             ppu: Ppu::default(),
-            apu: Apu {
-                buffer: Vec::with_capacity(1000),
-            },
+            apu: Apu::default(),
             // Meh...
             dma: Dmas::default(),
             timers: Timers::default(),
@@ -244,6 +247,7 @@ impl Default for GameGirlAdv {
         };
 
         gg[KEYINPUT] = 0x3FF;
+        gg[SOUNDBIAS] = 0x200;
 
         // Skip bootrom for now
         gg.cpu.pc = 0x0800_0000;

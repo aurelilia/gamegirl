@@ -164,6 +164,7 @@ impl GameGirlAdv {
     pub(super) fn set_byte(&mut self, addr: u32, value: u8) {
         let a = addr.us();
         match a {
+            0x0400_00A0..=0x0400_00A7 => panic!("unimplemented"),
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
             }
@@ -217,22 +218,14 @@ impl GameGirlAdv {
             TM3CNT_H => Timers::hi_write::<3>(self, value),
 
             // DMAs
-            0xBA => {
-                self[a] = value;
-                Dmas::update_idx(self, 0, value);
-            }
-            0xC6 => {
-                self[a] = value;
-                Dmas::update_idx(self, 1, value);
-            }
-            0xD2 => {
-                self[a] = value;
-                Dmas::update_idx(self, 2, value);
-            }
-            0xDE => {
-                self[a] = value;
-                Dmas::update_idx(self, 3, value);
-            }
+            0xBA => Dmas::update_idx(self, 0, value),
+            0xC6 => Dmas::update_idx(self, 1, value),
+            0xD2 => Dmas::update_idx(self, 2, value),
+            0xDE => Dmas::update_idx(self, 3, value),
+
+            // Audio
+            FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
+            FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
 
             // RO registers
             VCOUNT | KEYINPUT => (),
@@ -253,7 +246,7 @@ impl GameGirlAdv {
     }
 
     #[inline]
-    fn set<T>(&mut self, addr: u32, value: T, slow: fn(&mut GameGirlAdv, u32, T)) {
+    fn set<T: UpperHex>(&mut self, addr: u32, value: T, slow: fn(&mut GameGirlAdv, u32, T)) {
         let ptr = self.page::<true>(addr);
         if ptr as usize > 0x8000 {
             unsafe { ptr::write(mem::transmute::<_, *mut T>(ptr), value) }

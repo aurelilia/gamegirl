@@ -1,6 +1,7 @@
 use crate::{
     gga::{
-        addr::TM0CNT_H,
+        addr::{SOUNDCNT_H, TM0CNT_H},
+        audio::Apu,
         cpu::{Cpu, Interrupt},
         GameGirlAdv,
     },
@@ -79,6 +80,18 @@ impl Timers {
                 if gg[addr].is_bit(6) {
                     Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + TIM.u16())
                 }
+
+                if TIM < 2 {
+                    // Might need to notify APU about this
+                    let cnt = gg[SOUNDCNT_H];
+                    if cnt.bit(10).us() == TIM {
+                        Apu::timer_overflow::<0>(gg);
+                    }
+                    if cnt.bit(14).us() == TIM {
+                        Apu::timer_overflow::<1>(gg);
+                    }
+                }
+
                 true
             }
         }

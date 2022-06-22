@@ -28,3 +28,11 @@ pub const TM0CNT_H: u32 = 0x102;
 pub const TM1CNT_H: u32 = 0x106;
 pub const TM2CNT_H: u32 = 0x10A;
 pub const TM3CNT_H: u32 = 0x10E;
+
+// Audio
+pub const SOUNDCNT_H: u32 = 0x82;
+pub const SOUNDBIAS: u32 = 0x88;
+pub const FIFO_A_L: u32 = 0xA0;
+pub const FIFO_A_H: u32 = 0xA2;
+pub const FIFO_B_L: u32 = 0xA4;
+pub const FIFO_B_H: u32 = 0xA6;
