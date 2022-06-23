@@ -137,6 +137,13 @@ impl GameGirlAdv {
             TM2CNT_L => self.timers.counters[2],
             TM3CNT_L => self.timers.counters[3],
 
+            // Old sound
+            0x60..=0x80 | 0x84 | 0x90..=0x9F => {
+                let low = self.apu.cgb_chans.read_register_gga(a.u16());
+                let high = self.apu.cgb_chans.read_register_gga(a.u16() + 1);
+                hword(low, high)
+            }
+
             _ => self[a],
         }
     }
@@ -167,6 +174,12 @@ impl GameGirlAdv {
             // DMA channel edge case, why do games do this
             0x0400_00A0..=0x0400_00A3 => self.apu.push_sample::<0>(value),
             0x0400_00A4..=0x0400_00A7 => self.apu.push_sample::<1>(value),
+
+            // Old sound
+            0x0400_0060..=0x0400_0080 | 0x0400_0084 | 0x0400_0090..=0x0400_009F => self
+                .apu
+                .cgb_chans
+                .write_register_gga((addr & 0xFFF).u16(), value),
 
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
@@ -229,6 +242,12 @@ impl GameGirlAdv {
             // Audio
             FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
             FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
+            0x60..=0x80 | 0x84 | 0x90..=0x9F => {
+                self.apu.cgb_chans.write_register_gga(a.u16(), value.low());
+                self.apu
+                    .cgb_chans
+                    .write_register_gga(a.u16() + 1, value.high());
+            }
 
             // RO registers
             VCOUNT | KEYINPUT => (),

@@ -1,17 +1,14 @@
 use crate::{
     ggc::io::{
         addr::{DIV, KEY1},
-        apu::{
-            apu::{ChannelsControl, ChannelsSelection},
-            channel::ApuChannel,
-        },
         Mmu,
     },
     numutil::NumExt,
 };
 use serde::{Deserialize, Serialize};
 
-pub use apu::GenericApu;
+pub use apu::{ChannelsControl, ChannelsSelection, GenericApu};
+pub use channel::ApuChannel;
 
 mod apu;
 mod channel;

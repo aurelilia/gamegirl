@@ -293,3 +293,9 @@ impl GenericApu {
         }
     }
 }
+
+impl Default for GenericApu {
+    fn default() -> Self {
+        Self::new(true)
+    }
+}

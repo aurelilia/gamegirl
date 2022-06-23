@@ -4,6 +4,7 @@ use crate::{
         dma::Dmas,
         GameGirlAdv, CPU_CLOCK,
     },
+    ggc::io::apu::{ApuChannel, ChannelsControl, ChannelsSelection, GenericApu},
     numutil::{NumExt, U16Ext},
 };
 use serde::{Deserialize, Serialize};
@@ -14,15 +15,35 @@ const SAMPLE_EVERY_N_CLOCKS: f32 = CPU_CLOCK / SAMPLE_RATE;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct Apu {
+    // 4 channels found on GG(C)
+    pub(crate) cgb_chans: GenericApu,
+    clock_count: u16,
+    sequencer_tick: u16,
+
+    // DMA channels
     buffers: [VecDeque<i8>; 2],
     current_samples: [i8; 2],
 
+    // Output timer and buffer
     sample_counter: f32,
     pub buffer: Vec<f32>,
 }
 
 impl Apu {
     pub fn step(gg: &mut GameGirlAdv, cycles: u16) {
+        gg.apu.clock_count += cycles;
+        if gg.apu.clock_count >= 8 {
+            let cgb_cycles = gg.apu.clock_count >> 3;
+            gg.apu.cgb_chans.clock(cgb_cycles);
+            gg.apu.clock_count &= 7;
+
+            gg.apu.sequencer_tick += cgb_cycles;
+            if gg.apu.sequencer_tick > 0x1000 {
+                gg.apu.sequencer_tick -= 0x1000;
+                gg.apu.cgb_chans.tick_sequencer();
+            }
+        }
+
         gg.apu.sample_counter += cycles as f32;
         if gg.apu.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
             Self::push_output(gg);
@@ -53,11 +74,29 @@ impl Apu {
             left += b;
         }
 
+        let cgb_sample = gg.apu.cgb_chans.make_sample();
+        right += (cgb_sample[0] * 2048.) as i16;
+        left += (cgb_sample[1] * 2048.) as i16;
+
         let bias = gg[SOUNDBIAS].bits(0, 10) as i16;
         gg.apu.buffer.push(Self::bias(right, bias) as f32 / 1024.0);
         gg.apu.buffer.push(Self::bias(left, bias) as f32 / 1024.0);
     }
 
+    fn bias(mut sample: i16, bias: i16) -> i16 {
+        sample += bias;
+        if sample > 0x3ff {
+            sample = 0x3ff;
+        } else if sample < 0 {
+            sample = 0;
+        }
+        sample -= bias;
+        sample
+    }
+}
+
+// Impl block for DMA channels
+impl Apu {
     pub fn timer_overflow<const CH: usize>(gg: &mut GameGirlAdv) {
         if let Some(next) = gg.apu.buffers[CH].pop_front() {
             gg.apu.current_samples[CH] = next;
@@ -81,15 +120,192 @@ impl Apu {
     pub fn push_sample<const CH: usize>(&mut self, samples: u8) {
         self.buffers[CH].push_back(samples as i8);
     }
+}
 
-    fn bias(mut sample: i16, bias: i16) -> i16 {
-        sample += bias;
-        if sample > 0x3ff {
-            sample = 0x3ff;
-        } else if sample < 0 {
-            sample = 0;
+impl GenericApu {
+    pub fn read_register_gga(&self, addr: u16) -> u8 {
+        match addr {
+            0x60 => 0x80 | self.pulse1.channel().read_sweep_register(),
+            0x62 => 0x3F | (self.pulse1.channel().read_pattern_duty() << 6),
+            0x63 => self.pulse1.channel().envelope().read_envelope_register(),
+            0x64 => 0xFF,
+            0x65 => 0xBF | ((self.pulse1.read_length_enable() as u8) << 6),
+
+            0x68 => 0x3F | (self.pulse2.channel().read_pattern_duty() << 6),
+            0x69 => self.pulse2.channel().envelope().read_envelope_register(),
+            0x6C => 0xFF,
+            0x6D => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
+
+            0x70 => 0x7F | ((self.wave.dac_enabled() as u8) << 7),
+            0x72 => 0xFF,
+            0x73 => 0x9F | ((self.wave.channel().read_volume()) << 5),
+            0x74 => 0xFF,
+            0x75 => 0xBF | ((self.wave.read_length_enable() as u8) << 6),
+
+            0x78 => 0xFF,
+            0x79 => self.noise.channel().envelope().read_envelope_register(),
+            0x7C => self.noise.channel().read_noise_register(),
+            0x7D => 0xBF | ((self.noise.read_length_enable() as u8) << 6),
+
+            0x80 => self.channels_control.bits(),
+            0x81 => self.channels_selection.bits(),
+            0x84 => {
+                0x70 | ((self.power as u8) << 7)
+                    | ((self.noise.enabled() as u8) << 3)
+                    | ((self.wave.enabled() as u8) << 2)
+                    | ((self.pulse2.enabled() as u8) << 1)
+                    | self.pulse1.enabled() as u8
+            }
+
+            0x90..=0x9E => self.wave.channel().read_buffer((addr & 0xF) as u8),
+            _ => 0,
         }
-        sample -= bias;
-        sample
+    }
+
+    pub fn write_register_gga(&mut self, addr: u16, data: u8) {
+        // `addr % 5 != 2` will be true if its not a length counter register,
+        // as these are not affected by power off, but `addr % 5 != 2` also
+        // includes `0x81` and we don't want to be able to write to it
+        if !self.power && addr <= 0x81 && (addr % 5 != 2 || addr == 0x81) {
+            return;
+        }
+
+        let is_length_clock_next = self.is_length_clock_next();
+
+        match addr {
+            0x60 => self.pulse1.channel_mut().write_sweep_register(data),
+            0x62 => {
+                if self.power {
+                    self.pulse1.channel_mut().write_pattern_duty(data >> 6);
+                }
+
+                self.pulse1.write_sound_length(data & 0x3F);
+            }
+            0x63 => {
+                self.pulse1
+                    .channel_mut()
+                    .envelope_mut()
+                    .write_envelope_register(data);
+
+                self.pulse1.set_dac_enable(data & 0xF8 != 0);
+            }
+            0x64 => {
+                let freq = (self.pulse1.channel().frequency() & 0xFF00) | data as u16;
+                self.pulse1.channel_mut().write_frequency(freq);
+            }
+            0x65 => {
+                let freq =
+                    (self.pulse1.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
+                self.pulse1.channel_mut().write_frequency(freq);
+
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.pulse1,
+                    is_length_clock_next,
+                    data,
+                );
+            }
+
+            0x68 => {
+                if self.power {
+                    self.pulse2.channel_mut().write_pattern_duty(data >> 6);
+                }
+
+                self.pulse2.write_sound_length(data & 0x3F);
+            }
+            0x69 => {
+                self.pulse2
+                    .channel_mut()
+                    .envelope_mut()
+                    .write_envelope_register(data);
+
+                self.pulse2.set_dac_enable(data & 0xF8 != 0);
+            }
+            0x6C => {
+                let freq = (self.pulse2.channel().frequency() & 0xFF00) | data as u16;
+                self.pulse2.channel_mut().write_frequency(freq);
+            }
+            0x6D => {
+                let freq =
+                    (self.pulse2.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
+                self.pulse2.channel_mut().write_frequency(freq);
+
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.pulse2,
+                    is_length_clock_next,
+                    data,
+                );
+            }
+
+            0x70 => {
+                self.wave.set_dac_enable(data & 0x80 != 0);
+            }
+            0x72 => {
+                self.wave.write_sound_length(data);
+            }
+            0x73 => self.wave.channel_mut().write_volume((data >> 5) & 3),
+            0x74 => {
+                let freq = (self.wave.channel().frequency() & 0xFF00) | data as u16;
+                self.wave.channel_mut().write_frequency(freq);
+            }
+            0x75 => {
+                let freq = (self.wave.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
+                self.wave.channel_mut().write_frequency(freq);
+
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.wave,
+                    is_length_clock_next,
+                    data,
+                );
+            }
+
+            0x78 => self.noise.write_sound_length(data & 0x3F),
+            0x79 => {
+                self.noise
+                    .channel_mut()
+                    .envelope_mut()
+                    .write_envelope_register(data);
+
+                self.noise.set_dac_enable(data & 0xF8 != 0);
+            }
+            0x7C => self.noise.channel_mut().write_noise_register(data),
+            0x7D => {
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.noise,
+                    is_length_clock_next,
+                    data,
+                );
+            }
+
+            0x80 => self
+                .channels_control
+                .clone_from(&ChannelsControl::from_bits_truncate(data)),
+            0x81 => self
+                .channels_selection
+                .clone_from(&ChannelsSelection::from_bits_truncate(data)),
+
+            0x84 => {
+                let new_power = data & 0x80 != 0;
+                if self.power && !new_power {
+                    for i in 0x60..=0x81 {
+                        self.write_register_gga(i, 0);
+                    }
+                    self.power_off();
+                } else if !self.power && new_power {
+                    self.power_on(false);
+                }
+
+                // update `self.power` after `power_off`, because we
+                // need to be able to write zeros to registers normally
+                self.power = new_power;
+            }
+
+            0x90..=0x9E => {
+                self.wave
+                    .channel_mut()
+                    .write_buffer((addr & 0xF) as u8, data);
+            }
+
+            _ => (),
+        }
     }
 }
