@@ -5,10 +5,12 @@ use crate::{
         addr::{KEYINPUT, SOUNDBIAS},
         cpu::registers::Flag,
         dma::Dmas,
+        scheduling::AdvEvent,
         timer::Timers,
     },
     ggc::GGConfig,
     numutil::NumExt,
+    scheduler::Scheduler,
     Colour,
 };
 use audio::Apu;
@@ -27,6 +29,7 @@ mod dma;
 mod graphics;
 mod input;
 mod memory;
+mod scheduling;
 mod timer;
 
 pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
@@ -45,6 +48,7 @@ pub struct GameGirlAdv {
     pub timers: Timers,
     pub cart: Cartridge,
 
+    scheduler: Scheduler<AdvEvent>,
     pub options: EmulateOptions,
     pub config: GGConfig,
 
@@ -52,32 +56,23 @@ pub struct GameGirlAdv {
     #[serde(default)]
     pub debugger: GGADebugger,
 
-    /// Temporary for counting cycles in `advance_delta`.
-    #[serde(skip)]
-    #[serde(default)]
-    clock: usize,
-
     /// Temporary used during instruction execution that counts
     /// the amount of cycles the CPU has to wait until it can
     /// execute the next instruction.
+    /// Will be unneeded once scheduler is used everywhere.
     wait_cycles: u16,
+    unpaused: bool,
 }
 
 impl GameGirlAdv {
     /// Advance the system clock by the given delta in seconds.
     /// Might advance a few clocks more.
     pub fn advance_delta(&mut self, delta: f32) {
-        if !self.options.running {
-            return;
-        }
-        self.clock = 0;
-        let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as usize;
-        while self.clock < target {
-            if self.debugger.breakpoint_hit {
-                self.debugger.breakpoint_hit = false;
-                self.options.running = false;
-                break;
-            }
+        let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as u32;
+        self.scheduler.schedule(AdvEvent::PauseEmulation, target);
+
+        self.unpaused = true;
+        while self.options.running && self.unpaused {
             self.advance();
         }
     }
@@ -85,19 +80,9 @@ impl GameGirlAdv {
     /// Step until the PPU has finished producing the current frame.
     /// Only used for rewinding since it causes audio desync very easily.
     pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
-        if !self.options.running {
-            return None;
-        }
-
-        while self.ppu.last_frame == None {
-            if self.debugger.breakpoint_hit {
-                self.debugger.breakpoint_hit = false;
-                self.options.running = false;
-                return None;
-            }
+        while self.options.running && self.ppu.last_frame == None {
             self.advance();
         }
-
         self.ppu.last_frame.take()
     }
 
@@ -112,9 +97,7 @@ impl GameGirlAdv {
 
         let target = samples.len() * self.options.speed_multiplier;
         while self.apu.buffer.len() < target {
-            if self.debugger.breakpoint_hit {
-                self.debugger.breakpoint_hit = false;
-                self.options.running = false;
+            if !self.options.running {
                 samples.fill(0.0);
                 return;
             }
@@ -156,15 +139,19 @@ impl GameGirlAdv {
 
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
-        self.clock += self.wait_cycles.us();
         Ppu::step(self, self.wait_cycles);
         Timers::step(self, self.wait_cycles);
         Apu::step(self, self.wait_cycles);
         self.wait_cycles = 0;
+
+        while let Some(event) = self.scheduler.get_next_pending() {
+            event.kind.dispatch(self, event.late_by);
+        }
     }
 
     /// Add wait cycles, which advance the system besides the CPU.
     fn add_wait_cycles(&mut self, count: u16) {
+        self.scheduler.advance(count.u32());
         self.wait_cycles = self.wait_cycles.wrapping_add(count);
     }
 
@@ -239,16 +226,16 @@ impl Default for GameGirlAdv {
             memory: Memory::default(),
             ppu: Ppu::default(),
             apu: Apu::default(),
-            // Meh...
             dma: Dmas::default(),
             timers: Timers::default(),
             cart: Cartridge::default(),
 
+            scheduler: Scheduler::default(),
             options: EmulateOptions::default(),
             config: GGConfig::default(),
             debugger: GGADebugger::default(),
-            clock: 0,
             wait_cycles: 0,
+            unpaused: true,
         };
 
         // Initialize various IO registers

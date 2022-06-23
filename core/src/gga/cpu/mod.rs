@@ -41,6 +41,7 @@ pub struct Cpu {
 impl Cpu {
     pub fn exec_next_inst(gg: &mut GameGirlAdv) {
         if !gg.debugger.should_execute(gg.cpu.pc) {
+            gg.options.running = false; // Pause emulation, we hit a BP
             return;
         }
         if gg.cpu.pc_just_changed {

@@ -32,11 +32,10 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
         if !self.breakpoints_enabled {
             return true;
         }
-        self.breakpoint_hit |= self
+        !self
             .breakpoints
             .iter()
-            .any(|bp| bp.addr == Some(pc) && bp.pc);
-        !self.breakpoint_hit
+            .any(|bp| bp.addr == Some(pc) && bp.pc)
     }
 }
 
