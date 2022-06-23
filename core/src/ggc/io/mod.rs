@@ -150,6 +150,7 @@ impl Mmu {
             DMA => {
                 self[addr] = value;
                 let time = if self[KEY1].is_bit(7) { 324 } else { 648 };
+                self.scheduler.cancel(GGEvent::DMAFinish);
                 self.scheduler.schedule(GGEvent::DMAFinish, time);
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
