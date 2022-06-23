@@ -89,7 +89,11 @@ impl Inst {
 }
 
 pub fn get_next(gg: &GameGirl) -> Inst {
-    Inst(gg.mmu.read(gg.cpu.pc), gg.arg8())
+    let first = gg.mmu.read(gg.cpu.pc);
+    match first {
+        EXT => Inst(first, gg.arg8()),
+        _ => Inst(first, 0)
+    }
 }
 
 pub fn get_at(gg: &GameGirl, addr: u16) -> Inst {
