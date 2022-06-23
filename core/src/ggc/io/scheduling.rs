@@ -1,6 +1,6 @@
 use crate::{
     ggc::{
-        io::{apu::GGApu, dma, ppu::Ppu},
+        io::{apu::GGApu, dma, dma::Hdma, ppu::Ppu},
         GameGirl,
     },
     scheduler::Kind,
@@ -21,6 +21,10 @@ pub enum GGEvent {
     ApuEvent(ApuEvent),
     /// A DMA transfer completion.
     DMAFinish,
+    /// Advance HDMA transfer.
+    HdmaTransferStep,
+    /// A GDMA transfer.
+    GdmaTransfer,
     /// A timer overflow.
     TimerOverflow,
 }
@@ -33,6 +37,8 @@ impl GGEvent {
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
             ApuEvent(evt) => GGApu::handle_event(gg, *evt, late_by),
             DMAFinish => dma::do_oam_dma(gg),
+            HdmaTransferStep => Hdma::handle_hdma(gg),
+            GdmaTransfer => Hdma::handle_gdma(gg),
             _ => panic!("aaaaaa"),
         }
     }

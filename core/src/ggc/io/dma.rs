@@ -3,6 +3,7 @@ use crate::{
         io::{
             addr::{DMA, HDMA_DEST_HIGH, HDMA_DEST_LOW, HDMA_SRC_HIGH, HDMA_SRC_LOW, LCDC},
             ppu::DISP_EN,
+            scheduling::GGEvent,
             Mmu,
         },
         GameGirl,
@@ -29,40 +30,15 @@ pub struct Hdma {
     dest: u16,
 
     pub transfer_left: i16,
-    hblank_transferring: bool,
-    gdma_queued: bool,
-    pub ppu_in_hblank: bool,
+    pub hblank_transferring: bool,
 }
 
 impl Hdma {
-    pub fn step(gg: &mut GameGirl) {
-        if !gg.mmu.cgb {
-            return;
-        }
-        if gg.mmu.hdma.gdma_queued {
-            gg.mmu.hdma.gdma_queued = false;
-            gg.advance_clock(1);
-            while gg.mmu.hdma.transfer_left >= 0 {
-                Self::advance_transfer(gg);
-            }
-        }
-
-        if !Self::can_advance_hblank(gg) {
-            return;
-        }
-
-        gg.advance_clock(1);
-        Self::advance_transfer(gg);
-        if gg.mmu.hdma.transfer_left < 0 {
-            gg.mmu.hdma.hblank_transferring = false;
-            gg.mmu.hdma.transfer_left = 0xFF;
-        }
-    }
-
     pub fn write_start(mmu: &mut Mmu, value: u8) {
         if mmu.hdma.hblank_transferring && !value.is_bit(7) {
             mmu.hdma.hblank_transferring = false;
             mmu.hdma.transfer_left |= 0x80;
+            mmu.scheduler.cancel(GGEvent::HdmaTransferStep);
         } else {
             mmu.hdma.source = (mmu[HDMA_SRC_LOW].u16() & 0xF0) | (mmu[HDMA_SRC_HIGH].u16() << 8);
             mmu.hdma.dest =
@@ -70,15 +46,33 @@ impl Hdma {
             mmu.hdma.dest = (mmu.hdma.dest & 0x1FFF) | 0x8000;
             mmu.hdma.transfer_left = value as i16 & 0x7F;
             mmu.hdma.hblank_transferring = value.is_bit(7);
-            mmu.hdma.gdma_queued = !mmu.hdma.hblank_transferring;
+
+            if !mmu.hdma.hblank_transferring {
+                mmu.scheduler.schedule(GGEvent::GdmaTransfer, 2);
+            } else if !mmu[LCDC].is_bit(DISP_EN) {
+                // Only reschedule when PPU is off, when it is not, PPU will schedule next
+                // transfer step.
+                mmu.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
+            }
         }
     }
 
-    fn can_advance_hblank(gg: &mut GameGirl) -> bool {
-        let possible = gg.mmu.hdma.hblank_transferring
-            && (gg.mmu.hdma.ppu_in_hblank || !gg.mmu[LCDC].is_bit(DISP_EN));
-        gg.mmu.hdma.ppu_in_hblank = false;
-        possible
+    pub fn handle_hdma(gg: &mut GameGirl) {
+        Self::advance_transfer(gg);
+        if gg.mmu.hdma.transfer_left < 0 {
+            gg.mmu.hdma.hblank_transferring = false;
+            gg.mmu.hdma.transfer_left = 0xFF;
+        } else if !gg.mmu[LCDC].is_bit(DISP_EN) {
+            // Only reschedule when PPU is off, when it is not, PPU will schedule next
+            // transfer step.
+            gg.mmu.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
+        }
+    }
+
+    pub fn handle_gdma(gg: &mut GameGirl) {
+        while gg.mmu.hdma.transfer_left >= 0 {
+            Self::advance_transfer(gg);
+        }
     }
 
     fn advance_transfer(gg: &mut GameGirl) {

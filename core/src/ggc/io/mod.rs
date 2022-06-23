@@ -61,7 +61,6 @@ pub struct Mmu {
 impl Mmu {
     /// Step the system forward by the given amount of cycles.
     pub(super) fn step(gg: &mut GameGirl, m_cycles: u16) {
-        Hdma::step(gg);
         Timer::step(gg, m_cycles);
         GGApu::step(&mut gg.mmu, m_cycles);
     }
@@ -133,7 +132,7 @@ impl Mmu {
                 self[WRAM_SELECT] = value | 0xF8;
             }
             KEY1 if self.cgb => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
-            HDMA_START => Hdma::write_start(self, value),
+            HDMA_START if self.cgb => Hdma::write_start(self, value),
             HDMA_SRC_HIGH..=HDMA_DEST_LOW if self.cgb => self[addr] = value,
 
             IF => self[IF] = value | 0xE0,

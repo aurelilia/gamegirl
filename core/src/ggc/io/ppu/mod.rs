@@ -37,8 +37,6 @@ const CGB_BANK: u16 = 3;
 /// DMG/CGB mode.
 #[derive(Deserialize, Serialize)]
 pub struct Ppu {
-    mode: Mode,
-    mode_clock: u16,
     #[serde(skip)]
     #[serde(default = "serde_bool_arr")]
     bg_occupied_pixels: [bool; 160],
@@ -62,7 +60,9 @@ impl Ppu {
             PpuEvent::UploadEnd => {
                 Self::render_line(gg);
                 gg.mmu.ppu.bg_occupied_pixels = [false; 160];
-                gg.mmu.hdma.ppu_in_hblank = true;
+                if gg.mmu.cgb && gg.mmu.hdma.hblank_transferring {
+                    gg.mmu.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
+                }
                 Self::stat_interrupt(gg, 3);
                 (PpuEvent::HblankEnd, 204)
             }
@@ -117,6 +117,9 @@ impl Ppu {
     }
 
     fn render_line(gg: &mut GameGirl) {
+        if !gg.lcdc(DISP_EN) {
+            return;
+        }
         match &gg.mmu.ppu.kind {
             PpuKind::Dmg { .. } if gg.lcdc(BG_EN) => {
                 Self::render_bg(gg);
@@ -339,8 +342,6 @@ impl Ppu {
 
     pub(super) fn new() -> Self {
         Self {
-            mode: Mode::OAMScan,
-            mode_clock: 0,
             bg_occupied_pixels: [false; 160],
             window_line: 0,
             kind: PpuKind::Dmg {
@@ -367,31 +368,6 @@ impl Ppu {
 pub enum PpuKind {
     Dmg { used_x_obj_coords: [Option<u8>; 10] },
     Cgb(Cgb),
-}
-
-/// Mode the PPU can be in.
-#[derive(Copy, Clone, Deserialize, Serialize)]
-enum Mode {
-    HBlank = 204,
-    VBlank = 456,
-    OAMScan = 80,
-    Upload = 172,
-}
-
-impl Mode {
-    fn cycles(self) -> u16 {
-        self as u16
-    }
-
-    fn ordinal(self) -> u8 {
-        // ehhh
-        match self {
-            Mode::HBlank => 0,
-            Mode::VBlank => 1,
-            Mode::OAMScan => 2,
-            Mode::Upload => 3,
-        }
-    }
 }
 
 /// Data for a single sprite in OAM.
