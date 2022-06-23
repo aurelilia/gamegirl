@@ -179,6 +179,15 @@ impl GameGirlAdv {
             0x0400_00A0..=0x0400_00A3 => self.apu.push_sample::<0>(value),
             0x0400_00A4..=0x0400_00A7 => self.apu.push_sample::<1>(value),
 
+            // HALTCNT
+            0x0400_0301 => {
+                // We're halted, emulate peripherals until an interrupt is pending
+                while self[IF] == 0 {
+                    let evt = self.scheduler.pop();
+                    evt.kind.dispatch(self, evt.late_by);
+                }
+            }
+
             // Old sound
             0x0400_0060..=0x0400_0080 | 0x0400_0084 | 0x0400_0090..=0x0400_009F => self
                 .apu

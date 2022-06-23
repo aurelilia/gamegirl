@@ -66,6 +66,18 @@ impl<E: Kind> Scheduler<E> {
         }
     }
 
+    /// Return the next event immediately, and set the current time to
+    /// the event's execution time. This is useful during HALT or similar
+    /// states.
+    pub fn pop(&mut self) -> Event<E> {
+        let event = self.events.pop().unwrap();
+        self.time = event.execute_at;
+        Event {
+            kind: event.kind,
+            late_by: 0,
+        }
+    }
+
     /// Cancel all events of a given type.
     /// Somewhat expensive.
     pub fn cancel(&mut self, evt: E) {

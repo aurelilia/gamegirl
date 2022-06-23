@@ -34,6 +34,7 @@ pub struct Cpu {
     pub spsr: ModeReg,
 
     pc_just_changed: bool,
+    pub pending_int: bool,
     last_access_type: Access,
     prefetch: [u32; 2],
 }
@@ -50,7 +51,10 @@ impl Cpu {
         }
 
         gg.advance_clock();
-        if Self::check_interrupt_occurs(gg) || gg[HALTCNT].is_bit(15) {
+        if gg.cpu.pending_int {
+            gg.cpu.pending_int = false;
+            gg.cpu.inc_pc_by(4);
+            gg.cpu.exception_occurred(Exception::Irq);
             return;
         }
 
@@ -84,16 +88,8 @@ impl Cpu {
         mem::replace(&mut gg.cpu.prefetch[0], next)
     }
 
-    fn check_interrupt_occurs(gg: &mut GameGirlAdv) -> bool {
-        let ime = gg[IME] == 1;
-        let int = ime && !gg.cpu.flag(IrqDisable) && (gg[IE] & gg[IF]) != 0;
-        if int {
-            gg.cpu.inc_pc_by(4);
-            gg.cpu.exception_occurred(Exception::Irq);
-            gg[HALTCNT] = gg[HALTCNT].set_bit(15, false); // Exit halt state if
-                                                          // we were in it
-        }
-        int
+    fn check_pending_int(gg: &mut GameGirlAdv) {
+        gg.cpu.pending_int |= (gg[IME] == 1) && !gg.cpu.flag(IrqDisable) && (gg[IE] & gg[IF]) != 0;
     }
 
     fn exception_occurred(&mut self, kind: Exception) {
@@ -156,6 +152,7 @@ impl Cpu {
     #[inline]
     pub fn request_interrupt_idx(gg: &mut GameGirlAdv, idx: u16) {
         gg[IF] = gg[IF].set_bit(idx, true);
+        Self::check_pending_int(gg);
     }
 }
 
@@ -170,6 +167,7 @@ impl Default for Cpu {
             cpsr: 0xD3,
             spsr: ModeReg::default(),
             pc_just_changed: false,
+            pending_int: false,
             last_access_type: Access::NonSeq,
             prefetch: [0, 0],
         }
