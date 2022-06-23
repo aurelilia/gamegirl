@@ -14,29 +14,11 @@ use serde::{Deserialize, Serialize};
 /// OAM DMA transfer available on DMG and CGB.
 /// This implementation writes everything at once
 /// once the timer of 648 cycles is up.
-#[derive(Default, Deserialize, Serialize)]
-pub struct Dma {
-    time_left: i16,
-}
-
-impl Dma {
-    pub fn step(gg: &mut GameGirl, m_cycles: u16) {
-        if gg.mmu.dma.time_left <= 0 {
-            return;
-        }
-        gg.mmu.dma.time_left -= m_cycles as i16;
-        if gg.mmu.dma.time_left > 0 {
-            return;
-        }
-        let mut src = gg.mmu[DMA].u16() * 0x100;
-        for dest in 0xFE00..0xFEA0 {
-            gg.mmu.write(dest, gg.mmu.read(src));
-            src += 1;
-        }
-    }
-
-    pub fn start(&mut self) {
-        self.time_left = 162;
+pub fn do_oam_dma(gg: &mut GameGirl) {
+    let mut src = gg.mmu[DMA].u16() * 0x100;
+    for dest in 0xFE00..0xFEA0 {
+        gg.mmu.write(dest, gg.mmu.read(src));
+        src += 1;
     }
 }
 

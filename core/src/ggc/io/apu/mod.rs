@@ -7,6 +7,13 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    common::SAMPLE_RATE,
+    ggc::{
+        io::scheduling::{ApuEvent, GGEvent},
+        GameGirl, T_CLOCK_HZ,
+    },
+};
 pub use apu::{ChannelsControl, ChannelsSelection, GenericApu};
 pub use channel::ApuChannel;
 
@@ -17,13 +24,13 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
+pub const SAMPLE_EVERY_N_CLOCKS: u32 = T_CLOCK_HZ / SAMPLE_RATE;
+
 /// APU variant used by DMG/CGB.
 #[derive(Deserialize, Serialize)]
 pub struct GGApu {
     pub(super) inner: GenericApu,
 
-    /// Counts time until next sample.
-    sample_counter: f64,
     /// Stores the value of the 4th bit (5th in double speed mode) of the
     /// divider as sequencer clocks are controlled by the divider
     pub divider_sequencer_clock_bit: bool,
@@ -32,6 +39,19 @@ pub struct GGApu {
 }
 
 impl GGApu {
+    pub fn handle_event(gg: &mut GameGirl, event: ApuEvent, late_by: u32) {
+        match event {
+            ApuEvent::PushSample => {
+                let sample = gg.mmu.apu.inner.make_sample();
+                gg.mmu.apu.buffer.push(sample[0]);
+                gg.mmu.apu.buffer.push(sample[1]);
+                gg.mmu
+                    .scheduler
+                    .schedule(GGEvent::ApuEvent(event), SAMPLE_EVERY_N_CLOCKS - late_by);
+            }
+        }
+    }
+
     pub fn step(mmu: &mut Mmu, cycles: u16) {
         let ds = mmu.cgb && mmu[KEY1].is_bit(7);
         let div = mmu.timer.read(DIV);
@@ -47,18 +67,8 @@ impl GGApu {
         let div_bit = 4 + double_speed as u8;
 
         let adj_clocks = clocks * cycles;
-
-        const SAMPLE_RATE: f64 = 44100.;
-        const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 2) as f64) / SAMPLE_RATE;
-        self.sample_counter += adj_clocks as f64;
-        if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
-            let sample = self.inner.make_sample();
-            self.buffer.push(sample[0]);
-            self.buffer.push(sample[1]);
-            self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
-        }
-
         self.inner.clock(adj_clocks);
+
         if self.inner.power {
             let old_div_sequencer_bit = self.divider_sequencer_clock_bit;
             self.divider_sequencer_clock_bit = (divider >> div_bit) & 1 == 1;
@@ -76,7 +86,6 @@ impl GGApu {
     pub fn new(cgb: bool) -> Self {
         Self {
             inner: GenericApu::new(cgb),
-            sample_counter: 0.,
             divider_sequencer_clock_bit: false,
             buffer: Vec::new(),
         }

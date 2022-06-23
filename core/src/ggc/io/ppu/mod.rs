@@ -99,8 +99,9 @@ impl Ppu {
         gg.mmu[STAT] =
             gg.mmu[STAT].set_bit(2, gg.mmu[LYC] == gg.mmu[LY]).u8() & 0xFC | next_mode.ordinal();
 
-        let time = (time >> gg.t_shift) - late_by;
-        gg.scheduler.schedule(GGEvent::PpuEvent(next_mode), time);
+        gg.mmu
+            .scheduler
+            .schedule(GGEvent::PpuEvent(next_mode), time - late_by);
     }
 
     fn stat_interrupt(gg: &mut GameGirl, bit: u16) {

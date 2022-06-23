@@ -1,17 +1,13 @@
 use crate::{
     ggc::{
         io::{
-            addr::*,
-            apu::GGApu,
-            cartridge::Cartridge,
-            dma::{Dma, Hdma},
-            joypad::Joypad,
-            ppu::Ppu,
-            timer::Timer,
+            addr::*, apu::GGApu, cartridge::Cartridge, dma::Hdma, joypad::Joypad, ppu::Ppu,
+            scheduling::GGEvent, timer::Timer,
         },
         CgbMode, GGConfig, GameGirl,
     },
     numutil::NumExt,
+    scheduler::Scheduler,
 };
 use serde::{Deserialize, Serialize};
 use std::ops::{Index, IndexMut};
@@ -52,12 +48,12 @@ pub struct Mmu {
     #[serde(skip)]
     #[serde(default)]
     pub debugger: GGDebugger,
+    pub scheduler: Scheduler<GGEvent>,
 
     pub cart: Cartridge,
     timer: Timer,
     pub ppu: Ppu,
     joypad: Joypad,
-    dma: Dma,
     pub(super) apu: GGApu,
     hdma: Hdma,
 }
@@ -67,7 +63,6 @@ impl Mmu {
     pub(super) fn step(gg: &mut GameGirl, m_cycles: u16) {
         Hdma::step(gg);
         Timer::step(gg, m_cycles);
-        Dma::step(gg, m_cycles);
         GGApu::step(&mut gg.mmu, m_cycles);
     }
 
@@ -155,7 +150,8 @@ impl Mmu {
             STAT => self[STAT] = value | 0x80, // Bit 7 unavailable
             DMA => {
                 self[addr] = value;
-                self.dma.start();
+                let time = if self[KEY1].is_bit(7) { 324 } else { 648 };
+                self.scheduler.schedule(GGEvent::DMAFinish, time);
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
             NR10..=WAV_END => self.apu.write(HIGH_START + addr, value),
@@ -200,11 +196,11 @@ impl Mmu {
             bootrom: None,
             cgb: false,
             debugger,
+            scheduler: Scheduler::default(),
 
             timer: Timer::default(),
             ppu: Ppu::new(),
             joypad: Joypad::default(),
-            dma: Dma::default(),
             apu: GGApu::new(false),
             hdma: Hdma::default(),
             cart: Cartridge::dummy(),

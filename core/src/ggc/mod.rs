@@ -19,15 +19,16 @@ use crate::{
 
 use crate::{
     debugger::Debugger,
-    ggc::io::scheduling::{GGEvent, PpuEvent},
-    scheduler::Scheduler,
+    ggc::io::{
+        apu::SAMPLE_EVERY_N_CLOCKS,
+        scheduling::{ApuEvent, GGEvent, PpuEvent},
+    },
 };
 
 pub mod cpu;
 pub mod io;
 
-const T_CLOCK_HZ: usize = 4194304;
-const M_CLOCK_HZ: f32 = T_CLOCK_HZ as f32 / 4.0;
+const T_CLOCK_HZ: u32 = 4194304;
 
 pub type GGDebugger = Debugger<u16>;
 
@@ -43,7 +44,6 @@ pub struct GameGirl {
     /// 2, CGB 2x: 1.
     t_shift: u8,
     unpaused: bool,
-    scheduler: Scheduler<GGEvent>,
 
     /// Emulation options.
     pub options: EmulateOptions,
@@ -58,8 +58,8 @@ impl GameGirl {
             return;
         }
 
-        let target = (M_CLOCK_HZ * delta * self.options.speed_multiplier as f32) as u32;
-        self.scheduler.schedule(GGEvent::PauseEmulation, target);
+        let target = (T_CLOCK_HZ as f32 * delta * self.options.speed_multiplier as f32) as u32;
+        self.mmu.scheduler.schedule(GGEvent::PauseEmulation, target);
 
         self.unpaused = true;
         while self.options.running && self.unpaused {
@@ -144,8 +144,8 @@ impl GameGirl {
     fn advance_clock(&mut self, m_cycles: u16) {
         Mmu::step(self, m_cycles);
 
-        self.scheduler.advance(m_cycles.u32());
-        while let Some(event) = self.scheduler.get_next_pending() {
+        self.mmu.scheduler.advance((m_cycles << self.t_shift).u32());
+        while let Some(event) = self.mmu.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
         }
     }
@@ -249,13 +249,17 @@ impl Default for GameGirl {
 
             t_shift: 2,
             unpaused: true,
-            scheduler: Scheduler::default(),
             options: EmulateOptions::default(),
         };
 
         // Initialize scheduler
-        gg.scheduler
+        gg.mmu
+            .scheduler
             .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
+        gg.mmu.scheduler.schedule(
+            GGEvent::ApuEvent(ApuEvent::PushSample),
+            SAMPLE_EVERY_N_CLOCKS,
+        );
 
         gg
     }

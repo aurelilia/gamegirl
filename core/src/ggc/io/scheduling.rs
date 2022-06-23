@@ -1,5 +1,8 @@
 use crate::{
-    ggc::{io::ppu::Ppu, GameGirl},
+    ggc::{
+        io::{apu::GGApu, dma, ppu::Ppu},
+        GameGirl,
+    },
     scheduler::Kind,
 };
 use serde::{Deserialize, Serialize};
@@ -28,6 +31,8 @@ impl GGEvent {
         match self {
             PauseEmulation => gg.unpaused = false,
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
+            ApuEvent(evt) => GGApu::handle_event(gg, *evt, late_by),
+            DMAFinish => dma::do_oam_dma(gg),
             _ => panic!("aaaaaa"),
         }
     }
