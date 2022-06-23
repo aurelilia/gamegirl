@@ -95,8 +95,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
 
 /// Window for configuring active breakpoints.
 pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui) {
-    let mut bps = gg.debugger.breakpoints.lock().unwrap();
-    for bp in bps.iter_mut() {
+    for bp in gg.debugger.breakpoints.iter_mut() {
         ui.horizontal(|ui| {
             ui.label("0x");
             if ui
@@ -112,10 +111,10 @@ pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui) {
 
     ui.horizontal(|ui| {
         if ui.button("Add").clicked() {
-            bps.push(Breakpoint::default());
+            gg.debugger.breakpoints.push(Breakpoint::default());
         }
         if ui.button("Clear").clicked() {
-            bps.clear();
+            gg.debugger.breakpoints.clear();
         }
     });
 }

@@ -17,10 +17,7 @@ use cpu::Cpu;
 use graphics::Ppu;
 use memory::Memory;
 use serde::{Deserialize, Serialize};
-use std::{
-    mem,
-    sync::{atomic::Ordering, Arc},
-};
+use std::mem;
 
 pub mod addr;
 mod audio;
@@ -53,7 +50,7 @@ pub struct GameGirlAdv {
 
     #[serde(skip)]
     #[serde(default)]
-    pub debugger: Arc<GGADebugger>,
+    pub debugger: GGADebugger,
 
     /// Temporary for counting cycles in `advance_delta`.
     #[serde(skip)]
@@ -76,8 +73,8 @@ impl GameGirlAdv {
         self.clock = 0;
         let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as usize;
         while self.clock < target {
-            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
-                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+            if self.debugger.breakpoint_hit {
+                self.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 break;
             }
@@ -93,8 +90,8 @@ impl GameGirlAdv {
         }
 
         while self.ppu.last_frame == None {
-            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
-                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+            if self.debugger.breakpoint_hit {
+                self.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 return None;
             }
@@ -115,8 +112,8 @@ impl GameGirlAdv {
 
         let target = samples.len() * self.options.speed_multiplier;
         while self.apu.buffer.len() < target {
-            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
-                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+            if self.debugger.breakpoint_hit {
+                self.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 samples.fill(0.0);
                 return;
@@ -249,7 +246,7 @@ impl Default for GameGirlAdv {
 
             options: EmulateOptions::default(),
             config: GGConfig::default(),
-            debugger: Arc::new(GGADebugger::default()),
+            debugger: GGADebugger::default(),
             clock: 0,
             wait_cycles: 0,
         };

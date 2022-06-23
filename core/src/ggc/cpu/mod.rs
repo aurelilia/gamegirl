@@ -25,7 +25,7 @@ pub struct Cpu {
 impl Cpu {
     /// Execute the next instruction, moving the entire system forward.
     pub(super) fn exec_next_inst(gg: &mut GameGirl) {
-        if !gg.debugger.should_execute(gg.cpu.pc) {
+        if !gg.mmu.debugger.should_execute(gg.cpu.pc) {
             return;
         }
         let ime = gg.cpu.ime;

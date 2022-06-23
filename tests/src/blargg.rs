@@ -5,7 +5,7 @@ use crate::Status;
 pub fn exec() {
     crate::run_dir::<true>("blargg", |gg| {
         let gg = gg.as_ggc();
-        let serial = gg.debugger.serial_output.lock().unwrap();
+        let serial = &gg.mmu.debugger.serial_output;
         if serial.contains("Passed") {
             Break(Status::Success)
         } else if serial.contains("Failed") {

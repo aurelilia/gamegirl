@@ -99,7 +99,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
 
 /// Window for configuring active breakpoints.
 pub fn breakpoints(gg: &mut GameGirl, ui: &mut Ui) {
-    let mut bps = gg.debugger.breakpoints.lock().unwrap();
+    let bps = &mut gg.mmu.debugger.breakpoints;
     for bp in bps.iter_mut() {
         ui.horizontal(|ui| {
             ui.label("0x");

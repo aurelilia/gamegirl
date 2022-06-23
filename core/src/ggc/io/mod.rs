@@ -14,10 +14,7 @@ use crate::{
     numutil::NumExt,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::{Index, IndexMut},
-    sync::Arc,
-};
+use std::ops::{Index, IndexMut};
 
 use super::GGDebugger;
 
@@ -53,7 +50,7 @@ pub struct Mmu {
     pub(crate) cgb: bool,
     #[serde(skip)]
     #[serde(default)]
-    pub(super) debugger: Arc<GGDebugger>,
+    pub debugger: GGDebugger,
 
     pub cart: Cartridge,
     timer: Timer,
@@ -164,12 +161,7 @@ impl Mmu {
             BCPS..=OPRI => self.ppu.write_high(addr, value),
             NR10..=WAV_END => self.apu.write(HIGH_START + addr, value),
 
-            SB => self
-                .debugger
-                .serial_output
-                .lock()
-                .unwrap()
-                .push(value as char),
+            SB => self.debugger.serial_output.push(value as char),
 
             // Last 3 are unmapped regions.
             LY | SC | 0x03 | 0x08..=0x0E | 0x4C..=0x7F => (),
@@ -197,7 +189,7 @@ impl Mmu {
         new
     }
 
-    pub(super) fn new(debugger: Arc<GGDebugger>) -> Self {
+    pub(super) fn new(debugger: GGDebugger) -> Self {
         Self {
             vram: [0; 16384],
             vram_bank: 0,

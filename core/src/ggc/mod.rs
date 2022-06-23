@@ -3,10 +3,7 @@ use crate::{
     Colour,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    mem,
-    sync::{atomic::Ordering, Arc},
-};
+use std::mem;
 
 use crate::{
     ggc::{
@@ -36,9 +33,6 @@ pub type GGDebugger = Debugger<u16>;
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mmu: Mmu,
-    #[serde(skip)]
-    #[serde(default)]
-    pub debugger: Arc<GGDebugger>,
     pub config: GGConfig,
 
     /// Shift of t-clocks, which is different in CGB double speed mode. Regular:
@@ -64,8 +58,8 @@ impl GameGirl {
         self.clock = 0;
         let target = (M_CLOCK_HZ * delta * self.options.speed_multiplier as f32) as usize;
         while self.clock < target {
-            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
-                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+            if self.mmu.debugger.breakpoint_hit {
+                self.mmu.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 break;
             }
@@ -81,8 +75,8 @@ impl GameGirl {
         }
 
         while self.mmu.ppu.last_frame == None {
-            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
-                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+            if self.mmu.debugger.breakpoint_hit {
+                self.mmu.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 return None;
             }
@@ -103,8 +97,8 @@ impl GameGirl {
 
         let target = samples.len() * self.options.speed_multiplier;
         while self.mmu.apu.buffer.len() < target {
-            if self.debugger.breakpoint_hit.load(Ordering::Relaxed) {
-                self.debugger.breakpoint_hit.store(false, Ordering::Relaxed);
+            if self.mmu.debugger.breakpoint_hit {
+                self.mmu.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 samples.fill(0.0);
                 return;
@@ -209,7 +203,7 @@ impl GameGirl {
             self,
             common::deserialize(state, self.config.compress_savestates),
         );
-        self.debugger = old_self.debugger;
+        self.mmu.debugger = old_self.mmu.debugger;
         self.mmu.cart.rom = old_self.mmu.cart.rom;
         self.options.frame_finished = old_self.options.frame_finished;
         self.mmu.bootrom = old_self.mmu.bootrom;
@@ -220,8 +214,7 @@ impl GameGirl {
     pub fn load_cart(&mut self, cart: Cartridge, config: &GGConfig, reset: bool) {
         if reset {
             let old_self = mem::take(self);
-            self.debugger = old_self.debugger.clone();
-            self.mmu.debugger = old_self.debugger;
+            self.mmu.debugger = old_self.mmu.debugger;
             self.options.frame_finished = old_self.options.frame_finished;
         }
         self.mmu.load_cart(cart, config);
@@ -245,11 +238,10 @@ impl GameGirl {
 
 impl Default for GameGirl {
     fn default() -> Self {
-        let debugger = Arc::new(GGDebugger::default());
+        let debugger = GGDebugger::default();
         Self {
             cpu: Cpu::default(),
-            mmu: Mmu::new(debugger.clone()),
-            debugger,
+            mmu: Mmu::new(debugger),
             config: GGConfig::default(),
 
             t_shift: 2,

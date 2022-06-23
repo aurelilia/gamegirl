@@ -1,62 +1,47 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Mutex,
-};
-
 /// Debugger info that is required to be known by the system.
 /// Is generic over GGC/GGA; generic type Ptr is pointer size
 /// on the current system (u16/u32)
-#[derive(Default)]
-pub struct Debugger<Ptr: PartialEq + Copy> {
+#[derive(Clone, Default)]
+pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     /// Contains the serial output that was written to IO register SB.
-    pub serial_output: Mutex<String>,
+    pub serial_output: String,
 
     /// A list of breakpoints the system should stop on.
-    pub breakpoints: Mutex<Vec<Breakpoint<Ptr>>>,
+    pub breakpoints: Vec<Breakpoint<Ptr>>,
     /// If breakpoints are enabled.
-    pub breakpoints_enabled: AtomicBool,
+    pub breakpoints_enabled: bool,
     /// If a breakpoint was hit.
-    pub breakpoint_hit: AtomicBool,
+    pub breakpoint_hit: bool,
 }
 
-impl<Ptr: PartialEq + Copy> Debugger<Ptr> {
+impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
     /// Called before a memory write is executed, which might trigger a BP.
-    pub fn write_occurred(&self, addr: Ptr) {
-        if !self.breakpoints_enabled.load(Ordering::Relaxed) {
+    pub fn write_occurred(&mut self, addr: Ptr) {
+        if !self.breakpoints_enabled {
             return;
         }
-        let hit = self
+        self.breakpoint_hit |= self
             .breakpoints
-            .lock()
-            .unwrap()
             .iter()
             .any(|bp| bp.addr == Some(addr) && bp.write);
-        if hit {
-            self.breakpoint_hit.store(true, Ordering::Relaxed);
-        }
     }
 
     /// Called before an instruction is executed, which might trigger a BP.
     /// If it does, function returns false and inst should not be executed.
-    pub fn should_execute(&self, pc: Ptr) -> bool {
-        if !self.breakpoints_enabled.load(Ordering::Relaxed) {
+    pub fn should_execute(&mut self, pc: Ptr) -> bool {
+        if !self.breakpoints_enabled {
             return true;
         }
-        let hit = self
+        self.breakpoint_hit |= self
             .breakpoints
-            .lock()
-            .unwrap()
             .iter()
             .any(|bp| bp.addr == Some(pc) && bp.pc);
-        if hit {
-            self.breakpoint_hit.store(true, Ordering::Relaxed);
-        }
-        !hit
+        !self.breakpoint_hit
     }
 }
 
 /// A breakpoint.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Breakpoint<Ptr> {
     /// Address that this breakpoint is at.
     pub addr: Option<Ptr>,
