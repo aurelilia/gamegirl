@@ -78,10 +78,6 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             ui.monospace(format!("PC = {:04X}", gg.cpu.pc));
             ui.monospace(format!("SP = {:04X}", gg.cpu.sp));
             ui.add(
-                Label::new(RichText::new(format!("HALT = {}", gg.cpu.halt)).monospace())
-                    .wrap(false),
-            );
-            ui.add(
                 Label::new(RichText::new(format!("IME = {}", gg.cpu.ime)).monospace()).wrap(false),
             );
         });

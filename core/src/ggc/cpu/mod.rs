@@ -17,7 +17,6 @@ pub struct Cpu {
     pub pc: u16,
     pub sp: u16,
     pub ime: bool,
-    pub halt: bool,
     halt_bug: bool,
     regs: [u8; 8],
 }
@@ -31,46 +30,38 @@ impl Cpu {
         }
         let ime = gg.cpu.ime;
 
-        if gg.cpu.halt {
-            gg.advance_clock(1);
-            gg.cpu.halt = (gg.mmu[IF] & gg.mmu[IE] & 0x1F) == 0
-        } else {
-            let inst = inst::get_next(gg);
-            if gg.cpu.halt_bug {
-                gg.cpu.pc -= 1;
-                gg.cpu.halt_bug = false;
-            }
-
-            let (cycles, inc) = inst::execute(gg, inst);
-            if inc {
-                gg.cpu.pc += inst.size().u16();
-            }
-            gg.advance_clock(cycles.u16());
+        let inst = inst::get_next(gg);
+        if gg.cpu.halt_bug {
+            gg.cpu.pc -= 1;
+            gg.cpu.halt_bug = false;
         }
 
-        if Self::check_interrupts(gg, ime && gg.cpu.ime) {
-            gg.advance_clock(5)
+        let (cycles, inc) = inst::execute(gg, inst);
+        if inc {
+            gg.cpu.pc += inst.size().u16();
         }
+        gg.advance_clock(cycles.u16());
+
+        Self::check_interrupts(gg, ime && gg.cpu.ime);
     }
 
     /// Check if any interrupts occurred.
-    fn check_interrupts(gg: &mut GameGirl, ime: bool) -> bool {
+    fn check_interrupts(gg: &mut GameGirl, ime: bool) {
         let bits = gg.mmu[IE] & gg.mmu[IF] & 0x1F;
         if !ime || (bits == 0) {
-            return false;
+            return;
         }
 
         for bit in 0..5 {
             if bits.is_bit(bit) {
-                gg.cpu.halt = false;
                 gg.mmu[IF] = gg.mmu[IF].set_bit(bit, false) as u8;
                 gg.cpu.ime = false;
                 gg.push_stack(gg.cpu.pc);
                 gg.cpu.pc = Interrupt::from_index(bit).addr();
-                return true;
+                gg.advance_clock(5);
+                return;
             }
         }
-        false
     }
 
     pub fn flag(&self, flag: Flag) -> bool {

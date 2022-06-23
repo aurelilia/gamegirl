@@ -18,7 +18,6 @@ use crate::{
     },
     numutil::NumExt,
 };
-use std::mem;
 
 const TRACING: bool = false;
 
