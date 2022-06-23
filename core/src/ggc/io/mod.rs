@@ -2,7 +2,7 @@ use crate::{
     ggc::{
         io::{
             addr::*,
-            apu::Apu,
+            apu::GGApu,
             cartridge::Cartridge,
             dma::{Dma, Hdma},
             joypad::Joypad,
@@ -60,7 +60,7 @@ pub struct Mmu {
     pub ppu: Ppu,
     joypad: Joypad,
     dma: Dma,
-    pub(super) apu: Apu,
+    pub(super) apu: GGApu,
     hdma: Hdma,
 }
 
@@ -72,7 +72,7 @@ impl Mmu {
         Timer::step(gg, m_cycles);
         Ppu::step(gg, t_cycles);
         Dma::step(gg, m_cycles);
-        Apu::step(&mut gg.mmu, m_cycles);
+        GGApu::step(&mut gg.mmu, m_cycles);
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -106,9 +106,9 @@ impl Mmu {
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
 
-            NR10..=WAV_END => self.apu.read_register(HIGH_START + addr),
-            0x76 if self.cgb => self.apu.read_pcm12(),
-            0x77 if self.cgb => self.apu.read_pcm34(),
+            NR10..=WAV_END => self.apu.inner.read_register_gg(HIGH_START + addr),
+            0x76 if self.cgb => self.apu.inner.read_pcm12(),
+            0x77 if self.cgb => self.apu.inner.read_pcm34(),
 
             HDMA_START if self.cgb => self.hdma.transfer_left as u8,
             HDMA_SRC_HIGH..=HDMA_DEST_LOW => 0xFF,
@@ -162,7 +162,7 @@ impl Mmu {
                 self.dma.start();
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
-            NR10..=WAV_END => self.apu.write_register(HIGH_START + addr, value),
+            NR10..=WAV_END => self.apu.write(HIGH_START + addr, value),
 
             SB => self
                 .debugger
@@ -214,7 +214,7 @@ impl Mmu {
             ppu: Ppu::new(),
             joypad: Joypad::default(),
             dma: Dma::default(),
-            apu: Apu::new(false),
+            apu: GGApu::new(false),
             hdma: Hdma::default(),
             cart: Cartridge::dummy(),
         }
@@ -232,7 +232,7 @@ impl Mmu {
             BOOTIX_ROM.to_vec()
         });
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
-        self.apu = Apu::new(self.cgb);
+        self.apu = GGApu::new(self.cgb);
         self.cart = cart;
         self.init_high();
     }

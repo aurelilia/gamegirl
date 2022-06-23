@@ -4,7 +4,7 @@
 
 pub mod gui;
 
-use core::{ggc::io::apu::SAMPLE_RATE, System};
+use core::{common::SAMPLE_RATE, System};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     BufferSize, SampleRate, Stream, StreamConfig,

@@ -12,6 +12,9 @@ use crate::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{iter, mem, path::PathBuf};
 
+/// Audio sample rate of all emulated systems.
+pub const SAMPLE_RATE: u32 = 44100;
+
 /// Macro for forwarding functions on the main system enum to individual
 /// systems.
 macro_rules! forward {
