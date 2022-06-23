@@ -36,6 +36,7 @@ impl Cartridge {
             Flash64(state) if state.id_mode => FLASH64_ID[addr & 1],
             Flash128 { state, .. } if state.id_mode => FLASH128_ID[addr & 1],
             Flash128 { bank: 1, .. } => self.ram[addr | 0x8000],
+            Nothing => 0,
             _ => self.ram[addr],
         }
     }
@@ -132,7 +133,11 @@ impl FlashState {
 
             (_, _, _) if self.write_mode => {
                 self.write_mode = false;
-                ram[addr] = value;
+                if bank.cloned() == Some(1) {
+                    ram[addr | 0x8000] = value;
+                } else {
+                    ram[addr] = value;
+                }
             }
 
             (0x5555, 0xAA, None) => self.command_stage = Some(FirstWritten),
