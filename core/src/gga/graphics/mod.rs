@@ -11,6 +11,7 @@ use crate::{
         addr::{DISPCNT, DISPSTAT, VCOUNT},
         cpu::{Cpu, Interrupt},
         dma::Dmas,
+        scheduling::{AdvEvent, PpuEvent},
         GameGirlAdv,
     },
     numutil::NumExt,
@@ -49,9 +50,6 @@ pub struct Ppu {
     #[serde(with = "serde_arrays")]
     pub oam: [u8; KB],
 
-    mode: Mode,
-    mode_clock: u16,
-
     #[serde(skip)]
     #[serde(default = "serde_colour_arr")]
     pixels: [Colour; 240 * 160],
@@ -68,25 +66,19 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub fn step(gg: &mut GameGirlAdv, cycles: u16) {
-        gg.ppu.mode_clock += cycles;
-        if gg.ppu.mode_clock < gg.ppu.mode as u16 {
-            return;
-        }
-        gg.ppu.mode_clock -= gg.ppu.mode as u16;
-
-        gg.ppu.mode = match gg.ppu.mode {
-            Mode::Upload => {
+    pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: u32) {
+        let (next_event, cycles) = match event {
+            PpuEvent::HblankStart => {
                 Self::render_line(gg);
 
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, true);
                 Dmas::update(gg);
 
-                Mode::HBlank
+                (PpuEvent::HblankEnd, 272)
             }
 
-            Mode::HBlank => {
+            PpuEvent::HblankEnd => {
                 gg[VCOUNT] += 1;
 
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, false);
@@ -99,7 +91,7 @@ impl Ppu {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                     Dmas::update(gg);
-                    gg.ppu.last_frame = Some(Self::finish_frame(gg.ppu.pixels.to_vec()));
+                    gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
                 } else if gg[VCOUNT] > 227 {
                     gg[VCOUNT] = 0;
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false);
@@ -107,9 +99,11 @@ impl Ppu {
                 }
 
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, false);
-                Mode::Upload
+                (PpuEvent::HblankStart, 960)
             }
-        }
+        };
+        gg.scheduler
+            .schedule(AdvEvent::PpuEvent(next_event), cycles - late_by);
     }
 
     fn maybe_interrupt(gg: &mut GameGirlAdv, int: Interrupt, bit: u16) {
@@ -146,15 +140,19 @@ impl Ppu {
 
     fn finish_line(gg: &mut GameGirlAdv, line: u16) {
         let start = line.us() * 240;
-        let backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
+        let mut backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
+        Self::adjust_pixel(&mut backdrop);
+
         'pixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
             for prio in 0..4 {
                 if gg.ppu.obj_layers[prio][x] != EMPTY {
                     *pixel = gg.ppu.obj_layers[prio][x];
+                    Self::adjust_pixel(pixel);
                     continue 'pixels;
                 }
                 if gg.ppu.bg_layers[prio][x] != EMPTY {
                     *pixel = gg.ppu.bg_layers[prio][x];
+                    Self::adjust_pixel(pixel);
                     continue 'pixels;
                 }
             }
@@ -162,25 +160,17 @@ impl Ppu {
             // No matching pixel found...
             *pixel = backdrop;
         }
-        for layer in gg.ppu.obj_layers.iter().rev() {
-            for (x, pix) in layer.iter().enumerate().filter(|(_, p)| p[3] != 0) {
-                gg.ppu.pixels[start + x] = *pix;
-            }
-        }
 
         // Clear last line buffers
         gg.ppu.bg_layers = serde_layer_arr();
         gg.ppu.obj_layers = serde_layer_arr();
     }
 
-    /// Map a Vec of colours in 0-31 GGA space to 0-255 RGB.
-    fn finish_frame(mut pixels: Vec<Colour>) -> Vec<Colour> {
-        for pixel in pixels.iter_mut() {
-            for col in pixel.iter_mut().take(3) {
-                *col = (*col << 3) | (*col >> 2);
-            }
+    #[inline]
+    fn adjust_pixel(pixel: &mut Colour) {
+        for col in pixel.iter_mut().take(3) {
+            *col = (*col << 3) | (*col >> 2);
         }
-        pixels
     }
 }
 
@@ -190,20 +180,12 @@ impl Default for Ppu {
             palette: [0; KB],
             vram: [0; 96 * KB],
             oam: [0; KB],
-            mode: Mode::Upload,
-            mode_clock: 0,
             pixels: serde_colour_arr(),
             bg_layers: serde_layer_arr(),
             obj_layers: serde_layer_arr(),
             last_frame: None,
         }
     }
-}
-
-#[derive(Copy, Clone, Deserialize, Serialize)]
-enum Mode {
-    Upload = 960,
-    HBlank = 272,
 }
 
 fn serde_colour_arr() -> [Colour; 240 * 160] {

@@ -5,7 +5,7 @@ use crate::{
         addr::{KEYINPUT, SOUNDBIAS},
         cpu::registers::Flag,
         dma::Dmas,
-        scheduling::AdvEvent,
+        scheduling::{AdvEvent, PpuEvent},
         timer::Timers,
     },
     ggc::GGConfig,
@@ -139,7 +139,6 @@ impl GameGirlAdv {
 
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
-        Ppu::step(self, self.wait_cycles);
         Timers::step(self, self.wait_cycles);
         Apu::step(self, self.wait_cycles);
         self.wait_cycles = 0;
@@ -241,6 +240,10 @@ impl Default for GameGirlAdv {
         // Initialize various IO registers
         gg[KEYINPUT] = 0x3FF;
         gg[SOUNDBIAS] = 0x200;
+
+        // Initialize scheduler events
+        gg.scheduler
+            .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
 
         gg
     }
