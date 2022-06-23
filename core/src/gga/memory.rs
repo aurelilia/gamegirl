@@ -104,6 +104,7 @@ impl GameGirlAdv {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
+            0x0E00_0000..=0x0E00_7FFF => this.cart.read_ram(addr.us() & 0x7FFF),
             _ => 0,
         })
     }
@@ -181,10 +182,14 @@ impl GameGirlAdv {
                 .cgb_chans
                 .write_register_gga((addr & 0xFFF).u16(), value),
 
+            // MMIO
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
             }
             0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
+
+            // Cart save
+            0x0E00_0000..=0x0E00_7FFF => self.cart.write_ram(addr.us() & 0x7FFF, value),
 
             // VRAM weirdness
             0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
@@ -350,6 +355,7 @@ impl GameGirlAdv {
             0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
             0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
             0x0800_0000..=0x0DFF_FFFF if R => offs(&self.cart.rom, a - 0x800_0000),
+
             // VRAM mirror weirdness
             0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
             0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),

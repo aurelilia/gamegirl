@@ -151,11 +151,15 @@ impl System {
             );
             *self = Self::GGC(ggc);
         } else {
+            // TODO bad
             let until_32mb = 0x200_0000 - cart.len();
             cart.extend(iter::repeat(0).take(until_32mb));
 
             let mut gga = Box::new(GameGirlAdv::default());
-            gga.cart.rom = cart;
+            gga.cart.load_rom(cart);
+            if let Some(save) = Storage::load(path, gga.cart.title()) {
+                gga.cart.load_save(save);
+            }
             gga.init_memory();
             gga.options.frame_finished = mem::replace(
                 &mut self.options().frame_finished,
