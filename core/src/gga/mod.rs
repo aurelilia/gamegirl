@@ -56,12 +56,6 @@ pub struct GameGirlAdv {
     #[serde(skip)]
     #[serde(default)]
     pub debugger: GGADebugger,
-
-    /// Temporary used during instruction execution that counts
-    /// the amount of cycles the CPU has to wait until it can
-    /// execute the next instruction.
-    /// Will be unneeded once scheduler is used everywhere.
-    wait_cycles: u16,
     unpaused: bool,
 }
 
@@ -140,18 +134,15 @@ impl GameGirlAdv {
 
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
-        Timers::step(self, self.wait_cycles);
-        self.wait_cycles = 0;
-
         while let Some(event) = self.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
         }
     }
 
     /// Add wait cycles, which advance the system besides the CPU.
+    #[inline]
     fn add_wait_cycles(&mut self, count: u16) {
         self.scheduler.advance(count.u32());
-        self.wait_cycles = self.wait_cycles.wrapping_add(count);
     }
 
     fn reg(&self, idx: u32) -> u32 {
@@ -233,7 +224,6 @@ impl Default for GameGirlAdv {
             options: EmulateOptions::default(),
             config: GGConfig::default(),
             debugger: GGADebugger::default(),
-            wait_cycles: 0,
             unpaused: true,
         };
 

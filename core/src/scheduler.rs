@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::BinaryHeap};
 
 /// A scheduler used by the emulation cores to schedule peripherals.
 /// It is generic over the possible events and uses a binary heap
@@ -10,36 +9,54 @@ pub struct Scheduler<E: Kind> {
     time: u32,
     /// Events currently awaiting execution.
     #[serde(bound = "")]
-    events: BinaryHeap<ScheduledEvent<E>>,
+    events: Vec<ScheduledEvent<E>>,
 }
 
 impl<E: Kind> Scheduler<E> {
     /// Schedule an event of the given kind after the given amount
     /// of cycles have elapsed from now.
     pub fn schedule(&mut self, kind: E, after: u32) {
-        self.events.push(ScheduledEvent {
+        let time = self.time + after;
+        let event = ScheduledEvent {
             kind,
-            execute_at: self.time + after,
-        });
+            execute_at: time,
+        };
+        self.events.push(event);
+
+        // Ensure the event list is still sorted
+        // (Swap the new element further back until it is in the right spot)
+        // I tried multiple implementations (using Vec::swap, Vec::insert)
+        // and this was the fastest.
+        for idx in (1..self.events.len()).rev() {
+            let other = self.events[idx - 1];
+            if time > other.execute_at {
+                self.events[idx] = other;
+                self.events[idx - 1] = event;
+            } else {
+                break;
+            }
+        }
+
         // We run this here since it is probably the least-run function.
-        // We want to check the time as litte as possible to save perf.
+        // We want to check the time as little as possible to save perf.
         self.check_time();
     }
 
     /// Advance the timer by the given amount of ticks.
+    #[inline]
     pub fn advance(&mut self, by: u32) {
-        self.time = self.time.wrapping_add(by);
+        self.time += by;
     }
 
     /// Get the next pending event awaiting execution. Returns None
     /// if all pending events have been processed.
+    /// Note that this implementation assumes there is always at least one event
+    /// scheduled.
     pub fn get_next_pending(&mut self) -> Option<Event<E>> {
-        if self
-            .events
-            .peek()
-            .is_some_and(|e| e.execute_at <= self.time)
-        {
-            let event = self.events.pop().unwrap();
+        let idx = self.events.len() - 1;
+        let event = self.events[idx];
+        if event.execute_at <= self.time {
+            self.events.truncate(idx);
             Some(Event {
                 kind: event.kind,
                 late_by: self.time - event.execute_at,
@@ -49,26 +66,31 @@ impl<E: Kind> Scheduler<E> {
         }
     }
 
+    /// Cancel all events of a given type.
+    /// Somewhat expensive.
+    pub fn cancel(&mut self, evt: E) {
+        self.events.retain(|e| e.kind != evt);
+    }
+
+    pub fn now(&self) -> u32 {
+        self.time
+    }
+
     /// Checks to make sure the timer will not overflow by
     /// decrementing all times before that happens.
     #[inline]
     fn check_time(&mut self) {
         if self.time > 0xF000_0000 {
             self.time -= 0xF000_0000;
-            // Sadly, BinaryHeap does not allow mutating the elements.
-            // Since we know that this won't change order, it is safe
-            for event in &self.events {
-                let ptr = event as *const ScheduledEvent<E> as *mut ScheduledEvent<E>;
-                unsafe {
-                    (*ptr).execute_at -= 0xF000_0000;
-                }
+            for event in &mut self.events {
+                event.execute_at -= 0xF000_0000;
             }
         }
     }
 }
 
 /// An event awaiting execution
-#[derive(Deserialize, Serialize)]
+#[derive(Copy, Clone, Deserialize, Serialize)]
 struct ScheduledEvent<E: Kind> {
     /// Kind of event to execute
     #[serde(bound = "")]
@@ -77,42 +99,11 @@ struct ScheduledEvent<E: Kind> {
     execute_at: u32,
 }
 
-impl<E: Kind> PartialEq for ScheduledEvent<E> {
-    fn eq(&self, other: &Self) -> bool {
-        self.execute_at == other.execute_at
-    }
-}
-
-impl<E: Kind> Eq for ScheduledEvent<E> {}
-
-impl<E: Kind> PartialOrd for ScheduledEvent<E> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.execute_at.partial_cmp(&self.execute_at)
-    }
-    fn lt(&self, other: &Self) -> bool {
-        other.execute_at < self.execute_at
-    }
-    fn le(&self, other: &Self) -> bool {
-        other.execute_at <= self.execute_at
-    }
-    fn gt(&self, other: &Self) -> bool {
-        other.execute_at > self.execute_at
-    }
-    fn ge(&self, other: &Self) -> bool {
-        other.execute_at >= self.execute_at
-    }
-}
-
-impl<E: Kind> Ord for ScheduledEvent<E> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.execute_at.cmp(&self.execute_at)
-    }
-}
-
 /// Trait for event kinds.
-pub trait Kind: for<'de> Deserialize<'de> + Serialize {}
+pub trait Kind: for<'de> Deserialize<'de> + Serialize + PartialEq + Copy + Clone {}
 
 /// Event that is ready to be handled.
+#[derive(Copy, Clone)]
 pub struct Event<E: Kind> {
     /// The kind of event to handle
     pub kind: E,

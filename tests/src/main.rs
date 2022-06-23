@@ -26,7 +26,7 @@ fn main() {
             &GGConfig::default(),
         );
         gg.skip_bootrom();
-        for _ in 0..15 {
+        for _ in 0..30 {
             gg.advance_delta(1.0);
         }
     } else {

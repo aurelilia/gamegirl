@@ -100,6 +100,7 @@ impl GameGirlAdv {
 
     /// Read a byte from the bus. Does no timing-related things; simply fetches
     /// the value.
+    #[inline]
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
@@ -111,6 +112,7 @@ impl GameGirlAdv {
 
     /// Read a half-word from the bus (LE). Does no timing-related things;
     /// simply fetches the value.
+    #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
@@ -119,7 +121,8 @@ impl GameGirlAdv {
     }
 
     /// Read a word from the bus (LE). Does no timing-related things; simply
-    /// fetches the value. Also does not handle unaligned reads (yet)
+    /// fetches the value. Also does not handle unaligned reads.
+    #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF => {
@@ -133,10 +136,10 @@ impl GameGirlAdv {
         let a = addr & 0x3FE;
         match a {
             // Timers
-            TM0CNT_L => self.timers.counters[0],
-            TM1CNT_L => self.timers.counters[1],
-            TM2CNT_L => self.timers.counters[2],
-            TM3CNT_L => self.timers.counters[3],
+            TM0CNT_L => Timers::time_read::<0>(self),
+            TM1CNT_L => Timers::time_read::<1>(self),
+            TM2CNT_L => Timers::time_read::<2>(self),
+            TM3CNT_L => Timers::time_read::<3>(self),
 
             // Old sound
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
@@ -233,10 +236,10 @@ impl GameGirlAdv {
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
 
             // Timers
-            TM0CNT_H => Timers::hi_write::<0>(self, value),
-            TM1CNT_H => Timers::hi_write::<1>(self, value),
-            TM2CNT_H => Timers::hi_write::<2>(self, value),
-            TM3CNT_H => Timers::hi_write::<3>(self, value),
+            TM0CNT_H => Timers::hi_write::<0>(self, a, value),
+            TM1CNT_H => Timers::hi_write::<1>(self, a, value),
+            TM2CNT_H => Timers::hi_write::<2>(self, a, value),
+            TM3CNT_H => Timers::hi_write::<3>(self, a, value),
 
             // DMAs
             0xBA => Dmas::update_idx(self, 0, value),
@@ -314,6 +317,7 @@ impl GameGirlAdv {
         }
     }
 
+    #[inline]
     fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         let idx = ((addr.us() >> 24) & 0xF) + ty as usize;
         if W == 4 {

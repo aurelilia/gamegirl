@@ -75,10 +75,6 @@ impl Cpu {
             Self::fix_prefetch(gg);
             gg.cpu.pc_just_changed = false;
         }
-
-        // All instructions take at least one cycle.
-        // TODO correct? idts due to read already taking time
-        // gg.add_wait_cycles(1);
     }
 
     fn next_inst(gg: &mut GameGirlAdv) -> u32 {
@@ -136,23 +132,28 @@ impl Cpu {
         gg.cpu.prefetch[1] = Self::inst_at_pc(gg);
     }
 
+    #[inline]
     fn inc_pc(&mut self) {
         self.inc_pc_by(self.inst_size());
     }
 
+    #[inline]
     fn inc_pc_by(&mut self, count: u32) {
         self.pc = self.pc.wrapping_add(count);
     }
 
+    #[inline]
     pub fn inst_size(&self) -> u32 {
         // 4 on ARM, 2 on THUMB
         4 - ((self.flag(Thumb) as u32) << 1)
     }
 
+    #[inline]
     pub fn request_interrupt(gg: &mut GameGirlAdv, int: Interrupt) {
         Self::request_interrupt_idx(gg, int as u16);
     }
 
+    #[inline]
     pub fn request_interrupt_idx(gg: &mut GameGirlAdv, idx: u16) {
         gg[IF] = gg[IF].set_bit(idx, true);
     }

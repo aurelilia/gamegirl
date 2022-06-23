@@ -3,6 +3,7 @@ use crate::{
         addr::{SOUNDCNT_H, TM0CNT_H},
         audio::Apu,
         cpu::{Cpu, Interrupt},
+        scheduling::AdvEvent,
         GameGirlAdv,
     },
     numutil::NumExt,
@@ -13,92 +14,110 @@ const DIVS: [u16; 4] = [1, 64, 256, 1024];
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct Timers {
-    cycle_counters: [u16; 4],
-    pub counters: [u16; 4],
+    counters: [u16; 4],
+    scheduled_at: [u32; 4],
 }
 
 impl Timers {
-    pub fn step(gg: &mut GameGirlAdv, cycles: u16) {
-        let ov = Self::step_idx::<0>(gg, cycles, 0);
-        let ov = Self::step_idx::<1>(gg, cycles, ov);
-        let ov = Self::step_idx::<2>(gg, cycles, ov);
-        Self::step_idx::<3>(gg, cycles, ov);
+    pub fn handle_overflow_event(gg: &mut GameGirlAdv, idx: u8, late_by: u32) {
+        // Handle overflow
+        let until_ov = Self::overflow(gg, idx);
+        // Reschedule event
+        // Edge case: with high reload and fast timers, sometimes (late_by > until_ov).
+        // In this case, we simply schedule the next overflow event to be immediately.
+        gg.scheduler.schedule(
+            AdvEvent::TimerOverflow(idx),
+            until_ov.checked_sub(late_by).unwrap_or(0),
+        );
     }
 
-    #[inline]
-    fn step_idx<const TIM: usize>(gg: &mut GameGirlAdv, cycles: u16, prev_overflows: u16) -> u16 {
-        let mut overflows = 0;
-        let hi = gg[Self::hi_addr::<TIM>()];
-        if !hi.is_bit(7) {
-            // Timer off
-            return 0;
-        }
+    /// Read current time of the given timer. Might be a bit expensive, since
+    /// time needs to be calculated for timers on the scheduler.
+    pub fn time_read<const TIM: usize>(gg: &GameGirlAdv) -> u16 {
+        let ctrl = gg[Self::hi_addr(TIM.u8())];
+        let is_scheduled = ctrl.is_bit(7) && !ctrl.is_bit(2);
 
-        if TIM != 0 && hi.is_bit(2) {
-            // Increment on previous timer overflow
-            for _ in 0..prev_overflows {
-                overflows += Self::inc_timer::<TIM>(gg) as u16;
-            }
+        if is_scheduled {
+            // Is on scheduler, calculate current value
+            let scaler = DIVS[(ctrl & 3).us()].u32();
+            let elapsed = gg.scheduler.now() - gg.timers.scheduled_at[TIM];
+            gg.timers.counters[TIM] + (elapsed / scaler).u16()
         } else {
-            // Regular clock counting
-            let scaler = DIVS[hi.us() & 3];
-            gg.timers.cycle_counters[TIM] += cycles;
-            while gg.timers.cycle_counters[TIM] >= scaler {
-                gg.timers.cycle_counters[TIM] -= scaler;
-                overflows += Self::inc_timer::<TIM>(gg) as u16;
-            }
+            // Either off or inc on overflow, just return current counter
+            gg.timers.counters[TIM]
         }
-        overflows
     }
 
-    pub fn hi_write<const TIM: usize>(gg: &mut GameGirlAdv, value: u16) {
-        let addr = Self::hi_addr::<TIM>();
-        let was_on = gg[addr].is_bit(7);
-        let is_on = value.is_bit(7);
-        if !was_on && is_on {
-            gg.timers.counters[TIM] = gg[addr - 2];
-            gg.timers.cycle_counters[TIM] = 0;
+    pub fn hi_write<const TIM: u8>(gg: &mut GameGirlAdv, addr: u32, new_ctrl: u16) {
+        let old_ctrl = gg[addr];
+        let was_scheduled = old_ctrl.is_bit(7) && !old_ctrl.is_bit(2);
+        let is_scheduled = new_ctrl.is_bit(7) && !new_ctrl.is_bit(2);
+
+        if was_scheduled {
+            // Need to cancel current scheduled event
+            gg.scheduler.cancel(AdvEvent::TimerOverflow(TIM));
+        }
+        if is_scheduled {
+            // Need to start scheduling this timer
+            let until_ov = Self::next_overflow_time(gg[addr - 2], new_ctrl);
+            gg.scheduler
+                .schedule(AdvEvent::TimerOverflow(TIM), until_ov);
         }
 
-        gg[addr] = value
+        gg[addr] = new_ctrl;
+    }
+
+    // Handle an overflow and return time until next.
+    fn overflow(gg: &mut GameGirlAdv, idx: u8) -> u32 {
+        let addr = Self::hi_addr(idx);
+        let reload = gg[addr - 2];
+        let ctrl = gg[addr];
+        // Updated scheduled time that timers bound by the scheduler use
+        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now();
+        // Set to reload value
+        gg.timers.counters[idx.us()] = reload;
+        // Fire IRQ if enabled
+        if ctrl.is_bit(6) {
+            Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16())
+        }
+
+        if idx < 2 {
+            // Might need to notify APU about this
+            let cnt = gg[SOUNDCNT_H];
+            if cnt.bit(10).u8() == idx {
+                Apu::timer_overflow::<0>(gg);
+            }
+            if cnt.bit(14).u8() == idx {
+                Apu::timer_overflow::<1>(gg);
+            }
+        }
+
+        if idx != 3 && gg[addr + 2].is_bit(2) {
+            // Next timer is set to inc when we overflow.
+            Self::inc_timer(gg, idx.us() + 1);
+        }
+
+        Self::next_overflow_time(reload, ctrl)
+    }
+
+    fn next_overflow_time(reload: u16, ctrl: u16) -> u32 {
+        let scaler = DIVS[(ctrl & 3).us()].u32();
+        scaler * (0xFFFF - reload.u32())
     }
 
     #[inline]
-    fn inc_timer<const TIM: usize>(gg: &mut GameGirlAdv) -> bool {
-        let new = gg.timers.counters[TIM].checked_add(1);
+    fn inc_timer(gg: &mut GameGirlAdv, idx: usize) {
+        let new = gg.timers.counters[idx].checked_add(1);
         match new {
-            Some(val) => {
-                gg.timers.counters[TIM] = val;
-                false
-            }
+            Some(val) => gg.timers.counters[idx] = val,
             None => {
-                // Overflow
-                let addr = Self::hi_addr::<TIM>();
-                // Set to reload value
-                gg.timers.counters[TIM] = gg[addr - 2];
-                // Fire IRQ if enabled
-                if gg[addr].is_bit(6) {
-                    Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + TIM.u16())
-                }
-
-                if TIM < 2 {
-                    // Might need to notify APU about this
-                    let cnt = gg[SOUNDCNT_H];
-                    if cnt.bit(10).us() == TIM {
-                        Apu::timer_overflow::<0>(gg);
-                    }
-                    if cnt.bit(14).us() == TIM {
-                        Apu::timer_overflow::<1>(gg);
-                    }
-                }
-
-                true
+                Self::overflow(gg, idx.u8());
             }
         }
     }
 
     #[inline]
-    fn hi_addr<const TIM: usize>() -> u32 {
-        TM0CNT_H + (TIM.u32() << 2)
+    fn hi_addr(tim: u8) -> u32 {
+        TM0CNT_H + (tim.u32() << 2)
     }
 }

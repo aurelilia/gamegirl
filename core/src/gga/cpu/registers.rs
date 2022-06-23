@@ -1,7 +1,4 @@
-use crate::{
-    gga::cpu::{registers::Flag::Thumb, Cpu},
-    numutil::NumExt,
-};
+use crate::{gga::cpu::Cpu, numutil::NumExt};
 use bitmatch::bitmatch;
 use serde::{Deserialize, Serialize};
 
@@ -37,12 +34,6 @@ pub struct FiqReg {
 
 /// A register with different values for the different CPU modes
 pub type ModeReg = [u32; 6];
-
-/// CPU state.
-pub enum Mode {
-    Arm,
-    Thumb,
-}
 
 /// Execution context of the CPU.
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -101,14 +92,6 @@ pub enum Flag {
 }
 
 impl Cpu {
-    pub fn mode(&self) -> Mode {
-        if self.flag(Thumb) {
-            Mode::Thumb
-        } else {
-            Mode::Arm
-        }
-    }
-
     pub fn context(&self) -> Context {
         Context::get(self.cpsr & 0x1F)
     }
@@ -117,14 +100,17 @@ impl Cpu {
         self.cpsr = (self.cpsr & !0x1F) | ctx.to_u32()
     }
 
+    #[inline]
     pub fn flag(&self, flag: Flag) -> bool {
         self.cpsr.is_bit(flag as u16)
     }
 
+    #[inline]
     pub fn set_flag(&mut self, flag: Flag, en: bool) {
         self.cpsr = self.cpsr.set_bit(flag as u16, en);
     }
 
+    #[inline]
     pub fn adj_pc(&self) -> u32 {
         self.pc & !2
     }
@@ -133,16 +119,19 @@ impl Cpu {
     mode_reg!(lr, set_lr);
     mode_reg!(spsr, set_spsr);
 
+    #[inline]
     pub fn set_pc(&mut self, val: u32) {
         self.pc_just_changed = true;
         // Align to 2/4 depending on mode
         self.pc = val & (!(self.inst_size() - 1));
     }
 
+    #[inline]
     pub fn low(&self, idx: u16) -> u32 {
         self.low[idx.us()]
     }
 
+    #[inline]
     pub fn set_low(&mut self, inst: u32, pos: u32, val: u32) {
         self.low[((inst >> pos) & 7) as usize] = val;
     }

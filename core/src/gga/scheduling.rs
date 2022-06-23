@@ -1,12 +1,12 @@
 use crate::{
-    gga::{audio::Apu, graphics::Ppu, GameGirlAdv},
+    gga::{audio::Apu, graphics::Ppu, timer::Timers, GameGirlAdv},
     scheduler::Kind,
 };
 use serde::{Deserialize, Serialize};
 use AdvEvent::*;
 
 /// All scheduler events on the GGA.
-#[derive(Copy, Clone, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum AdvEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
@@ -16,6 +16,8 @@ pub enum AdvEvent {
     PpuEvent(PpuEvent),
     /// An event handled by the APU.
     ApuEvent(ApuEvent),
+    /// A timer overflow.
+    TimerOverflow(u8),
 }
 
 impl AdvEvent {
@@ -28,6 +30,7 @@ impl AdvEvent {
                 let time = Apu::handle_event(gg, *evt, late_by);
                 gg.scheduler.schedule(*self, time);
             }
+            TimerOverflow(idx) => Timers::handle_overflow_event(gg, *idx, late_by),
         }
     }
 }
@@ -42,7 +45,7 @@ impl Default for AdvEvent {
 impl Kind for AdvEvent {}
 
 /// Events the PPU generates.
-#[derive(Copy, Clone, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum PpuEvent {
     /// Start of HBlank.
@@ -52,7 +55,7 @@ pub enum PpuEvent {
 }
 
 /// Events the APU generates.
-#[derive(Copy, Clone, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum ApuEvent {
     /// Tick the CGB sound channels.
