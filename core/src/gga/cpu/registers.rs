@@ -1,4 +1,7 @@
-use crate::{gga::cpu::Cpu, numutil::NumExt};
+use crate::{
+    gga::{cpu::Cpu, GameGirlAdv},
+    numutil::NumExt,
+};
 use bitmatch::bitmatch;
 use serde::{Deserialize, Serialize};
 
@@ -120,13 +123,6 @@ impl Cpu {
     mode_reg!(spsr, set_spsr);
 
     #[inline]
-    pub fn set_pc(&mut self, val: u32) {
-        self.pc_just_changed = true;
-        // Align to 2/4 depending on mode
-        self.pc = val & (!(self.inst_size() - 1));
-    }
-
-    #[inline]
     pub fn low(&self, idx: u16) -> u32 {
         self.low[idx.us()]
     }
@@ -157,14 +153,23 @@ impl Cpu {
             _ => self.pc + 4,
         }
     }
+}
+
+impl GameGirlAdv {
+    #[inline]
+    pub fn set_pc(&mut self, val: u32) {
+        // Align to 2/4 depending on mode
+        self.cpu.pc = val & (!(self.cpu.inst_size() - 1));
+        Cpu::pipeline_stall(self);
+    }
 
     pub fn set_reg(&mut self, idx: u32, val: u32) {
         match idx {
-            0..=7 => self.low[idx.us()] = val,
-            8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq = val,
-            8..=12 => self.fiqs[(idx - 8).us()].reg = val,
-            13 => self.set_sp(val),
-            14 => self.set_lr(val),
+            0..=7 => self.cpu.low[idx.us()] = val,
+            8..=12 if self.cpu.context() == Context::Fiq => self.cpu.fiqs[(idx - 8).us()].fiq = val,
+            8..=12 => self.cpu.fiqs[(idx - 8).us()].reg = val,
+            13 => self.cpu.set_sp(val),
+            14 => self.cpu.set_lr(val),
             _ => self.set_pc(val),
         }
     }

@@ -234,7 +234,14 @@ impl GameGirlAdv {
         let a = addr & 0x3FF;
         match a {
             // General
-            IME => self[IME] = value & 1,
+            IME => {
+                self[IME] = value & 1;
+                Cpu::check_if_interrupt(self);
+            }
+            IE => {
+                self[IE] = value;
+                Cpu::check_if_interrupt(self);
+            }
             IF => self[IF] &= !value,
             WAITCNT => {
                 self[a] = value;
@@ -327,7 +334,7 @@ impl GameGirlAdv {
     }
 
     #[inline]
-    fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
+    pub fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         let idx = ((addr.us() >> 24) & 0xF) + ty as usize;
         if W == 4 {
             self.memory.wait_word[idx]

@@ -197,7 +197,7 @@ impl GameGirlAdv {
     pub fn reset(&mut self) {
         let old_self = mem::take(self);
         self.restore_from(old_self);
-        Cpu::fix_prefetch(self);
+        Cpu::pipeline_stall(self);
     }
 
     pub fn skip_bootrom(&mut self) {

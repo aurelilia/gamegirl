@@ -26,25 +26,25 @@ impl GameGirlAdv {
                     // BL
                     self.cpu.set_lr(self.cpu.pc - 4);
                 } // else: B
-                self.cpu.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+                self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
             }
 
             "000100101111111111110001_nnnn" => {
                 let rn = self.reg(n);
                 if rn.is_bit(0) {
                     self.cpu.set_flag(Thumb, true);
-                    self.cpu.set_pc(rn - 1);
+                    self.set_pc(rn - 1);
                 } else {
-                    self.cpu.set_pc(rn);
+                    self.set_pc(rn);
                 }
             }
 
             "1111_????????????????????????" => {
-                self.cpu.exception_occurred(Exception::Swi);
+                Cpu::exception_occurred(self, Exception::Swi);
             }
 
-            "00010_0001111dddd000000000000" => self.cpu.set_reg(d, self.cpu.cpsr),
-            "00010_1001111dddd000000000000" => self.cpu.set_reg(d, self.cpu.spsr()),
+            "00010_0001111dddd000000000000" => self.set_reg(d, self.cpu.cpsr),
+            "00010_1001111dddd000000000000" => self.set_reg(d, self.cpu.spsr()),
 
             "00010_d10f??c111100000000mmmm" => self.msr(self.cpu.reg(m), f == 1, c == 1, d == 1),
             "00110_d10f??c1111mmmmnnnnnnnn" => {
@@ -65,7 +65,7 @@ impl GameGirlAdv {
                 } else {
                     self.write_word(addr, reg, NonSeq)
                 }
-                self.cpu.set_reg(d, mem_value);
+                self.set_reg(d, mem_value);
                 self.add_wait_cycles(1);
             }
 
@@ -80,7 +80,7 @@ impl GameGirlAdv {
                     self.add_wait_cycles(1);
                 }
 
-                self.cpu.set_reg(d, res);
+                self.set_reg(d, res);
                 if c == 0 {
                     // Restore CPSR if we weren't supposed to set flags
                     self.cpu.cpsr = cpsr;
@@ -110,8 +110,8 @@ impl GameGirlAdv {
 
                 self.cpu.set_flag(Flag::Zero, out == 0);
                 self.cpu.set_flag(Flag::Neg, out.is_bit(63));
-                self.cpu.set_reg(d, (out >> 32).u32());
-                self.cpu.set_reg(n, out.u32());
+                self.set_reg(d, (out >> 32).u32());
+                self.set_reg(n, out.u32());
                 if c == 0 {
                     // Restore CPSR if we weren't supposed to set flags
                     self.cpu.cpsr = cpsr;
@@ -146,15 +146,14 @@ impl GameGirlAdv {
                         addr = Self::mod_with_offs(addr, 4, u == 1);
                     }
                     if l == 0 && reg == n.u16() && reg != first_reg {
-                        self.cpu
-                            .set_reg(n, Self::mod_with_offs(self.reg(n), end_offs, u == 1));
+                        self.set_reg(n, Self::mod_with_offs(self.reg(n), end_offs, u == 1));
                     }
 
                     if l == 0 {
                         self.write_word(addr, self.cpu.reg_pc4(reg.u32()), kind);
                     } else {
                         let val = self.read_word(addr, kind);
-                        self.cpu.set_reg(reg.u32(), val);
+                        self.set_reg(reg.u32(), val);
                     }
 
                     kind = Seq;
@@ -164,7 +163,7 @@ impl GameGirlAdv {
                 }
 
                 if w == 1 && (l == 0 || !set_n) {
-                    self.cpu.set_reg(n, addr);
+                    self.set_reg(n, addr);
                 }
 
                 self.cpu.cpsr = cpsr;
@@ -221,7 +220,7 @@ impl GameGirlAdv {
             "000_pu1w1nnnnddddiiii1101iiii" => {
                 // LDRSB with imm
                 self.ldrstr::<true>(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
-                self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
+                self.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001101mmmm" => {
                 // LDRSB with reg
@@ -235,12 +234,12 @@ impl GameGirlAdv {
                     d,
                     self.cpu.reg(m),
                 );
-                self.cpu.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
+                self.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
             "000_pu1w1nnnnddddiiii1111iiii" => {
                 // LDRSH with imm
                 self.ldrstr::<false>(p == 0, u == 1, 2, (p == 0) || (w == 1), false, n, d, i);
-                self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
+                self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
             "000_pu0w1nnnndddd00001111mmmm" => {
                 // LDRSH with reg
@@ -254,7 +253,7 @@ impl GameGirlAdv {
                     d,
                     self.cpu.reg(m),
                 );
-                self.cpu.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
+                self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
 
             "000_oooocnnnnddddaaaaattrmmmm" => {
@@ -350,15 +349,16 @@ impl GameGirlAdv {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
             self.cpu.cpsr = self.cpu.spsr();
+            Cpu::check_if_interrupt(self);
             if self.cpu.flag(Thumb) {
-                self.cpu.pc_just_changed = true;
+                Cpu::pipeline_stall(self);
             }
         }
 
         if !(0x8..=0xB).contains(&op) {
             // Only write if needed - 8-B should not
             // since they might set PC when they should not
-            self.cpu.set_reg(dest, value);
+            self.set_reg(dest, value);
         }
     }
 
@@ -378,6 +378,7 @@ impl GameGirlAdv {
             // Thumb flag may not be changed
             dest = dest.set_bit(5, false);
             self.cpu.cpsr = dest;
+            Cpu::check_if_interrupt(self);
         }
     }
 
@@ -403,23 +404,23 @@ impl GameGirlAdv {
             (true, _) => self.write_byte(addr, (self.cpu.reg_pc4(d) & 0xFF).u8(), NonSeq),
             (false, 4) if ALIGN => {
                 let val = self.read_word(addr, NonSeq);
-                self.cpu.set_reg(d, val);
+                self.set_reg(d, val);
             }
             (false, 4) => {
                 let val = self.read_word_ldrswp(addr, NonSeq);
-                self.cpu.set_reg(d, val);
+                self.set_reg(d, val);
             }
             (false, 2) if ALIGN => {
                 let val = self.read_hword(addr, NonSeq);
-                self.cpu.set_reg(d, val);
+                self.set_reg(d, val);
             }
             (false, 2) => {
                 let val = self.read_hword_ldrsh(addr, NonSeq);
-                self.cpu.set_reg(d, val);
+                self.set_reg(d, val);
             }
             (false, _) => {
                 let val = self.read_byte(addr, NonSeq).u32();
-                self.cpu.set_reg(d, val);
+                self.set_reg(d, val);
             }
         }
 
@@ -428,7 +429,7 @@ impl GameGirlAdv {
         }
         // Edge case: If n == d on an LDR, writeback does nothing
         if writeback && (str || n != d) {
-            self.cpu.set_reg(n, addr);
+            self.set_reg(n, addr);
         }
 
         if !str {

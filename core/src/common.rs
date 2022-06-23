@@ -167,7 +167,7 @@ impl System {
             );
 
             // Fill the prefetch
-            Cpu::fix_prefetch(&mut gga);
+            Cpu::pipeline_stall(&mut gga);
             *self = Self::GGA(gga);
         }
 

@@ -11,7 +11,7 @@ impl GameGirlAdv {
     /// incremented/decremented by 0x40.
     pub fn on_empty_rlist(&mut self, rb: u32, str: bool, up: bool, before: bool) {
         let addr = self.cpu.reg(rb);
-        self.cpu.set_reg(rb, Self::mod_with_offs(addr, 0x40, up));
+        self.set_reg(rb, Self::mod_with_offs(addr, 0x40, up));
 
         if str {
             let addr = match (up, before) {
@@ -23,7 +23,7 @@ impl GameGirlAdv {
             self.write_word(addr, self.cpu.pc + self.cpu.inst_size(), NonSeq);
         } else {
             let val = self.read_word(addr, NonSeq);
-            self.cpu.set_pc(val);
+            self.set_pc(val);
         }
     }
 

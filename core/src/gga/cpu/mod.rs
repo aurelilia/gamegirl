@@ -32,11 +32,6 @@ pub struct Cpu {
     pub pc: u32,
     pub cpsr: u32,
     pub spsr: ModeReg,
-
-    pc_just_changed: bool,
-    pub pending_int: bool,
-    last_access_type: Access,
-    prefetch: [u32; 2],
 }
 
 impl Cpu {
@@ -45,87 +40,65 @@ impl Cpu {
             gg.options.running = false; // Pause emulation, we hit a BP
             return;
         }
-        if gg.cpu.pc_just_changed {
-            Self::fix_prefetch(gg);
-            gg.cpu.pc_just_changed = false;
-        }
 
         gg.advance_clock();
-        if gg.cpu.pending_int {
-            gg.cpu.pending_int = false;
-            gg.cpu.inc_pc_by(4);
-            gg.cpu.exception_occurred(Exception::Irq);
-            return;
-        }
-
-        let inst = Self::next_inst(gg);
-
-        if TRACING {
-            let mnem = if gg.cpu.flag(Thumb) {
-                GameGirlAdv::get_mnemonic_thumb(inst.u16())
-            } else {
-                GameGirlAdv::get_mnemonic_arm(inst)
-            };
-            println!("0x{:08X} {}", gg.cpu.pc, mnem);
-        }
+        gg.cpu.inc_pc();
 
         if gg.cpu.flag(Thumb) {
-            gg.execute_inst_thumb(inst.u16());
+            let inst = gg.read_hword(gg.cpu.pc - 4, Access::Seq).u16();
+            gg.execute_inst_thumb(inst);
+
+            if TRACING {
+                let mnem = GameGirlAdv::get_mnemonic_thumb(inst);
+                println!("0x{:08X} {}", gg.cpu.pc, mnem);
+            }
         } else {
+            let inst = gg.read_word(gg.cpu.pc - 8, Access::Seq);
             gg.execute_inst_arm(inst);
-        }
 
-        if gg.cpu.pc_just_changed {
-            Self::fix_prefetch(gg);
-            gg.cpu.pc_just_changed = false;
+            if TRACING {
+                let mnem = GameGirlAdv::get_mnemonic_arm(inst);
+                println!("0x{:08X} {}", gg.cpu.pc, mnem);
+            }
         }
     }
 
-    fn next_inst(gg: &mut GameGirlAdv) -> u32 {
-        gg.cpu.inc_pc();
-        let fetched = Self::inst_at_pc(gg);
-        let next = mem::replace(&mut gg.cpu.prefetch[1], fetched);
-        mem::replace(&mut gg.cpu.prefetch[0], next)
+    pub fn check_if_interrupt(gg: &mut GameGirlAdv) {
+        let int = (gg[IME] == 1) && !gg.cpu.flag(IrqDisable) && (gg[IE] & gg[IF]) != 0;
+        if int {
+            gg.cpu.inc_pc_by(4);
+            Cpu::exception_occurred(gg, Exception::Irq);
+        }
     }
 
-    fn check_pending_int(gg: &mut GameGirlAdv) {
-        gg.cpu.pending_int |= (gg[IME] == 1) && !gg.cpu.flag(IrqDisable) && (gg[IE] & gg[IF]) != 0;
-    }
-
-    fn exception_occurred(&mut self, kind: Exception) {
-        if self.flag(Thumb) {
-            self.inc_pc_by(2); // ??
+    fn exception_occurred(gg: &mut GameGirlAdv, kind: Exception) {
+        if gg.cpu.flag(Thumb) {
+            gg.cpu.inc_pc_by(2); // ??
         }
 
-        let cpsr = self.cpsr;
-        self.set_context(kind.context());
+        let cpsr = gg.cpu.cpsr;
+        gg.cpu.set_context(kind.context());
 
-        self.set_flag(Thumb, false);
-        self.set_flag(IrqDisable, true);
+        gg.cpu.set_flag(Thumb, false);
+        gg.cpu.set_flag(IrqDisable, true);
         if let Exception::Reset | Exception::Fiq = kind {
-            self.set_flag(FiqDisable, true);
+            gg.cpu.set_flag(FiqDisable, true);
         }
 
-        self.set_lr(self.pc - self.inst_size());
-        self.set_spsr(cpsr);
-        self.set_pc(kind.vector());
+        gg.cpu.set_lr(gg.cpu.pc - gg.cpu.inst_size());
+        gg.cpu.set_spsr(cpsr);
+        gg.set_pc(kind.vector());
     }
 
-    fn inst_at_pc(gg: &mut GameGirlAdv) -> u32 {
-        let inst = if gg.cpu.flag(Thumb) {
-            gg.read_hword(gg.cpu.pc, gg.cpu.last_access_type).u32()
+    pub fn pipeline_stall(gg: &mut GameGirlAdv) {
+        if gg.cpu.flag(Thumb) {
+            gg.add_wait_cycles(gg.wait_time::<2>(gg.cpu.pc, Access::NonSeq));
+            gg.add_wait_cycles(gg.wait_time::<2>(gg.cpu.pc + 4, Access::Seq));
         } else {
-            gg.read_word(gg.cpu.pc, gg.cpu.last_access_type)
+            gg.add_wait_cycles(gg.wait_time::<4>(gg.cpu.pc, Access::NonSeq));
+            gg.add_wait_cycles(gg.wait_time::<4>(gg.cpu.pc + 4, Access::Seq));
         };
-        gg.cpu.last_access_type = Access::Seq;
-        inst
-    }
-
-    pub fn fix_prefetch(gg: &mut GameGirlAdv) {
-        gg.cpu.last_access_type = Access::NonSeq;
-        gg.cpu.prefetch[0] = Self::inst_at_pc(gg);
         gg.cpu.inc_pc();
-        gg.cpu.prefetch[1] = Self::inst_at_pc(gg);
     }
 
     #[inline]
@@ -152,7 +125,7 @@ impl Cpu {
     #[inline]
     pub fn request_interrupt_idx(gg: &mut GameGirlAdv, idx: u16) {
         gg[IF] = gg[IF].set_bit(idx, true);
-        Self::check_pending_int(gg);
+        Self::check_if_interrupt(gg);
     }
 }
 
@@ -166,10 +139,6 @@ impl Default for Cpu {
             pc: 0,
             cpsr: 0xD3,
             spsr: ModeReg::default(),
-            pc_just_changed: false,
-            pending_int: false,
-            last_access_type: Access::NonSeq,
-            prefetch: [0, 0],
         }
     }
 }

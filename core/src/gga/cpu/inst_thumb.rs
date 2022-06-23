@@ -14,7 +14,7 @@ impl GameGirlAdv {
         #[bitmatch]
         match inst {
             // SWI
-            "11011111_????????" => self.cpu.exception_occurred(Exception::Swi),
+            "11011111_????????" => Cpu::exception_occurred(self, Exception::Swi),
 
             // THUMB.1
             "000_00nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.lsl(self.low(s), n.u32()),
@@ -98,25 +98,25 @@ impl GameGirlAdv {
             // THUMB.5
             "010001_00dssssddd" => {
                 let res = self.reg(d.u32()).wrapping_add(self.reg(s.u32()));
-                self.cpu.set_reg(d.u32(), res);
+                self.set_reg(d.u32(), res);
             }
             "010001_01dssssddd" => {
                 self.cpu.sub(self.reg(d.u32()), self.reg(s.u32()));
             } // CMP
-            "010001_10dssssddd" => self.cpu.set_reg(d.u32(), self.reg(s.u32())),
+            "010001_10dssssddd" => self.set_reg(d.u32(), self.reg(s.u32())),
             "010001_1101111???" => {
                 self.cpu.set_flag(Thumb, false);
-                self.cpu.set_pc(self.cpu.pc); // Align
+                self.set_pc(self.cpu.pc); // Align
             } // BX ARM switch
             "010001_110ssss???" => {
                 if !self.reg(s.u32()).is_bit(0) {
                     self.cpu.set_flag(Thumb, false);
-                    self.cpu.set_pc(self.reg(s.u32()) & !3);
+                    self.set_pc(self.reg(s.u32()) & !3);
                 } else {
-                    self.cpu.set_pc(self.reg(s.u32()) & !1);
+                    self.set_pc(self.reg(s.u32()) & !1);
                 }
             } // BX
-            "010001_111ssss???" => self.cpu.set_pc(self.reg(s.u32())), // BLX
+            "010001_111ssss???" => self.set_pc(self.reg(s.u32())), // BLX
 
             // THUMB.6
             "01001_dddnnnnnnnn" => {
@@ -241,7 +241,7 @@ impl GameGirlAdv {
                 }
                 if b == 1 {
                     let pc = self.read_word(sp, kind);
-                    self.cpu.set_pc(pc);
+                    self.set_pc(pc);
                     sp += 4;
                     kind = Seq;
                 }
@@ -294,14 +294,14 @@ impl GameGirlAdv {
                 let nn = (n.u8() as i8 as i32) * 2; // Step 2
                 let condition = self.cpu.eval_condition(c);
                 if condition {
-                    self.cpu.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+                    self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
                 }
             }
 
             // THUMB.18
             "11100_nnnnnnnnnnn" => {
                 let nn = (n.i10() as i32) * 2; // Step 2
-                self.cpu.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+                self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
             }
 
             // THUMB.19
@@ -310,7 +310,7 @@ impl GameGirlAdv {
                 .set_lr(self.cpu.pc.wrapping_add_signed((n.i10() as i32) << 12)),
             "111t1_nnnnnnnnnnn" => {
                 let pc = self.cpu.pc;
-                self.cpu.set_pc(self.cpu.lr().wrapping_add(n.u32() << 1));
+                self.set_pc(self.cpu.lr().wrapping_add(n.u32() << 1));
                 self.cpu.set_lr(pc - 1);
                 self.cpu.set_flag(Thumb, t == 1);
             }
