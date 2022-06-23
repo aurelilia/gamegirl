@@ -10,6 +10,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::ggc::io::scheduling::{GGEvent, PpuEvent};
 pub use dmg::COLOURS;
 
 mod cgb;
@@ -54,32 +55,19 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub(super) fn step(gg: &mut GameGirl, t_cycles: u16) {
-        if !gg.lcdc(DISP_EN) {
-            return;
-        }
-        let mode = {
-            let ppu = gg.ppu();
-            ppu.mode_clock += t_cycles;
-            if ppu.mode_clock < ppu.mode.cycles() {
-                return;
-            }
-            ppu.mode_clock -= ppu.mode.cycles();
-            ppu.mode
-        };
+    pub(super) fn handle_event(gg: &mut GameGirl, evt: PpuEvent, late_by: u32) {
+        let (next_mode, time) = match evt {
+            PpuEvent::OamScanEnd => (PpuEvent::UploadEnd, 172),
 
-        let next_mode = match mode {
-            Mode::OAMScan => Mode::Upload,
-
-            Mode::Upload => {
+            PpuEvent::UploadEnd => {
                 Self::render_line(gg);
                 gg.mmu.ppu.bg_occupied_pixels = [false; 160];
                 gg.mmu.hdma.ppu_in_hblank = true;
                 Self::stat_interrupt(gg, 3);
-                Mode::HBlank
+                (PpuEvent::HblankEnd, 204)
             }
 
-            Mode::HBlank => {
+            PpuEvent::HblankEnd => {
                 gg.mmu[LY] += 1;
                 Self::stat_interrupt(gg, 5);
                 Self::lyc_interrupt(gg);
@@ -87,13 +75,13 @@ impl Ppu {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
                     gg.ppu().last_frame = Some(gg.mmu.ppu.pixels.to_vec());
-                    Mode::VBlank
+                    (PpuEvent::VblankEnd, 456)
                 } else {
-                    Mode::OAMScan
+                    (PpuEvent::OamScanEnd, 80)
                 }
             }
 
-            Mode::VBlank => {
+            PpuEvent::VblankEnd => {
                 gg.mmu[LY] += 1;
                 Self::lyc_interrupt(gg);
                 if gg.mmu[LY] > 153 {
@@ -101,16 +89,18 @@ impl Ppu {
                     gg.mmu.ppu.window_line = 0;
                     (gg.options.frame_finished)(BorrowedSystem::GGC(gg));
                     Self::stat_interrupt(gg, 5);
-                    Mode::OAMScan
+                    (PpuEvent::OamScanEnd, 80)
                 } else {
-                    Mode::VBlank
+                    (PpuEvent::VblankEnd, 456)
                 }
             }
         };
 
         gg.mmu[STAT] =
             gg.mmu[STAT].set_bit(2, gg.mmu[LYC] == gg.mmu[LY]).u8() & 0xFC | next_mode.ordinal();
-        gg.ppu().mode = next_mode;
+
+        let time = (time >> gg.t_shift) - late_by;
+        gg.scheduler.schedule(GGEvent::PpuEvent(next_mode), time);
     }
 
     fn stat_interrupt(gg: &mut GameGirl, bit: u16) {

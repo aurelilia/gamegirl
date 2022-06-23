@@ -63,6 +63,10 @@ impl GameGirlAdv {
     /// Advance the system clock by the given delta in seconds.
     /// Might advance a few clocks more.
     pub fn advance_delta(&mut self, delta: f32) {
+        if !self.options.running {
+            return;
+        }
+
         let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as u32;
         self.scheduler.schedule(AdvEvent::PauseEmulation, target);
 

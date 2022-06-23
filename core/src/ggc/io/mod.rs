@@ -24,6 +24,7 @@ pub mod cartridge;
 mod dma;
 pub mod joypad;
 pub mod ppu;
+pub mod scheduling;
 mod timer;
 
 /// The MMU of the GG, containing all IO devices along
@@ -63,11 +64,9 @@ pub struct Mmu {
 
 impl Mmu {
     /// Step the system forward by the given amount of cycles.
-    /// The given T cycles should already be adjusted for CGB 2x speed mode.
-    pub(super) fn step(gg: &mut GameGirl, m_cycles: u16, t_cycles: u16) {
+    pub(super) fn step(gg: &mut GameGirl, m_cycles: u16) {
         Hdma::step(gg);
         Timer::step(gg, m_cycles);
-        Ppu::step(gg, t_cycles);
         Dma::step(gg, m_cycles);
         GGApu::step(&mut gg.mmu, m_cycles);
     }

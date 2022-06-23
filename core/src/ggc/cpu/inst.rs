@@ -260,7 +260,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> (u8, bool) {
             while gg.mmu[IF] & 0x1F == 0 {
                 gg.advance_clock(4);
             }
-        },
+        }
         0x40..=0x7F => {
             let reg = (inst.0 - 0x40) >> 3;
             match reg {

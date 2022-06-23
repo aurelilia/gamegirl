@@ -17,7 +17,11 @@ use crate::{
     numutil::NumExt,
 };
 
-use crate::debugger::Debugger;
+use crate::{
+    debugger::Debugger,
+    ggc::io::scheduling::{GGEvent, PpuEvent},
+    scheduler::Scheduler,
+};
 
 pub mod cpu;
 pub mod io;
@@ -38,11 +42,9 @@ pub struct GameGirl {
     /// Shift of t-clocks, which is different in CGB double speed mode. Regular:
     /// 2, CGB 2x: 1.
     t_shift: u8,
-    /// Temporary for keeping track of how many clocks elapsed in
-    /// [advance_delta].
-    #[serde(skip)]
-    #[serde(default)]
-    clock: usize,
+    unpaused: bool,
+    scheduler: Scheduler<GGEvent>,
+
     /// Emulation options.
     pub options: EmulateOptions,
 }
@@ -55,14 +57,12 @@ impl GameGirl {
         if !self.options.running {
             return;
         }
-        self.clock = 0;
-        let target = (M_CLOCK_HZ * delta * self.options.speed_multiplier as f32) as usize;
-        while self.clock < target {
-            if self.mmu.debugger.breakpoint_hit {
-                self.mmu.debugger.breakpoint_hit = false;
-                self.options.running = false;
-                break;
-            }
+
+        let target = (M_CLOCK_HZ * delta * self.options.speed_multiplier as f32) as u32;
+        self.scheduler.schedule(GGEvent::PauseEmulation, target);
+
+        self.unpaused = true;
+        while self.options.running && self.unpaused {
             self.advance();
         }
     }
@@ -142,9 +142,12 @@ impl GameGirl {
     /// Advance the MMU, which is everything except the CPU.
     /// Should not advance by more than 7 cycles at once.3
     fn advance_clock(&mut self, m_cycles: u16) {
-        let t_cycles = m_cycles << self.t_shift;
-        Mmu::step(self, m_cycles, t_cycles);
-        self.clock += m_cycles.us();
+        Mmu::step(self, m_cycles);
+
+        self.scheduler.advance(m_cycles.u32());
+        while let Some(event) = self.scheduler.get_next_pending() {
+            event.kind.dispatch(self, event.late_by);
+        }
     }
 
     /// Switch between CGB 2x and normal speed mode.
@@ -239,15 +242,22 @@ impl GameGirl {
 impl Default for GameGirl {
     fn default() -> Self {
         let debugger = GGDebugger::default();
-        Self {
+        let mut gg = Self {
             cpu: Cpu::default(),
             mmu: Mmu::new(debugger),
             config: GGConfig::default(),
 
             t_shift: 2,
-            clock: 0,
+            unpaused: true,
+            scheduler: Scheduler::default(),
             options: EmulateOptions::default(),
-        }
+        };
+
+        // Initialize scheduler
+        gg.scheduler
+            .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
+
+        gg
     }
 }
 
