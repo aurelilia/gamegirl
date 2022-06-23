@@ -1,5 +1,5 @@
 use crate::{
-    gga::{graphics::Ppu, GameGirlAdv},
+    gga::{audio::Apu, graphics::Ppu, GameGirlAdv},
     scheduler::Kind,
 };
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,8 @@ pub enum AdvEvent {
     PauseEmulation,
     /// An event handled by the PPU.
     PpuEvent(PpuEvent),
+    /// An event handled by the APU.
+    ApuEvent(ApuEvent),
 }
 
 impl AdvEvent {
@@ -22,6 +24,10 @@ impl AdvEvent {
         match self {
             PauseEmulation => gg.unpaused = false,
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
+            ApuEvent(evt) => {
+                let time = Apu::handle_event(gg, *evt, late_by);
+                gg.scheduler.schedule(*self, time);
+            }
         }
     }
 }
@@ -43,4 +49,16 @@ pub enum PpuEvent {
     HblankStart,
     /// End of HBlank, which is the start of the next scanline.
     HblankEnd,
+}
+
+/// Events the APU generates.
+#[derive(Copy, Clone, Deserialize, Serialize)]
+#[repr(u16)]
+pub enum ApuEvent {
+    /// Tick the CGB sound channels.
+    Cgb,
+    /// Tick the CGB sequencer.
+    Sequencer,
+    /// Push a sample to the output.
+    PushSample,
 }

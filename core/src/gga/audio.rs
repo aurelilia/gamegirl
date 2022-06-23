@@ -2,6 +2,7 @@ use crate::{
     gga::{
         addr::{FIFO_A_L, SOUNDBIAS, SOUNDCNT_H},
         dma::Dmas,
+        scheduling::ApuEvent,
         GameGirlAdv, CPU_CLOCK,
     },
     ggc::io::apu::{ApuChannel, ChannelsControl, ChannelsSelection, GenericApu},
@@ -11,43 +12,38 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 const SAMPLE_RATE: f32 = 44100.;
-const SAMPLE_EVERY_N_CLOCKS: f32 = CPU_CLOCK / SAMPLE_RATE;
+pub const SAMPLE_EVERY_N_CLOCKS: u32 = (CPU_CLOCK / SAMPLE_RATE) as u32;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct Apu {
     // 4 channels found on GG(C)
     pub(crate) cgb_chans: GenericApu,
-    clock_count: u16,
-    sequencer_tick: u16,
-
     // DMA channels
     buffers: [VecDeque<i8>; 2],
     current_samples: [i8; 2],
-
-    // Output timer and buffer
-    sample_counter: f32,
+    // Output buffer
     pub buffer: Vec<f32>,
 }
 
 impl Apu {
-    pub fn step(gg: &mut GameGirlAdv, cycles: u16) {
-        gg.apu.clock_count += cycles;
-        if gg.apu.clock_count >= 8 {
-            let cgb_cycles = gg.apu.clock_count >> 3;
-            gg.apu.cgb_chans.clock(cgb_cycles);
-            gg.apu.clock_count &= 7;
-
-            gg.apu.sequencer_tick += cgb_cycles;
-            if gg.apu.sequencer_tick > 0x1000 {
-                gg.apu.sequencer_tick -= 0x1000;
-                gg.apu.cgb_chans.tick_sequencer();
+    /// Handle event. Since all APU events reschedule themselves, this
+    /// function returns the time after which the event should repeat.
+    pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: u32) -> u32 {
+        match event {
+            ApuEvent::Cgb => {
+                gg.apu.cgb_chans.clock(1 + (late_by >> 3).u16());
+                8 - (late_by & 7)
             }
-        }
 
-        gg.apu.sample_counter += cycles as f32;
-        if gg.apu.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
-            Self::push_output(gg);
-            gg.apu.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
+            ApuEvent::Sequencer => {
+                gg.apu.cgb_chans.tick_sequencer();
+                0x8000 - late_by
+            }
+
+            ApuEvent::PushSample => {
+                Self::push_output(gg);
+                SAMPLE_EVERY_N_CLOCKS - late_by
+            }
         }
     }
 

@@ -3,9 +3,10 @@ use crate::{
     debugger::Debugger,
     gga::{
         addr::{KEYINPUT, SOUNDBIAS},
+        audio::SAMPLE_EVERY_N_CLOCKS,
         cpu::registers::Flag,
         dma::Dmas,
-        scheduling::{AdvEvent, PpuEvent},
+        scheduling::{AdvEvent, ApuEvent, PpuEvent},
         timer::Timers,
     },
     ggc::GGConfig,
@@ -140,7 +141,6 @@ impl GameGirlAdv {
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
         Timers::step(self, self.wait_cycles);
-        Apu::step(self, self.wait_cycles);
         self.wait_cycles = 0;
 
         while let Some(event) = self.scheduler.get_next_pending() {
@@ -244,6 +244,13 @@ impl Default for GameGirlAdv {
         // Initialize scheduler events
         gg.scheduler
             .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
+        gg.scheduler.schedule(AdvEvent::ApuEvent(ApuEvent::Cgb), 8);
+        gg.scheduler
+            .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
+        gg.scheduler.schedule(
+            AdvEvent::ApuEvent(ApuEvent::PushSample),
+            SAMPLE_EVERY_N_CLOCKS,
+        );
 
         gg
     }
