@@ -19,7 +19,7 @@ use crate::{
     numutil::NumExt,
 };
 
-const TRACING: bool = false;
+pub(crate) const TRACING: bool = false;
 
 /// Represents the CPU of the console - an ARM7TDMI.
 #[derive(Deserialize, Serialize)]

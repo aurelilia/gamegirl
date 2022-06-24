@@ -246,6 +246,10 @@ impl Default for GameGirlAdv {
             SAMPLE_EVERY_N_CLOCKS,
         );
 
+        if cpu::TRACING {
+            gg.skip_bootrom();
+        }
+
         gg
     }
 }
