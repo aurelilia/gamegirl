@@ -7,9 +7,9 @@ A Gameboy (Color/Advance) emulator written in Rust, whose GG/GGC core is a rewri
 ## Status
 The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
-AGB support is early with many things still missing; still working on the PPU and
-making the emulation overall more accurate and fast. Some games are playable with
-graphical glitches, though.
+AGB support is early with some things still missing; still working on the PPU and
+making the emulation overall more accurate and fast. Most games are playable, but with
+graphical glitches.
 
 ### Features
 - Complete DMG/CGB implementation, including running DMG games on CGB
@@ -25,7 +25,7 @@ graphical glitches, though.
     - Memory, register and stack view
     - Cartridge Info Viewer
     - Visual debugging tools: VRAM and map viewers
-- Automated running of blargg and mooneye tests
+- Automated running of a bunch of different tests
 
 ### Planned Features
 - [ ] Controller support
@@ -35,6 +35,8 @@ graphical glitches, though.
 
 
 ## Screenshots
+##### Playing Pokemon Emerald
+![Gamegirl playing Pokemon Emerald](img/4.jpg)
 ##### Playing Pokemon Crystal Clear
 ![Gamegirl playing Pokemon Crystal Clear](img/1.jpg)
 ##### Pokemon Pinball with running debugger and memory viewer
