@@ -349,10 +349,7 @@ impl GameGirlAdv {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
             self.cpu.cpsr = self.cpu.spsr();
-            Cpu::check_if_interrupt(self);
-            if self.cpu.flag(Thumb) {
-                Cpu::pipeline_stall(self);
-            }
+            // Cpu::check_if_interrupt(self); todo ?
         }
 
         if !(0x8..=0xB).contains(&op) {
