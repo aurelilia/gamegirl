@@ -62,7 +62,7 @@ impl Mmu {
     /// Step the system forward by the given amount of cycles.
     pub(super) fn step(gg: &mut GameGirl, m_cycles: u16) {
         Timer::step(gg, m_cycles);
-        GGApu::step(&mut gg.mmu, m_cycles);
+        GGApu::step(&mut gg.mmu);
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -154,7 +154,7 @@ impl Mmu {
                 self.scheduler.schedule(GGEvent::DMAFinish, time);
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
-            NR10..=WAV_END => self.apu.write(HIGH_START + addr, value),
+            NR10..=WAV_END => GGApu::write(self, HIGH_START + addr, value),
 
             SB => self.debugger.serial_output.push(value as char),
 

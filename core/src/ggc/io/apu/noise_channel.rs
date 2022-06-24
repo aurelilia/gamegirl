@@ -1,4 +1,6 @@
-use super::{envelope::EnvelopGenerator, ApuChannel};
+use crate::numutil::NumExt;
+
+use super::{envelope::EnvelopGenerator, ApuChannel, ScheduleFn};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Deserialize, Serialize)]
@@ -7,14 +9,11 @@ pub struct NoiseChannel {
     step_mode_7_bits: bool,
     divisor_code: u8,
 
-    frequency_timer: u16,
-
     feedback_shift_register: u16,
 
     envelope: EnvelopGenerator,
 
     channel_enabled: bool,
-
     dac_enable: bool,
 }
 
@@ -37,15 +36,9 @@ impl NoiseChannel {
         &mut self.envelope
     }
 
-    pub fn clock(&mut self) {
-        if self.frequency_timer == 0 {
-            self.clock_feedback_register();
-
-            // reload timer
-            self.frequency_timer = self.get_frequency();
-        } else {
-            self.frequency_timer -= 1;
-        }
+    pub fn clock(&mut self) -> u32 {
+        self.clock_feedback_register();
+        self.get_frequency().u32() << 2
     }
 }
 
@@ -86,7 +79,7 @@ impl ApuChannel for NoiseChannel {
         self.envelope.current_volume() == 0
     }
 
-    fn trigger(&mut self) {
+    fn trigger(&mut self, _sched: &mut impl ScheduleFn) {
         self.envelope.trigger();
         // because its 15 bits
         self.feedback_shift_register = 0x7FFF;

@@ -4,6 +4,7 @@ use crate::{
         Mmu,
     },
     numutil::NumExt,
+    scheduler::Scheduler,
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +15,7 @@ use crate::{
         GameGirl, T_CLOCK_HZ,
     },
 };
-pub use apu::{ChannelsControl, ChannelsSelection, GenericApu};
+pub use apu::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
 pub use channel::ApuChannel;
 
 mod apu;
@@ -49,26 +50,28 @@ impl GGApu {
                     .scheduler
                     .schedule(GGEvent::ApuEvent(event), SAMPLE_EVERY_N_CLOCKS - late_by);
             }
+
+            ApuEvent::Gen(gen) => {
+                let next = gen.dispatch(&mut gg.mmu.apu.inner);
+                gg.mmu.scheduler.schedule(
+                    GGEvent::ApuEvent(event),
+                    next.checked_sub(late_by).unwrap_or(1),
+                );
+            }
         }
     }
 
-    pub fn step(mmu: &mut Mmu, cycles: u16) {
+    pub fn step(mmu: &mut Mmu) {
         let ds = mmu.cgb && mmu[KEY1].is_bit(7);
         let div = mmu.timer.read(DIV);
-        mmu.apu.clock(cycles, ds, div);
+        mmu.apu.clock(ds, div);
     }
 
     /// The APU is clocked by the divider, on the falling edge of the bit 12
     /// of the divider, this is needed since the divider can be clocked manually
     /// by resetting it to 0 on write
-    fn clock(&mut self, cycles: u16, double_speed: bool, divider: u8) {
-        // 2 in normal speed, 1 in double speed
-        let clocks = (!double_speed) as u16 + 1;
+    fn clock(&mut self, double_speed: bool, divider: u8) {
         let div_bit = 4 + double_speed as u8;
-
-        let adj_clocks = clocks * cycles;
-        self.inner.clock(adj_clocks);
-
         if self.inner.power {
             let old_div_sequencer_bit = self.divider_sequencer_clock_bit;
             self.divider_sequencer_clock_bit = (divider >> div_bit) & 1 == 1;
@@ -78,9 +81,20 @@ impl GGApu {
         }
     }
 
-    pub fn write(&mut self, addr: u16, value: u8) {
-        self.inner
-            .write_register_gg(addr, value, self.divider_sequencer_clock_bit);
+    pub fn write(mmu: &mut Mmu, addr: u16, value: u8) {
+        mmu.apu.inner.write_register_gg(
+            addr,
+            value,
+            mmu.apu.divider_sequencer_clock_bit,
+            &mut shed(&mut mmu.scheduler),
+        );
+    }
+
+    pub fn init_scheduler(gg: &mut GameGirl) {
+        gg.mmu
+            .apu
+            .inner
+            .init_scheduler(&mut shed(&mut gg.mmu.scheduler));
     }
 
     pub fn new(cgb: bool) -> Self {
@@ -136,7 +150,13 @@ impl GenericApu {
         }
     }
 
-    pub fn write_register_gg(&mut self, addr: u16, data: u8, clock_bit: bool) {
+    pub fn write_register_gg(
+        &mut self,
+        addr: u16,
+        data: u8,
+        clock_bit: bool,
+        sched: &mut impl ScheduleFn,
+    ) {
         // `addr % 5 != 2` will be true if its not a length counter register,
         // as these are not affected by power off, but `addr % 5 != 2` also
         // includes `0xFF25` and we don't want to be able to write to it
@@ -176,6 +196,7 @@ impl GenericApu {
                     &mut *self.pulse1,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -208,6 +229,7 @@ impl GenericApu {
                     &mut *self.pulse2,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -230,6 +252,7 @@ impl GenericApu {
                     &mut *self.wave,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -249,6 +272,7 @@ impl GenericApu {
                     &mut *self.noise,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -263,7 +287,7 @@ impl GenericApu {
                 let new_power = data & 0x80 != 0;
                 if self.power && !new_power {
                     for i in 0xFF10..=0xFF25 {
-                        self.write_register_gg(i, 0, clock_bit);
+                        self.write_register_gg(i, 0, clock_bit, sched);
                     }
                     self.power_off();
                 } else if !self.power && new_power {
@@ -300,5 +324,13 @@ impl GenericApu {
         let p2 = self.noise.output() & 0xF;
 
         (p2 << 4) | p1
+    }
+}
+
+fn shed(sched: &mut Scheduler<GGEvent>) -> impl ScheduleFn + '_ {
+    |e, t| {
+        let evt = GGEvent::ApuEvent(ApuEvent::Gen(e));
+        sched.cancel(evt);
+        sched.schedule(evt, t)
     }
 }

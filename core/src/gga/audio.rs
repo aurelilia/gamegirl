@@ -1,18 +1,22 @@
 use crate::{
+    common::SAMPLE_RATE,
     gga::{
         addr::{FIFO_A_L, SOUNDBIAS, SOUNDCNT_H},
         dma::Dmas,
         scheduling::ApuEvent,
         GameGirlAdv, CPU_CLOCK,
     },
-    ggc::io::apu::{ApuChannel, ChannelsControl, ChannelsSelection, GenericApu},
+    ggc::io::apu::{ApuChannel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
     numutil::{NumExt, U16Ext},
+    scheduler::Scheduler,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-const SAMPLE_RATE: f32 = 44100.;
-pub const SAMPLE_EVERY_N_CLOCKS: u32 = (CPU_CLOCK / SAMPLE_RATE) as u32;
+use super::scheduling::AdvEvent;
+
+pub const SAMPLE_EVERY_N_CLOCKS: u32 = (CPU_CLOCK / SAMPLE_RATE as f32) as u32;
+const GG_OFFS: u32 = 4;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct Apu {
@@ -30,10 +34,11 @@ impl Apu {
     /// function returns the time after which the event should repeat.
     pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: u32) -> u32 {
         match event {
-            ApuEvent::Cgb => {
-                gg.apu.cgb_chans.clock(1 + (late_by >> 3).u16());
-                8 - (late_by & 7)
-            }
+            // We multiply the time by 4 since the generic APU expects GG t-cycles,
+            // which are 1/4th of GGA CPU clock
+            ApuEvent::Gen(gen) => (gen.dispatch(&mut gg.apu.cgb_chans) * GG_OFFS)
+                .checked_sub(late_by)
+                .unwrap_or(GG_OFFS),
 
             ApuEvent::Sequencer => {
                 gg.apu.cgb_chans.tick_sequencer();
@@ -45,6 +50,12 @@ impl Apu {
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
+    }
+
+    pub fn init_scheduler(gg: &mut GameGirlAdv) {
+        gg.apu
+            .cgb_chans
+            .init_scheduler(&mut shed(&mut gg.scheduler));
     }
 
     fn push_output(gg: &mut GameGirlAdv) {
@@ -158,7 +169,7 @@ impl GenericApu {
         }
     }
 
-    pub fn write_register_gga(&mut self, addr: u16, data: u8) {
+    pub fn write_register_gga(&mut self, addr: u16, data: u8, sched: &mut impl ScheduleFn) {
         // `addr % 5 != 2` will be true if its not a length counter register,
         // as these are not affected by power off, but `addr % 5 != 2` also
         // includes `0x81` and we don't want to be able to write to it
@@ -198,6 +209,7 @@ impl GenericApu {
                     &mut *self.pulse1,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -229,6 +241,7 @@ impl GenericApu {
                     &mut *self.pulse2,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -251,6 +264,7 @@ impl GenericApu {
                     &mut *self.wave,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -269,6 +283,7 @@ impl GenericApu {
                     &mut *self.noise,
                     is_length_clock_next,
                     data,
+                    sched,
                 );
             }
 
@@ -283,7 +298,7 @@ impl GenericApu {
                 let new_power = data & 0x80 != 0;
                 if self.power && !new_power {
                     for i in 0x60..=0x81 {
-                        self.write_register_gga(i, 0);
+                        self.write_register_gga(i, 0, sched);
                     }
                     self.power_off();
                 } else if !self.power && new_power {
@@ -303,5 +318,14 @@ impl GenericApu {
 
             _ => (),
         }
+    }
+}
+
+#[inline]
+pub fn shed(sched: &mut Scheduler<AdvEvent>) -> impl ScheduleFn + '_ {
+    |e, t| {
+        let evt = AdvEvent::ApuEvent(ApuEvent::Gen(e));
+        sched.cancel(evt);
+        sched.schedule(evt, t * GG_OFFS)
     }
 }

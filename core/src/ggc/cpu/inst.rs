@@ -92,7 +92,7 @@ pub fn get_next(gg: &GameGirl) -> Inst {
     let first = gg.mmu.read(gg.cpu.pc);
     match first {
         EXT => Inst(first, gg.arg8()),
-        _ => Inst(first, 0)
+        _ => Inst(first, 0),
     }
 }
 

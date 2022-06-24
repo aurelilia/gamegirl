@@ -238,7 +238,7 @@ impl Default for GameGirlAdv {
         // Initialize scheduler events
         gg.scheduler
             .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
-        gg.scheduler.schedule(AdvEvent::ApuEvent(ApuEvent::Cgb), 8);
+        Apu::init_scheduler(&mut gg);
         gg.scheduler
             .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
         gg.scheduler.schedule(

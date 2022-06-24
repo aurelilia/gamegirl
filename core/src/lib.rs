@@ -2,6 +2,7 @@
 #![feature(exclusive_range_pattern)]
 #![feature(is_some_with)]
 #![feature(mixed_integer_ops)]
+#![feature(trait_alias)]
 
 pub mod common;
 pub mod debugger;

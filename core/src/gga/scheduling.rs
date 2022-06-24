@@ -1,5 +1,6 @@
 use crate::{
     gga::{audio::Apu, graphics::Ppu, timer::Timers, GameGirlAdv},
+    ggc::io::apu::GenApuEvent,
     scheduler::Kind,
 };
 use serde::{Deserialize, Serialize};
@@ -58,8 +59,8 @@ pub enum PpuEvent {
 #[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum ApuEvent {
-    /// Tick the CGB sound channels.
-    Cgb,
+    /// Event from the generic CGB APU.
+    Gen(GenApuEvent),
     /// Tick the CGB sequencer.
     Sequencer,
     /// Push a sample to the output.

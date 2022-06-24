@@ -20,7 +20,7 @@ use crate::{
 use crate::{
     debugger::Debugger,
     ggc::io::{
-        apu::SAMPLE_EVERY_N_CLOCKS,
+        apu::{GGApu, SAMPLE_EVERY_N_CLOCKS},
         scheduling::{ApuEvent, GGEvent, PpuEvent},
     },
 };
@@ -260,6 +260,7 @@ impl Default for GameGirl {
             GGEvent::ApuEvent(ApuEvent::PushSample),
             SAMPLE_EVERY_N_CLOCKS,
         );
+        GGApu::init_scheduler(&mut gg);
 
         gg
     }

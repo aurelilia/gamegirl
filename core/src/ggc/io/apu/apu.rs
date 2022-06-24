@@ -11,8 +11,6 @@ use super::{
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
-use crate::numutil::NumExt;
-
 bitflags! {
     #[derive(Deserialize, Serialize)]
     pub struct ChannelsControl: u8 {
@@ -49,8 +47,8 @@ bitflags! {
 
 #[derive(Deserialize, Serialize)]
 pub struct GenericApu {
-    pub pulse1: Dac<LengthCountedChannel<PulseChannel>>,
-    pub pulse2: Dac<LengthCountedChannel<PulseChannel>>,
+    pub pulse1: Dac<LengthCountedChannel<PulseChannel<false>>>,
+    pub pulse2: Dac<LengthCountedChannel<PulseChannel<true>>>,
     pub wave: Dac<LengthCountedChannel<WaveChannel>>,
     pub noise: Dac<LengthCountedChannel<NoiseChannel>>,
 
@@ -67,10 +65,6 @@ pub struct GenericApu {
     /// Sweeps          are clocked in positions 3, 7
     pub sequencer_position: i8,
 
-    // Keep track when to clock the APU, it should be clocked every 4 tcycles
-    // this is to keep working normally even in CPU double speed mode
-    pub clocks_counter: u16,
-
     pub cgb: bool,
 }
 
@@ -86,31 +80,8 @@ impl GenericApu {
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::new(cgb), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             sequencer_position: 0,
-            clocks_counter: 0,
 
             cgb,
-        }
-    }
-
-    /// Advance the inner APU by the given amount of cycles.
-    pub fn clock(&mut self, cycles: u16) {
-        self.clocks_counter += cycles;
-        if self.power {
-            self.wave.channel_mut().clock(cycles.u16());
-            self.tick_components();
-        } else {
-            self.clocks_counter &= 1;
-            return;
-        }
-    }
-
-    #[inline]
-    fn tick_components(&mut self) {
-        while self.clocks_counter >= 2 {
-            self.clocks_counter -= 2;
-            self.pulse1.channel_mut().clock();
-            self.pulse2.channel_mut().clock();
-            self.noise.channel_mut().clock();
         }
     }
 
@@ -276,6 +247,7 @@ impl GenericApu {
         channel: &mut LengthCountedChannel<C>,
         is_length_clock_next: bool,
         data: u8,
+        sched: &mut impl ScheduleFn,
     ) {
         let old_length_enable = channel.read_length_enable();
         let new_length_enable = (data >> 6) & 1 == 1;
@@ -289,13 +261,44 @@ impl GenericApu {
 
         if data & 0x80 != 0 {
             // trigger length, which would trigger the channel inside
-            channel.trigger_length(!is_length_clock_next);
+            channel.trigger_length(!is_length_clock_next, sched);
         }
+    }
+
+    pub fn init_scheduler(&mut self, sched: &mut impl ScheduleFn) {
+        sched(GenApuEvent::NoiseReload, 4);
     }
 }
 
 impl Default for GenericApu {
     fn default() -> Self {
         Self::new(true)
+    }
+}
+
+pub trait ScheduleFn = FnMut(GenApuEvent, u32);
+
+#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
+pub enum GenApuEvent {
+    Pulse1Reload,
+    Pulse2Reload,
+    WaveReload,
+    NoiseReload,
+}
+
+impl GenApuEvent {
+    pub fn dispatch(&self, apu: &mut GenericApu) -> u32 {
+        if !apu.power {
+            // Just wait a while.
+            return 0xFF;
+        }
+
+        match self {
+            Self::Pulse1Reload => apu.pulse1.channel_mut().clock(),
+            Self::Pulse2Reload => apu.pulse2.channel_mut().clock(),
+            Self::WaveReload => apu.wave.channel_mut().clock(),
+            Self::NoiseReload => apu.noise.channel_mut().clock(),
+        }
+        .max(1)
     }
 }

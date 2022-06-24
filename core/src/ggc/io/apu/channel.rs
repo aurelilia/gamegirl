@@ -1,3 +1,4 @@
+use super::ScheduleFn;
 use serde::{Deserialize, Serialize};
 
 pub trait ApuChannel {
@@ -7,7 +8,7 @@ pub trait ApuChannel {
     fn enabled(&self) -> bool;
     fn set_dac_enable(&mut self, enabled: bool);
     fn dac_enabled(&self) -> bool;
-    fn trigger(&mut self);
+    fn trigger(&mut self, sched: &mut impl ScheduleFn);
 }
 
 #[derive(Deserialize, Serialize)]
@@ -71,12 +72,12 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
     //
     /// A wrapper around `trigger` to account for the special case where the
     /// current counter is clocked after reloading to the max length
-    pub fn trigger_length(&mut self, is_not_length_clock_next: bool) {
+    pub fn trigger_length(&mut self, is_not_length_clock_next: bool, sched: &mut impl ScheduleFn) {
         if self.current_counter == 0 {
             self.current_counter =
                 self.max_length - (is_not_length_clock_next && self.counter_decrease_enable) as u16;
         }
-        self.trigger();
+        self.trigger(sched);
     }
 
     pub fn reset_length_counter(&mut self) {
@@ -98,12 +99,12 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
         !self.channel.enabled() || self.channel.muted()
     }
 
-    fn trigger(&mut self) {
+    fn trigger(&mut self, sched: &mut impl ScheduleFn) {
         if self.dac_enabled() {
             self.set_enable(true);
         }
 
-        self.channel.trigger();
+        self.channel.trigger(sched);
     }
 
     fn set_enable(&mut self, enabled: bool) {

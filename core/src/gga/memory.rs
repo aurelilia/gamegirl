@@ -17,6 +17,8 @@ use std::{
     ptr,
 };
 
+use super::audio;
+
 pub const KB: usize = 1024;
 pub const PAGE_SIZE: usize = 0x8000; // 32KiB
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
@@ -189,10 +191,13 @@ impl GameGirlAdv {
             }
 
             // Old sound
-            0x0400_0060..=0x0400_0080 | 0x0400_0084 | 0x0400_0090..=0x0400_009F => self
-                .apu
-                .cgb_chans
-                .write_register_gga((addr & 0xFFF).u16(), value),
+            0x0400_0060..=0x0400_0080 | 0x0400_0084 | 0x0400_0090..=0x0400_009F => {
+                self.apu.cgb_chans.write_register_gga(
+                    (addr & 0xFFF).u16(),
+                    value,
+                    &mut audio::shed(&mut self.scheduler),
+                )
+            }
 
             // MMIO
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
@@ -267,10 +272,13 @@ impl GameGirlAdv {
             FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
             FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
-                self.apu.cgb_chans.write_register_gga(a.u16(), value.low());
+                let mut sched = audio::shed(&mut self.scheduler);
                 self.apu
                     .cgb_chans
-                    .write_register_gga(a.u16() + 1, value.high());
+                    .write_register_gga(a.u16(), value.low(), &mut sched);
+                self.apu
+                    .cgb_chans
+                    .write_register_gga(a.u16() + 1, value.high(), &mut sched);
             }
 
             // RO registers

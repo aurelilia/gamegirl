@@ -1,6 +1,11 @@
 use crate::{
     ggc::{
-        io::{apu::GGApu, dma, dma::Hdma, ppu::Ppu},
+        io::{
+            apu::{GGApu, GenApuEvent},
+            dma,
+            dma::Hdma,
+            ppu::Ppu,
+        },
         GameGirl,
     },
     scheduler::Kind,
@@ -81,4 +86,6 @@ impl PpuEvent {
 pub enum ApuEvent {
     /// Push a sample to the output.
     PushSample,
+    /// Event from the inner generic APU.
+    Gen(GenApuEvent),
 }

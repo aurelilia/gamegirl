@@ -1,4 +1,5 @@
-use super::ApuChannel;
+use super::{ApuChannel, ScheduleFn};
+use crate::{ggc::io::apu::GenApuEvent, numutil::NumExt};
 use serde::{Deserialize, Serialize};
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
@@ -12,10 +13,7 @@ pub struct WaveChannel {
     buffer: [u8; 16],
     buffer_position: u8,
 
-    frequency_timer: u16,
-
     channel_enable: bool,
-
     dac_enable: bool,
 
     cgb: bool,
@@ -60,14 +58,9 @@ impl WaveChannel {
         }
     }
 
-    // Cycles here is the one adjusted for normal/double speed.
-    pub fn clock(&mut self, cycles: u16) {
-        if cycles > self.frequency_timer {
-            self.clock_position();
-            self.frequency_timer = (0x7FF - self.frequency) - (cycles - self.frequency_timer);
-        } else {
-            self.frequency_timer -= cycles;
-        }
+    pub fn clock(&mut self) -> u32 {
+        self.clock_position();
+        (0x7FF - self.frequency).u32() << 2
     }
 
     pub fn reset_buffer_index(&mut self) {
@@ -115,29 +108,14 @@ impl ApuChannel for WaveChannel {
         self.channel_enable
     }
 
-    fn trigger(&mut self) {
-        // if its DMG and will clock next, meaning that it is reading buffer now,
-        // then activate the wave-ram rewrite bug
-        //
-        // Some bytes from wave-ram are rewritten based on the current index
-        if !self.cgb && self.frequency_timer == 0 {
-            // get the next index that will be incremented to in the next clock
-            let index = ((self.buffer_position + 1) & 0x1F) / 2;
-
-            if index < 4 {
-                self.buffer[0] = self.buffer[index as usize];
-            } else {
-                let four_bytes_align_start = ((index / 4) * 4) as usize;
-                for i in 0..4 {
-                    self.buffer[i] = self.buffer[four_bytes_align_start + i];
-                }
-            }
-        }
-
+    fn trigger(&mut self, sched: &mut impl ScheduleFn) {
         self.buffer_position = 0;
         // no idea why `3` works here, but with this tests pass and found it
         // in other emulators
-        self.frequency_timer = 0x7FF - self.frequency + 3;
+        sched(
+            GenApuEvent::WaveReload,
+            (0x7FF - self.frequency + 3).u32() << 2,
+        );
     }
 
     fn set_dac_enable(&mut self, enabled: bool) {

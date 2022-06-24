@@ -1,4 +1,5 @@
-use super::{envelope::EnvelopGenerator, ApuChannel};
+use super::{envelope::EnvelopGenerator, ApuChannel, ScheduleFn};
+use crate::{ggc::io::apu::GenApuEvent, numutil::NumExt};
 use serde::{Deserialize, Serialize};
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
@@ -9,7 +10,7 @@ const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
 ];
 
 #[derive(Deserialize, Serialize)]
-pub struct PulseChannel {
+pub struct PulseChannel<const SECOND: bool> {
     sweep_period: u8,
     sweep_current_time: u8,
     sweep_internal_enable: bool,
@@ -26,16 +27,11 @@ pub struct PulseChannel {
     envelope: EnvelopGenerator,
     frequency: u16,
 
-    frequency_timer: u16,
-
     channel_enabled: bool,
-
-    first_trigger: bool,
-
     dac_enable: bool,
 }
 
-impl Default for PulseChannel {
+impl<const T: bool> Default for PulseChannel<T> {
     fn default() -> Self {
         Self {
             sweep_internal_enable: false,
@@ -50,15 +46,13 @@ impl Default for PulseChannel {
             sequencer_position: 0,
             envelope: EnvelopGenerator::default(),
             frequency: 0,
-            frequency_timer: 0,
             channel_enabled: false,
-            first_trigger: false,
             dac_enable: false,
         }
     }
 }
 
-impl PulseChannel {
+impl<const T: bool> PulseChannel<T> {
     pub fn write_sweep_register(&mut self, data: u8) {
         let old_negate = self.sweep_negate;
 
@@ -105,20 +99,9 @@ impl PulseChannel {
         &mut self.envelope
     }
 
-    pub fn clock(&mut self) {
-        // obsecure behaviour
-        if !self.first_trigger {
-            return;
-        }
-
-        if self.frequency_timer == 0 {
-            self.clock_sequencer();
-
-            // reload timer
-            self.frequency_timer = 0x7FF - self.frequency;
-        } else {
-            self.frequency_timer -= 1;
-        }
+    pub fn clock(&mut self) -> u32 {
+        self.clock_sequencer();
+        (0x7FF - self.frequency).u32() << 2
     }
 
     pub fn clock_sweeper(&mut self) {
@@ -144,7 +127,7 @@ impl PulseChannel {
     }
 }
 
-impl PulseChannel {
+impl<const T: bool> PulseChannel<T> {
     fn clock_sequencer(&mut self) {
         self.sequencer_position = (self.sequencer_position + 1) & 7;
     }
@@ -187,7 +170,7 @@ impl PulseChannel {
     }
 }
 
-impl ApuChannel for PulseChannel {
+impl<const T: bool> ApuChannel for PulseChannel<T> {
     fn output(&self) -> u8 {
         self.sequencer_data[self.sequencer_position] * self.envelope.current_volume()
     }
@@ -196,9 +179,13 @@ impl ApuChannel for PulseChannel {
         self.envelope.current_volume() == 0
     }
 
-    fn trigger(&mut self) {
-        self.first_trigger = true;
-        self.frequency_timer = 0x7FF - self.frequency;
+    fn trigger(&mut self, sched: &mut impl ScheduleFn) {
+        let evt = if T {
+            GenApuEvent::Pulse2Reload
+        } else {
+            GenApuEvent::Pulse1Reload
+        };
+        sched(evt, (0x7FF - self.frequency).u32() << 2);
         self.envelope.trigger();
         self.sweep_trigger();
     }
