@@ -1,28 +1,29 @@
+use bitmatch::bitmatch;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     gga::{cpu::Cpu, GameGirlAdv},
     numutil::NumExt,
 };
-use bitmatch::bitmatch;
-use serde::{Deserialize, Serialize};
 
 /// Macro for creating accessors for mode-dependent registers.
 macro_rules! mode_reg {
     ($reg:ident, $set:ident) => {
         pub fn $reg(&self) -> u32 {
-            let ctx = self.context();
-            if ctx == Context::System {
+            let mode = self.mode();
+            if mode == Mode::System {
                 self.$reg[0]
             } else {
-                self.$reg[self.context() as usize]
+                self.$reg[mode as usize]
             }
         }
 
         pub fn $set(&mut self, val: u32) {
-            let ctx = self.context();
-            if ctx == Context::System {
+            let mode = self.mode();
+            if mode == Mode::System {
                 self.$reg[0] = val;
             } else {
-                self.$reg[self.context() as usize] = val;
+                self.$reg[mode as usize] = val;
             }
         }
     };
@@ -40,7 +41,7 @@ pub type ModeReg = [u32; 6];
 
 /// Execution context of the CPU.
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Context {
+pub enum Mode {
     User,
     Fiq,
     Supervisor,
@@ -50,7 +51,7 @@ pub enum Context {
     System,
 }
 
-impl Context {
+impl Mode {
     #[bitmatch]
     pub fn get(n: u32) -> Self {
         #[bitmatch]
@@ -95,11 +96,13 @@ pub enum Flag {
 }
 
 impl Cpu {
-    pub fn context(&self) -> Context {
-        Context::get(self.cpsr & 0x1F)
+    /// Get the current CPU mode.
+    pub fn mode(&self) -> Mode {
+        Mode::get(self.cpsr & 0x1F)
     }
 
-    pub fn set_context(&mut self, ctx: Context) {
+    /// Set the mode bits inside CPSR.
+    pub fn set_mode(&mut self, ctx: Mode) {
         self.cpsr = (self.cpsr & !0x1F) | ctx.to_u32()
     }
 
@@ -113,6 +116,7 @@ impl Cpu {
         self.cpsr = self.cpsr.set_bit(flag as u16, en);
     }
 
+    /// Get the 'adjusted' value of the PC that some instructions need.
     #[inline]
     pub fn adj_pc(&self) -> u32 {
         self.pc & !2
@@ -135,7 +139,7 @@ impl Cpu {
     pub fn reg(&self, idx: u32) -> u32 {
         match idx {
             0..=7 => self.low[idx.us()],
-            8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq,
+            8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq,
             8..=12 => self.fiqs[(idx - 8).us()].reg,
             13 => self.sp(),
             14 => self.lr(),
@@ -146,7 +150,7 @@ impl Cpu {
     pub fn reg_pc4(&self, idx: u32) -> u32 {
         match idx {
             0..=7 => self.low[idx.us()],
-            8..=12 if self.context() == Context::Fiq => self.fiqs[(idx - 8).us()].fiq,
+            8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq,
             8..=12 => self.fiqs[(idx - 8).us()].reg,
             13 => self.sp(),
             14 => self.lr(),
@@ -156,6 +160,7 @@ impl Cpu {
 }
 
 impl GameGirlAdv {
+    /// Set the PC. Needs special behavior to fake the pipeline.
     #[inline]
     pub fn set_pc(&mut self, val: u32) {
         // Align to 2/4 depending on mode
@@ -166,7 +171,7 @@ impl GameGirlAdv {
     pub fn set_reg(&mut self, idx: u32, val: u32) {
         match idx {
             0..=7 => self.cpu.low[idx.us()] = val,
-            8..=12 if self.cpu.context() == Context::Fiq => self.cpu.fiqs[(idx - 8).us()].fiq = val,
+            8..=12 if self.cpu.mode() == Mode::Fiq => self.cpu.fiqs[(idx - 8).us()].fiq = val,
             8..=12 => self.cpu.fiqs[(idx - 8).us()].reg = val,
             13 => self.cpu.set_sp(val),
             14 => self.cpu.set_lr(val),

@@ -1,10 +1,12 @@
-use crate::Colour;
 use core::{
     debugger::Breakpoint,
     gga::{addr::IME, GameGirlAdv},
     numutil::NumExt,
 };
+
 use eframe::egui::{Label, RichText, TextEdit, Ui};
+
+use crate::Colour;
 
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.

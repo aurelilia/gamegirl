@@ -1,22 +1,21 @@
-use crate::gui::{
-    input::{Input, InputAction, HOTKEYS},
-    App,
-};
-use core::{
-    common::Button,
-    ggc::{CgbMode, GGConfig},
-};
+use core::common::{Button, CgbMode, SystemConfig};
+
 use eframe::{
     egui,
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui},
 };
 use serde::{Deserialize, Serialize};
 
+use crate::gui::{
+    input::{Input, InputAction, HOTKEYS},
+    App,
+};
+
 /// User-configurable options.
 #[derive(Serialize, Deserialize)]
 pub struct Options {
     /// Options passed to the system when loading a ROM.
-    pub gg: GGConfig,
+    pub gg: SystemConfig,
     /// Input configuration.
     pub input: Input,
 

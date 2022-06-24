@@ -1,3 +1,8 @@
+use std::collections::VecDeque;
+
+use serde::{Deserialize, Serialize};
+
+use super::scheduling::AdvEvent;
 use crate::{
     common::SAMPLE_RATE,
     gga::{
@@ -10,14 +15,11 @@ use crate::{
     numutil::{NumExt, U16Ext},
     scheduler::Scheduler,
 };
-use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-
-use super::scheduling::AdvEvent;
 
 pub const SAMPLE_EVERY_N_CLOCKS: u32 = (CPU_CLOCK / SAMPLE_RATE as f32) as u32;
 const GG_OFFS: u32 = 4;
 
+/// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Apu {
     // 4 channels found on GG(C)
@@ -104,6 +106,8 @@ impl Apu {
 
 // Impl block for DMA channels
 impl Apu {
+    /// Timer handling this channel overflowed, go to next sample and request
+    /// more samples if needed
     pub fn timer_overflow<const CH: usize>(gg: &mut GameGirlAdv) {
         if let Some(next) = gg.apu.buffers[CH].pop_front() {
             gg.apu.current_samples[CH] = next;

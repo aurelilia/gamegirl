@@ -4,6 +4,8 @@ mod palette;
 mod render;
 mod tile;
 
+use serde::{Deserialize, Serialize};
+
 use super::memory::KB;
 use crate::{
     common::BorrowedSystem,
@@ -17,7 +19,6 @@ use crate::{
     numutil::NumExt,
     Colour,
 };
-use serde::{Deserialize, Serialize};
 
 // DISPCNT
 const FRAME_SELECT: u16 = 4;

@@ -1,17 +1,21 @@
+pub use dmg::COLOURS;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     common::BorrowedSystem,
     ggc::{
         cpu::Interrupt,
-        io::{addr::*, ppu::cgb::Cgb, Mmu},
+        io::{
+            addr::*,
+            ppu::cgb::Cgb,
+            scheduling::{GGEvent, PpuEvent},
+            Mmu,
+        },
         GameGirl,
     },
     numutil::NumExt,
     Colour,
 };
-use serde::{Deserialize, Serialize};
-
-use crate::ggc::io::scheduling::{GGEvent, PpuEvent};
-pub use dmg::COLOURS;
 
 mod cgb;
 mod dmg;

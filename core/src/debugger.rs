@@ -4,12 +4,10 @@
 #[derive(Clone, Default)]
 pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     /// Contains the serial output that was written to IO register SB.
+    /// Currently only on GG.
     pub serial_output: String,
-
     /// A list of breakpoints the system should stop on.
     pub breakpoints: Vec<Breakpoint<Ptr>>,
-    /// If breakpoints are enabled.
-    pub breakpoints_enabled: bool,
     /// If a breakpoint was hit.
     pub breakpoint_hit: bool,
 }
@@ -17,7 +15,7 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
 impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
     /// Called before a memory write is executed, which might trigger a BP.
     pub fn write_occurred(&mut self, addr: Ptr) {
-        if !self.breakpoints_enabled {
+        if self.breakpoints.is_empty() {
             return;
         }
         self.breakpoint_hit |= self
@@ -29,7 +27,7 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
     /// Called before an instruction is executed, which might trigger a BP.
     /// If it does, function returns false and inst should not be executed.
     pub fn should_execute(&mut self, pc: Ptr) -> bool {
-        if !self.breakpoints_enabled {
+        if self.breakpoints.is_empty() {
             return true;
         }
         !self

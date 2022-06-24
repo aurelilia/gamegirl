@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     gga::{
         addr::DISPSTAT,
@@ -7,15 +9,19 @@ use crate::{
     },
     numutil::{word, NumExt},
 };
-use serde::{Deserialize, Serialize};
 
+/// GGA's 4 DMA channels.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Dmas {
+    /// Internal source registers
     src: [u32; 4],
+    /// Internal destination registers
     dst: [u32; 4],
 }
 
 impl Dmas {
+    /// Update all DMAs to see if they need ticking.
+    /// Called on V/Hblank.
     pub fn update(gg: &mut GameGirlAdv) {
         for idx in 0..4 {
             let base = Self::base_addr(idx);
@@ -23,6 +29,7 @@ impl Dmas {
         }
     }
 
+    /// Update a given DMA after it's control register was written.
     pub fn update_idx(gg: &mut GameGirlAdv, idx: u16, new_ctrl: u16) {
         let base = Self::base_addr(idx);
         let old_ctrl = gg[base + 0xA];
@@ -38,16 +45,20 @@ impl Dmas {
         Self::step_dma::<false>(gg, idx, base, new_ctrl);
     }
 
+    /// Try to perform a special transfer, if the DMA is otherwise configured
+    /// for it.
     pub fn check_special_transfer(gg: &mut GameGirlAdv, idx: u16) {
         let base = Self::base_addr(idx);
         Self::step_dma::<true>(gg, idx, base, gg[base + 0xA]);
     }
 
+    /// Get the destination register for a DMA; this is not the internal one.
     pub fn get_dest(gg: &mut GameGirlAdv, idx: u16) -> u32 {
         let base = Self::base_addr(idx);
         word(gg[base + 4], gg[base + 6])
     }
 
+    /// Step a DMA and perform a transfer if possible.
     fn step_dma<const SPECIAL: bool>(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16) {
         let on = ctrl.is_bit(15)
             && match ctrl.bits(12, 2) {
@@ -89,6 +100,7 @@ impl Dmas {
         }
     }
 
+    /// Perform a transfer.
     fn perform_transfer<const WORD: bool>(
         gg: &mut GameGirlAdv,
         idx: usize,
@@ -113,6 +125,8 @@ impl Dmas {
         }
     }
 
+    /// Get the step with which to change SRC/DST registers after every write.
+    /// Multiplied by 2 for word-sized DMAs.
     fn get_step(bits: u16) -> i32 {
         match bits {
             0 => 2,
@@ -122,6 +136,7 @@ impl Dmas {
         }
     }
 
+    /// Get the base address for a DMA (First register: SRC low)
     fn base_addr(idx: u16) -> u32 {
         0xB0 + (idx.u32() * 0xC)
     }

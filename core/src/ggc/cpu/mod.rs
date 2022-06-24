@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     ggc::{
         io::addr::{IE, IF},
@@ -5,7 +7,6 @@ use crate::{
     },
     numutil::NumExt,
 };
-use serde::{Deserialize, Serialize};
 
 mod alu;
 mod data;

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     ggc::{
         io::{
@@ -10,7 +12,6 @@ use crate::{
     },
     numutil::NumExt,
 };
-use serde::{Deserialize, Serialize};
 
 /// OAM DMA transfer available on DMG and CGB.
 /// This implementation writes everything at once

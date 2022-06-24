@@ -4,9 +4,7 @@ mod blargg;
 mod gba;
 mod mooneye;
 
-use ansi_term::Colour;
-use core::{ggc::GGConfig, System};
-use rayon::prelude::*;
+use core::{common::SystemConfig, System};
 use std::{
     env, fs,
     ops::ControlFlow,
@@ -14,6 +12,9 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Instant,
 };
+
+use ansi_term::Colour;
+use rayon::prelude::*;
 
 const TIMEOUT: usize = 30;
 
@@ -23,7 +24,7 @@ fn main() {
         gg.load_cart(
             include_bytes!("../../bench.gb").to_vec(),
             None,
-            &GGConfig::default(),
+            &SystemConfig::default(),
         );
         gg.skip_bootrom();
         for _ in 0..30 {
@@ -122,7 +123,7 @@ fn run<const SKIP: bool>(
     cond: fn(&System) -> ControlFlow<Status>,
 ) -> Result<(), String> {
     let mut gg = System::default();
-    gg.load_cart(test, None, &GGConfig::default());
+    gg.load_cart(test, None, &SystemConfig::default());
     if SKIP {
         gg.skip_bootrom();
     }

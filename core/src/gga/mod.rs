@@ -1,5 +1,14 @@
+use std::mem;
+
+use audio::Apu;
+use cartridge::Cartridge;
+use cpu::Cpu;
+use graphics::Ppu;
+use memory::Memory;
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    common::{self, EmulateOptions},
+    common::{self, EmulateOptions, SystemConfig},
     debugger::Debugger,
     gga::{
         addr::{KEYINPUT, SOUNDBIAS},
@@ -9,18 +18,10 @@ use crate::{
         scheduling::{AdvEvent, ApuEvent, PpuEvent},
         timer::Timers,
     },
-    ggc::GGConfig,
     numutil::NumExt,
     scheduler::Scheduler,
     Colour,
 };
-use audio::Apu;
-use cartridge::Cartridge;
-use cpu::Cpu;
-use graphics::Ppu;
-use memory::Memory;
-use serde::{Deserialize, Serialize};
-use std::mem;
 
 pub mod addr;
 mod audio;
@@ -51,12 +52,14 @@ pub struct GameGirlAdv {
 
     scheduler: Scheduler<AdvEvent>,
     pub options: EmulateOptions,
-    pub config: GGConfig,
+    pub config: SystemConfig,
 
     #[serde(skip)]
     #[serde(default)]
     pub debugger: GGADebugger,
-    unpaused: bool,
+    /// Temporary used by [advance_delta]. Will be true until the scheduled
+    /// PauseEmulation event fires.
+    ticking: bool,
 }
 
 impl GameGirlAdv {
@@ -70,8 +73,8 @@ impl GameGirlAdv {
         let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as u32;
         self.scheduler.schedule(AdvEvent::PauseEmulation, target);
 
-        self.unpaused = true;
-        while self.options.running && self.unpaused {
+        self.ticking = true;
+        while self.options.running && self.ticking {
             self.advance();
         }
     }
@@ -226,9 +229,9 @@ impl Default for GameGirlAdv {
 
             scheduler: Scheduler::default(),
             options: EmulateOptions::default(),
-            config: GGConfig::default(),
+            config: SystemConfig::default(),
             debugger: GGADebugger::default(),
-            unpaused: true,
+            ticking: true,
         };
 
         // Initialize various IO registers
@@ -255,7 +258,8 @@ impl Default for GameGirlAdv {
 }
 
 /// Enum for the types of memory accesses; either sequential
-/// or non-sequential.
+/// or non-sequential. The numbers assigned to the variants are
+/// to speed up reading the wait times in `memory.rs`.
 #[derive(Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Access {
     Seq = 0,

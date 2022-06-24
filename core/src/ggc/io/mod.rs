@@ -1,18 +1,23 @@
+use std::ops::{Index, IndexMut};
+
+use serde::{Deserialize, Serialize};
+
+use super::GGDebugger;
 use crate::{
-    ggc::{
-        io::{
-            addr::*, apu::GGApu, cartridge::Cartridge, dma::Hdma, joypad::Joypad, ppu::Ppu,
-            scheduling::GGEvent, timer::Timer,
-        },
-        CgbMode, GGConfig, GameGirl,
+    common::{CgbMode, SystemConfig},
+    ggc::io::{
+        addr::*,
+        apu::Apu,
+        cartridge::Cartridge,
+        dma::Hdma,
+        joypad::Joypad,
+        ppu::Ppu,
+        scheduling::{GGEvent, PpuEvent},
+        timer::Timer,
     },
     numutil::NumExt,
     scheduler::Scheduler,
 };
-use serde::{Deserialize, Serialize};
-use std::ops::{Index, IndexMut};
-
-use super::GGDebugger;
 
 pub(super) mod addr;
 pub mod apu;
@@ -55,7 +60,7 @@ pub struct Mmu {
     timer: Timer,
     pub ppu: Ppu,
     joypad: Joypad,
-    pub(super) apu: GGApu,
+    pub(super) apu: Apu,
     hdma: Hdma,
 }
 
@@ -134,7 +139,7 @@ impl Mmu {
             IE => self[IE] = value,
             BOOTROM_DISABLE => self.bootrom = None,
 
-            DIV | TAC => Timer::write(self, addr, value),
+            DIV | TIMA | TAC => Timer::write(self, addr, value),
             LCDC => {
                 self[LCDC] = value;
                 if !value.is_bit(7) {
@@ -149,7 +154,7 @@ impl Mmu {
                 self.scheduler.schedule(GGEvent::DMAFinish, time);
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
-            NR10..=WAV_END => GGApu::write(self, HIGH_START + addr, value),
+            NR10..=WAV_END => Apu::write(self, HIGH_START + addr, value),
 
             SB => self.debugger.serial_output.push(value as char),
 
@@ -171,7 +176,7 @@ impl Mmu {
     }
 
     /// Reset the MMU and all IO devices except the cartridge.
-    pub(super) fn reset(&mut self, config: &GGConfig) -> Self {
+    pub(super) fn reset(&mut self, config: &SystemConfig) -> Self {
         // TODO the clones are kinda eh
         let mut new = Self::new(self.debugger.clone());
         new.cgb = self.cgb;
@@ -197,13 +202,13 @@ impl Mmu {
             timer: Timer::default(),
             ppu: Ppu::new(),
             joypad: Joypad::default(),
-            apu: GGApu::new(false),
+            apu: Apu::new(false),
             hdma: Hdma::default(),
             cart: Cartridge::dummy(),
         }
     }
 
-    pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &GGConfig) {
+    pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &SystemConfig) {
         self.cgb = match conf.mode {
             CgbMode::Always => true,
             CgbMode::Prefer => cart.supports_cgb(),
@@ -215,9 +220,10 @@ impl Mmu {
             BOOTIX_ROM.to_vec()
         });
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
-        self.apu = GGApu::new(self.cgb);
+        self.apu = Apu::new(self.cgb);
         self.cart = cart;
         self.init_high();
+        self.init_scheduler();
     }
 
     fn init_high(&mut self) {
@@ -242,6 +248,12 @@ impl Mmu {
         if self.cgb {
             self[KEY1] = 0;
         }
+    }
+
+    fn init_scheduler(&mut self) {
+        self.scheduler
+            .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
+        Apu::init_scheduler(self);
     }
 }
 

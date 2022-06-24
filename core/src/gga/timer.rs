@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     gga::{
         addr::{SOUNDCNT_H, TM0CNT_H},
@@ -8,17 +10,22 @@ use crate::{
     },
     numutil::NumExt,
 };
-use serde::{Deserialize, Serialize};
 
 const DIVS: [u16; 4] = [1, 64, 256, 1024];
 
+/// Timers on the GGA.
+/// They run on the scheduler when in regular counting mode.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Timers {
+    /// Counter value. Used for cascading counters; for scheduled counters this
+    /// will be the reload value (actual counter is calculated on read)
     counters: [u16; 4],
+    /// The time the timer was scheduled, if it is on the scheduler.
     scheduled_at: [u32; 4],
 }
 
 impl Timers {
+    /// Handle overflow of a scheduled timer.
     pub fn handle_overflow_event(gg: &mut GameGirlAdv, idx: u8, late_by: u32) {
         // Handle overflow
         let until_ov = Self::overflow(gg, idx);
@@ -27,7 +34,7 @@ impl Timers {
         // In this case, we simply schedule the next overflow event to be immediately.
         gg.scheduler.schedule(
             AdvEvent::TimerOverflow(idx),
-            until_ov.checked_sub(late_by).unwrap_or(0),
+            until_ov.saturating_sub(late_by),
         );
     }
 
@@ -48,6 +55,7 @@ impl Timers {
         }
     }
 
+    /// Handle CTRL write by scheduling timer as appropriate.
     pub fn hi_write<const TIM: u8>(gg: &mut GameGirlAdv, addr: u32, new_ctrl: u16) {
         let old_ctrl = gg[addr];
         let was_scheduled = old_ctrl.is_bit(7) && !old_ctrl.is_bit(2);
@@ -67,7 +75,7 @@ impl Timers {
         gg[addr] = new_ctrl;
     }
 
-    // Handle an overflow and return time until next.
+    /// Handle an overflow and return time until next.
     fn overflow(gg: &mut GameGirlAdv, idx: u8) -> u32 {
         let addr = Self::hi_addr(idx);
         let reload = gg[addr - 2];
@@ -100,11 +108,13 @@ impl Timers {
         Self::next_overflow_time(reload, ctrl)
     }
 
+    /// Time until next overflow, for scheduling.
     fn next_overflow_time(reload: u16, ctrl: u16) -> u32 {
         let scaler = DIVS[(ctrl & 3).us()].u32();
         scaler * (0xFFFF - reload.u32())
     }
 
+    /// Increment a timer. Used for cascading timers.
     #[inline]
     fn inc_timer(gg: &mut GameGirlAdv, idx: usize) {
         let new = gg.timers.counters[idx].checked_add(1);
@@ -116,6 +126,7 @@ impl Timers {
         }
     }
 
+    /// Get the CTRL address of the given timer.
     #[inline]
     fn hi_addr(tim: u8) -> u32 {
         TM0CNT_H + (tim.u32() << 2)

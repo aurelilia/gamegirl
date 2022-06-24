@@ -1,3 +1,13 @@
+use std::{
+    fmt::UpperHex,
+    mem,
+    ops::{Index, IndexMut},
+    ptr,
+};
+
+use serde::{Deserialize, Serialize};
+
+use super::audio;
 use crate::{
     gga::{
         addr::*,
@@ -9,20 +19,13 @@ use crate::{
     },
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
-use serde::{Deserialize, Serialize};
-use std::{
-    fmt::UpperHex,
-    mem,
-    ops::{Index, IndexMut},
-    ptr,
-};
-
-use super::audio;
 
 pub const KB: usize = 1024;
 pub const PAGE_SIZE: usize = 0x8000; // 32KiB
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
 
+/// Memory struct containing the GGA's memory regions along with page tables
+/// and other auxiliary cached information relating to memory.
 #[derive(Deserialize, Serialize)]
 pub struct Memory {
     #[serde(with = "serde_arrays")]
@@ -289,6 +292,8 @@ impl GameGirlAdv {
     }
 
     // Unsafe corner!
+    /// Get a value in memory. Will try to do a fast read from page tables,
+    /// falls back to given closure if no page table is mapped at that address.
     #[inline]
     fn get<T>(&self, addr: u32, slow: fn(&GameGirlAdv, u32) -> T) -> T {
         let ptr = self.page::<false>(addr);
@@ -299,6 +304,8 @@ impl GameGirlAdv {
         }
     }
 
+    /// Sets a value in memory. Will try to do a fast write with page tables,
+    /// falls back to given closure if no page table is mapped at that address.
     #[inline]
     fn set<T: UpperHex>(&mut self, addr: u32, value: T, slow: fn(&mut GameGirlAdv, u32, T)) {
         let ptr = self.page::<true>(addr);
@@ -309,6 +316,9 @@ impl GameGirlAdv {
         }
     }
 
+    /// Get the page table at the given address. Can be a write or read table,
+    /// see const generic parameter. If there is no page mapped, returns a
+    /// pointer in range 0..0x7FFF (due to offsets to the (null) pointer)
     fn page<const WRITE: bool>(&self, addr: u32) -> *mut u8 {
         const MASK: [usize; 16] = [
             0x3FFF, // BIOS
@@ -341,6 +351,7 @@ impl GameGirlAdv {
         }
     }
 
+    /// Get wait time for a given address.
     #[inline]
     pub fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         let idx = ((addr.us() >> 24) & 0xF) + ty as usize;
@@ -351,6 +362,7 @@ impl GameGirlAdv {
         }
     }
 
+    /// Initialize page tables and wait times.
     pub fn init_memory(&mut self) {
         for i in 0..self.memory.read_pages.len() {
             self.memory.read_pages[i] = unsafe { self.get_page::<true>(i * PAGE_SIZE) };

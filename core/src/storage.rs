@@ -94,10 +94,10 @@ impl Storage {
 
 /// Abstract game save that can be loaded by a cartridge.
 pub struct GameSave {
-    /// The game's RAM.
+    /// The game's RAM, or other backup method storage.
     pub ram: Vec<u8>,
     /// RTC time, for GGC games.
     pub rtc: Option<u64>,
-    /// Game title.
+    /// Game title. Used for saving to disk.
     pub title: String,
 }

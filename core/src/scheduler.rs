@@ -130,7 +130,7 @@ pub struct Event<E: Kind> {
     pub kind: E,
     /// By how many ticks the event was delayed by. For example:
     /// - Event was scheduled to be executed at tick 1000
-    /// - Scheduler ran until 1010
+    /// - Scheduler ran until 1010 before the event got handled
     /// - `late_by` will be 1010 - 1000 = 10.
     pub late_by: u32,
 }

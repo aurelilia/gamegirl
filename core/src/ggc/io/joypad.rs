@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     common::Button,
     ggc::{cpu::Interrupt, io::addr::JOYP, GameGirl},
 };
-use serde::{Deserialize, Serialize};
 
 /// Joypad of the console.
 #[derive(Default, Deserialize, Serialize)]
@@ -27,6 +28,9 @@ impl Joypad {
 
     /// To be called by GUI code; sets the state of a given button.
     pub fn set(gg: &mut GameGirl, button: Button, state: bool) {
+        if button as usize >= 8 {
+            return; // GGA buttons
+        }
         gg.mmu.joypad.key_states[button as usize] = state;
         let read = gg.mmu.joypad.read(gg.mmu[JOYP]);
         if read & 0x0F != 0x0F {

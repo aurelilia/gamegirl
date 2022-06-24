@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use super::{ApuChannel, ScheduleFn};
 use crate::{ggc::io::apu::GenApuEvent, numutil::NumExt};
-use serde::{Deserialize, Serialize};
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 

@@ -74,13 +74,14 @@ cargo run -p tests --release
 ```
 
 ### GG/GGC
-#### Blargg test results
-All tests except for `oam_bug` (which will not be implemented) pass.
-#### Mooneye test results
-- `acceptance`: 30 out of 71 pass
-- `emulator-only`: All pass (except MBC1 multicart; will not be supported)
-#### Acid2
-mattcurrie's dmg-acid2 and cgb-acid2 are both correct, including CGB compatibility mode on dmg-acid2.
+- [x] Blargg (except `oam_bug`)
+- [ ] Mooneye
+  - [ ] `acceptance`: 30/71
+  - [x] `emulator-only`: 27/28 (MBC1M, will not be supported)
+- [x] Acid2
+  - [x] dmg-acid2
+  - [x] dmg-acid2 in CGB mode
+  - [x] cgb-acid2
 
 ### GGA
 - [ ] jsmolka's gba-tests

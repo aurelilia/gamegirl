@@ -1,16 +1,18 @@
 //! This file contains common structures shared by GGC and GGA.
 
+use std::{iter, mem, path::PathBuf};
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use crate::{
     gga::{cpu::Cpu, GameGirlAdv},
     ggc::{
         io::{cartridge::Cartridge, joypad::Joypad},
-        GGConfig, GameGirl,
+        GameGirl,
     },
     storage::Storage,
     Colour,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{iter, mem, path::PathBuf};
 
 /// Audio sample rate of all emulated systems.
 pub const SAMPLE_RATE: u32 = 44100;
@@ -85,7 +87,7 @@ impl System {
     }
 
     /// Get emulation config.
-    pub fn config(&self) -> &GGConfig {
+    pub fn config(&self) -> &SystemConfig {
         match self {
             System::GGC(gg) => &gg.config,
             System::GGA(gg) => &gg.config,
@@ -93,7 +95,7 @@ impl System {
     }
 
     /// Get emulation config.
-    pub fn config_mut(&mut self) -> &mut GGConfig {
+    pub fn config_mut(&mut self) -> &mut SystemConfig {
         match self {
             System::GGC(gg) => &mut gg.config,
             System::GGA(gg) => &mut gg.config,
@@ -134,9 +136,12 @@ impl System {
         }
     }
 
-    /// Load a cart.
-    pub fn load_cart(&mut self, mut cart: Vec<u8>, path: Option<PathBuf>, config: &GGConfig) {
+    /// Load a cart. Automatically picks the right system kind.
+    pub fn load_cart(&mut self, mut cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+        // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
+        // that is present on every cartridge.
         let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
+
         if is_ggc {
             let mut cart = Cartridge::from_rom(cart);
             if let Some(save) = Storage::load(path, cart.title(true)) {
@@ -152,6 +157,7 @@ impl System {
             *self = Self::GGC(ggc);
         } else {
             // TODO bad
+            // Should fix memory pages to eliminate this.
             let until_32mb = 0x200_0000 - cart.len();
             cart.extend(iter::repeat(0).take(until_32mb));
 
@@ -166,7 +172,7 @@ impl System {
                 EmulateOptions::serde_frame_finished(),
             );
 
-            // Fill the prefetch
+            // Fake filling the prefetch
             Cpu::pipeline_stall(&mut gga);
             *self = Self::GGA(gga);
         }
@@ -184,6 +190,7 @@ impl Default for System {
 }
 
 /// Options that are used by the GUI and shared between GGC/GGA.
+/// These can be changed at runtime.
 #[derive(Deserialize, Serialize)]
 pub struct EmulateOptions {
     /// If the system is running. If false, any calls to [advance_delta] and
@@ -222,6 +229,46 @@ impl Default for EmulateOptions {
     }
 }
 
+/// Configuration used when initializing the system.
+/// These options don't change at runtime.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SystemConfig {
+    /// How to handle CGB mode.
+    pub mode: CgbMode,
+    /// If save states should be compressed.
+    pub compress_savestates: bool,
+    /// If CGB colours should be corrected.
+    pub cgb_colour_correction: bool,
+    /// Audio volume multiplier
+    pub volume: f32,
+}
+
+impl Default for SystemConfig {
+    fn default() -> Self {
+        Self {
+            mode: CgbMode::Prefer,
+            compress_savestates: false,
+            cgb_colour_correction: false,
+            volume: 0.5,
+        }
+    }
+}
+
+/// How to handle CGB mode depending on cart compatibility.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CgbMode {
+    /// Always run in CGB mode, even when the cart does not support it.
+    /// If it does not, it is run in DMG compatibility mode, just like on a
+    /// real CGB.
+    Always,
+    /// If the cart has CGB support, run it as CGB; if not, don't.
+    Prefer,
+    /// Never run the cart in CGB mode unless it requires it.
+    Never,
+}
+
+/// Borrowed system enum used for "end of frame" callbacks on all cores.
+/// These are mainly used for rewinding savestates.
 pub enum BorrowedSystem<'s> {
     GGC(&'s GameGirl),
     GGA(&'s GameGirlAdv),
@@ -259,7 +306,7 @@ impl Button {
 }
 
 /// Serialize an object that can be loaded with [deserialize].
-/// It is optionally zstd-compressed bincode.
+/// It is (optionally zstd-compressed) bincode.
 pub fn serialize<T: Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
     if cfg!(target_arch = "wasm32") {
         // Currently crashes when loading...
@@ -277,7 +324,7 @@ pub fn serialize<T: Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
 }
 
 /// Deserialize an object that was made with [serialize].
-/// It is optionally zstd-compressed bincode.
+/// It is (optionally zstd-compressed) bincode.
 pub fn deserialize<T: DeserializeOwned>(state: &[u8], with_zstd: bool) -> T {
     if with_zstd {
         let decoder = zstd::stream::Decoder::new(state).unwrap();

@@ -1,21 +1,18 @@
-use crate::{
-    ggc::io::{
-        addr::{DIV, KEY1},
-        Mmu,
-    },
-    scheduler::Scheduler,
-};
+pub use apu::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
+pub use channel::ApuChannel;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::SAMPLE_RATE,
     ggc::{
-        io::scheduling::{ApuEvent, GGEvent},
+        io::{
+            scheduling::{ApuEvent, GGEvent},
+            Mmu,
+        },
         GameGirl, T_CLOCK_HZ,
     },
+    scheduler::Scheduler,
 };
-pub use apu::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
-pub use channel::ApuChannel;
 
 mod apu;
 mod channel;
@@ -28,12 +25,12 @@ pub const SAMPLE_EVERY_N_CLOCKS: u32 = T_CLOCK_HZ / SAMPLE_RATE;
 
 /// APU variant used by DMG/CGB.
 #[derive(Deserialize, Serialize)]
-pub struct GGApu {
+pub struct Apu {
     pub(super) inner: GenericApu,
     pub buffer: Vec<f32>,
 }
 
-impl GGApu {
+impl Apu {
     pub fn handle_event(gg: &mut GameGirl, event: ApuEvent, late_by: u32) {
         match event {
             ApuEvent::PushSample => {
@@ -68,17 +65,13 @@ impl GGApu {
             .write_register_gg(addr, value, &mut shed(&mut mmu.scheduler));
     }
 
-    pub fn init_scheduler(gg: &mut GameGirl) {
-        gg.mmu
-            .apu
-            .inner
-            .init_scheduler(&mut shed(&mut gg.mmu.scheduler));
-        gg.mmu.scheduler.schedule(
+    pub fn init_scheduler(mmu: &mut Mmu) {
+        mmu.apu.inner.init_scheduler(&mut shed(&mut mmu.scheduler));
+        mmu.scheduler.schedule(
             GGEvent::ApuEvent(ApuEvent::PushSample),
             SAMPLE_EVERY_N_CLOCKS,
         );
-        gg.mmu
-            .scheduler
+        mmu.scheduler
             .schedule(GGEvent::ApuEvent(ApuEvent::TickSequencer), 0x2000);
     }
 

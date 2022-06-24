@@ -1,9 +1,11 @@
-use crate::{ggc::io::cartridge::MBCKind::*, numutil::NumExt, storage::GameSave};
-use serde::{Deserialize, Serialize};
 use std::{
     iter,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+use serde::{Deserialize, Serialize};
+
+use crate::{ggc::io::cartridge::MBCKind::*, numutil::NumExt, storage::GameSave};
 
 const CGB_FLAG: u16 = 0x0143;
 const CGB_ONLY: u8 = 0xC0;

@@ -1,4 +1,3 @@
-use crate::{gui::App, Colour};
 use core::{
     common::System,
     debugger::Breakpoint,
@@ -9,6 +8,8 @@ use core::{
     },
     numutil::NumExt,
 };
+use std::{fmt::Write, iter};
+
 use eframe::{
     egui::{
         vec2, Align, ColorImage, Context, ImageData, Label, RichText, ScrollArea, TextEdit,
@@ -16,7 +17,8 @@ use eframe::{
     },
     epaint::ImageDelta,
 };
-use std::{fmt::Write, iter};
+
+use crate::{gui::App, Colour};
 
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.

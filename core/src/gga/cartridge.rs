@@ -1,8 +1,10 @@
-use crate::{gga::memory::KB, storage::GameSave};
-use serde::{Deserialize, Serialize};
 use std::iter;
+
+use serde::{Deserialize, Serialize};
 use FlashCmdStage::*;
 use SaveType::*;
+
+use crate::{gga::memory::KB, storage::GameSave};
 
 const SAVE_TYPES: &[(SaveType, &str)] = &[
     (

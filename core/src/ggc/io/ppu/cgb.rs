@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     ggc::{
         io::{
@@ -9,7 +11,6 @@ use crate::{
     numutil::NumExt,
     Colour,
 };
-use serde::{Deserialize, Serialize};
 
 /// Data required for a CGB PPU, mainly palette data.
 #[derive(Deserialize, Serialize)]

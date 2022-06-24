@@ -2,14 +2,15 @@
 //! It is under the MIT license. See the linked repository for more info.
 //! Thank you to Amjad50 for mizu!
 
+use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
+
 use super::{
     channel::{ApuChannel, Dac, LengthCountedChannel},
     noise_channel::NoiseChannel,
     pulse_channel::PulseChannel,
     wave_channel::WaveChannel,
 };
-use bitflags::bitflags;
-use serde::{Deserialize, Serialize};
 
 bitflags! {
     #[derive(Deserialize, Serialize)]
@@ -268,7 +269,7 @@ impl Default for GenericApu {
 
 pub trait ScheduleFn = FnMut(GenApuEvent, u32);
 
-#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub enum GenApuEvent {
     Pulse1Reload,
     Pulse2Reload,

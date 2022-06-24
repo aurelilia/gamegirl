@@ -1,9 +1,10 @@
+use std::fmt::UpperHex;
+
 use crate::gga::{
     cpu::{registers::Flag::*, Cpu},
     Access::NonSeq,
     GameGirlAdv,
 };
-use std::fmt::UpperHex;
 
 impl GameGirlAdv {
     /// Called by multiple load/store instructions when the Rlist was

@@ -1,28 +1,21 @@
-use crate::{
-    common::{self, EmulateOptions},
-    Colour,
-};
-use serde::{Deserialize, Serialize};
 use std::mem;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
+    common::{self, EmulateOptions, SystemConfig},
+    debugger::Debugger,
     ggc::{
         cpu::{Cpu, Interrupt},
         io::{
             addr::{IF, KEY1},
             cartridge::Cartridge,
+            scheduling::GGEvent,
             Mmu,
         },
     },
     numutil::NumExt,
-};
-
-use crate::{
-    debugger::Debugger,
-    ggc::io::{
-        apu::{GGApu, SAMPLE_EVERY_N_CLOCKS},
-        scheduling::{ApuEvent, GGEvent, PpuEvent},
-    },
+    Colour,
 };
 
 pub mod cpu;
@@ -38,12 +31,14 @@ pub type GGDebugger = Debugger<u16>;
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mmu: Mmu,
-    pub config: GGConfig,
+    pub config: SystemConfig,
 
-    /// Shift of t-clocks, which is different in CGB double speed mode. Regular:
-    /// 2, CGB 2x: 1.
+    /// Shift of m-cycles to t-clocks, which is different in CGB double speed
+    /// mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
-    unpaused: bool,
+    /// Temporary used by [advance_delta]. Will be true until the scheduled
+    /// PauseEmulation event fires,
+    ticking: bool,
 
     /// Emulation options.
     pub options: EmulateOptions,
@@ -61,8 +56,8 @@ impl GameGirl {
         let target = (T_CLOCK_HZ as f32 * delta * self.options.speed_multiplier as f32) as u32;
         self.mmu.scheduler.schedule(GGEvent::PauseEmulation, target);
 
-        self.unpaused = true;
-        while self.options.running && self.unpaused {
+        self.ticking = true;
+        while self.options.running && self.ticking {
             self.advance();
         }
     }
@@ -139,8 +134,7 @@ impl GameGirl {
         Cpu::exec_next_inst(self)
     }
 
-    /// Advance the MMU, which is everything except the CPU.
-    /// Should not advance by more than 7 cycles at once.3
+    /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, m_cycles: u16) {
         self.mmu.scheduler.advance((m_cycles << self.t_shift).u32());
         while let Some(event) = self.mmu.scheduler.get_next_pending() {
@@ -153,29 +147,32 @@ impl GameGirl {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
         self.mmu.speed = if self.t_shift == 1 { 2 } else { 1 };
         self.mmu[KEY1] = (self.t_shift & 1) << 7;
-        for _ in 0..=1024 {
-            self.advance_clock(2)
-        }
+        self.advance_clock(2048);
     }
 
+    /// Request an interrupt. Sets the bit in IF.
     fn request_interrupt(&mut self, ir: Interrupt) {
         self.mmu[IF] = self.mmu[IF].set_bit(ir.to_index(), true) as u8;
     }
 
+    /// Get an 8-bit argument for the current CPU instruction.
     fn arg8(&self) -> u8 {
         self.mmu.read(self.cpu.pc + 1)
     }
 
+    /// Get a 16-bit argument for the current CPU instruction.
     fn arg16(&self) -> u16 {
         self.mmu.read16(self.cpu.pc + 1)
     }
 
+    /// Pop the current value off the SP.
     fn pop_stack(&mut self) -> u16 {
         let val = self.mmu.read16(self.cpu.sp);
         self.cpu.sp = self.cpu.sp.wrapping_add(2);
         val
     }
 
+    /// Push the given value to the current SP.
     fn push_stack(&mut self, value: u16) {
         self.cpu.sp = self.cpu.sp.wrapping_sub(2);
         self.mmu.write16(self.cpu.sp, value)
@@ -213,7 +210,7 @@ impl GameGirl {
 
     /// Load the given cartridge.
     /// `reset` indicates if the system should be reset before loading.
-    pub fn load_cart(&mut self, cart: Cartridge, config: &GGConfig, reset: bool) {
+    pub fn load_cart(&mut self, cart: Cartridge, config: &SystemConfig, reset: bool) {
         if reset {
             let old_self = mem::take(self);
             self.mmu.debugger = old_self.mmu.debugger;
@@ -226,7 +223,7 @@ impl GameGirl {
     /// Create a system with a cart already loaded.
     pub fn with_cart(rom: Vec<u8>) -> Self {
         let mut gg = Self::default();
-        gg.load_cart(Cartridge::from_rom(rom), &GGConfig::default(), false);
+        gg.load_cart(Cartridge::from_rom(rom), &SystemConfig::default(), false);
         gg.options.running = true;
         gg.options.rom_loaded = true;
         gg
@@ -241,59 +238,14 @@ impl GameGirl {
 impl Default for GameGirl {
     fn default() -> Self {
         let debugger = GGDebugger::default();
-        let mut gg = Self {
+        Self {
             cpu: Cpu::default(),
             mmu: Mmu::new(debugger),
-            config: GGConfig::default(),
+            config: SystemConfig::default(),
 
             t_shift: 2,
-            unpaused: true,
+            ticking: true,
             options: EmulateOptions::default(),
-        };
-
-        // Initialize scheduler
-        gg.mmu
-            .scheduler
-            .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
-        GGApu::init_scheduler(&mut gg);
-
-        gg
-    }
-}
-
-/// Configuration used when initializing the system.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct GGConfig {
-    /// How to handle CGB mode.
-    pub mode: CgbMode,
-    /// If save states should be compressed.
-    pub compress_savestates: bool,
-    /// If CGB colours should be corrected.
-    pub cgb_colour_correction: bool,
-    /// Audio volume multiplier
-    pub volume: f32,
-}
-
-impl Default for GGConfig {
-    fn default() -> Self {
-        Self {
-            mode: CgbMode::Prefer,
-            compress_savestates: false,
-            cgb_colour_correction: false,
-            volume: 0.5,
         }
     }
-}
-
-/// How to handle CGB mode depending on cart compatibility.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CgbMode {
-    /// Always run in CGB mode, even when the cart does not support it.
-    /// If it does not, it is run in DMG compatibility mode, just like on a
-    /// real CGB.
-    Always,
-    /// If the cart has CGB support, run it as CGB; if not, don't.
-    Prefer,
-    /// Never run the cart in CGB mode unless it requires it.
-    Never,
 }

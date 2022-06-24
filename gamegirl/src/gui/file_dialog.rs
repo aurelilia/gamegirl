@@ -1,6 +1,8 @@
-use crate::gui::Message;
-use rfd::FileHandle;
 use std::{future::Future, path::PathBuf, sync::mpsc};
+
+use rfd::FileHandle;
+
+use crate::gui::Message;
 
 /// A file picked by the user.
 pub struct File {

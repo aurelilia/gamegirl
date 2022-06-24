@@ -5,13 +5,13 @@
 pub mod gui;
 
 use core::{common::SAMPLE_RATE, System};
+use std::sync::{Arc, Mutex};
+
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     BufferSize, SampleRate, Stream, StreamConfig,
 };
 use eframe::egui::Color32;
-use std::sync::{Arc, Mutex};
-
 #[cfg(target_arch = "wasm32")]
 use eframe::wasm_bindgen::{self, prelude::*};
 

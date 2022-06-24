@@ -1,5 +1,6 @@
-use super::ScheduleFn;
 use serde::{Deserialize, Serialize};
+
+use super::ScheduleFn;
 
 pub trait ApuChannel {
     fn output(&self) -> u8;

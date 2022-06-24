@@ -1,9 +1,11 @@
-use crate::gui::{file_dialog, App};
 use core::common::{Button, Button::*};
+use std::collections::HashMap;
+
 use eframe::egui::Key;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use InputAction::*;
+
+use crate::gui::{file_dialog, App};
 
 pub(super) const HOTKEYS: &[(&str, fn(&mut App, bool))] = &[
     ("Open ROM", |a, p| {

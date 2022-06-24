@@ -1,13 +1,14 @@
+use serde::{Deserialize, Serialize};
+use AdvEvent::*;
+
 use crate::{
     gga::{audio::Apu, graphics::Ppu, timer::Timers, GameGirlAdv},
     ggc::io::apu::GenApuEvent,
     scheduler::Kind,
 };
-use serde::{Deserialize, Serialize};
-use AdvEvent::*;
 
 /// All scheduler events on the GGA.
-#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum AdvEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
@@ -25,7 +26,7 @@ impl AdvEvent {
     /// Handle the event by delegating to the appropriate handler.
     pub fn dispatch(&self, gg: &mut GameGirlAdv, late_by: u32) {
         match self {
-            PauseEmulation => gg.unpaused = false,
+            PauseEmulation => gg.ticking = false,
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
             ApuEvent(evt) => {
                 let time = Apu::handle_event(gg, *evt, late_by);
@@ -46,7 +47,7 @@ impl Default for AdvEvent {
 impl Kind for AdvEvent {}
 
 /// Events the PPU generates.
-#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum PpuEvent {
     /// Start of HBlank.
@@ -56,7 +57,7 @@ pub enum PpuEvent {
 }
 
 /// Events the APU generates.
-#[derive(Copy, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[repr(u16)]
 pub enum ApuEvent {
     /// Event from the generic CGB APU.

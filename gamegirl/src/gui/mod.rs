@@ -5,18 +5,18 @@ mod input;
 mod options;
 mod rewind;
 
-use crate::{
-    gui::{
-        debugger_ggc::VisualDebugState, file_dialog::File, input::InputAction, options::Options,
-        rewind::Rewinding,
-    },
-    Colour,
-};
 use core::{
     common::{BorrowedSystem, System},
     gga::GameGirlAdv,
     ggc::GameGirl,
 };
+use std::{
+    fs, mem,
+    path::PathBuf,
+    sync::{mpsc, Arc, Mutex},
+    time::Duration,
+};
+
 use eframe::{
     egui::{
         self, util::History, vec2, widgets, Context, Event, ImageData, Layout, TextureFilter, Ui,
@@ -27,11 +27,13 @@ use eframe::{
     epi::{Frame, Storage},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fs, mem,
-    path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
-    time::Duration,
+
+use crate::{
+    gui::{
+        debugger_ggc::VisualDebugState, file_dialog::File, input::InputAction, options::Options,
+        rewind::Rewinding,
+    },
+    Colour,
 };
 
 /// How long a frame takes, and how much the GG should be advanced
@@ -286,29 +288,22 @@ impl App {
 
     /// Process all async messages that came in during this frame.
     fn process_messages(&mut self) {
-        loop {
-            match self.message_channel.1.try_recv() {
-                Ok(Message::FileOpen(file)) => {
-                    self.save_game();
-                    self.gg.lock().unwrap().load_cart(
-                        file.content,
-                        file.path.clone(),
-                        &self.state.options.gg,
-                    );
+        while let Ok(Message::FileOpen(file)) = self.message_channel.1.try_recv() {
+            self.save_game();
+            self.gg.lock().unwrap().load_cart(
+                file.content,
+                file.path.clone(),
+                &self.state.options.gg,
+            );
 
-                    self.current_rom_path = file.path.clone();
-                    if let Some(path) = file.path {
-                        if let Some(existing) =
-                            self.state.last_opened.iter().position(|p| *p == path)
-                        {
-                            self.state.last_opened.swap(0, existing);
-                        } else {
-                            self.state.last_opened.insert(0, path);
-                            self.state.last_opened.truncate(10);
-                        }
-                    }
+            self.current_rom_path = file.path.clone();
+            if let Some(path) = file.path {
+                if let Some(existing) = self.state.last_opened.iter().position(|p| *p == path) {
+                    self.state.last_opened.swap(0, existing);
+                } else {
+                    self.state.last_opened.insert(0, path);
+                    self.state.last_opened.truncate(10);
                 }
-                Err(_) => break,
             }
         }
     }

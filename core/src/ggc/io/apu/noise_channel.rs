@@ -1,7 +1,7 @@
-use crate::numutil::NumExt;
+use serde::{Deserialize, Serialize};
 
 use super::{envelope::EnvelopGenerator, ApuChannel, ScheduleFn};
-use serde::{Deserialize, Serialize};
+use crate::numutil::NumExt;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct NoiseChannel {

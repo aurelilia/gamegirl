@@ -1,3 +1,6 @@
+//! Input handler.
+//! Luckily, GGA input is dead simple compared to even GG.
+
 use crate::{
     common::Button,
     gga::{

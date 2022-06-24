@@ -1,6 +1,7 @@
 use core::common::System;
-use gamegirl::gui;
 use std::sync::{Arc, Mutex};
+
+use gamegirl::gui;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {

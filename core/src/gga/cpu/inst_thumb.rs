@@ -1,3 +1,5 @@
+use bitmatch::bitmatch;
+
 use crate::{
     gga::{
         cpu::{registers::Flag::*, Cpu, Exception},
@@ -6,7 +8,6 @@ use crate::{
     },
     numutil::{NumExt, U16Ext},
 };
-use bitmatch::bitmatch;
 
 impl GameGirlAdv {
     #[bitmatch]

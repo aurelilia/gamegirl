@@ -1,7 +1,9 @@
+use bitmatch::bitmatch;
+
 use crate::{
     gga::{
         cpu::{
-            registers::{Context, Flag, Flag::*},
+            registers::{Flag, Flag::*, Mode},
             Access::*,
             Cpu, Exception,
         },
@@ -9,7 +11,6 @@ use crate::{
     },
     numutil::{NumExt, U32Ext},
 };
-use bitmatch::bitmatch;
 
 impl GameGirlAdv {
     #[bitmatch]
@@ -126,7 +127,7 @@ impl GameGirlAdv {
                 let cpsr = self.cpu.cpsr;
                 if s == 1 {
                     // Use user mode regs
-                    self.cpu.set_context(Context::System);
+                    self.cpu.set_mode(Mode::System);
                 }
 
                 // TODO mehhh, this entire implementation is terrible
@@ -342,10 +343,7 @@ impl GameGirlAdv {
         if !flags {
             // Restore CPSR if we weren't supposed to set flags
             self.cpu.cpsr = cpsr;
-        } else if dest == 15
-            && self.cpu.context() != Context::User
-            && self.cpu.context() != Context::System
-        {
+        } else if dest == 15 && self.cpu.mode() != Mode::User && self.cpu.mode() != Mode::System {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
             self.cpu.cpsr = self.cpu.spsr();
@@ -365,7 +363,7 @@ impl GameGirlAdv {
         if flags {
             dest = (dest & 0x00FFFFFF) | (src & 0xFF000000)
         };
-        if ctrl && self.cpu.context() != Context::User {
+        if ctrl && self.cpu.mode() != Mode::User {
             dest = (dest & 0xFFFFFF00) | (src & 0xFF)
         };
 

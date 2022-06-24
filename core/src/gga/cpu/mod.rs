@@ -10,9 +10,9 @@ use crate::{
     gga::{
         addr::*,
         cpu::registers::{
-            Context, FiqReg,
+            FiqReg,
             Flag::{FiqDisable, IrqDisable, Thumb},
-            ModeReg,
+            Mode, ModeReg,
         },
         Access, GameGirlAdv,
     },
@@ -34,6 +34,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
+    /// Execute the next instruction and advance the scheduler.
     pub fn exec_next_inst(gg: &mut GameGirlAdv) {
         if !gg.debugger.should_execute(gg.cpu.pc) {
             gg.options.running = false; // Pause emulation, we hit a BP
@@ -62,6 +63,8 @@ impl Cpu {
         }
     }
 
+    /// Check if an interrupt needs to be handled and jump to the handler if so.
+    /// Called on any events that might cause an interrupt to be triggered..
     pub fn check_if_interrupt(gg: &mut GameGirlAdv) {
         let int = (gg[IME] == 1) && !gg.cpu.flag(IrqDisable) && (gg[IE] & gg[IF]) != 0;
         if int {
@@ -70,13 +73,14 @@ impl Cpu {
         }
     }
 
+    /// An exception occured, jump to the bootrom handler and deal with it.
     fn exception_occurred(gg: &mut GameGirlAdv, kind: Exception) {
         if gg.cpu.flag(Thumb) {
             gg.cpu.inc_pc_by(2); // ??
         }
 
         let cpsr = gg.cpu.cpsr;
-        gg.cpu.set_context(kind.context());
+        gg.cpu.set_mode(kind.mode());
 
         gg.cpu.set_flag(Thumb, false);
         gg.cpu.set_flag(IrqDisable, true);
@@ -89,6 +93,8 @@ impl Cpu {
         gg.set_pc(kind.vector());
     }
 
+    /// Emulate a pipeline stall / fill; used when PC changes.
+    /// This emulator does not emulate the pipeline.
     pub fn pipeline_stall(gg: &mut GameGirlAdv) {
         if gg.cpu.flag(Thumb) {
             gg.add_wait_cycles(gg.wait_time::<2>(gg.cpu.pc, Access::NonSeq));
@@ -116,11 +122,14 @@ impl Cpu {
         4 - ((self.flag(Thumb) as u32) << 1)
     }
 
+    /// Request an interrupt. Will check if the CPU will service it right away.
     #[inline]
     pub fn request_interrupt(gg: &mut GameGirlAdv, int: Interrupt) {
         Self::request_interrupt_idx(gg, int as u16);
     }
 
+    /// Request an interrupt by index. Will check if the CPU will service it
+    /// right away.
     #[inline]
     pub fn request_interrupt_idx(gg: &mut GameGirlAdv, idx: u16) {
         gg[IF] = gg[IF].set_bit(idx, true);
@@ -162,6 +171,9 @@ pub enum Interrupt {
 }
 
 /// Possible exceptions.
+/// Most are only listed to preserve bit order in IE/IF, only SWI
+/// and IRQ ever get raised on the GGA. (UND does as well, but this
+/// emulator doesn't implement that.)
 #[derive(Copy, Clone)]
 pub enum Exception {
     Reset,
@@ -175,21 +187,23 @@ pub enum Exception {
 }
 
 impl Exception {
+    /// Vector to set the PC to when this exception occurs.
     fn vector(self) -> u32 {
         self as u32 * 4
     }
 
-    fn context(self) -> Context {
-        const CTX: [Context; 8] = [
-            Context::Supervisor,
-            Context::Undefined,
-            Context::Supervisor,
-            Context::Abort,
-            Context::Abort,
-            Context::Supervisor,
-            Context::Irq,
-            Context::Fiq,
+    /// Mode to execute the exception in.
+    fn mode(self) -> Mode {
+        const MODE: [Mode; 8] = [
+            Mode::Supervisor,
+            Mode::Undefined,
+            Mode::Supervisor,
+            Mode::Abort,
+            Mode::Abort,
+            Mode::Supervisor,
+            Mode::Irq,
+            Mode::Fiq,
         ];
-        CTX[self as usize]
+        MODE[self as usize]
     }
 }
