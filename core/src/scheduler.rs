@@ -84,6 +84,15 @@ impl<E: Kind> Scheduler<E> {
         self.events.retain(|e| e.kind != evt);
     }
 
+    /// Pull an event forward by the given amount of ticks.
+    /// This function does not reorder and is therefore not suitable for
+    /// big time changes!
+    pub fn pull_forward(&mut self, evt: E, by: u32) {
+        for evt in self.events.iter_mut().filter(|e| e.kind == evt) {
+            evt.execute_at -= by;
+        }
+    }
+
     pub fn now(&self) -> u32 {
         self.time
     }

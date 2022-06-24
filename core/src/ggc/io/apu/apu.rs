@@ -209,18 +209,8 @@ impl GenericApu {
         self.noise.set_enable(false);
     }
 
-    pub(crate) fn power_on(&mut self, clock_bit: bool) {
+    pub(crate) fn power_on(&mut self) {
         self.sequencer_position = 0;
-
-        // Special case where if the APU is turned on and bit 4 (5 in double speed)
-        // of the divider is set, the APU will delay the next clock, so it will take
-        // 2 clocks to reach the first event in the sequencer instead of 1
-        //
-        // See: SameSuite test apu/div_write_trigger_10, Note: In the test it describes
-        // that the APU `skips` the first event and not delay it which is wrong
-        if clock_bit {
-            self.sequencer_position = -1;
-        }
 
         self.pulse1.channel_mut().reset_sequencer();
         self.pulse2.channel_mut().reset_sequencer();

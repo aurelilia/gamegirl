@@ -49,6 +49,7 @@ pub struct Mmu {
     #[serde(default)]
     pub debugger: GGDebugger,
     pub scheduler: Scheduler<GGEvent>,
+    pub speed: u8,
 
     pub cart: Cartridge,
     timer: Timer,
@@ -59,12 +60,6 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    /// Step the system forward by the given amount of cycles.
-    pub(super) fn step(gg: &mut GameGirl, m_cycles: u16) {
-        Timer::step(gg, m_cycles);
-        GGApu::step(&mut gg.mmu);
-    }
-
     pub fn read(&self, addr: u16) -> u8 {
         let a = addr.us();
         match addr {
@@ -91,7 +86,7 @@ impl Mmu {
     fn read_high(&self, addr: u16) -> u8 {
         match addr {
             JOYP => self.joypad.read(self[JOYP]),
-            DIV | TAC => self.timer.read(addr),
+            DIV | TIMA | TAC => Timer::read(self, addr),
 
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
@@ -149,7 +144,7 @@ impl Mmu {
             STAT => self[STAT] = value | 0x80, // Bit 7 unavailable
             DMA => {
                 self[addr] = value;
-                let time = if self[KEY1].is_bit(7) { 324 } else { 648 };
+                let time = 648 / self.speed.u32();
                 self.scheduler.cancel(GGEvent::DMAFinish);
                 self.scheduler.schedule(GGEvent::DMAFinish, time);
             }
@@ -197,6 +192,7 @@ impl Mmu {
             cgb: false,
             debugger,
             scheduler: Scheduler::default(),
+            speed: 1,
 
             timer: Timer::default(),
             ppu: Ppu::new(),

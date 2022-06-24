@@ -5,6 +5,7 @@ use crate::{
             dma,
             dma::Hdma,
             ppu::Ppu,
+            timer::Timer,
         },
         GameGirl,
     },
@@ -44,7 +45,7 @@ impl GGEvent {
             DMAFinish => dma::do_oam_dma(gg),
             HdmaTransferStep => Hdma::handle_hdma(gg),
             GdmaTransfer => Hdma::handle_gdma(gg),
-            _ => panic!("aaaaaa"),
+            TimerOverflow => Timer::on_overflow(gg, late_by),
         }
     }
 }
@@ -86,6 +87,8 @@ impl PpuEvent {
 pub enum ApuEvent {
     /// Push a sample to the output.
     PushSample,
+    /// Tick the sequencer.
+    TickSequencer,
     /// Event from the inner generic APU.
     Gen(GenApuEvent),
 }

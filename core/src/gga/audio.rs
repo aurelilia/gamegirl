@@ -302,7 +302,7 @@ impl GenericApu {
                     }
                     self.power_off();
                 } else if !self.power && new_power {
-                    self.power_on(false);
+                    self.power_on();
                 }
 
                 // update `self.power` after `power_off`, because we

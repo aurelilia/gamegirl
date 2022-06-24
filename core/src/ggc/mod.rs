@@ -142,8 +142,6 @@ impl GameGirl {
     /// Advance the MMU, which is everything except the CPU.
     /// Should not advance by more than 7 cycles at once.3
     fn advance_clock(&mut self, m_cycles: u16) {
-        Mmu::step(self, m_cycles);
-
         self.mmu.scheduler.advance((m_cycles << self.t_shift).u32());
         while let Some(event) = self.mmu.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
@@ -153,6 +151,7 @@ impl GameGirl {
     /// Switch between CGB 2x and normal speed mode.
     fn switch_speed(&mut self) {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
+        self.mmu.speed = if self.t_shift == 1 { 2 } else { 1 };
         self.mmu[KEY1] = (self.t_shift & 1) << 7;
         for _ in 0..=1024 {
             self.advance_clock(2)
@@ -256,10 +255,6 @@ impl Default for GameGirl {
         gg.mmu
             .scheduler
             .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
-        gg.mmu.scheduler.schedule(
-            GGEvent::ApuEvent(ApuEvent::PushSample),
-            SAMPLE_EVERY_N_CLOCKS,
-        );
         GGApu::init_scheduler(&mut gg);
 
         gg

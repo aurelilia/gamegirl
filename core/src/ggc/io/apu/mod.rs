@@ -3,7 +3,6 @@ use crate::{
         addr::{DIV, KEY1},
         Mmu,
     },
-    numutil::NumExt,
     scheduler::Scheduler,
 };
 use serde::{Deserialize, Serialize};
@@ -31,11 +30,6 @@ pub const SAMPLE_EVERY_N_CLOCKS: u32 = T_CLOCK_HZ / SAMPLE_RATE;
 #[derive(Deserialize, Serialize)]
 pub struct GGApu {
     pub(super) inner: GenericApu,
-
-    /// Stores the value of the 4th bit (5th in double speed mode) of the
-    /// divider as sequencer clocks are controlled by the divider
-    pub divider_sequencer_clock_bit: bool,
-
     pub buffer: Vec<f32>,
 }
 
@@ -51,6 +45,13 @@ impl GGApu {
                     .schedule(GGEvent::ApuEvent(event), SAMPLE_EVERY_N_CLOCKS - late_by);
             }
 
+            ApuEvent::TickSequencer => {
+                gg.mmu.apu.inner.tick_sequencer();
+                gg.mmu
+                    .scheduler
+                    .schedule(GGEvent::ApuEvent(event), 0x2000 - late_by);
+            }
+
             ApuEvent::Gen(gen) => {
                 let next = gen.dispatch(&mut gg.mmu.apu.inner);
                 gg.mmu.scheduler.schedule(
@@ -61,33 +62,10 @@ impl GGApu {
         }
     }
 
-    pub fn step(mmu: &mut Mmu) {
-        let ds = mmu.cgb && mmu[KEY1].is_bit(7);
-        let div = mmu.timer.read(DIV);
-        mmu.apu.clock(ds, div);
-    }
-
-    /// The APU is clocked by the divider, on the falling edge of the bit 12
-    /// of the divider, this is needed since the divider can be clocked manually
-    /// by resetting it to 0 on write
-    fn clock(&mut self, double_speed: bool, divider: u8) {
-        let div_bit = 4 + double_speed as u8;
-        if self.inner.power {
-            let old_div_sequencer_bit = self.divider_sequencer_clock_bit;
-            self.divider_sequencer_clock_bit = (divider >> div_bit) & 1 == 1;
-            if old_div_sequencer_bit && !self.divider_sequencer_clock_bit {
-                self.inner.tick_sequencer();
-            }
-        }
-    }
-
     pub fn write(mmu: &mut Mmu, addr: u16, value: u8) {
-        mmu.apu.inner.write_register_gg(
-            addr,
-            value,
-            mmu.apu.divider_sequencer_clock_bit,
-            &mut shed(&mut mmu.scheduler),
-        );
+        mmu.apu
+            .inner
+            .write_register_gg(addr, value, &mut shed(&mut mmu.scheduler));
     }
 
     pub fn init_scheduler(gg: &mut GameGirl) {
@@ -95,13 +73,19 @@ impl GGApu {
             .apu
             .inner
             .init_scheduler(&mut shed(&mut gg.mmu.scheduler));
+        gg.mmu.scheduler.schedule(
+            GGEvent::ApuEvent(ApuEvent::PushSample),
+            SAMPLE_EVERY_N_CLOCKS,
+        );
+        gg.mmu
+            .scheduler
+            .schedule(GGEvent::ApuEvent(ApuEvent::TickSequencer), 0x2000);
     }
 
     pub fn new(cgb: bool) -> Self {
         Self {
             inner: GenericApu::new(cgb),
-            divider_sequencer_clock_bit: false,
-            buffer: Vec::new(),
+            buffer: Vec::with_capacity(5000),
         }
     }
 }
@@ -150,13 +134,7 @@ impl GenericApu {
         }
     }
 
-    pub fn write_register_gg(
-        &mut self,
-        addr: u16,
-        data: u8,
-        clock_bit: bool,
-        sched: &mut impl ScheduleFn,
-    ) {
+    pub fn write_register_gg(&mut self, addr: u16, data: u8, sched: &mut impl ScheduleFn) {
         // `addr % 5 != 2` will be true if its not a length counter register,
         // as these are not affected by power off, but `addr % 5 != 2` also
         // includes `0xFF25` and we don't want to be able to write to it
@@ -287,11 +265,11 @@ impl GenericApu {
                 let new_power = data & 0x80 != 0;
                 if self.power && !new_power {
                     for i in 0xFF10..=0xFF25 {
-                        self.write_register_gg(i, 0, clock_bit, sched);
+                        self.write_register_gg(i, 0, sched);
                     }
                     self.power_off();
                 } else if !self.power && new_power {
-                    self.power_on(clock_bit);
+                    self.power_on();
                 }
 
                 // update `self.power` after `power_off`, because we

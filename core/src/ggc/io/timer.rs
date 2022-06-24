@@ -1,7 +1,7 @@
 use crate::{
     ggc::{
         cpu::Interrupt,
-        io::{addr::*, Mmu},
+        io::{addr::*, scheduling::GGEvent, Mmu},
         GameGirl,
     },
     numutil::NumExt,
@@ -11,10 +11,8 @@ use serde::{Deserialize, Serialize};
 /// Timer available on DMG and CGB.
 #[derive(Deserialize, Serialize)]
 pub struct Timer {
-    div: u16,
-    counter_timer: u16,
-    interrupt_next: bool,
-
+    div_start: u32,
+    scheduled_at: u32,
     control: u8,
     counter_running: bool,
     counter_divider: u16,
@@ -22,31 +20,37 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn step(gg: &mut GameGirl, m_cycles: u16) {
-        let mut tim = gg.timer();
-        tim.div = tim.div.wrapping_add(m_cycles);
-        if tim.interrupt_next {
-            tim.interrupt_next = false;
-            gg.mmu[TIMA] = gg.mmu[TMA];
-            gg.request_interrupt(Interrupt::Timer);
-        }
-
-        let tima = gg.mmu[TIMA];
-        let mut tim = gg.timer(); // Work around borrow checker
-        if tim.counter_running {
-            tim.counter_timer += m_cycles;
-            if tim.counter_timer >= tim.counter_divider {
-                tim.counter_timer -= tim.counter_divider;
-                tim.interrupt_next = tima == 0xFF;
-                gg.mmu[TIMA] = gg.mmu[TIMA].wrapping_add(1);
-            }
-        }
+    pub fn on_overflow(gg: &mut GameGirl, late_by: u32) {
+        gg.mmu[TIMA] = gg.mmu[TMA];
+        gg.request_interrupt(Interrupt::Timer);
+        gg.mmu.timer.scheduled_at = gg.mmu.scheduler.now();
+        let time =
+            Self::next_overflow_time(gg.mmu[TMA], gg.timer().counter_divider) / gg.mmu.speed.u32();
+        gg.mmu.scheduler.schedule(
+            GGEvent::TimerOverflow,
+            time.checked_sub(late_by).unwrap_or(1),
+        );
     }
 
-    pub fn read(&self, addr: u16) -> u8 {
+    fn next_overflow_time(tma: u8, divider: u16) -> u32 {
+        divider.u32() * (0xFF - tma.u32())
+    }
+
+    pub fn read(mmu: &Mmu, addr: u16) -> u8 {
         match addr {
-            DIV => (self.div >> 6) as u8,
-            TAC => self.control | 0xF8,
+            DIV => (mmu.scheduler.now() >> 8) as u8,
+            TAC => mmu.timer.control | 0xF8,
+
+            TIMA => {
+                if mmu.timer.counter_running {
+                    let time_elapsed = mmu.scheduler.now() - mmu.timer.scheduled_at;
+                    mmu[TIMA]
+                        + ((time_elapsed.u16() * mmu.speed.u16()) / mmu.timer.counter_divider).u8()
+                } else {
+                    mmu[TIMA]
+                }
+            }
+
             _ => 0xFF,
         }
     }
@@ -54,45 +58,51 @@ impl Timer {
     pub fn write(mmu: &mut Mmu, addr: u16, value: u8) {
         match addr {
             DIV => {
-                let prev = mmu.timer.div.is_bit(mmu.timer.counter_bit);
-                mmu.timer.div = 0;
-                mmu.timer.counter_timer = 0;
+                let prev = Self::div(mmu).is_bit(mmu.timer.counter_bit);
+                mmu.timer.div_start = mmu.scheduler.now();
                 if prev {
-                    let mut tima = mmu[TIMA].u16();
-                    tima += 1;
-                    if tima > 0xFF {
-                        mmu.timer.interrupt_next = true;
-                    }
-                    mmu[TIMA] = tima.u8();
+                    mmu.scheduler.pull_forward(GGEvent::TimerOverflow, 4);
+                    mmu.timer.scheduled_at -= 4;
                 }
             }
             TAC => {
                 mmu.timer.control = value & 7;
                 mmu.timer.counter_running = mmu.timer.control.is_bit(2);
                 mmu.timer.counter_divider = match mmu.timer.control & 3 {
-                    0 => 256, // 4K
-                    1 => 4,   // 256K
-                    2 => 16,  // 64K
-                    _ => 64,  // 16K (3)
+                    0 => 1024, // 4K
+                    1 => 16,   // 256K
+                    2 => 64,   // 64K
+                    _ => 256,  // 16K (3)
                 };
                 mmu.timer.counter_bit = match mmu.timer.control & 3 {
-                    0 => 7, // 4K
-                    1 => 1, // 256K
-                    2 => 3, // 64K
-                    _ => 5, // 16K (3)
+                    0 => 9, // 4K
+                    1 => 3, // 256K
+                    2 => 5, // 64K
+                    _ => 7, // 16K (3)
                 };
+
+                mmu.scheduler.cancel(GGEvent::TimerOverflow);
+                if mmu.timer.counter_running {
+                    mmu.timer.scheduled_at = mmu.scheduler.now();
+                    let time = Self::next_overflow_time(mmu[TMA], mmu.timer.counter_divider)
+                        / mmu.speed.u32();
+                    mmu.scheduler.schedule(GGEvent::TimerOverflow, time);
+                }
             }
             _ => (),
         }
+    }
+
+    fn div(mmu: &mut Mmu) -> u16 {
+        (mmu.scheduler.now() - mmu.timer.div_start).u16()
     }
 }
 
 impl Default for Timer {
     fn default() -> Self {
         Self {
-            div: 0,
-            counter_timer: 0,
-            interrupt_next: false,
+            div_start: 0,
+            scheduled_at: 0,
             control: 0,
             counter_running: false,
             counter_divider: 1024,
