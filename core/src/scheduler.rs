@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
 
 /// A scheduler used by the emulation cores to schedule peripherals.
@@ -9,7 +10,7 @@ pub struct Scheduler<E: Kind> {
     time: u32,
     /// Events currently awaiting execution.
     #[serde(bound = "")]
-    events: Vec<ScheduledEvent<E>>,
+    events: ArrayVec<ScheduledEvent<E>, 16>,
 }
 
 impl<E: Kind> Scheduler<E> {
@@ -21,7 +22,7 @@ impl<E: Kind> Scheduler<E> {
             kind,
             execute_at: time,
         };
-        self.events.push(event);
+        unsafe { self.events.push_unchecked(event) };
 
         // Ensure the event list is still sorted
         // (Swap the new element further back until it is in the right spot)
@@ -31,15 +32,13 @@ impl<E: Kind> Scheduler<E> {
             let other = self.events[idx - 1];
             if time > other.execute_at {
                 self.events[idx] = other;
-                self.events[idx - 1] = event;
             } else {
-                break;
+                self.events[idx] = event;
+                return;
             }
         }
-
-        // We run this here since it is probably the least-run function.
-        // We want to check the time as little as possible to save perf.
-        self.check_time();
+        // The loop exited without finding a bigger element, this new one is the biggest
+        self.events[0] = event;
     }
 
     /// Advance the timer by the given amount of ticks.
@@ -48,8 +47,7 @@ impl<E: Kind> Scheduler<E> {
         self.time += by;
     }
 
-    /// Get the next pending event awaiting execution. Returns None
-    /// if all pending events have been processed.
+    /// Execute all pending events in order with the given closure.
     /// Note that this implementation assumes there is always at least one event
     /// scheduled.
     pub fn get_next_pending(&mut self) -> Option<Event<E>> {
@@ -82,6 +80,9 @@ impl<E: Kind> Scheduler<E> {
     /// Somewhat expensive.
     pub fn cancel(&mut self, evt: E) {
         self.events.retain(|e| e.kind != evt);
+        // We run this here since it is probably the least-run function.
+        // We want to check the time as little as possible to save perf.
+        self.check_time();
     }
 
     pub fn now(&self) -> u32 {
