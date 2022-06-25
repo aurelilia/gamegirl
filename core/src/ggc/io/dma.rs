@@ -18,8 +18,8 @@ use crate::{
 /// once the timer of 648 cycles is up.
 pub fn do_oam_dma(gg: &mut GameGirl) {
     let mut src = gg.mmu[DMA].u16() * 0x100;
-    for dest in 0xFE00..0xFEA0 {
-        gg.mmu.write(dest, gg.mmu.read(src));
+    for dest in 0..0xA0 {
+        gg.mmu.oam[dest] = gg.mmu.read(src);
         src += 1;
     }
 }

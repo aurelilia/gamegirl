@@ -297,7 +297,7 @@ impl GameGirlAdv {
     #[inline]
     fn get<T>(&self, addr: u32, slow: fn(&GameGirlAdv, u32) -> T) -> T {
         let ptr = self.page::<false>(addr);
-        if !ptr.is_null() {
+        if ptr as usize > 0x8000 {
             unsafe { mem::transmute::<_, *const T>(ptr).read() }
         } else {
             slow(self, addr)

@@ -1,4 +1,8 @@
-use std::ops::{Index, IndexMut};
+use std::{
+    mem,
+    ops::{Index, IndexMut},
+    ptr,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -47,6 +51,12 @@ pub struct Mmu {
     high: [u8; 256],
 
     #[serde(skip)]
+    #[serde(default = "serde_pages")]
+    read_pages: [*mut u8; 256],
+    #[serde(with = "serde_arrays")]
+    page_offsets: [u32; 16],
+
+    #[serde(skip)]
     #[serde(default)]
     pub(super) bootrom: Option<Vec<u8>>,
     pub(crate) cgb: bool,
@@ -66,22 +76,11 @@ pub struct Mmu {
 
 impl Mmu {
     pub fn read(&self, addr: u16) -> u8 {
-        let a = addr.us();
-        match addr {
-            0x0000..0x0100 if self.bootrom.is_some() => self.bootrom.as_ref().unwrap()[a],
-            0x0200..0x0900 if self.bootrom.is_some() && self.cgb => {
-                self.bootrom.as_ref().unwrap()[a - 0x0100]
-            }
-            0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cart.read(addr),
-
-            0x8000..=0x9FFF => self.vram[(a & 0x1FFF) + (self.vram_bank.us() * 0x2000)],
-            0xC000..=0xCFFF => self.wram[(a & 0x0FFF)],
-            0xD000..=0xDFFF => self.wram[(a & 0x0FFF) + (self.wram_bank.us() * 0x1000)],
-            0xE000..=0xFDFF => self.wram[a & 0x1FFF],
-            0xFE00..=0xFE9F => self.oam[a & 0xFF],
-
-            _ => self.read_high(addr & 0x00FF),
-        }
+        self.get(addr, |this, addr| match addr {
+            0xA000..=0xBFFF => this.cart.read(addr),
+            0xFE00..=0xFE9F => this.oam[addr.us() & 0xFF],
+            _ => this.read_high(addr & 0x00FF),
+        })
     }
 
     pub(super) fn read_signed(&self, addr: u16) -> i8 {
@@ -111,7 +110,17 @@ impl Mmu {
         self.debugger.write_occurred(addr);
         let a = addr.us();
         match addr {
-            0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cart.write(addr, value),
+            0x0000..=0x7FFF => {
+                self.cart.write(addr, value);
+                // Refresh page offsets
+                for i in 0..4 {
+                    self.page_offsets[i] = self.cart.rom0_bank.u32() * 0x4000;
+                }
+                for i in 4..8 {
+                    self.page_offsets[i] = self.cart.rom1_bank.u32() * 0x4000;
+                }
+            }
+            0xA000..=0xBFFF => self.cart.write(addr, value),
             0x8000..=0x9FFF => self.vram[(a & 0x1FFF) + (self.vram_bank.us() * 0x2000)] = value,
             0xC000..=0xCFFF => self.wram[(a & 0x0FFF)] = value,
             0xD000..=0xDFFF => self.wram[(a & 0x0FFF) + (self.wram_bank.us() * 0x1000)] = value,
@@ -125,10 +134,13 @@ impl Mmu {
         match addr {
             VRAM_SELECT if self.cgb => {
                 self.vram_bank = value & 1;
+                self.page_offsets[8] = self.vram_bank.u32() * 0x2000;
+                self.page_offsets[9] = self.vram_bank.u32() * 0x2000;
                 self[VRAM_SELECT] = value | 0xFE;
             }
             WRAM_SELECT if self.cgb => {
                 self.wram_bank = u8::max(1, value & 7);
+                self.page_offsets[0xD] = self.wram_bank.u32() * 0x1000;
                 self[WRAM_SELECT] = value | 0xF8;
             }
             KEY1 if self.cgb => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
@@ -137,7 +149,11 @@ impl Mmu {
 
             IF => self[IF] = value | 0xE0,
             IE => self[IE] = value,
-            BOOTROM_DISABLE => self.bootrom = None,
+            BOOTROM_DISABLE => {
+                self.bootrom = None;
+                // Refresh page tables
+                self.init_memory();
+            }
 
             DIV | TIMA | TAC => Timer::write(self, addr, value),
             LCDC => {
@@ -193,6 +209,11 @@ impl Mmu {
             oam: [0; 160],
             high: [0xFF; 256],
 
+            read_pages: serde_pages(),
+            page_offsets: [
+                0, 0, 0, 0, 0x4000, 0x4000, 0x4000, 0x4000, 0, 0, 0, 0, 0, 0x1000, 0, 0,
+            ],
+
             bootrom: None,
             cgb: false,
             debugger,
@@ -222,6 +243,7 @@ impl Mmu {
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
         self.apu = Apu::new(self.cgb);
         self.cart = cart;
+        self.init_memory();
         self.init_high();
         self.init_scheduler();
     }
@@ -255,6 +277,55 @@ impl Mmu {
             .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
         Apu::init_scheduler(self);
     }
+
+    // Unsafe corner!
+    /// Get a value in memory. Will try to do a fast read from page tables,
+    /// falls back to given closure if no page table is mapped at that address.
+    #[inline]
+    fn get<T>(&self, a: u16, slow: fn(&Self, u16) -> T) -> T {
+        let addr = a.us();
+        let ptr = unsafe {
+            let page = self.read_pages.get_unchecked(addr >> 8);
+            page.add(addr & 0xFF)
+                .add(self.page_offsets.get_unchecked(addr >> 12).us())
+        };
+
+        if ptr as usize > 0xFF_FFFF {
+            unsafe { mem::transmute::<_, *const T>(ptr).read() }
+        } else {
+            slow(self, a)
+        }
+    }
+
+    /// Initialize page tables.
+    pub fn init_memory(&mut self) {
+        for i in 0..self.read_pages.len() {
+            self.read_pages[i] = unsafe { self.get_page(i * 0x100) };
+        }
+    }
+
+    unsafe fn get_page(&self, a: usize) -> *mut u8 {
+        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
+            let ptr = reg.as_ptr() as *mut u8;
+            ptr.add(offs)
+        }
+
+        match a {
+            0x0000..0x0100 if self.bootrom.is_some() => offs(self.bootrom.as_ref().unwrap(), a),
+            0x0200..0x0900 if self.bootrom.is_some() && self.cgb => {
+                offs(self.bootrom.as_ref().unwrap(), a - 0x0100)
+            }
+            0x0000..=0x3FFF => offs(&self.cart.rom, a),
+            0x4000..=0x7FFF => offs(&self.cart.rom, a - 0x4000),
+
+            0x8000..=0x9FFF => offs(&self.vram, a - 0x8000),
+            0xC000..=0xCFFF => offs(&self.wram, a - 0xC000),
+            0xD000..=0xDFFF => offs(&self.wram, a - 0xD000),
+            0xE000..=0xFDFF => offs(&self.wram, a - 0xE000),
+
+            _ => ptr::null::<u8>() as *mut u8,
+        }
+    }
 }
 
 impl Index<u16> for Mmu {
@@ -268,4 +339,10 @@ impl IndexMut<u16> for Mmu {
     fn index_mut(&mut self, index: u16) -> &mut Self::Output {
         &mut self.high[index.us()]
     }
+}
+
+unsafe impl Send for Mmu {}
+
+fn serde_pages() -> [*mut u8; 256] {
+    [ptr::null::<u8>() as *mut u8; 256]
 }

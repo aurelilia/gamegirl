@@ -8,7 +8,7 @@ use crate::{
     ggc::{
         cpu::{Cpu, Interrupt},
         io::{
-            addr::{IF, KEY1},
+            addr::{BOOTROM_DISABLE, IF, KEY1},
             cartridge::Cartridge,
             scheduling::GGEvent,
             Mmu,
@@ -206,6 +206,7 @@ impl GameGirl {
         self.mmu.cart.rom = old_self.mmu.cart.rom;
         self.options.frame_finished = old_self.options.frame_finished;
         self.mmu.bootrom = old_self.mmu.bootrom;
+        self.mmu.init_memory();
     }
 
     /// Load the given cartridge.
@@ -231,7 +232,7 @@ impl GameGirl {
 
     pub fn skip_bootrom(&mut self) {
         self.cpu.pc = 0x100;
-        self.mmu.bootrom = None;
+        self.mmu.write(BOOTROM_DISABLE, 1);
     }
 }
 
