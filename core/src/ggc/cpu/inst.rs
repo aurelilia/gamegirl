@@ -1,6 +1,6 @@
 use crate::{
     ggc::{
-        cpu::{data, DReg, DReg::*, Flag::*, Reg, Reg::*},
+        cpu::{data, data::NAMES, DReg, DReg::*, Flag::*, Reg, Reg::*},
         io::addr::{IE, IF, KEY1},
         GameGirl,
     },
@@ -90,10 +90,26 @@ impl Inst {
 
 pub fn get_next(gg: &GameGirl) -> Inst {
     let first = gg.mmu.read(gg.cpu.pc);
-    match first {
+    let inst = match first {
         EXT => Inst(first, gg.arg8()),
         _ => Inst(first, 0),
+    };
+
+    if crate::TRACING {
+        println!(
+            "PC={:04X}, SP={:04X}, SPV={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, I={}",
+            gg.cpu.pc,
+            gg.cpu.sp,
+            gg.mmu.read16(gg.cpu.sp),
+            gg.cpu.dreg(AF),
+            gg.cpu.dreg(BC),
+            gg.cpu.dreg(DE),
+            gg.cpu.dreg(HL),
+            NAMES[inst.0.us()]
+        );
     }
+
+    inst
 }
 
 pub fn get_at(gg: &GameGirl, addr: u16) -> Inst {

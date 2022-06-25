@@ -19,8 +19,6 @@ use crate::{
     numutil::NumExt,
 };
 
-pub(crate) const TRACING: bool = false;
-
 /// Represents the CPU of the console - an ARM7TDMI.
 #[derive(Deserialize, Serialize)]
 pub struct Cpu {
@@ -48,7 +46,7 @@ impl Cpu {
             let inst = gg.read_hword(gg.cpu.pc - 4, Access::Seq).u16();
             gg.execute_inst_thumb(inst);
 
-            if TRACING {
+            if crate::TRACING {
                 let mnem = GameGirlAdv::get_mnemonic_thumb(inst);
                 println!("0x{:08X} {}", gg.cpu.pc, mnem);
             }
@@ -56,7 +54,7 @@ impl Cpu {
             let inst = gg.read_word(gg.cpu.pc - 8, Access::Seq);
             gg.execute_inst_arm(inst);
 
-            if TRACING {
+            if crate::TRACING {
                 let mnem = GameGirlAdv::get_mnemonic_arm(inst);
                 println!("0x{:08X} {}", gg.cpu.pc, mnem);
             }

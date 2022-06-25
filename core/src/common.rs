@@ -179,6 +179,9 @@ impl System {
 
         self.options().running = true;
         self.options().rom_loaded = true;
+        if crate::TRACING {
+            self.skip_bootrom();
+        }
     }
 }
 

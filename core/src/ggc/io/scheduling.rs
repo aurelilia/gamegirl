@@ -4,6 +4,7 @@ use GGEvent::*;
 use crate::{
     ggc::{
         io::{
+            addr::{TIMA, TMA},
             apu::{Apu, GenApuEvent},
             dma,
             dma::Hdma,
@@ -34,6 +35,9 @@ pub enum GGEvent {
     GdmaTransfer,
     /// A timer overflow.
     TimerOverflow,
+    /// A TMA reload. This only happens 4 t-cycles after timer overflow, hence
+    /// the separate event.
+    TmaReload,
 }
 
 impl GGEvent {
@@ -47,6 +51,7 @@ impl GGEvent {
             HdmaTransferStep => Hdma::handle_hdma(gg),
             GdmaTransfer => Hdma::handle_gdma(gg),
             TimerOverflow => Timer::on_overflow(gg, late_by),
+            TmaReload => gg.mmu[TIMA] = gg.mmu[TMA],
         }
     }
 }

@@ -27,8 +27,14 @@ impl Timer {
         gg.mmu[TIMA] = gg.mmu[TMA];
         gg.request_interrupt(Interrupt::Timer);
         gg.mmu.timer.scheduled_at = gg.mmu.scheduler.now();
-        let time = Self::next_overflow_time(gg.mmu[TMA], gg.mmu.timer.counter_divider)
-            / gg.mmu.speed.u32();
+        let time = Self::next_overflow_time(&gg.mmu);
+
+        // Obscure behavior: It takes 1 M-cycle for the timer to actually reload
+        gg.mmu[TIMA] = 0;
+        gg.mmu
+            .scheduler
+            .schedule(GGEvent::TmaReload, 4u32.checked_sub(late_by).unwrap_or(0));
+
         gg.mmu.scheduler.schedule(
             GGEvent::TimerOverflow,
             time.checked_sub(late_by).unwrap_or(1),
@@ -36,37 +42,50 @@ impl Timer {
     }
 
     /// Get the time when the next overflow will occur, in t-cycles.
-    fn next_overflow_time(tima: u8, divider: u16) -> u32 {
-        divider.u32() * (0x100 - tima.u32())
+    fn next_overflow_time(mmu: &Mmu) -> u32 {
+        let time = mmu.timer.counter_divider.u32() * (0x100 - mmu[TIMA].u32());
+        // Account for already-running DIV causing less time for the first step
+        let div = Self::div(mmu) & (mmu.timer.counter_divider - 1);
+        // Account for 2x speed affecting the timer
+        (time - div.u32()) / mmu.speed.u32()
     }
 
     pub fn read(mmu: &Mmu, addr: u16) -> u8 {
         match addr {
             DIV => (Self::div(mmu) >> 8).u8(),
             TAC => mmu.timer.control | 0xF8,
-
-            TIMA => {
-                if mmu.timer.counter_running {
-                    let time_elapsed = mmu.scheduler.now() - mmu.timer.scheduled_at;
-                    mmu[TIMA]
-                        + ((time_elapsed.u16() * mmu.speed.u16()) / mmu.timer.counter_divider).u8()
-                } else {
-                    mmu[TIMA]
-                }
-            }
-
+            TIMA => Self::get_tima(mmu),
             _ => 0xFF,
+        }
+    }
+
+    fn get_tima(mmu: &Mmu) -> u8 {
+        if mmu.timer.counter_running {
+            // Make sure we account for DIV being the timer's source of increases
+            // properly, would count too little if not
+            let time_elapsed = mmu.scheduler.now()
+                - (mmu.timer.scheduled_at & !(mmu.timer.counter_divider.u32() - 1));
+            let time_ds = time_elapsed.u16() * mmu.speed.u16();
+            mmu[TIMA] + (time_ds / mmu.timer.counter_divider).u8()
+        } else {
+            mmu[TIMA]
         }
     }
 
     pub fn write(mmu: &mut Mmu, addr: u16, value: u8) {
         match addr {
             DIV => {
-                let prev = Self::div(mmu).is_bit(mmu.timer.counter_bit);
+                let prev = Self::div(mmu);
+
+                // Reset DIV.
                 mmu.timer.div_start = mmu.scheduler.now();
-                if prev {
-                    mmu.scheduler.pull_forward(GGEvent::TimerOverflow, 4);
-                    mmu.timer.scheduled_at -= 4;
+
+                // Reschedule TIMA, it counts on DIV so the counting for this increment starts
+                // anew If the DIV counter bit was set, increment TIMA
+                // (increment on falling DIV edge)
+                if mmu.timer.counter_running {
+                    mmu[TIMA] = Self::get_tima(mmu) + prev.bit(mmu.timer.counter_bit).u8();
+                    Self::reschedule(mmu);
                 }
             }
             TIMA => {
@@ -74,6 +93,10 @@ impl Timer {
                 Self::reschedule(mmu);
             }
             TAC => {
+                // Update TIMA first of all
+                mmu[TIMA] = Self::get_tima(mmu);
+
+                // Update control values...
                 mmu.timer.control = value & 7;
                 mmu.timer.counter_running = mmu.timer.control.is_bit(2);
                 mmu.timer.counter_divider = match mmu.timer.control & 3 {
@@ -89,6 +112,7 @@ impl Timer {
                     _ => 7, // 16K (3)
                 };
 
+                // Now reschedule if needed.
                 Self::reschedule(mmu);
             }
             _ => (),
@@ -105,9 +129,8 @@ impl Timer {
         mmu.scheduler.cancel(GGEvent::TimerOverflow);
         if mmu.timer.counter_running {
             mmu.timer.scheduled_at = mmu.scheduler.now();
-            let time =
-                Self::next_overflow_time(mmu[TIMA], mmu.timer.counter_divider) / mmu.speed.u32();
-            mmu.scheduler.schedule(GGEvent::TimerOverflow, time);
+            mmu.scheduler
+                .schedule(GGEvent::TimerOverflow, Self::next_overflow_time(mmu));
         }
     }
 }
