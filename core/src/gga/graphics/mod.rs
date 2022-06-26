@@ -76,7 +76,7 @@ impl Ppu {
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, true);
                 Dmas::update(gg);
 
-                (PpuEvent::HblankEnd, 272)
+                (PpuEvent::HblankEnd, 272u32)
             }
 
             PpuEvent::HblankEnd => {
@@ -103,8 +103,10 @@ impl Ppu {
                 (PpuEvent::HblankStart, 960)
             }
         };
-        gg.scheduler
-            .schedule(AdvEvent::PpuEvent(next_event), cycles - late_by);
+        gg.scheduler.schedule(
+            AdvEvent::PpuEvent(next_event),
+            cycles.saturating_sub(late_by),
+        );
     }
 
     fn maybe_interrupt(gg: &mut GameGirlAdv, int: Interrupt, bit: u16) {

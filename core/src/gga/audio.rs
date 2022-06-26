@@ -44,12 +44,12 @@ impl Apu {
 
             ApuEvent::Sequencer => {
                 gg.apu.cgb_chans.tick_sequencer();
-                0x8000 - late_by
+                0x8000u32.saturating_sub(late_by)
             }
 
             ApuEvent::PushSample => {
                 Self::push_output(gg);
-                SAMPLE_EVERY_N_CLOCKS - late_by
+                SAMPLE_EVERY_N_CLOCKS.saturating_sub(late_by)
             }
         }
     }

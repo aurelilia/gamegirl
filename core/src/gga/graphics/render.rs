@@ -15,7 +15,7 @@ impl Ppu {
         mosaic: bool,
     ) {
         for idx in 0..4 {
-            let byte = gg.ppu.vram[tile_addr + idx];
+            let byte = gg.ppu.vram(tile_addr + idx);
             Self::set_pixel::<OBJ>(gg, x, prio, palette, byte & 0xF, mosaic);
             x += x_step;
             Self::set_pixel::<OBJ>(gg, x, prio, palette, byte >> 4, mosaic);
@@ -32,7 +32,7 @@ impl Ppu {
         mosaic: bool,
     ) {
         for idx in 0..8 {
-            let colour = gg.ppu.vram[tile_addr + idx];
+            let colour = gg.ppu.vram(tile_addr + idx);
             Self::set_pixel::<OBJ>(gg, x, prio, 0, colour, mosaic);
             x += x_step;
         }
@@ -89,6 +89,14 @@ impl Ppu {
             &mut gg.ppu.obj_layers
         } else {
             &mut gg.ppu.bg_layers
+        }
+    }
+
+    fn vram(&self, addr: usize) -> u8 {
+        if addr <= 0x17FFF {
+            self.vram[addr]
+        } else {
+            self.vram[addr - 0x18000]
         }
     }
 }

@@ -17,7 +17,7 @@ impl Ppu {
         }
 
         let is_2d = !gg[DISPCNT].is_bit(OBJ_MAPPING_1D);
-        for idx in 0..127 {
+        for idx in 0..128 {
             let addr = idx << 3;
             let y = gg.ppu.oam[addr] as i16;
             let obj = Object {
@@ -42,15 +42,18 @@ impl Ppu {
         // TODO: Object modes.
         let size = obj.size();
         let base_tile_idx = obj.attr2.bits(0, 10).us();
-        let adj_tile_idx =
-            base_tile_idx + ((obj_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 32 });
-        let tile_addr = 0x1_0000 + (adj_tile_idx * 32);
-
         let tile_count = size.0 >> 3;
         let prio = obj.attr2.bits(10, 2);
         let mosaic = obj.attr2.is_bit(4);
 
+        if obj.attr0.is_bit(1) {
+            // OBJ disable
+            return;
+        }
         if obj.attr0.is_bit(5) {
+            let adj_tile_idx =
+                base_tile_idx + ((obj_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 16 });
+            let tile_addr = 0x1_0000 + (adj_tile_idx * 64);
             let mut tile_line_addr = tile_addr + (tile_y.us() * 8);
             for _ in 0..tile_count {
                 Self::render_tile_8bpp::<true>(gg, prio, obj_x, x_step, tile_line_addr, mosaic);
@@ -58,6 +61,9 @@ impl Ppu {
                 tile_line_addr += 64;
             }
         } else {
+            let adj_tile_idx =
+                base_tile_idx + ((obj_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 32 });
+            let tile_addr = 0x1_0000 + (adj_tile_idx * 32);
             let mut tile_line_addr = tile_addr + (tile_y.us() * 4);
             let palette = obj.attr2.bits(12, 4).u8();
             for _ in 0..tile_count {
