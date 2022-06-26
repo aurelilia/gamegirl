@@ -33,23 +33,45 @@ pub struct Cartridge {
 }
 
 impl Cartridge {
-    pub fn read_ram(&self, addr: usize) -> u8 {
+    pub fn read_ram_byte(&self, addr: usize) -> u8 {
         match self.save_type {
             Flash64(state) if state.mode == FlashMode::Id => FLASH64_ID[addr & 1],
             Flash128 { state, .. } if state.mode == FlashMode::Id => FLASH128_ID[addr & 1],
 
             Flash128 { bank: 1, .. } => self.ram[addr | 0x10000],
-            Nothing => 0,
-            _ => self.ram[addr],
+            Flash64(_) | Flash128 { .. } => self.ram[addr],
+            Sram if addr < 0x8000 => self.ram[addr],
+
+            _ => 0,
         }
     }
 
-    pub fn write_ram(&mut self, addr: usize, value: u8) {
+    pub fn read_ram_hword(&self, addr: u32) -> u16 {
+        match self.save_type {
+            Eeprom => todo!(),
+            _ => 0,
+        }
+    }
+
+    pub fn write_ram_byte(&mut self, addr: usize, value: u8) {
         match &mut self.save_type {
             Flash64(state) => state.write(addr, value, &mut self.ram, None),
             Flash128 { state, bank } => state.write(addr, value, &mut self.ram, Some(bank)),
+            Sram if addr < 0x8000 => self.ram[addr] = value,
             _ => (),
         }
+    }
+
+    pub fn write_ram_hword(&mut self, addr: u32, value: u16) {
+        match &mut self.save_type {
+            Eeprom => todo!(),
+            _ => (),
+        }
+    }
+
+    pub fn is_eeprom_at(&self, addr: u32) -> bool {
+        matches!(self.save_type, SaveType::Eeprom)
+            && (self.rom.len() <= 16 * (KB * KB) || addr >= 0x0DFF_FF00)
     }
 
     pub fn load_rom(&mut self, rom: Vec<u8>) {

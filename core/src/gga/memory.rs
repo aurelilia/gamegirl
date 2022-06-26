@@ -110,7 +110,11 @@ impl GameGirlAdv {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
-            0x0E00_0000..=0x0E00_FFFF => this.cart.read_ram(addr.us() & 0xFFFF),
+            0x0E00_0000..=0x0E00_FFFF => this.cart.read_ram_byte(addr.us() & 0xFFFF),
+            // Account for unmapped last page due to EEPROM
+            0x0DFF_8000..=0x0DFF_FFFF if this.cart.rom.len() >= (addr.us() - 0x800_0000) => {
+                this.cart.rom[addr.us() - 0x800_0000]
+            }
             _ => 0,
         })
     }
@@ -121,6 +125,11 @@ impl GameGirlAdv {
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
+            0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
+                this.cart.read_ram_hword(addr & 0xFF)
+            }
+            // Account for unmapped last page due to EEPROM
+            0x0DFF_8000..=0x0DFF_FFFF => hword(this.get_byte(addr), this.get_byte(addr + 1)),
             _ => 0,
         })
     }
@@ -133,6 +142,8 @@ impl GameGirlAdv {
             0x0400_0000..=0x04FF_FFFF => {
                 word(this.get_mmio(addr), this.get_mmio(addr.wrapping_add(2)))
             }
+            // Account for unmapped last page due to EEPROM
+            0x0DFF_8000..=0x0DFF_FFFF => word(this.get_hword(addr), this.get_hword(addr + 2)),
             _ => 0,
         })
     }
@@ -209,7 +220,7 @@ impl GameGirlAdv {
             0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
             // Cart save
-            0x0E00_0000..=0x0E00_FFFF => self.cart.write_ram(addr.us() & 0xFFFF, value),
+            0x0E00_0000..=0x0E00_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
 
             // VRAM weirdness
             0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
@@ -224,6 +235,9 @@ impl GameGirlAdv {
         let addr = addr & !1; // Forcibly align: All write instructions do this
         self.set(addr, value, |this, addr, value| match addr {
             0x0400_0000..=0x04FF_FFFF => this.set_mmio(addr, value),
+            0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
+                this.cart.write_ram_hword(addr & 0xFF, value)
+            }
             _ => (),
         });
     }
@@ -394,7 +408,10 @@ impl GameGirlAdv {
             0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
             0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
             0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
-            0x0800_0000..=0x0DFF_FFFF if R => offs(&self.cart.rom, a - 0x800_0000),
+            // Does not go all the way due to EEPROM, also does not mirror
+            0x0800_0000..=0x0DFF_7FFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
+                offs(&self.cart.rom, a - 0x800_0000)
+            }
 
             // VRAM mirror weirdness
             0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),

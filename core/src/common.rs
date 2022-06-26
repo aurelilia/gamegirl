@@ -1,6 +1,6 @@
 //! This file contains common structures shared by GGC and GGA.
 
-use std::{mem, path::PathBuf};
+use std::{iter, mem, path::PathBuf};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -141,7 +141,7 @@ impl System {
     }
 
     /// Load a cart. Automatically picks the right system kind.
-    pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+    pub fn load_cart(&mut self, mut cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
         // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
         // that is present on every cartridge.
         let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
@@ -160,6 +160,10 @@ impl System {
             );
             *self = Self::GGC(ggc);
         } else {
+            // Paging implementation requires this to prevent reading unallocated memory
+            let until_full_page = 0x7FFF - (cart.len() & 0x7FFF);
+            cart.extend(iter::repeat(0).take(until_full_page));
+
             let mut gga = Box::new(GameGirlAdv::default());
             gga.config = config.clone();
             gga.cart.load_rom(cart);
