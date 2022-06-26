@@ -94,9 +94,9 @@ graphical glitches.
     - [x] Scheduled timers
     - [x] Cascading timers
     - [x] APU FIFO ticking
-  - [ ] Cartridge save types
-    - [ ] EEPROM
-    - [ ] SRAM
+  - [x] Cartridge save types
+    - [x] EEPROM
+    - [x] SRAM
     - [x] Flash
 
 ### Planned Features

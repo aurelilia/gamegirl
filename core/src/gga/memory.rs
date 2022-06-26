@@ -125,9 +125,7 @@ impl GameGirlAdv {
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
-            0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
-                this.cart.read_ram_hword(addr & 0xFF)
-            }
+            0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => this.cart.read_ram_hword(),
             // Account for unmapped last page due to EEPROM
             0x0DFF_8000..=0x0DFF_FFFF => hword(this.get_byte(addr), this.get_byte(addr + 1)),
             _ => 0,
@@ -236,7 +234,7 @@ impl GameGirlAdv {
         self.set(addr, value, |this, addr, value| match addr {
             0x0400_0000..=0x04FF_FFFF => this.set_mmio(addr, value),
             0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
-                this.cart.write_ram_hword(addr & 0xFF, value)
+                this.cart.write_ram_hword(value)
             }
             _ => (),
         });

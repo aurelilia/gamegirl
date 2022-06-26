@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     gga::{
         addr::DISPSTAT,
+        cartridge::SaveType,
         cpu::{Cpu, Interrupt},
         graphics::{HBLANK, VBLANK},
         Access, GameGirlAdv,
@@ -84,8 +85,15 @@ impl Dmas {
         } else {
             Self::get_step(ctrl.bits(5, 2))
         };
-        if SPECIAL || ctrl.is_bit(10) {
+        let word_transfer = ctrl.is_bit(10);
+        if SPECIAL || word_transfer {
             Self::perform_transfer::<true>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
+        } else if idx == 3 {
+            // Maybe alert EEPROM, if the cart has one
+            if let SaveType::Eeprom(eeprom) = &mut gg.cart.save_type {
+                eeprom.dma3_started(gg.dma.dst[3], count);
+            }
+            Self::perform_transfer::<false>(gg, 3, count, src_mod, dst_mod);
         } else {
             Self::perform_transfer::<false>(gg, idx.us(), count, src_mod, dst_mod);
         }
