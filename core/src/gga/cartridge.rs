@@ -35,9 +35,10 @@ pub struct Cartridge {
 impl Cartridge {
     pub fn read_ram(&self, addr: usize) -> u8 {
         match self.save_type {
-            Flash64(state) if state.id_mode => FLASH64_ID[addr & 1],
-            Flash128 { state, .. } if state.id_mode => FLASH128_ID[addr & 1],
-            Flash128 { bank: 1, .. } => self.ram[addr | 0x8000],
+            Flash64(state) if state.mode == FlashMode::Id => FLASH64_ID[addr & 1],
+            Flash128 { state, .. } if state.mode == FlashMode::Id => FLASH128_ID[addr & 1],
+
+            Flash128 { bank: 1, .. } => self.ram[addr | 0x10000],
             Nothing => 0,
             _ => self.ram[addr],
         }
@@ -63,6 +64,17 @@ impl Cartridge {
             Sram => self.ram.extend(zero_iter.take((32 * KB) - len)),
             Flash64(_) => self.ram.extend(zero_iter.take((64 * KB) - len)),
             Flash128 { .. } => self.ram.extend(zero_iter.take((128 * KB) - len)),
+        }
+    }
+
+    pub fn make_save(&self) -> Option<GameSave> {
+        match self.save_type {
+            Nothing => None,
+            _ => Some(GameSave {
+                ram: self.ram.clone(),
+                rtc: None,
+                title: self.title(),
+            }),
         }
     }
 
@@ -120,23 +132,21 @@ impl Default for SaveType {
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct FlashState {
     command_stage: Option<FlashCmdStage>,
-    id_mode: bool,
-    write_mode: bool,
-    bank_select: bool,
+    mode: FlashMode,
 }
 
 impl FlashState {
     fn write(&mut self, addr: usize, value: u8, ram: &mut [u8], bank: Option<&mut u8>) {
         match (addr, value, self.command_stage) {
-            (0x0, _, _) if self.bank_select => {
-                self.bank_select = false;
+            (0x0, _, _) if self.mode == FlashMode::BankSelect => {
+                self.mode = FlashMode::Regular;
                 *bank.unwrap() = value & 1;
             }
 
-            (_, _, _) if self.write_mode => {
-                self.write_mode = false;
+            (_, _, _) if self.mode == FlashMode::Write => {
+                self.mode = FlashMode::Regular;
                 if bank.cloned() == Some(1) {
-                    ram[addr | 0x8000] = value;
+                    ram[addr | 0x10000] = value;
                 } else {
                     ram[addr] = value;
                 }
@@ -145,12 +155,46 @@ impl FlashState {
             (0x5555, 0xAA, None) => self.command_stage = Some(FirstWritten),
             (0x2AAA, 0x55, Some(FirstWritten)) => self.command_stage = Some(SecondWritten),
 
+            // Erase 4K sector
+            (_, 0x30, Some(SecondWritten)) => {
+                if self.mode == FlashMode::Erase {
+                    let addr = if bank.cloned() == Some(1) {
+                        (addr & 0xF000) | 0x10000
+                    } else {
+                        addr & 0xF000
+                    };
+                    for mem in ram.iter_mut().skip(addr).take(0x1000) {
+                        *mem = 0xFF;
+                    }
+                }
+                self.mode = FlashMode::Regular;
+                self.command_stage = None;
+            }
+
             (0x5555, _, Some(SecondWritten)) => {
                 match value {
-                    0x90 => self.id_mode = true,
-                    0xF0 => self.id_mode = false,
-                    0xA0 => self.write_mode = true,
-                    0xB0 if bank.is_some() => self.bank_select = true,
+                    // Enter Erase mode
+                    0x80 => self.mode = FlashMode::Erase,
+                    // Erase entire chip
+                    0x10 => {
+                        if self.mode == FlashMode::Erase {
+                            for mem in ram {
+                                *mem = 0xFF;
+                            }
+                        }
+                        self.mode = FlashMode::Regular;
+                    }
+
+                    // Enter write mode
+                    0xA0 => self.mode = FlashMode::Write,
+                    // Enter bank select, if banked chip
+                    0xB0 if bank.is_some() => self.mode = FlashMode::BankSelect,
+
+                    // Enter ID mode
+                    0x90 => self.mode = FlashMode::Id,
+                    // Exit ID mode
+                    0xF0 => self.mode = FlashMode::Regular,
+
                     _ => (),
                 }
                 self.command_stage = None;
@@ -164,9 +208,7 @@ impl FlashState {
         // Why is Default not const...
         Self {
             command_stage: None,
-            id_mode: false,
-            write_mode: false,
-            bank_select: false,
+            mode: FlashMode::Regular,
         }
     }
 }
@@ -175,4 +217,13 @@ impl FlashState {
 pub enum FlashCmdStage {
     FirstWritten,
     SecondWritten,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+pub enum FlashMode {
+    Regular,
+    Write,
+    Id,
+    Erase,
+    BankSelect,
 }

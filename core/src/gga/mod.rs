@@ -193,7 +193,12 @@ impl GameGirlAdv {
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {
-        self.cart.rom = old_self.cart.rom;
+        let save = old_self.cart.make_save();
+        self.cart.load_rom(old_self.cart.rom);
+        if let Some(save) = save {
+            self.cart.load_save(save);
+        }
+
         self.options = old_self.options;
         self.config = old_self.config;
         self.debugger = old_self.debugger;

@@ -4,6 +4,17 @@ A Gameboy (Color/Advance) emulator written in Rust, whose GG/GGC core is a rewri
 [Try it in your browser!](https://gamegirl.angm.xyz)
 
 
+## Screenshots
+##### Playing Pokemon Emerald
+![Gamegirl playing Pokemon Emerald](img/4.jpg)
+##### Playing Pokemon Crystal Clear
+![Gamegirl playing Pokemon Crystal Clear](img/1.jpg)
+##### Pokemon Pinball with running debugger and memory viewer
+![Gamegirl playing Pokemon Pinball](img/2.jpg)
+##### TLoZ: Oracle of Ages with some visual debugging tools open
+![Gamegirl playing Oracle of Ages](img/3.jpg)
+
+
 ## Status
 The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
@@ -27,6 +38,67 @@ graphical glitches.
     - Visual debugging tools: VRAM and map viewers
 - Automated running of a bunch of different tests
 
+### System emulation
+- [ ] DMG/CGB
+  - [x] Most commercial games running glitch-free 
+  - [ ] Full SM83 CPU
+    - [x] Full instruction set implemented and passing tests
+    - [ ] M-cycle accuracy
+    - [ ] Highly accurate interrupts (Pinball Fantasy)
+  - [ ] PPU
+    - [x] Passing visual tests
+    - [ ] OAM bug
+    - [ ] Variable OAM scan timings
+  - [ ] Timer
+    - [x] Passing blargg tests
+    - [ ] Passing mooneye tests
+  - [x] OAM DMA
+  - [x] APU
+  - [x] Cartridge mappers
+    - [x] MBC1
+    - [x] MBC2
+    - [x] MBC3
+    - [x] MBC5
+  - [x] CGB features
+    - [x] 2x Speed
+    - [x] HDMA
+    - [x] Banking
+    - [x] PPU: DMG compatibility mode
+
+- [ ] AGB
+  - [ ] Most commercial games running glitch-free
+  - [x] Full ARM7DTMI CPU
+    - [x] Cycle accuracy
+    - [x] Accurate interrupts
+    - [x] Accurate waitstates
+  - [ ] Open bus behavior
+  - [ ] PPU
+    - [ ] Passing visual tests 
+    - [x] Text mode Backgrounds
+    - [x] Bitmap mode Backgrounds
+    - [x] Objects
+    - [x] Priority
+    - [ ] Blending
+    - [ ] Affine BGs/objects
+    - [ ] Windows
+  - [ ] APU
+    - [x] CGB sound channels
+    - [x] DMA sound channels
+    - [ ] Volume control registers
+  - [ ] DMAs
+    - [x] General transfers
+    - [ ] Fine register behavior (Not replacing address if invalid, etc)
+    - [x] APU FIFO transfers
+    - [ ] GamePak EEPROM transfers
+  - [x] Timers
+    - [x] Scheduled timers
+    - [x] Cascading timers
+    - [x] APU FIFO ticking
+  - [ ] Cartridge save types
+    - [ ] EEPROM
+    - [ ] SRAM
+    - [x] Flash
+
 ### Planned Features
 - [ ] Controller support
 - [ ] Save export on Web/WASM
@@ -34,22 +106,10 @@ graphical glitches.
 - [ ] Proper GBA support, someday?
 
 
-## Screenshots
-##### Playing Pokemon Emerald
-![Gamegirl playing Pokemon Emerald](img/4.jpg)
-##### Playing Pokemon Crystal Clear
-![Gamegirl playing Pokemon Crystal Clear](img/1.jpg)
-##### Pokemon Pinball with running debugger and memory viewer
-![Gamegirl playing Pokemon Pinball](img/2.jpg)
-##### TLoZ: Oracle of Ages with some visual debugging tools open
-![Gamegirl playing Oracle of Ages](img/3.jpg)
-
-
 ## Goals
 The main goals of this emulator is to create a nice-to-use emulator with many comfort features that should be able
-to run well in the browser. Accuracy is only a goal when it fixes issues encountered
-by actual games; implementing complex but ultimately useless hardware details that aren't used by (almost any) games
-(like the OAM bug or MBC1 multicarts) is not a goal of this emulator.
+to run well in the browser. Accuracy is also a goal however, with the only exception being details
+that noticeably hurt performance to implement.
 
 ### Missing console features
 - Some MBC3 controllers have a built-in RTC for keeping track of time; gamegirl implements it,
@@ -77,7 +137,7 @@ cargo run -p tests --release
 - [x] Blargg (except `oam_bug`)
 - [ ] Mooneye
   - [ ] `acceptance`: 30/71
-  - [x] `emulator-only`: 27/28 (MBC1M, will not be supported)
+  - [x] `emulator-only`: 27/28 (MBC1M, not supported)
 - [x] Acid2
   - [x] dmg-acid2
   - [x] dmg-acid2 in CGB mode

@@ -110,7 +110,7 @@ impl GameGirlAdv {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
-            0x0E00_0000..=0x0E00_7FFF => this.cart.read_ram(addr.us() & 0x7FFF),
+            0x0E00_0000..=0x0E00_FFFF => this.cart.read_ram(addr.us() & 0xFFFF),
             _ => 0,
         })
     }
@@ -209,7 +209,7 @@ impl GameGirlAdv {
             0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
             // Cart save
-            0x0E00_0000..=0x0E00_7FFF => self.cart.write_ram(addr.us() & 0x7FFF, value),
+            0x0E00_0000..=0x0E00_FFFF => self.cart.write_ram(addr.us() & 0xFFFF, value),
 
             // VRAM weirdness
             0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
@@ -434,6 +434,8 @@ impl GameGirlAdv {
             (0x0C00_0000..=0x0DFF_FFFF, _, NonSeq) => {
                 Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()]
             }
+
+            (0x0E00_0000..=0x0EFF_FFFF, _, _) => Self::WS_NONSEQ[self[WAITCNT].bits(0, 2).us()],
 
             _ => 1,
         }
