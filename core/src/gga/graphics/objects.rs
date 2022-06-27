@@ -168,9 +168,9 @@ impl Ppu {
             let adj_tile_idx =
                 base_tile_idx + ((trans_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 32 });
             let tile_addr = 0x1_0000 + (adj_tile_idx * 32);
-            let mut tile_line_addr = tile_addr + (tile_y.us() * 4) + (32 * (trans_x.us() >> 3));
+            let tile_line_addr = tile_addr + (tile_y.us() * 4) + (32 * (trans_x.us() >> 3));
             let byte = gg.ppu.vram(tile_line_addr + ((trans_x.us() & 7) >> 1));
-            if trans_x.is_bit(1) {
+            if trans_x.is_bit(0) {
                 byte >> 4
             } else {
                 byte & 0xF
