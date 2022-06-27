@@ -10,9 +10,17 @@ pub const GREENSWAP: u32 = 0x2;
 pub const DISPSTAT: u32 = 0x4;
 pub const VCOUNT: u32 = 0x6;
 pub const BG0CNT: u32 = 0x8;
+pub const BG1CNT: u32 = 0xA;
 pub const BG0HOFS: u32 = 0x10;
 pub const BG0VOFS: u32 = 0x12;
+pub const BG3VOFS: u32 = 0x1E;
+pub const WIN1V: u32 = 0x46;
+pub const WININ: u32 = 0x48;
+pub const WINOUT: u32 = 0x4A;
 pub const MOSAIC: u32 = 0x4C;
+pub const BLDCNT: u32 = 0x50;
+pub const BLDALPHA: u32 = 0x52;
+pub const BLDY: u32 = 0x54;
 
 // Input
 pub const KEYINPUT: u32 = 0x130;

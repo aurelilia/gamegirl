@@ -11,7 +11,7 @@ use super::audio;
 use crate::{
     gga::{
         addr::*,
-        cpu::Cpu,
+        cpu::{registers::Flag, Cpu},
         dma::Dmas,
         timer::Timers,
         Access::{self, *},
@@ -187,12 +187,31 @@ impl GameGirlAdv {
             TM2CNT_L => Timers::time_read::<2>(self),
             TM3CNT_L => Timers::time_read::<3>(self),
 
+            // Nonexistent registers between sound
+            0x66 | 0x6A | 0x6E | 0x76 | 0x7A | 0x7E | 0x86 | 0x8A => self.invalid_read(addr).u16(),
+
             // Old sound
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
                 let low = self.apu.cgb_chans.read_register_gga(a.u16());
                 let high = self.apu.cgb_chans.read_register_gga(a.u16() + 1);
                 hword(low, high)
             }
+
+            // Write-only registers (PPU)
+            BG0HOFS..=WIN1V | MOSAIC | BLDY => self.invalid_read(addr).u16(),
+            // Write-only registers (DMA)
+            0xB0..=0xB8 | 0xBC..=0xC4 | 0xC8..=0xD0 | 0xD4..=0xDC => self.invalid_read(addr).u16(),
+
+            // Nonexistent registers
+            0x4E
+            | 0x56..=0x5E
+            | 0xA0..=0xAF
+            | 0xE0..=0xFF
+            | 0x110..=0x12F
+            | 0x134..=0x1FF
+            | 0x206
+            | 0x20A
+            | 0x302..=0x3FE => self.invalid_read(addr).u16(),
 
             _ => self[a],
         }
@@ -208,7 +227,26 @@ impl GameGirlAdv {
 
             _ => {
                 // Open bus
-                self.get_word(self.cpu.pc)
+                if !self.cpu.flag(Flag::Thumb) {
+                    // Simple case: just read PC in ARM mode
+                    self.get_word(self.cpu.pc)
+                } else {
+                    // Thumb mode... complicated.
+                    // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
+                    match self.cpu.pc >> 24 {
+                        0x02 | 0x05 | 0x06 | 0x08..=0xD => {
+                            let hword = self.get_hword(self.cpu.pc);
+                            word(hword, hword)
+                        }
+                        _ if self.cpu.pc.is_bit(1) => {
+                            word(self.get_hword(self.cpu.pc - 2), self.get_hword(self.cpu.pc))
+                        }
+                        0x00 | 0x07 => {
+                            word(self.get_hword(self.cpu.pc), self.get_hword(self.cpu.pc + 2))
+                        }
+                        _ => word(self.get_hword(self.cpu.pc), self.get_hword(self.cpu.pc - 2)),
+                    }
+                }
             }
         }
     }
@@ -355,8 +393,17 @@ impl GameGirlAdv {
                 self.update_wait_times();
             }
 
+            // DMA Audio
+            FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
+            FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
+
             // PPU
             DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
+            BG0CNT | BG1CNT => self[a] = value & 0xDFFF,
+            BG0HOFS..=BG3VOFS => self[a] = value & 0x1FF,
+            WININ | WINOUT => self[a] = value & 0x3F3F,
+            BLDCNT => self[a] = value & 0x3FFF,
+            BLDALPHA => self[a] = value & 0x1F1F,
 
             // Timers
             TM0CNT_H => Timers::hi_write::<0>(self, a, value),
@@ -370,9 +417,7 @@ impl GameGirlAdv {
             0xD2 => Dmas::update_idx(self, 2, value),
             0xDE => Dmas::update_idx(self, 3, value),
 
-            // Audio
-            FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
-            FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
+            // CGB audio
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
                 let mut sched = audio::shed(&mut self.scheduler);
                 self.apu
