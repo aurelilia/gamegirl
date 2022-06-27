@@ -31,8 +31,8 @@ impl Joypad {
         if button as usize >= 8 {
             return; // GGA buttons
         }
-        gg.mmu.joypad.key_states[button as usize] = state;
-        let read = gg.mmu.joypad.read(gg.mmu[JOYP]);
+        gg.joypad.key_states[button as usize] = state;
+        let read = gg.joypad.read(gg[JOYP]);
         if read & 0x0F != 0x0F {
             gg.request_interrupt(Interrupt::Joypad);
         }

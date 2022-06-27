@@ -9,7 +9,7 @@ use crate::{
             addr::*,
             ppu::cgb::Cgb,
             scheduling::{GGEvent, PpuEvent},
-            Mmu,
+            Memory,
         },
         GameGirl,
     },
@@ -63,22 +63,22 @@ impl Ppu {
 
             PpuEvent::UploadEnd => {
                 Self::render_line(gg);
-                gg.mmu.ppu.bg_occupied_pixels = [false; 160];
-                if gg.mmu.cgb && gg.mmu.hdma.hblank_transferring {
-                    gg.mmu.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
+                gg.ppu.bg_occupied_pixels = [false; 160];
+                if gg.cgb && gg.hdma.hblank_transferring {
+                    gg.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
                 }
                 Self::stat_interrupt(gg, 3);
                 (PpuEvent::HblankEnd, 204)
             }
 
             PpuEvent::HblankEnd => {
-                gg.mmu[LY] += 1;
+                gg[LY] += 1;
                 Self::stat_interrupt(gg, 5);
                 Self::lyc_interrupt(gg);
-                if gg.mmu[LY] == 144 {
+                if gg[LY] == 144 {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
-                    gg.ppu().last_frame = Some(gg.mmu.ppu.pixels.to_vec());
+                    gg.ppu().last_frame = Some(gg.ppu.pixels.to_vec());
                     (PpuEvent::VblankEnd, 456)
                 } else {
                     (PpuEvent::OamScanEnd, 80)
@@ -86,11 +86,11 @@ impl Ppu {
             }
 
             PpuEvent::VblankEnd => {
-                gg.mmu[LY] += 1;
+                gg[LY] += 1;
                 Self::lyc_interrupt(gg);
-                if gg.mmu[LY] > 153 {
-                    gg.mmu[LY] = 0;
-                    gg.mmu.ppu.window_line = 0;
+                if gg[LY] > 153 {
+                    gg[LY] = 0;
+                    gg.ppu.window_line = 0;
                     (gg.options.frame_finished)(BorrowedSystem::GGC(gg));
                     Self::stat_interrupt(gg, 5);
                     (PpuEvent::OamScanEnd, 80)
@@ -100,22 +100,20 @@ impl Ppu {
             }
         };
 
-        gg.mmu[STAT] =
-            gg.mmu[STAT].set_bit(2, gg.mmu[LYC] == gg.mmu[LY]).u8() & 0xFC | next_mode.ordinal();
+        gg[STAT] = gg[STAT].set_bit(2, gg[LYC] == gg[LY]).u8() & 0xFC | next_mode.ordinal();
 
-        gg.mmu
-            .scheduler
+        gg.scheduler
             .schedule(GGEvent::PpuEvent(next_mode), time - late_by);
     }
 
     fn stat_interrupt(gg: &mut GameGirl, bit: u16) {
-        if gg.mmu[STAT].is_bit(bit) {
+        if gg[STAT].is_bit(bit) {
             gg.request_interrupt(Interrupt::Stat);
         }
     }
 
     fn lyc_interrupt(gg: &mut GameGirl) {
-        if gg.mmu[LYC] == gg.mmu[LY] {
+        if gg[LYC] == gg[LY] {
             Self::stat_interrupt(gg, 6);
         }
     }
@@ -124,7 +122,7 @@ impl Ppu {
         if !gg.lcdc(DISP_EN) {
             return;
         }
-        match &gg.mmu.ppu.kind {
+        match &gg.ppu.kind {
             PpuKind::Dmg { .. } if gg.lcdc(BG_EN) => {
                 Self::render_bg(gg);
                 if gg.lcdc(WIN_EN) {
@@ -166,26 +164,25 @@ impl Ppu {
 
     fn render_bg(gg: &mut GameGirl) {
         // Only render until the point where the window starts, should it be active
-        let end_x =
-            if gg.lcdc(WIN_EN) && (7u8..166u8).contains(&gg.mmu[WX]) && gg.mmu[WY] <= gg.mmu[LY] {
-                gg.mmu[WX] - 7
-            } else {
-                160
-            };
+        let end_x = if gg.lcdc(WIN_EN) && (7u8..166u8).contains(&gg[WX]) && gg[WY] <= gg[LY] {
+            gg[WX] - 7
+        } else {
+            160
+        };
         Self::render_bg_or_window(
             gg,
-            gg.mmu[SCX],
+            gg[SCX],
             0,
             end_x,
             gg.map_addr(BG_MAP),
-            gg.mmu[SCY].wrapping_add(gg.mmu[LY]),
+            gg[SCY].wrapping_add(gg[LY]),
             true,
         )
     }
 
     fn render_window(gg: &mut GameGirl) {
-        let wx = gg.mmu[WX] as i16 - 7;
-        if !(0..=159).contains(&wx) || gg.mmu[WY] > gg.mmu[LY] {
+        let wx = gg[WX] as i16 - 7;
+        if !(0..=159).contains(&wx) || gg[WY] > gg[LY] {
             return;
         }
 
@@ -195,7 +192,7 @@ impl Ppu {
             wx as u8,
             160,
             gg.map_addr(WIN_MAP),
-            gg.mmu.ppu.window_line,
+            gg.ppu.window_line,
             false,
         );
         gg.ppu().window_line += 1;
@@ -210,7 +207,7 @@ impl Ppu {
         map_line: u8,
         correct_tile_addr: bool,
     ) {
-        let method = match gg.mmu.ppu.kind {
+        let method = match gg.ppu.kind {
             PpuKind::Dmg { .. } => Self::dmg_render_bg_or_window,
             PpuKind::Cgb(_) => Self::cgb_render_bg_or_window,
         };
@@ -228,10 +225,10 @@ impl Ppu {
     fn render_objs(gg: &mut GameGirl) {
         let mut count = 0;
         let sprite_offs = 8 + gg.lcdc(BIG_OBJS) as i16 * 8;
-        let ly = gg.mmu[LY] as i16;
+        let ly = gg[LY] as i16;
 
         for idx in 0..40 {
-            let sprite = Sprite::from(&gg.mmu, idx);
+            let sprite = Sprite::from(&gg.mem, idx);
             if sprite.y <= ly
                 && ((sprite.y + sprite_offs) > ly)
                 && gg.ppu().allow_obj(sprite.x as u8, count)
@@ -247,7 +244,7 @@ impl Ppu {
 
     fn render_obj(gg: &mut GameGirl, line: i16, sprite: Sprite) {
         // OBP0/OBP1 are right next to each other, make use of it
-        let dmg_palette = gg.mmu[OBP0 + sprite.opt.bit(DMG_PAL).u16()];
+        let dmg_palette = gg[OBP0 + sprite.opt.bit(DMG_PAL).u16()];
         let tile_y_op = (line - sprite.y) & 0x07;
         let tile_y = if sprite.opt.is_bit(Y_FLIP) {
             7 - tile_y_op
@@ -265,9 +262,9 @@ impl Ppu {
 
         let tile_data_addr = (tile_num.u16() * 0x10)
             + (tile_y as u16 * 2)
-            + ((gg.mmu.cgb && sprite.opt.is_bit(CGB_BANK)) as u16) * 0x2000;
-        let high = gg.mmu.vram[tile_data_addr.us() + 1];
-        let low = gg.mmu.vram[tile_data_addr.us()];
+            + ((gg.cgb && sprite.opt.is_bit(CGB_BANK)) as u16) * 0x2000;
+        let high = gg.mem.vram[tile_data_addr.us() + 1];
+        let low = gg.mem.vram[tile_data_addr.us()];
 
         for tile_x in 0..8 {
             let colour_idx = if !sprite.opt.is_bit(X_FLIP) {
@@ -300,7 +297,7 @@ impl Ppu {
         dmg_palette: u8,
         cgb_palette: u8,
     ) {
-        let colour = match &mut gg.mmu.ppu.kind {
+        let colour = match &mut gg.ppu.kind {
             PpuKind::Dmg { .. } => Self::get_colour(dmg_palette, colour_idx),
             PpuKind::Cgb(cgb) => {
                 cgb.unavailable_pixels[x.us()] = colour_idx != 0;
@@ -316,8 +313,8 @@ impl Ppu {
     }
 
     fn is_pixel_free(gg: &GameGirl, x: i16, prio: bool) -> bool {
-        let base = prio || !gg.mmu.ppu.bg_occupied_pixels[x as usize];
-        match &gg.mmu.ppu.kind {
+        let base = prio || !gg.ppu.bg_occupied_pixels[x as usize];
+        match &gg.ppu.kind {
             PpuKind::Dmg { .. } => base,
             // Make sure we ignore unavailable pixels in DMG compat mode
             PpuKind::Cgb(cgb) => {
@@ -333,7 +330,7 @@ impl Ppu {
             _ if gg.lcdc(BG_MAP) => 0x1C00,
             _ => 0x1800,
         } + idx;
-        Self::bg_tile_data_addr(gg, gg.mmu.vram[addr.us()])
+        Self::bg_tile_data_addr(gg, gg.mem.vram[addr.us()])
     }
 
     fn bg_tile_data_addr(gg: &GameGirl, idx: u8) -> u16 {
@@ -344,7 +341,7 @@ impl Ppu {
         }
     }
 
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             bg_occupied_pixels: [false; 160],
             window_line: 0,
@@ -384,7 +381,7 @@ struct Sprite {
 }
 
 impl Sprite {
-    fn from(mmu: &Mmu, idx: u8) -> Self {
+    fn from(mmu: &Memory, idx: u8) -> Self {
         let base = idx.us() * 4;
         Self {
             x: mmu.oam[base + 1] as i16 - 8,
@@ -398,17 +395,17 @@ impl Sprite {
 impl GameGirl {
     #[inline]
     fn ppu(&mut self) -> &mut Ppu {
-        &mut self.mmu.ppu
+        &mut self.ppu
     }
 
     #[inline]
     fn lcdc(&self, bit: u16) -> bool {
-        self.mmu[LCDC].is_bit(bit)
+        self[LCDC].is_bit(bit)
     }
 
     #[inline]
     fn map_addr(&self, bit: u16) -> u16 {
-        if self.mmu[LCDC].is_bit(bit) {
+        if self[LCDC].is_bit(bit) {
             0x1C00
         } else {
             0x1800

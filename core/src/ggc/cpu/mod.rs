@@ -25,7 +25,7 @@ pub struct Cpu {
 impl Cpu {
     /// Execute the next instruction, moving the entire system forward.
     pub(super) fn exec_next_inst(gg: &mut GameGirl) {
-        if !gg.mmu.debugger.should_execute(gg.cpu.pc) {
+        if !gg.debugger.should_execute(gg.cpu.pc) {
             gg.options.running = false; // Pause emulation, we hit a BP
             return;
         }
@@ -48,14 +48,14 @@ impl Cpu {
 
     /// Check if any interrupts occurred.
     fn check_interrupts(gg: &mut GameGirl, ime: bool) {
-        let bits = gg.mmu[IE] & gg.mmu[IF] & 0x1F;
+        let bits = gg[IE] & gg[IF] & 0x1F;
         if !ime || (bits == 0) {
             return;
         }
 
         for bit in 0..5 {
             if bits.is_bit(bit) {
-                gg.mmu[IF] = gg.mmu[IF].set_bit(bit, false) as u8;
+                gg[IF] = gg[IF].set_bit(bit, false) as u8;
                 gg.cpu.ime = false;
                 gg.push_stack(gg.cpu.pc);
                 gg.cpu.pc = Interrupt::from_index(bit).addr();

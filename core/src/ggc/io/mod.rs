@@ -6,7 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::GGDebugger;
+use super::GameGirl;
 use crate::{
     common::{CgbMode, SystemConfig},
     ggc::io::{
@@ -14,31 +14,27 @@ use crate::{
         apu::Apu,
         cartridge::Cartridge,
         dma::Hdma,
-        joypad::Joypad,
-        ppu::Ppu,
         scheduling::{GGEvent, PpuEvent},
         timer::Timer,
     },
     numutil::NumExt,
-    scheduler::Scheduler,
 };
 
 pub(super) mod addr;
 pub mod apu;
 pub mod cartridge;
-mod dma;
+pub mod dma;
 pub mod joypad;
 pub mod ppu;
 pub mod scheduling;
-mod timer;
+pub mod timer;
 
-/// The MMU of the GG, containing all IO devices along
-/// with big arrays holding internal memory.
+/// The memory of the GG, containing big arrays holding internal memory.
 ///
-/// IO registers can be directly read by IO devices by indexing the MMU,
+/// IO registers can be directly read by IO devices by indexing the GG,
 /// the various addresses are defined in the `addr` submodule.
 #[derive(Deserialize, Serialize)]
-pub struct Mmu {
+pub struct Memory {
     #[serde(with = "serde_arrays")]
     pub vram: [u8; 2 * 8192],
     vram_bank: u8,
@@ -59,26 +55,13 @@ pub struct Mmu {
     #[serde(skip)]
     #[serde(default)]
     pub(super) bootrom: Option<Vec<u8>>,
-    pub(crate) cgb: bool,
-    #[serde(skip)]
-    #[serde(default)]
-    pub debugger: GGDebugger,
-    pub scheduler: Scheduler<GGEvent>,
-    pub speed: u8,
-
-    pub cart: Cartridge,
-    timer: Timer,
-    pub ppu: Ppu,
-    joypad: Joypad,
-    pub(super) apu: Apu,
-    hdma: Hdma,
 }
 
-impl Mmu {
+impl GameGirl {
     pub fn read(&self, addr: u16) -> u8 {
         self.get(addr, |this, addr| match addr {
             0xA000..=0xBFFF => this.cart.read(addr),
-            0xFE00..=0xFE9F => this.oam[addr.us() & 0xFF],
+            0xFE00..=0xFE9F => this.mem.oam[addr.us() & 0xFF],
             _ => this.read_high(addr & 0x00FF),
         })
     }
@@ -114,17 +97,21 @@ impl Mmu {
                 self.cart.write(addr, value);
                 // Refresh page offsets
                 for i in 0..4 {
-                    self.page_offsets[i] = self.cart.rom0_bank.u32() * 0x4000;
+                    self.mem.page_offsets[i] = self.cart.rom0_bank.u32() * 0x4000;
                 }
                 for i in 4..8 {
-                    self.page_offsets[i] = self.cart.rom1_bank.u32() * 0x4000;
+                    self.mem.page_offsets[i] = self.cart.rom1_bank.u32() * 0x4000;
                 }
             }
             0xA000..=0xBFFF => self.cart.write(addr, value),
-            0x8000..=0x9FFF => self.vram[(a & 0x1FFF) + (self.vram_bank.us() * 0x2000)] = value,
-            0xC000..=0xCFFF => self.wram[(a & 0x0FFF)] = value,
-            0xD000..=0xDFFF => self.wram[(a & 0x0FFF) + (self.wram_bank.us() * 0x1000)] = value,
-            0xFE00..=0xFE9F => self.oam[a & 0xFF] = value,
+            0x8000..=0x9FFF => {
+                self.mem.vram[(a & 0x1FFF) + (self.mem.vram_bank.us() * 0x2000)] = value
+            }
+            0xC000..=0xCFFF => self.mem.wram[(a & 0x0FFF)] = value,
+            0xD000..=0xDFFF => {
+                self.mem.wram[(a & 0x0FFF) + (self.mem.wram_bank.us() * 0x1000)] = value
+            }
+            0xFE00..=0xFE9F => self.mem.oam[a & 0xFF] = value,
             0xFF00..=0xFFFF => self.write_high(addr & 0x00FF, value),
             _ => (),
         }
@@ -133,14 +120,14 @@ impl Mmu {
     fn write_high(&mut self, addr: u16, value: u8) {
         match addr {
             VRAM_SELECT if self.cgb => {
-                self.vram_bank = value & 1;
-                self.page_offsets[8] = self.vram_bank.u32() * 0x2000;
-                self.page_offsets[9] = self.vram_bank.u32() * 0x2000;
+                self.mem.vram_bank = value & 1;
+                self.mem.page_offsets[8] = self.mem.vram_bank.u32() * 0x2000;
+                self.mem.page_offsets[9] = self.mem.vram_bank.u32() * 0x2000;
                 self[VRAM_SELECT] = value | 0xFE;
             }
             WRAM_SELECT if self.cgb => {
-                self.wram_bank = u8::max(1, value & 7);
-                self.page_offsets[0xD] = self.wram_bank.u32() * 0x1000;
+                self.mem.wram_bank = u8::max(1, value & 7);
+                self.mem.page_offsets[0xD] = self.mem.wram_bank.u32() * 0x1000;
                 self[WRAM_SELECT] = value | 0xF8;
             }
             KEY1 if self.cgb => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
@@ -150,7 +137,7 @@ impl Mmu {
             IF => self[IF] = value | 0xE0,
             IE => self[IE] = value,
             BOOTROM_DISABLE => {
-                self.bootrom = None;
+                self.mem.bootrom = None;
                 // Refresh page tables
                 self.init_memory();
             }
@@ -191,51 +178,36 @@ impl Mmu {
         self.write(addr.wrapping_add(1), (value >> 8).u8());
     }
 
-    /// Reset the MMU and all IO devices except the cartridge.
-    pub(super) fn reset(&mut self, config: &SystemConfig) -> Self {
-        // TODO the clones are kinda eh
-        let mut new = Self::new(self.debugger.clone());
-        new.cgb = self.cgb;
-        new.load_cart(self.cart.clone(), config);
-        new
+    /// Get an 8-bit argument for the current CPU instruction.
+    pub fn arg8(&self) -> u8 {
+        self.read(self.cpu.pc + 1)
     }
 
-    pub(super) fn new(debugger: GGDebugger) -> Self {
-        Self {
-            vram: [0; 16384],
-            vram_bank: 0,
-            wram: [0; 32768],
-            wram_bank: 1,
-            oam: [0; 160],
-            high: [0xFF; 256],
-
-            read_pages: serde_pages(),
-            page_offsets: [
-                0, 0, 0, 0, 0x4000, 0x4000, 0x4000, 0x4000, 0, 0, 0, 0, 0, 0x1000, 0, 0,
-            ],
-
-            bootrom: None,
-            cgb: false,
-            debugger,
-            scheduler: Scheduler::default(),
-            speed: 1,
-
-            timer: Timer::default(),
-            ppu: Ppu::new(),
-            joypad: Joypad::default(),
-            apu: Apu::new(false),
-            hdma: Hdma::default(),
-            cart: Cartridge::dummy(),
-        }
+    /// Get a 16-bit argument for the current CPU instruction.
+    pub fn arg16(&self) -> u16 {
+        self.read16(self.cpu.pc + 1)
     }
 
-    pub(super) fn load_cart(&mut self, cart: Cartridge, conf: &SystemConfig) {
+    /// Pop the current value off the SP.
+    pub fn pop_stack(&mut self) -> u16 {
+        let val = self.read16(self.cpu.sp);
+        self.cpu.sp = self.cpu.sp.wrapping_add(2);
+        val
+    }
+
+    /// Push the given value to the current SP.
+    pub fn push_stack(&mut self, value: u16) {
+        self.cpu.sp = self.cpu.sp.wrapping_sub(2);
+        self.write16(self.cpu.sp, value)
+    }
+
+    pub(super) fn load_cart_mem(&mut self, cart: Cartridge, conf: &SystemConfig) {
         self.cgb = match conf.mode {
             CgbMode::Always => true,
             CgbMode::Prefer => cart.supports_cgb(),
             CgbMode::Never => cart.requires_cgb(),
         };
-        self.bootrom = Some(if self.cgb {
+        self.mem.bootrom = Some(if self.cgb {
             CGB_BOOTROM.to_vec()
         } else {
             BOOTIX_ROM.to_vec()
@@ -285,9 +257,9 @@ impl Mmu {
     fn get<T>(&self, a: u16, slow: fn(&Self, u16) -> T) -> T {
         let addr = a.us();
         let ptr = unsafe {
-            let page = self.read_pages.get_unchecked(addr >> 8);
+            let page = self.mem.read_pages.get_unchecked(addr >> 8);
             page.add(addr & 0xFF)
-                .add(self.page_offsets.get_unchecked(addr >> 12).us())
+                .add(self.mem.page_offsets.get_unchecked(addr >> 12).us())
         };
 
         if ptr as usize > 0xFF_FFFF {
@@ -299,8 +271,8 @@ impl Mmu {
 
     /// Initialize page tables.
     pub fn init_memory(&mut self) {
-        for i in 0..self.read_pages.len() {
-            self.read_pages[i] = unsafe { self.get_page(i * 0x100) };
+        for i in 0..self.mem.read_pages.len() {
+            self.mem.read_pages[i] = unsafe { self.get_page(i * 0x100) };
         }
     }
 
@@ -311,37 +283,59 @@ impl Mmu {
         }
 
         match a {
-            0x0000..0x0100 if self.bootrom.is_some() => offs(self.bootrom.as_ref().unwrap(), a),
-            0x0200..0x0900 if self.bootrom.is_some() && self.cgb => {
-                offs(self.bootrom.as_ref().unwrap(), a - 0x0100)
+            0x0000..0x0100 if self.mem.bootrom.is_some() => {
+                offs(self.mem.bootrom.as_ref().unwrap(), a)
+            }
+            0x0200..0x0900 if self.mem.bootrom.is_some() && self.cgb => {
+                offs(self.mem.bootrom.as_ref().unwrap(), a - 0x0100)
             }
             0x0000..=0x3FFF => offs(&self.cart.rom, a),
             0x4000..=0x7FFF => offs(&self.cart.rom, a - 0x4000),
 
-            0x8000..=0x9FFF => offs(&self.vram, a - 0x8000),
-            0xC000..=0xCFFF => offs(&self.wram, a - 0xC000),
-            0xD000..=0xDFFF => offs(&self.wram, a - 0xD000),
-            0xE000..=0xFDFF => offs(&self.wram, a - 0xE000),
+            0x8000..=0x9FFF => offs(&self.mem.vram, a - 0x8000),
+            0xC000..=0xCFFF => offs(&self.mem.wram, a - 0xC000),
+            0xD000..=0xDFFF => offs(&self.mem.wram, a - 0xD000),
+            0xE000..=0xFDFF => offs(&self.mem.wram, a - 0xE000),
 
             _ => ptr::null::<u8>() as *mut u8,
         }
     }
 }
 
-impl Index<u16> for Mmu {
+impl Memory {
+    pub(super) fn new() -> Self {
+        Self {
+            vram: [0; 16384],
+            vram_bank: 0,
+            wram: [0; 32768],
+            wram_bank: 1,
+            oam: [0; 160],
+            high: [0xFF; 256],
+
+            read_pages: serde_pages(),
+            page_offsets: [
+                0, 0, 0, 0, 0x4000, 0x4000, 0x4000, 0x4000, 0, 0, 0, 0, 0, 0x1000, 0, 0,
+            ],
+
+            bootrom: None,
+        }
+    }
+}
+
+impl Index<u16> for GameGirl {
     type Output = u8;
     fn index(&self, index: u16) -> &Self::Output {
-        &self.high[index.us()]
+        &self.mem.high[index.us()]
     }
 }
 
-impl IndexMut<u16> for Mmu {
+impl IndexMut<u16> for GameGirl {
     fn index_mut(&mut self, index: u16) -> &mut Self::Output {
-        &mut self.high[index.us()]
+        &mut self.mem.high[index.us()]
     }
 }
 
-unsafe impl Send for Mmu {}
+unsafe impl Send for Memory {}
 
 fn serde_pages() -> [*mut u8; 256] {
     [ptr::null::<u8>() as *mut u8; 256]

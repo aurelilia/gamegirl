@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common::SAMPLE_RATE,
     ggc::{
-        io::{
-            scheduling::{ApuEvent, GGEvent},
-            Mmu,
-        },
+        io::scheduling::{ApuEvent, GGEvent},
         GameGirl, T_CLOCK_HZ,
     },
     scheduler::Scheduler,
@@ -34,24 +31,22 @@ impl Apu {
     pub fn handle_event(gg: &mut GameGirl, event: ApuEvent, late_by: u32) {
         match event {
             ApuEvent::PushSample => {
-                let sample = gg.mmu.apu.inner.make_sample();
-                gg.mmu.apu.buffer.push(sample[0]);
-                gg.mmu.apu.buffer.push(sample[1]);
-                gg.mmu
-                    .scheduler
+                let sample = gg.apu.inner.make_sample();
+                gg.apu.buffer.push(sample[0]);
+                gg.apu.buffer.push(sample[1]);
+                gg.scheduler
                     .schedule(GGEvent::ApuEvent(event), SAMPLE_EVERY_N_CLOCKS - late_by);
             }
 
             ApuEvent::TickSequencer => {
-                gg.mmu.apu.inner.tick_sequencer();
-                gg.mmu
-                    .scheduler
+                gg.apu.inner.tick_sequencer();
+                gg.scheduler
                     .schedule(GGEvent::ApuEvent(event), 0x2000 - late_by);
             }
 
             ApuEvent::Gen(gen) => {
-                let next = gen.dispatch(&mut gg.mmu.apu.inner);
-                gg.mmu.scheduler.schedule(
+                let next = gen.dispatch(&mut gg.apu.inner);
+                gg.scheduler.schedule(
                     GGEvent::ApuEvent(event),
                     next.checked_sub(late_by).unwrap_or(1),
                 );
@@ -59,19 +54,19 @@ impl Apu {
         }
     }
 
-    pub fn write(mmu: &mut Mmu, addr: u16, value: u8) {
-        mmu.apu
+    pub fn write(gg: &mut GameGirl, addr: u16, value: u8) {
+        gg.apu
             .inner
-            .write_register_gg(addr, value, &mut shed(&mut mmu.scheduler));
+            .write_register_gg(addr, value, &mut shed(&mut gg.scheduler));
     }
 
-    pub fn init_scheduler(mmu: &mut Mmu) {
-        mmu.apu.inner.init_scheduler(&mut shed(&mut mmu.scheduler));
-        mmu.scheduler.schedule(
+    pub fn init_scheduler(gg: &mut GameGirl) {
+        gg.apu.inner.init_scheduler(&mut shed(&mut gg.scheduler));
+        gg.scheduler.schedule(
             GGEvent::ApuEvent(ApuEvent::PushSample),
             SAMPLE_EVERY_N_CLOCKS,
         );
-        mmu.scheduler
+        gg.scheduler
             .schedule(GGEvent::ApuEvent(ApuEvent::TickSequencer), 0x2000);
     }
 

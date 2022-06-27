@@ -23,14 +23,14 @@ impl Ppu {
         correct_tile_addr: bool,
     ) {
         let colours = Self::get_bg_colours(gg);
-        let line = gg.mmu[LY];
+        let line = gg[LY];
         let mut tile_x = scroll_x & 7;
         let tile_y = map_line & 7;
         let mut tile_addr = map_addr + ((map_line / 8).u16() * 0x20) + (scroll_x >> 3).u16();
         let mut tile_data_addr =
-            Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()]) + (tile_y.u16() * 2);
-        let mut high = gg.mmu.vram[tile_data_addr.us() + 1];
-        let mut low = gg.mmu.vram[tile_data_addr.us()];
+            Self::bg_tile_data_addr(gg, gg.mem.vram[tile_addr.us()]) + (tile_y.u16() * 2);
+        let mut high = gg.mem.vram[tile_data_addr.us() + 1];
+        let mut low = gg.mem.vram[tile_data_addr.us()];
 
         for tile_idx_addr in start_x..end_x {
             let colour_idx = (high.bit(7 - tile_x.u16()) << 1) + low.bit(7 - tile_x.u16());
@@ -47,15 +47,15 @@ impl Ppu {
                     tile_addr + 1
                 };
                 tile_data_addr =
-                    Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()]) + (tile_y.u16() * 2);
-                high = gg.mmu.vram[tile_data_addr.us() + 1];
-                low = gg.mmu.vram[tile_data_addr.us()];
+                    Self::bg_tile_data_addr(gg, gg.mem.vram[tile_addr.us()]) + (tile_y.u16() * 2);
+                high = gg.mem.vram[tile_data_addr.us() + 1];
+                low = gg.mem.vram[tile_data_addr.us()];
             }
         }
     }
 
     pub fn clear_line(gg: &mut GameGirl) {
-        let y = gg.mmu[LY];
+        let y = gg[LY];
         for idx in 0..160 {
             let col = COLOURS[0];
             gg.ppu().set_pixel(idx, y, [col, col, col, 255]);
@@ -85,7 +85,7 @@ impl Ppu {
     }
 
     pub fn get_bg_colours(gg: &GameGirl) -> [Colour; 4] {
-        let palette = gg.mmu[BGP];
+        let palette = gg[BGP];
         [
             Self::get_colour(palette, 0),
             Self::get_colour(palette, 1),

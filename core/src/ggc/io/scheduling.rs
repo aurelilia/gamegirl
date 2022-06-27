@@ -51,7 +51,7 @@ impl GGEvent {
             HdmaTransferStep => Hdma::handle_hdma(gg),
             GdmaTransfer => Hdma::handle_gdma(gg),
             TimerOverflow => Timer::on_overflow(gg, late_by),
-            TmaReload => gg.mmu[TIMA] = gg.mmu[TMA],
+            TmaReload => gg[TIMA] = gg[TMA],
         }
     }
 }

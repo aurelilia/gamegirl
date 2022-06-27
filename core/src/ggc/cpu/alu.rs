@@ -63,7 +63,7 @@ impl GameGirl {
     // as well as kotcrab's xgbc emulator for showing me correct behavior for 0xE8 &
     // 0xF8!
     pub(super) fn add_sp(&mut self) -> u16 {
-        let value = self.mmu.read_signed(self.cpu.pc + 1) as i16;
+        let value = self.read_signed(self.cpu.pc + 1) as i16;
         self.cpu.set_fl(Flag::Zero, false);
         self.cpu.set_fl(Flag::Negative, false);
         self.cpu.set_fli16(

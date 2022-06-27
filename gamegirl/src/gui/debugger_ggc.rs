@@ -33,7 +33,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             ui.set_min_width(150.0);
             let mut pc = gg.cpu.pc;
             let inst = inst::get_at(gg, pc);
-            let arg = gg.mmu.read16(pc + 1);
+            let arg = gg.read16(pc + 1);
             ui.add(
                 Label::new(
                     RichText::new(format!("0x{:04X} {}", pc, inst.formatted_name(arg)))
@@ -45,7 +45,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             pc += inst.size().u16();
             for _ in 0..0xF {
                 let inst = inst::get_at(gg, pc);
-                let arg = gg.mmu.read16(pc + 1);
+                let arg = gg.read16(pc + 1);
                 ui.add(
                     Label::new(
                         RichText::new(format!("0x{:04X} {}", pc, inst.formatted_name(arg)))
@@ -63,8 +63,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             for _ in 0..0xF {
                 ui.add(
                     Label::new(
-                        RichText::new(format!("0x{:04X} - {:04X}", sp, gg.mmu.read16(sp)))
-                            .monospace(),
+                        RichText::new(format!("0x{:04X} - {:04X}", sp, gg.read16(sp))).monospace(),
                     )
                     .wrap(false),
                 );
@@ -97,7 +96,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
 
 /// Window for configuring active breakpoints.
 pub fn breakpoints(gg: &mut GameGirl, ui: &mut Ui) {
-    let bps = &mut gg.mmu.debugger.breakpoints;
+    let bps = &mut gg.debugger.breakpoints;
     for bp in bps.iter_mut() {
         ui.horizontal(|ui| {
             ui.label("0x");
@@ -163,7 +162,7 @@ pub fn memory(gg: &mut GameGirl, ui: &mut Ui) {
             let row_start = row_start * 0x10;
             write!(&mut buf, "{:04X} -", row_start).unwrap();
             for offset in 0..0x10 {
-                write!(&mut buf, " {:02X}", gg.mmu.read(row_start + offset)).unwrap();
+                write!(&mut buf, " {:02X}", gg.read(row_start + offset)).unwrap();
             }
 
             let label = ui.add(Label::new(RichText::new(&buf).monospace()).wrap(false));
@@ -182,24 +181,24 @@ pub fn cart_info(gg: &mut GameGirl, ui: &mut Ui) {
         return;
     }
 
-    ui.label(format!("Reported Title: {}", gg.mmu.cart.title(false)));
+    ui.label(format!("Reported Title: {}", gg.cart.title(false)));
     ui.label(format!(
         "Reported Title (extended): {}",
-        gg.mmu.cart.title(false)
+        gg.cart.title(false)
     ));
-    ui.label(format!("ROM banks: {}", gg.mmu.cart.rom_bank_count()));
-    ui.label(format!("RAM banks: {}", gg.mmu.cart.ram_bank_count()));
+    ui.label(format!("ROM banks: {}", gg.cart.rom_bank_count()));
+    ui.label(format!("RAM banks: {}", gg.cart.ram_bank_count()));
     match () {
-        _ if gg.mmu.cart.requires_cgb() => ui.label("GB Colour compatibility: Required"),
-        _ if gg.mmu.cart.supports_cgb() => ui.label("GB Colour compatibility: Supported"),
+        _ if gg.cart.requires_cgb() => ui.label("GB Colour compatibility: Required"),
+        _ if gg.cart.supports_cgb() => ui.label("GB Colour compatibility: Supported"),
         _ => ui.label("GB Colour compatibility: Unsupported"),
     };
 
     ui.separator();
-    ui.label(format!("Current ROM0 bank: {}", gg.mmu.cart.rom0_bank));
-    ui.label(format!("Current ROM1 bank: {}", gg.mmu.cart.rom1_bank));
-    ui.label(format!("Current RAM bank: {}", gg.mmu.cart.ram_bank));
-    ui.label(format!("MBC type and state: {:?}", gg.mmu.cart.kind));
+    ui.label(format!("Current ROM0 bank: {}", gg.cart.rom0_bank));
+    ui.label(format!("Current ROM1 bank: {}", gg.cart.rom1_bank));
+    ui.label(format!("Current RAM bank: {}", gg.cart.ram_bank));
+    ui.label(format!("MBC type and state: {:?}", gg.cart.kind));
 }
 
 /// State for visual debugging tools.
@@ -333,8 +332,8 @@ fn upload_texture(
 fn draw_tile(gg: &GameGirl, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u16) {
     for line in 0..8 {
         let base_addr = tile_ptr + (line * 2);
-        let high = gg.mmu.vram[base_addr.us()];
-        let low = gg.mmu.vram[base_addr.us() + 1];
+        let high = gg.mem.vram[base_addr.us()];
+        let low = gg.mem.vram[base_addr.us() + 1];
 
         for pixel in 0..8 {
             let colour_idx = (high.bit(7 - pixel) << 1) + low.bit(7 - pixel);

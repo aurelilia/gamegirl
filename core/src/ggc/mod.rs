@@ -9,12 +9,18 @@ use crate::{
         cpu::{Cpu, Interrupt},
         io::{
             addr::{BOOTROM_DISABLE, IF, KEY1},
+            apu::Apu,
             cartridge::Cartridge,
+            dma::Hdma,
+            joypad::Joypad,
+            ppu::Ppu,
             scheduling::GGEvent,
-            Mmu,
+            timer::Timer,
+            Memory,
         },
     },
     numutil::NumExt,
+    scheduler::Scheduler,
     Colour,
 };
 
@@ -30,9 +36,23 @@ pub type GGDebugger = Debugger<u16>;
 #[derive(Deserialize, Serialize)]
 pub struct GameGirl {
     pub cpu: Cpu,
-    pub mmu: Mmu,
-    pub config: SystemConfig,
+    pub mem: Memory,
 
+    cgb: bool,
+    #[serde(skip)]
+    #[serde(default)]
+    pub debugger: GGDebugger,
+    scheduler: Scheduler<GGEvent>,
+
+    pub cart: Cartridge,
+    pub timer: Timer,
+    pub ppu: Ppu,
+    pub joypad: Joypad,
+    pub apu: Apu,
+    pub hdma: Hdma,
+
+    /// CPU speed, 1/2x.
+    speed: u8,
     /// Shift of m-cycles to t-clocks, which is different in CGB double speed
     /// mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
@@ -40,6 +60,8 @@ pub struct GameGirl {
     /// PauseEmulation event fires,
     ticking: bool,
 
+    /// System config.
+    pub config: SystemConfig,
     /// Emulation options.
     pub options: EmulateOptions,
 }
@@ -54,7 +76,7 @@ impl GameGirl {
         }
 
         let target = (T_CLOCK_HZ as f32 * delta * self.options.speed_multiplier as f32) as u32;
-        self.mmu.scheduler.schedule(GGEvent::PauseEmulation, target);
+        self.scheduler.schedule(GGEvent::PauseEmulation, target);
 
         self.ticking = true;
         while self.options.running && self.ticking {
@@ -69,16 +91,16 @@ impl GameGirl {
             return None;
         }
 
-        while self.mmu.ppu.last_frame == None {
-            if self.mmu.debugger.breakpoint_hit {
-                self.mmu.debugger.breakpoint_hit = false;
+        while self.ppu.last_frame == None {
+            if self.debugger.breakpoint_hit {
+                self.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 return None;
             }
             self.advance();
         }
 
-        self.mmu.ppu.last_frame.take()
+        self.ppu.last_frame.take()
     }
 
     /// Produce the next audio samples and write them to the given buffer.
@@ -91,9 +113,9 @@ impl GameGirl {
         }
 
         let target = samples.len() * self.options.speed_multiplier;
-        while self.mmu.apu.buffer.len() < target {
-            if self.mmu.debugger.breakpoint_hit {
-                self.mmu.debugger.breakpoint_hit = false;
+        while self.apu.buffer.len() < target {
+            if self.debugger.breakpoint_hit {
+                self.debugger.breakpoint_hit = false;
                 self.options.running = false;
                 samples.fill(0.0);
                 return;
@@ -101,7 +123,7 @@ impl GameGirl {
             self.advance();
         }
 
-        let mut buffer = mem::take(&mut self.mmu.apu.buffer);
+        let mut buffer = mem::take(&mut self.apu.buffer);
         if self.options.invert_audio_samples {
             // If rewinding, truncate and get rid of any excess samples to prevent
             // audio samples getting backed up
@@ -115,9 +137,9 @@ impl GameGirl {
             // however this is preferred to audio falling behind and eating
             // a lot of memory.
             for sample in buffer.drain(target..) {
-                self.mmu.apu.buffer.push(sample);
+                self.apu.buffer.push(sample);
             }
-            self.mmu.apu.buffer.truncate(5_000);
+            self.apu.buffer.truncate(5_000);
 
             for (src, dst) in buffer
                 .into_iter()
@@ -136,8 +158,8 @@ impl GameGirl {
 
     /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, m_cycles: u16) {
-        self.mmu.scheduler.advance((m_cycles << self.t_shift).u32());
-        while let Some(event) = self.mmu.scheduler.get_next_pending() {
+        self.scheduler.advance((m_cycles << self.t_shift).u32());
+        while let Some(event) = self.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
         }
     }
@@ -145,44 +167,36 @@ impl GameGirl {
     /// Switch between CGB 2x and normal speed mode.
     fn switch_speed(&mut self) {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
-        self.mmu.speed = if self.t_shift == 1 { 2 } else { 1 };
-        self.mmu[KEY1] = (self.t_shift & 1) << 7;
+        self.speed = if self.t_shift == 1 { 2 } else { 1 };
+        self[KEY1] = (self.t_shift & 1) << 7;
         self.advance_clock(2048);
     }
 
     /// Request an interrupt. Sets the bit in IF.
     fn request_interrupt(&mut self, ir: Interrupt) {
-        self.mmu[IF] = self.mmu[IF].set_bit(ir.to_index(), true) as u8;
+        self[IF] = self[IF].set_bit(ir.to_index(), true) as u8;
     }
 
-    /// Get an 8-bit argument for the current CPU instruction.
-    fn arg8(&self) -> u8 {
-        self.mmu.read(self.cpu.pc + 1)
-    }
+    /// Restore state after a savestate load. `old_self` should be the
+    /// system state before the state was loaded.
+    pub fn restore_from(&mut self, old_self: Self) {
+        let save = old_self.cart.make_save();
+        self.load_cart_mem(old_self.cart, &old_self.config);
+        if let Some(save) = save {
+            self.cart.load_save(save);
+        }
 
-    /// Get a 16-bit argument for the current CPU instruction.
-    fn arg16(&self) -> u16 {
-        self.mmu.read16(self.cpu.pc + 1)
-    }
-
-    /// Pop the current value off the SP.
-    fn pop_stack(&mut self) -> u16 {
-        let val = self.mmu.read16(self.cpu.sp);
-        self.cpu.sp = self.cpu.sp.wrapping_add(2);
-        val
-    }
-
-    /// Push the given value to the current SP.
-    fn push_stack(&mut self, value: u16) {
-        self.cpu.sp = self.cpu.sp.wrapping_sub(2);
-        self.mmu.write16(self.cpu.sp, value)
+        self.options = old_self.options;
+        self.config = old_self.config;
+        self.debugger = old_self.debugger;
+        self.mem.bootrom = old_self.mem.bootrom;
+        self.init_memory();
     }
 
     /// Reset the console, while keeping the current cartridge inserted.
     pub fn reset(&mut self) {
-        self.cpu = Cpu::default();
-        self.mmu = self.mmu.reset(&self.config);
-        self.t_shift = 2;
+        let old_self = mem::take(self);
+        self.restore_from(old_self);
     }
 
     /// Create a save state that can be loaded with [load_state].
@@ -202,11 +216,7 @@ impl GameGirl {
             self,
             common::deserialize(state, self.config.compress_savestates),
         );
-        self.mmu.debugger = old_self.mmu.debugger;
-        self.mmu.cart.rom = old_self.mmu.cart.rom;
-        self.options.frame_finished = old_self.options.frame_finished;
-        self.mmu.bootrom = old_self.mmu.bootrom;
-        self.mmu.init_memory();
+        self.restore_from(old_self);
     }
 
     /// Load the given cartridge.
@@ -214,10 +224,10 @@ impl GameGirl {
     pub fn load_cart(&mut self, cart: Cartridge, config: &SystemConfig, reset: bool) {
         if reset {
             let old_self = mem::take(self);
-            self.mmu.debugger = old_self.mmu.debugger;
+            self.debugger = old_self.debugger;
             self.options.frame_finished = old_self.options.frame_finished;
         }
-        self.mmu.load_cart(cart, config);
+        self.load_cart_mem(cart, config);
         self.config = config.clone();
     }
 
@@ -232,7 +242,7 @@ impl GameGirl {
 
     pub fn skip_bootrom(&mut self) {
         self.cpu.pc = 0x100;
-        self.mmu.write(BOOTROM_DISABLE, 1);
+        self.write(BOOTROM_DISABLE, 1);
     }
 }
 
@@ -241,9 +251,21 @@ impl Default for GameGirl {
         let debugger = GGDebugger::default();
         Self {
             cpu: Cpu::default(),
-            mmu: Mmu::new(debugger),
+            mem: Memory::new(),
             config: SystemConfig::default(),
 
+            cgb: false,
+            debugger,
+            scheduler: Scheduler::default(),
+
+            timer: Timer::default(),
+            ppu: Ppu::new(),
+            joypad: Joypad::default(),
+            apu: Apu::new(false),
+            hdma: Hdma::default(),
+            cart: Cartridge::dummy(),
+
+            speed: 1,
             t_shift: 2,
             ticking: true,
             options: EmulateOptions::default(),

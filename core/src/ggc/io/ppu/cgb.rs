@@ -167,23 +167,23 @@ impl Ppu {
         map_line: u8,
         correct_tile_addr: bool,
     ) {
-        let line = gg.mmu[LY];
+        let line = gg[LY];
         let bg_en = gg.lcdc(BG_EN);
 
         let mut tile_x = scroll_x & 7;
         let mut tile_addr = map_addr + ((map_line / 8).u16() * 0x20) + (scroll_x >> 3).u16();
-        let mut attributes = gg.mmu.vram[0x2000 + (tile_addr.us() & 0x1FFF)];
+        let mut attributes = gg.mem.vram[0x2000 + (tile_addr.us() & 0x1FFF)];
         let mut has_prio = attributes.is_bit(7) && bg_en;
         let mut tile_y = if attributes.is_bit(6) {
             7 - (map_line & 7)
         } else {
             map_line & 7
         };
-        let mut tile_data_addr = Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()])
+        let mut tile_data_addr = Self::bg_tile_data_addr(gg, gg.mem.vram[tile_addr.us()])
             + (tile_y.u16() * 2)
             + attributes.bit(3).u16() * 0x2000;
-        let mut high = gg.mmu.vram[tile_data_addr.us() + 1];
-        let mut low = gg.mmu.vram[tile_data_addr.us()];
+        let mut high = gg.mem.vram[tile_data_addr.us() + 1];
+        let mut low = gg.mem.vram[tile_data_addr.us()];
 
         for tile_idx_addr in start_x..end_x {
             let x = if attributes.is_bit(5) {
@@ -211,18 +211,18 @@ impl Ppu {
                 } else {
                     tile_addr + 1
                 };
-                attributes = gg.mmu.vram[0x2000 + (tile_addr.us() & 0x1FFF)];
+                attributes = gg.mem.vram[0x2000 + (tile_addr.us() & 0x1FFF)];
                 has_prio = attributes.is_bit(7) && bg_en;
                 tile_y = if attributes.is_bit(6) {
                     7 - (map_line & 7)
                 } else {
                     map_line & 7
                 };
-                tile_data_addr = Self::bg_tile_data_addr(gg, gg.mmu.vram[tile_addr.us()])
+                tile_data_addr = Self::bg_tile_data_addr(gg, gg.mem.vram[tile_addr.us()])
                     + (tile_y.u16() * 2)
                     + attributes.bit(3).u16() * 0x2000;
-                high = gg.mmu.vram[tile_data_addr.us() + 1];
-                low = gg.mmu.vram[tile_data_addr.us()];
+                high = gg.mem.vram[tile_data_addr.us() + 1];
+                low = gg.mem.vram[tile_data_addr.us()];
             }
         }
     }
@@ -230,7 +230,7 @@ impl Ppu {
 
 impl GameGirl {
     fn cgb(&mut self) -> &mut Cgb {
-        if let PpuKind::Cgb(cgb) = &mut self.mmu.ppu.kind {
+        if let PpuKind::Cgb(cgb) = &mut self.ppu.kind {
             cgb
         } else {
             panic!()

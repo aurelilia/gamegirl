@@ -73,7 +73,7 @@ impl System {
     /// Get the last frame produced by the PPU.
     pub fn last_frame(&mut self) -> Option<Vec<Colour>> {
         match self {
-            System::GGC(gg) => gg.mmu.ppu.last_frame.take(),
+            System::GGC(gg) => gg.ppu.last_frame.take(),
             System::GGA(gg) => gg.ppu.last_frame.take(),
         }
     }
@@ -114,7 +114,7 @@ impl System {
     pub fn save_game(&self, path: Option<PathBuf>) {
         match self {
             System::GGC(gg) => {
-                if let Some(save) = gg.mmu.cart.make_save() {
+                if let Some(save) = gg.cart.make_save() {
                     Storage::save(path, save);
                 }
             }

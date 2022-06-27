@@ -6,7 +6,7 @@ use crate::Status;
 pub fn blargg() {
     crate::run_dir::<true, true>("blargg", |gg| {
         let gg = gg.as_ggc();
-        let serial = &gg.mmu.debugger.serial_output;
+        let serial = &gg.debugger.serial_output;
         if serial.contains("Failed") {
             Break(Status::FailAt(serial.lines().last().unwrap().to_string()))
         } else {
@@ -18,7 +18,7 @@ pub fn blargg() {
 pub fn blargg_sound() {
     crate::run_dir::<true, true>("blargg_sound", |gg| {
         let gg = gg.as_ggc();
-        if gg.mmu.read(0xA000) == 0 {
+        if gg.read(0xA000) == 0 {
             Break(Status::Success)
         } else {
             Continue(())
