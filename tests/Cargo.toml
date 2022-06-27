@@ -9,3 +9,5 @@ edition = "2021"
 core = { path = "../core" }
 ansi_term = "0.12.1"
 rayon = "1.5.3"
+png = "0.17.5"
+seahorse = "2.1.0"

@@ -58,7 +58,7 @@ impl Ppu {
         if obj.attr0.is_bit(5) {
             let tile_addr = 0x1_0000
                 + if !is_2d {
-                    (base_tile_idx + ((obj_y.us() >> 3) * size.0.us() >> 3)) * 64
+                    (base_tile_idx + (((obj_y.us() >> 3) * size.0.us()) >> 3)) * 64
                 } else {
                     (base_tile_idx + ((obj_y.us() >> 3) * 32)) * 32
                 };
@@ -158,7 +158,7 @@ impl Ppu {
         if is_8bpp {
             let tile_addr = 0x1_0000
                 + if !is_2d {
-                    (base_tile_idx + ((trans_y.us() >> 3) * size.0.us() >> 3)) * 64
+                    (base_tile_idx + (((trans_y.us() >> 3) * size.0.us()) >> 3)) * 64
                 } else {
                     (base_tile_idx + ((trans_y.us() >> 3) * 32)) * 32
                 };

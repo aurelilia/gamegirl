@@ -33,7 +33,7 @@ impl Timer {
         gg.mmu[TIMA] = 0;
         gg.mmu
             .scheduler
-            .schedule(GGEvent::TmaReload, 4u32.checked_sub(late_by).unwrap_or(0));
+            .schedule(GGEvent::TmaReload, 4u32.saturating_sub(late_by));
 
         gg.mmu.scheduler.schedule(
             GGEvent::TimerOverflow,

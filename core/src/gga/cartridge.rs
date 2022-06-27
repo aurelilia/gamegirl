@@ -50,9 +50,8 @@ impl Cartridge {
     }
 
     pub fn write_ram_hword(&mut self, value: u16) {
-        match &mut self.save_type {
-            Eeprom(eeprom) => eeprom.write(value, &mut self.ram),
-            _ => (),
+        if let Eeprom(eeprom) = &mut self.save_type {
+            eeprom.write(value, &mut self.ram);
         }
     }
 

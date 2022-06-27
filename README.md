@@ -128,10 +128,13 @@ cargo build --release
 
 
 ## Testing
-Blargg and mooneye ROMs can be run automatically:
+Test ROMs can be run automatically:
 ```bash
-# Release recommended for speed
+# Run GGA test roms
 cargo run -p tests --release
+
+# Also run GG test roms
+cargo run -p tests --release -- --gg
 ```
 
 ### GG/GGC
