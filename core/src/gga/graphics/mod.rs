@@ -88,9 +88,11 @@ impl Ppu {
                 gg[VCOUNT] += 1;
 
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, false);
-                if gg[DISPSTAT].is_bit(LYC_IRQ) && gg[VCOUNT] == gg[DISPSTAT].bits(8, 8) {
+                if gg[VCOUNT] == gg[DISPSTAT].bits(8, 8) {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, true);
                     Self::maybe_interrupt(gg, Interrupt::VCounter, LYC_IRQ);
+                } else {
+                    gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, false);
                 }
 
                 if gg[VCOUNT] == 160 {

@@ -121,7 +121,7 @@ impl GameGirlAdv {
                 this.cart.rom[addr.us() - 0x800_0000]
             }
 
-            _ => this.invalid_read(addr).u8(),
+            _ => this.invalid_read::<false>(addr).u8(),
         })
     }
 
@@ -147,7 +147,7 @@ impl GameGirlAdv {
                 hword(byte, byte)
             }
 
-            _ => this.invalid_read(addr).u16(),
+            _ => this.invalid_read::<false>(addr).u16(),
         })
     }
 
@@ -174,7 +174,7 @@ impl GameGirlAdv {
                 word(hword, hword)
             }
 
-            _ => this.invalid_read(addr),
+            _ => this.invalid_read::<true>(addr),
         })
     }
 
@@ -188,7 +188,9 @@ impl GameGirlAdv {
             TM3CNT_L => Timers::time_read::<3>(self),
 
             // Nonexistent registers between sound
-            0x66 | 0x6A | 0x6E | 0x76 | 0x7A | 0x7E | 0x86 | 0x8A => self.invalid_read(addr).u16(),
+            0x66 | 0x6A | 0x6E | 0x76 | 0x7A | 0x7E | 0x86 | 0x8A => {
+                self.invalid_read::<false>(addr).u16()
+            }
 
             // Old sound
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
@@ -198,11 +200,12 @@ impl GameGirlAdv {
             }
 
             // Write-only registers (PPU)
-            BG0HOFS..=WIN1V | MOSAIC | BLDY => self.invalid_read(addr).u16(),
+            BG0HOFS..=WIN1V | MOSAIC | BLDY => self.invalid_read::<false>(addr).u16(),
             // Write-only registers (DMA)
-            0xB0..=0xB8 | 0xBC..=0xC4 | 0xC8..=0xD0 | 0xD4..=0xDC => self.invalid_read(addr).u16(),
+            0xB0..=0xB8 | 0xBC..=0xC4 | 0xC8..=0xD0 | 0xD4..=0xDC => {
+                self.invalid_read::<false>(addr).u16()
+            }
 
-            // Nonexistent registers
             0x4E
             | 0x56..=0x5E
             | 0xA0..=0xAF
@@ -211,18 +214,19 @@ impl GameGirlAdv {
             | 0x134..=0x1FF
             | 0x206
             | 0x20A
-            | 0x302..=0x3FE => self.invalid_read(addr).u16(),
+            | 0x302..=0x3FE => self.invalid_read::<false>(addr).u16(),
 
             _ => self[a],
         }
     }
 
-    fn invalid_read(&self, addr: u32) -> u32 {
+    fn invalid_read<const WORD: bool>(&self, addr: u32) -> u32 {
         match addr {
             0x0800_0000..=0x0DFF_FFFF => {
                 // Out of bounds ROM read
-                let addr = addr >> 1;
-                addr & 0xFFFF
+                let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
+                let low = addr.u16();
+                word(low, low.wrapping_add(1))
             }
 
             _ => {

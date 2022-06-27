@@ -38,11 +38,10 @@ impl Dmas {
         let old_ctrl = gg[base + 0xA];
         if !old_ctrl.is_bit(15) && new_ctrl.is_bit(15) {
             // Reload SRC/DST
-            let mask = if idx == 3 { 0xFFF_FFFF } else { 0x7FF_FFFF };
             let src = word(gg[base], gg[base + 2]);
             let dst = word(gg[base + 4], gg[base + 6]);
-            gg.dma.src[idx.us()] = src & mask;
-            gg.dma.dst[idx.us()] = dst & mask;
+            gg.dma.src[idx.us()] = src;
+            gg.dma.dst[idx.us()] = dst;
         }
 
         gg[base + 0xA] = new_ctrl;
@@ -119,10 +118,14 @@ impl Dmas {
         src_mod: i32,
         dst_mod: i32,
     ) {
-        let mut kind = Access::NonSeq;
-        let valid = Self::is_valid_addr(idx, gg.dma.src[idx]);
+        if !gg.dma.check_valid_addr::<true>(idx, gg.dma.dst[idx]) {
+            return;
+        }
 
-        if valid {
+        let mut kind = Access::NonSeq;
+        let valid_src = gg.dma.check_valid_addr::<false>(idx, gg.dma.src[idx]);
+
+        if valid_src {
             // First, align SRC/DST
             let align = if WORD { 3 } else { 1 };
             gg.dma.src[idx] &= !align;
@@ -176,10 +179,19 @@ impl Dmas {
     }
 
     // Checks if a given addr is valid for a DMA.
-    fn is_valid_addr(dma: usize, addr: u32) -> bool {
+    fn check_valid_addr<const DST: bool>(&mut self, dma: usize, addr: u32) -> bool {
         match addr {
-            0x0200_0000..=0x03FF_FFFF | 0x0500_0000..=0x07FF_FFFF => true,
-            0x0800_0000..=0x0FFF_FFFF => dma == 3,
+            0x0200_0000..=0x0400_0300 | 0x0500_0000..=0x07FF_FFFF => true,
+
+            // All SRAM reads return 0 with DMA0
+            0x0E00_0000..=0x0FFF_FFFF if !DST && dma == 0 => {
+                self.cache = 0;
+                false
+            }
+            // Only DMA3 can write SRAM
+            0x0E00_0000..=0x0FFF_FFFF if DST => dma == 3,
+            // DMA0 cannot access cartridge
+            0x0800_0000..=0x0FFF_FFFF => dma != 0,
             _ => false,
         }
     }
