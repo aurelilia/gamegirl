@@ -68,10 +68,10 @@ graphical glitches.
 - [ ] AGB
   - [ ] Most commercial games running glitch-free
   - [x] Full ARM7DTMI CPU
-    - [x] Cycle accuracy
+    - [x] Instruction-level accuracy
     - [x] Accurate interrupts
     - [x] Accurate waitstates
-  - [ ] Open bus behavior
+  - [x] Open bus behavior
   - [ ] PPU
     - [ ] Passing visual tests 
     - [x] Text mode Backgrounds
@@ -156,7 +156,7 @@ cargo run -p tests --release -- --gg
   - [ ] I/O read: 91/123
     - Various bit masks are wrong
   - [ ] Timing: Calibration fails
-  - [ ] Timer count-up/IRQ: Freezes the emulator...
+  - [ ] Timer count-up/IRQ: Freezes...
   - [x] Shifter: 140/140
   - [x] Carry: 93/93
   - [x] BIOS math: 625/625

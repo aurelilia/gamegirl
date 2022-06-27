@@ -32,6 +32,7 @@ impl Timers {
         // Reschedule event
         // Edge case: with high reload and fast timers, sometimes (late_by > until_ov).
         // In this case, we simply schedule the next overflow event to be immediately.
+        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by;
         gg.scheduler.schedule(
             AdvEvent::TimerOverflow(idx),
             until_ov.saturating_sub(late_by),
@@ -48,7 +49,7 @@ impl Timers {
             // Is on scheduler, calculate current value
             let scaler = DIVS[(ctrl & 3).us()].u32();
             let elapsed = gg.scheduler.now() - gg.timers.scheduled_at[TIM];
-            gg.timers.counters[TIM] + (elapsed / scaler).u16()
+            gg.timers.counters[TIM].wrapping_add((elapsed / scaler).u16())
         } else {
             // Either off or inc on overflow, just return current counter
             gg.timers.counters[TIM]
@@ -56,20 +57,29 @@ impl Timers {
     }
 
     /// Handle CTRL write by scheduling timer as appropriate.
-    pub fn hi_write<const TIM: u8>(gg: &mut GameGirlAdv, addr: u32, new_ctrl: u16) {
+    pub fn hi_write<const TIM: usize>(gg: &mut GameGirlAdv, addr: u32, new_ctrl: u16) {
+        // Update current counter value first
+        gg.timers.counters[TIM] = Self::time_read::<TIM>(gg);
+
         let old_ctrl = gg[addr];
         let was_scheduled = old_ctrl.is_bit(7) && !old_ctrl.is_bit(2);
         let is_scheduled = new_ctrl.is_bit(7) && !new_ctrl.is_bit(2);
 
         if was_scheduled {
             // Need to cancel current scheduled event
-            gg.scheduler.cancel(AdvEvent::TimerOverflow(TIM));
+            gg.scheduler.cancel(AdvEvent::TimerOverflow(TIM.u8()));
         }
         if is_scheduled {
             // Need to start scheduling this timer
             let until_ov = Self::next_overflow_time(gg[addr - 2], new_ctrl);
+            gg.timers.scheduled_at[TIM] = gg.scheduler.now();
             gg.scheduler
-                .schedule(AdvEvent::TimerOverflow(TIM), until_ov);
+                .schedule(AdvEvent::TimerOverflow(TIM.u8()), until_ov);
+
+            if !was_scheduled {
+                // Reload counter.
+                gg.timers.counters[TIM] = gg[addr - 2];
+            }
         }
 
         gg[addr] = new_ctrl;
@@ -80,8 +90,6 @@ impl Timers {
         let addr = Self::hi_addr(idx);
         let reload = gg[addr - 2];
         let ctrl = gg[addr];
-        // Updated scheduled time that timers bound by the scheduler use
-        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now();
         // Set to reload value
         gg.timers.counters[idx.us()] = reload;
         // Fire IRQ if enabled
@@ -111,7 +119,7 @@ impl Timers {
     /// Time until next overflow, for scheduling.
     fn next_overflow_time(reload: u16, ctrl: u16) -> u32 {
         let scaler = DIVS[(ctrl & 3).us()].u32();
-        scaler * (0xFFFF - reload.u32())
+        scaler * (0x1_0000 - reload.u32())
     }
 
     /// Increment a timer. Used for cascading timers.
