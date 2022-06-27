@@ -157,6 +157,13 @@ cargo run -p tests --release -- --gg
   - [x] `nes`
   - [x] `bios`
   - [ ] `unsafe` (Fails at 002, OOB ROM reads)
+- [ ] destoer's gba_tests
+  - [x] `cond_invalid`
+  - [ ] `dma_priority` (Causes stack overflow even...)
+  - [x] `hello_world`
+  - [x] `if_ack`
+  - Unsure of how to interpret results of the rest...
+- [x] ladystarbreeze's GBA test collection
 - [x] [FuzzARM](https://github.com/DenSinH/FuzzARM), all 5 precompiled tests
 - [x] ARMWrestler
 
@@ -180,3 +187,5 @@ cargo run -p tests --release -- --gg
 - [mj-hd, for rgba, which I used to properly understand ARM7 emulation details](https://github.com/mj-hd/rgba/)
 - [jsmolka, for their testing ROMs](https://github.com/jsmolka/gba-tests)
 - [DenSinH, for FuzzARM and GBAC-](https://github.com/DenSinH)
+- [ladystarbreeze, for their testing ROMs](https://github.com/ladystarbreeze/GBA-Test-Collection)
+- [destoer, for their testing ROMs](https://github.com/destoer/gba_tests)

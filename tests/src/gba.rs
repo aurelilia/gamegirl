@@ -2,8 +2,8 @@ use std::ops::ControlFlow::{Break, Continue};
 
 use crate::Status;
 
-pub fn exec_gba_tests() {
-    crate::run_dir::<true, true>("gba-tests", |gg| {
+pub fn exec_jsmolka() {
+    crate::run_dir::<true, true>("jsmolka", |gg| {
         let gg = gg.as_gga();
         if gg.cpu.sp() == 0x03008014 {
             let ones = gg.cpu.reg(10);
@@ -27,4 +27,12 @@ pub fn exec_fuzzarm() {
             Continue(())
         }
     })
+}
+
+pub fn exec_ladystarbreeze() {
+    crate::run_dir::<true, true>("ladystarbreeze", |_| Continue(()))
+}
+
+pub fn exec_destoer() {
+    crate::run_dir::<true, true>("destoer", |_| Continue(()))
 }
