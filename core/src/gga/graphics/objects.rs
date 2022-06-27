@@ -56,9 +56,12 @@ impl Ppu {
         let mosaic = obj.attr2.is_bit(4);
 
         if obj.attr0.is_bit(5) {
-            let adj_tile_idx =
-                base_tile_idx + ((obj_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 16 });
-            let tile_addr = 0x1_0000 + (adj_tile_idx * 64);
+            let tile_addr = 0x1_0000
+                + if !is_2d {
+                    (base_tile_idx + ((obj_y.us() >> 3) * size.0.us() >> 3)) * 64
+                } else {
+                    (base_tile_idx + ((obj_y.us() >> 3) * 32)) * 32
+                };
             let mut tile_line_addr = tile_addr + (tile_y.us() * 8);
             for _ in 0..tile_count {
                 Self::render_tile_8bpp::<true>(gg, prio, obj_x, x_step, tile_line_addr, mosaic);
@@ -128,10 +131,10 @@ impl Ppu {
                 break;
             }
 
-            let px = ((rotscal[0] * dx + rotscal[1] * dy) >> 8) + px0 as i32;
-            let py = ((rotscal[2] * dx + rotscal[3] * dy) >> 8) + py0 as i32;
+            let trans_x = ((rotscal[0] * dx + rotscal[1] * dy) >> 8) + px0 as i32;
+            let trans_y = ((rotscal[2] * dx + rotscal[3] * dy) >> 8) + py0 as i32;
             dx += 1;
-            let (trans_x, trans_y) = (px as u16, py as u16);
+            let (trans_x, trans_y) = (trans_x as u16, trans_y as u16);
             if trans_x >= size.0 || trans_y >= size.1 {
                 continue;
             }
@@ -153,9 +156,12 @@ impl Ppu {
     ) -> u8 {
         let tile_y = trans_y & 7;
         if is_8bpp {
-            let adj_tile_idx =
-                base_tile_idx + ((trans_y.us() >> 3) * if !is_2d { size.0.us() >> 3 } else { 16 });
-            let tile_addr = 0x1_0000 + (adj_tile_idx * 64);
+            let tile_addr = 0x1_0000
+                + if !is_2d {
+                    (base_tile_idx + ((trans_y.us() >> 3) * size.0.us() >> 3)) * 64
+                } else {
+                    (base_tile_idx + ((trans_y.us() >> 3) * 32)) * 32
+                };
             let tile_line_addr = tile_addr + (tile_y.us() * 8) + (64 * (trans_x.us() >> 3));
             gg.ppu.vram(tile_line_addr + (trans_x.us() & 7))
         } else {

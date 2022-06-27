@@ -1,3 +1,8 @@
+//! For this PPU implementation, I took a lot of reference from DenSinH's GBAC-.
+//! It is not an outright copy, but I want to thank them for their code
+//! that helped me understand the PPU's more complex behavior.
+//! The code is under the MIT license at https://github.com/DenSinH/GBAC-.
+
 mod bitmap;
 mod objects;
 mod palette;
