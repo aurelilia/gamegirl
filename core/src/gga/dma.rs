@@ -82,11 +82,19 @@ impl Dmas {
             _ => count.u32(),
         };
         let src_mod = Self::get_step(ctrl.bits(7, 2));
-        let dst_mod = if FIFO {
-            0
-        } else {
-            Self::get_step(ctrl.bits(5, 2))
+
+        let dst_raw = ctrl.bits(5, 2);
+        let dst_mod = match dst_raw {
+            _ if FIFO => 0,
+            3 => {
+                // Reload DST + Increment
+                let dst = word(gg[base + 4], gg[base + 6]);
+                gg.dma.dst[idx.us()] = dst;
+                2
+            }
+            _ => Self::get_step(dst_raw),
         };
+
         let word_transfer = ctrl.is_bit(10);
         if FIFO || word_transfer {
             Self::perform_transfer::<true>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
