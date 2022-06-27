@@ -87,9 +87,10 @@ graphical glitches.
     - [ ] Volume control registers
   - [ ] DMAs
     - [x] General transfers
-    - [ ] Fine register behavior (Not replacing address if invalid, etc)
+    - [x] Fine register behavior (Not replacing address if invalid, etc)
     - [x] APU FIFO transfers
-    - [ ] GamePak EEPROM transfers
+    - [x] GamePak EEPROM transfers
+    - [ ] DMA3 Video Capture
   - [x] Timers
     - [x] Scheduled timers
     - [x] Cascading timers

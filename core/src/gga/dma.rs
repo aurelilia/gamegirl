@@ -36,10 +36,15 @@ impl Dmas {
         let old_ctrl = gg[base + 0xA];
         if !old_ctrl.is_bit(15) && new_ctrl.is_bit(15) {
             // Reload SRC/DST
+            let mask = if idx == 3 {
+                0xFFF_FFFF
+            } else {
+                0x7FF_FFFF
+            };
             let src = word(gg[base], gg[base + 2]);
             let dst = word(gg[base + 4], gg[base + 6]);
-            gg.dma.src[idx.us()] = src;
-            gg.dma.dst[idx.us()] = dst;
+            gg.dma.src[idx.us()] = src & mask;
+            gg.dma.dst[idx.us()] = dst & mask;
         }
 
         gg[base + 0xA] = new_ctrl;
@@ -60,13 +65,13 @@ impl Dmas {
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma<const SPECIAL: bool>(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16) {
+    fn step_dma<const FIFO: bool>(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16) {
         let on = ctrl.is_bit(15)
             && match ctrl.bits(12, 2) {
                 0 => true,
                 1 => gg[DISPSTAT].is_bit(VBLANK),
                 2 => gg[DISPSTAT].is_bit(HBLANK),
-                _ => SPECIAL,
+                _ => FIFO,
             };
         if !on {
             return;
@@ -74,19 +79,19 @@ impl Dmas {
 
         let count = gg[base + 8];
         let count = match count {
-            _ if SPECIAL => 4,
+            _ if FIFO => 4,
             0 if idx == 3 => 0x1_0000,
             0 => 0x4000,
             _ => count.u32(),
         };
         let src_mod = Self::get_step(ctrl.bits(7, 2));
-        let dst_mod = if SPECIAL {
+        let dst_mod = if FIFO {
             0
         } else {
             Self::get_step(ctrl.bits(5, 2))
         };
         let word_transfer = ctrl.is_bit(10);
-        if SPECIAL || word_transfer {
+        if FIFO || word_transfer {
             Self::perform_transfer::<true>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
         } else if idx == 3 {
             // Maybe alert EEPROM, if the cart has one
