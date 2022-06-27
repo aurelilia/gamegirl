@@ -35,7 +35,9 @@ pub struct Memory {
     #[serde(with = "serde_arrays")]
     pub mmio: [u16; KB / 2],
 
-    open_bus: [u8; 4],
+    /// Value to return when trying to read BIOS outside of it
+    pub(crate) bios_value: u32,
+
     #[serde(skip)]
     #[serde(default = "serde_pages")]
     read_pages: [*mut u8; 8192],
@@ -108,6 +110,9 @@ impl GameGirlAdv {
     #[inline]
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
         self.get(addr, |this, addr| match addr {
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u8(),
+
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
 
@@ -126,6 +131,9 @@ impl GameGirlAdv {
     #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, |this, addr| match addr {
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u16(),
+
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
 
             // If EEPROM, use that...
@@ -149,6 +157,9 @@ impl GameGirlAdv {
     #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
         self.get(addr, |this, addr| match addr {
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF => this.memory.bios_value,
+
             0x0400_0000..=0x04FF_FFFF => {
                 word(this.get_mmio(addr), this.get_mmio(addr.wrapping_add(2)))
             }
@@ -323,7 +334,15 @@ impl GameGirlAdv {
                 self[IE] = value;
                 Cpu::check_if_interrupt(self);
             }
-            IF => self[IF] &= !value,
+            IF => {
+                self[IF] &= !value;
+                // We assume that acknowledging the interrupt is the last thing the handler
+                // does, and set the BIOS read value to the post-interrupt
+                // state. Not entirely accurate...
+                if self.memory.bios_value == 0xE25EF004 {
+                    self.memory.bios_value = 0xE55EC002;
+                }
+            }
             WAITCNT => {
                 self[a] = value;
                 self.update_wait_times();
@@ -399,7 +418,7 @@ impl GameGirlAdv {
     /// pointer in range 0..0x7FFF (due to offsets to the (null) pointer)
     fn page<const WRITE: bool>(&self, addr: u32) -> *mut u8 {
         const MASK: [usize; 16] = [
-            0x3FFF, // BIOS
+            0,      // Unmapped
             0,      // Unmapped
             0x7FFF, // EWRAM
             0x7FFF, // IWRAM
@@ -426,6 +445,13 @@ impl GameGirlAdv {
                 self.memory.read_pages.get_unchecked(page_idx)
             };
             page.add(addr & mask)
+        }
+    }
+
+    fn bios_read<T>(&self, addr: u32) -> T {
+        unsafe {
+            let ptr = BIOS.as_ptr().add(addr.us() & 0x3FFF);
+            mem::transmute::<_, *const T>(ptr).read()
         }
     }
 
@@ -466,7 +492,6 @@ impl GameGirlAdv {
         }
 
         match a {
-            0x0000_0000..=0x0000_3FFF if R => offs(BIOS, a),
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
             0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
@@ -535,7 +560,7 @@ impl Default for Memory {
             ewram: [0; 256 * KB],
             iwram: [0; 32 * KB],
             mmio: [0; KB / 2],
-            open_bus: [0; 4],
+            bios_value: 0xE129F000,
             read_pages: serde_pages(),
             write_pages: serde_pages(),
             wait_word: [0; 32],

@@ -42,6 +42,7 @@ impl GameGirlAdv {
 
             "1111_????????????????????????" => {
                 Cpu::exception_occurred(self, Exception::Swi);
+                self.memory.bios_value = 0xE3A02004;
             }
 
             "00010_0001111dddd000000000000" => self.set_reg(d, self.cpu.cpsr),

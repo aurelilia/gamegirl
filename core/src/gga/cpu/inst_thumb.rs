@@ -15,7 +15,10 @@ impl GameGirlAdv {
         #[bitmatch]
         match inst {
             // SWI
-            "11011111_????????" => Cpu::exception_occurred(self, Exception::Swi),
+            "11011111_????????" => {
+                Cpu::exception_occurred(self, Exception::Swi);
+                self.memory.bios_value = 0xE3A02004;
+            }
 
             // THUMB.1
             "000_00nnnnnsssddd" => self.cpu.low[d.us()] = self.cpu.lsl(self.low(s), n.u32()),

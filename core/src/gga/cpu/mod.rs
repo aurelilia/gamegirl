@@ -78,6 +78,9 @@ impl Cpu {
 
     /// An exception occurred, jump to the bootrom handler and deal with it.
     fn exception_occurred(gg: &mut GameGirlAdv, kind: Exception) {
+        if gg.cpu.pc > 0x100_0000 {
+            gg.memory.bios_value = 0xE25EF004;
+        }
         if gg.cpu.flag(Thumb) {
             gg.cpu.inc_pc_by(2); // ??
         }
