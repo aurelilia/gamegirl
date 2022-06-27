@@ -1,5 +1,9 @@
 use crate::{
-    gga::{addr::MOSAIC, graphics::Ppu, GameGirlAdv},
+    gga::{
+        addr::MOSAIC,
+        graphics::{Ppu, EMPTY},
+        GameGirlAdv,
+    },
     numutil::NumExt,
     Colour,
 };
@@ -38,19 +42,19 @@ impl Ppu {
         }
     }
 
-    fn get_pixel<const OBJ: bool>(&mut self, x: u16, prio: u16) -> Option<Colour> {
+    fn get_pixel<const OBJ: bool>(&self, x: u16, prio: u16) -> Option<Colour> {
         if !(0..240).contains(&x) {
             return None;
         }
         let layers = if OBJ {
-            &mut self.obj_layers
+            &self.obj_layers
         } else {
-            &mut self.bg_layers
+            &self.bg_layers
         };
         Some(layers[prio.us()][x.us()])
     }
 
-    fn set_pixel<const OBJ: bool>(
+    pub(super) fn set_pixel<const OBJ: bool>(
         gg: &mut GameGirlAdv,
         x: i16,
         prio: u16,
@@ -58,7 +62,7 @@ impl Ppu {
         colour_idx: u8,
         mosaic: bool,
     ) {
-        if !(0..240).contains(&x) || colour_idx == 0 {
+        if !(0..240).contains(&x) || colour_idx == 0 || gg.ppu.is_occupied::<OBJ>(x as u16, prio) {
             return;
         }
         let x = x as u16;
@@ -84,6 +88,10 @@ impl Ppu {
         layers[prio.us()][x.us()] = colour;
     }
 
+    pub(super) fn is_occupied<const OBJ: bool>(&self, x: u16, prio: u16) -> bool {
+        self.get_pixel::<OBJ>(x, prio) != Some(EMPTY)
+    }
+
     fn get_layers<const OBJ: bool>(gg: &mut GameGirlAdv) -> &mut [[Colour; 240]; 4] {
         if OBJ {
             &mut gg.ppu.obj_layers
@@ -92,7 +100,7 @@ impl Ppu {
         }
     }
 
-    fn vram(&self, addr: usize) -> u8 {
+    pub(crate) fn vram(&self, addr: usize) -> u8 {
         if addr <= 0x17FFF {
             self.vram[addr]
         } else {

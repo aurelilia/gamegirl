@@ -10,3 +10,6 @@ inherits = "release"
 strip = true
 codegen-units = 4
 lto = true
+
+[profile.dev]
+opt-level = 1
