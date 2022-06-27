@@ -62,7 +62,7 @@ impl GameGirlAdv {
         self.add_wait_cycles(self.wait_time::<2>(addr, kind));
         if addr.is_bit(0) {
             // Unaligned
-            let val = self.get_hword(addr - 1);
+            let val = self.get_hword(addr);
             Cpu::ror_s0(val.u32(), 8)
         } else {
             // Aligned
@@ -76,7 +76,7 @@ impl GameGirlAdv {
         self.add_wait_cycles(self.wait_time::<2>(addr, kind));
         if addr.is_bit(0) {
             // Unaligned
-            let val = self.get_byte(addr);
+            let val = self.get_hword(addr) >> 8;
             val as i8 as i16 as u32
         } else {
             // Aligned
@@ -86,7 +86,6 @@ impl GameGirlAdv {
 
     /// Read a word from the bus (LE). Also enforces timing.
     pub(super) fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
-        let addr = addr & !3; // Forcibly align
         self.add_wait_cycles(self.wait_time::<4>(addr, kind));
         self.get_word(addr)
     }
@@ -109,7 +108,7 @@ impl GameGirlAdv {
     /// the value.
     #[inline]
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
-        self.get(addr, |this, addr| match addr {
+        self.get(addr, !0, |this, addr| match addr {
             0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u8(),
 
@@ -130,7 +129,7 @@ impl GameGirlAdv {
     /// simply fetches the value.
     #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
-        self.get(addr, |this, addr| match addr {
+        self.get(addr, !1, |this, addr| match addr {
             0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u16(),
 
@@ -156,7 +155,7 @@ impl GameGirlAdv {
     /// fetches the value. Also does not handle unaligned reads.
     #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
-        self.get(addr, |this, addr| match addr {
+        self.get(addr, !3, |this, addr| match addr {
             0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value,
 
@@ -207,7 +206,10 @@ impl GameGirlAdv {
                 addr & 0xFFFF
             }
 
-            _ => 0,
+            _ => {
+                // Open bus
+                self.get_word(self.cpu.pc)
+            }
         }
     }
 
@@ -257,16 +259,21 @@ impl GameGirlAdv {
             }
 
             // MMIO
-            0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => {
+            0x0400_0000..=0x0400_0301 if addr.is_bit(0) => {
                 self.set_hword(addr, self.get_hword(addr).set_high(value))
             }
-            0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
+            0x0400_0000..=0x0400_0301 => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
             // Cart save
             0x0E00_0000..=0x0FFF_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
 
             // VRAM weirdness
-            0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
+            0x0500_0000..=0x0600_FFFF => self.set_hword(addr & !1, hword(value, value)),
+            0x0602_0000..=0x06FF_FFFF if a & 0x1_FFFF < 0x1_0000 => {
+                // Only BG VRAM gets written to, OBJ VRAM is ignored
+                self.set_hword(addr & !1, hword(value, value));
+            }
+            0x0601_0000..=0x07FF_FFFF => (), // Ignored
 
             _ => self.set(addr, value, |_this, _addr, _value| ()),
         }
@@ -277,7 +284,7 @@ impl GameGirlAdv {
     pub(super) fn set_hword(&mut self, addr_unaligned: u32, value: u16) {
         let addr = addr_unaligned & !1; // Forcibly align: All write instructions do this
         self.set(addr, value, |this, addr, value| match addr {
-            0x0400_0000..=0x04FF_FFFF => this.set_mmio(addr, value),
+            0x0400_0000..=0x0400_0300 => this.set_mmio(addr, value),
 
             // Maybe write EEPROM
             0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
@@ -304,7 +311,7 @@ impl GameGirlAdv {
     pub(super) fn set_word(&mut self, addr_unaligned: u32, value: u32) {
         let addr = addr_unaligned & !3; // Forcibly align: All write instructions do this
         self.set(addr, value, |this, addr, value| match addr {
-            0x0400_0000..=0x04FF_FFFF => {
+            0x0400_0000..=0x0400_0300 => {
                 this.set_mmio(addr, value.low());
                 this.set_mmio(addr.wrapping_add(2), value.high());
             }
@@ -387,8 +394,9 @@ impl GameGirlAdv {
     /// Get a value in memory. Will try to do a fast read from page tables,
     /// falls back to given closure if no page table is mapped at that address.
     #[inline]
-    fn get<T>(&self, addr: u32, slow: impl FnOnce(&GameGirlAdv, u32) -> T) -> T {
-        let ptr = self.page::<false>(addr);
+    fn get<T>(&self, addr: u32, align: u32, slow: impl FnOnce(&GameGirlAdv, u32) -> T) -> T {
+        let aligned = addr & align;
+        let ptr = self.page::<false>(aligned);
         if ptr as usize > 0x8000 {
             unsafe { mem::transmute::<_, *const T>(ptr).read() }
         } else {

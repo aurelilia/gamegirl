@@ -18,6 +18,8 @@ pub struct Dmas {
     src: [u32; 4],
     /// Internal destination registers
     dst: [u32; 4],
+    /// Internal cache shared between DMAs
+    cache: u32,
 }
 
 impl Dmas {
@@ -118,19 +120,47 @@ impl Dmas {
         dst_mod: i32,
     ) {
         let mut kind = Access::NonSeq;
-        for _ in 0..count {
-            if WORD {
-                let value = gg.read_word(gg.dma.src[idx], kind);
-                gg.write_word(gg.dma.dst[idx], value, kind);
-            } else {
-                let value = gg.read_hword(gg.dma.src[idx], kind).u16();
-                gg.write_hword(gg.dma.dst[idx], value, kind);
+        let valid = Self::is_valid_addr(idx, gg.dma.src[idx]);
+
+        if valid {
+            // First, align SRC/DST
+            let align = if WORD { 3 } else { 1 };
+            gg.dma.src[idx] &= !align;
+            gg.dma.dst[idx] &= !align;
+
+            for _ in 0..count {
+                if WORD {
+                    let value = gg.read_word(gg.dma.src[idx], kind);
+                    gg.write_word(gg.dma.dst[idx], value, kind);
+                } else {
+                    let value = gg.read_hword(gg.dma.src[idx], kind).u16();
+                    gg.write_hword(gg.dma.dst[idx], value, kind);
+                }
+                gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
+                gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
+                // Only first is NonSeq
+                kind = Access::Seq;
             }
 
-            gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
-            gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
-            // Only first is NonSeq
-            kind = Access::Seq;
+            // Put last value into cache
+            if WORD {
+                gg.dma.cache = gg.get_word(gg.dma.src[idx].wrapping_add_signed(-src_mod));
+            } else {
+                let value = gg.get_hword(gg.dma.src[idx].wrapping_add_signed(-src_mod));
+                gg.dma.cache = word(value, value);
+            }
+        } else {
+            for _ in 0..count {
+                if WORD {
+                    gg.write_word(gg.dma.dst[idx], gg.dma.cache, kind);
+                } else {
+                    gg.write_hword(gg.dma.dst[idx], gg.dma.cache.u16(), kind);
+                }
+                gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
+                gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
+                // Only first is NonSeq
+                kind = Access::Seq;
+            }
         }
     }
 
@@ -142,6 +172,15 @@ impl Dmas {
             1 => -2,
             2 => 0,
             _ => 0, // TODO
+        }
+    }
+
+    // Checks if a given addr is valid for a DMA.
+    fn is_valid_addr(dma: usize, addr: u32) -> bool {
+        match addr {
+            0x0200_0000..=0x03FF_FFFF | 0x0500_0000..=0x07FF_FFFF => true,
+            0x0800_0000..=0x0FFF_FFFF => dma == 3,
+            _ => false,
         }
     }
 

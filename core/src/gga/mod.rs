@@ -213,8 +213,8 @@ impl GameGirlAdv {
     }
 
     pub fn skip_bootrom(&mut self) {
-        self.cpu.pc = 0x0800_0000;
         self.cpu.cpsr = 0x1F;
+        self.set_pc(0x0800_0000);
         self.cpu.sp[1] = 0x0300_7F00;
         self.cpu.sp[3] = 0x0300_7F00;
         self.cpu.sp[5] = 0x0300_7F00;

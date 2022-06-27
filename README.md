@@ -148,6 +148,11 @@ cargo run -p tests --release -- --gg
   - [x] cgb-acid2
 
 ### GGA
+- [ ] mgba's suite
+  - Memory: 1489/1552
+    - ROM load: DMA1-3 fail
+    - ROM OOB load: 32, DMA1-3, swi fail
+    - SRAM load: DMA1-3 fail
 - [ ] jsmolka's gba-tests
   - [x] `arm`
   - [x] `memory`
@@ -183,6 +188,7 @@ cargo run -p tests --release -- --gg
 - blargg, Gekkio and mattcurie for their test ROMs and retrio for hosting blargg's ROMs
 
 ### GGA
+- [endrift, for mGBA, it's test suite and blog,](https://github.com/endrift) which was my inspiration for doing GGA emulation
 - [GBATEK, as a technical reference](https://problemkaputt.de/gbatek.htm)
 - [mj-hd, for rgba, which I used to properly understand ARM7 emulation details](https://github.com/mj-hd/rgba/)
 - [jsmolka, for their testing ROMs](https://github.com/jsmolka/gba-tests)
