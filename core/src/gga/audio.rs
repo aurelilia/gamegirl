@@ -61,6 +61,12 @@ impl Apu {
     }
 
     fn push_output(gg: &mut GameGirlAdv) {
+        if !gg.apu.cgb_chans.power {
+            // Master enable, also applies to DMA channels
+            gg.apu.buffer.push(0.);
+            gg.apu.buffer.push(0.);
+            return;
+        }
         let mut left = 0;
         let mut right = 0;
 
@@ -84,8 +90,14 @@ impl Apu {
         }
 
         let cgb_sample = gg.apu.cgb_chans.make_sample();
-        right += (cgb_sample[0] * 2048.) as i16;
-        left += (cgb_sample[1] * 2048.) as i16;
+        let cgb_mul = match cnt & 3 {
+            0 => 512.,  // 25%
+            1 => 1024., // 50%
+            2 => 2048., // 100%
+            _ => 0.,    // 3: prohibited
+        };
+        right += (cgb_sample[0] * cgb_mul * 0.8) as i16;
+        left += (cgb_sample[1] * cgb_mul * 0.8) as i16;
 
         let bias = gg[SOUNDBIAS].bits(0, 10) as i16;
         gg.apu.buffer.push(Self::bias(right, bias) as f32 / 1024.0);

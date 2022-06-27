@@ -81,10 +81,10 @@ graphical glitches.
     - [ ] Blending
     - [ ] Affine BGs/objects
     - [ ] Windows
-  - [ ] APU
+  - [x] APU
     - [x] CGB sound channels
     - [x] DMA sound channels
-    - [ ] Volume control registers
+    - [x] All Volume control registers
   - [ ] DMAs
     - [x] General transfers
     - [x] Fine register behavior (Not replacing address if invalid, etc)

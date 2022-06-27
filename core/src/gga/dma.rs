@@ -36,11 +36,7 @@ impl Dmas {
         let old_ctrl = gg[base + 0xA];
         if !old_ctrl.is_bit(15) && new_ctrl.is_bit(15) {
             // Reload SRC/DST
-            let mask = if idx == 3 {
-                0xFFF_FFFF
-            } else {
-                0x7FF_FFFF
-            };
+            let mask = if idx == 3 { 0xFFF_FFFF } else { 0x7FF_FFFF };
             let src = word(gg[base], gg[base + 2]);
             let dst = word(gg[base + 4], gg[base + 6]);
             gg.dma.src[idx.us()] = src & mask;
