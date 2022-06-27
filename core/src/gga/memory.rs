@@ -110,12 +110,14 @@ impl GameGirlAdv {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
-            0x0E00_0000..=0x0E00_FFFF => this.cart.read_ram_byte(addr.us() & 0xFFFF),
+
+            0x0E00_0000..=0x0FFF_FFFF => this.cart.read_ram_byte(addr.us() & 0xFFFF),
             // Account for unmapped last page due to EEPROM
             0x0DFF_8000..=0x0DFF_FFFF if this.cart.rom.len() >= (addr.us() - 0x800_0000) => {
                 this.cart.rom[addr.us() - 0x800_0000]
             }
-            _ => 0,
+
+            _ => this.invalid_read(addr).u8(),
         })
     }
 
@@ -125,10 +127,20 @@ impl GameGirlAdv {
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, |this, addr| match addr {
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
+
+            // If EEPROM, use that...
             0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => this.cart.read_ram_hword(),
-            // Account for unmapped last page due to EEPROM
+            // If not, account for unmapped last page due to EEPROM
             0x0DFF_8000..=0x0DFF_FFFF => hword(this.get_byte(addr), this.get_byte(addr + 1)),
-            _ => 0,
+
+            // Other saves
+            0x0E00_0000..=0x0FFF_FFFF => {
+                // Reading halfwords causes the byte to be repeated
+                let byte = this.cart.read_ram_byte(addr.us() & 0xFFFF);
+                hword(byte, byte)
+            }
+
+            _ => this.invalid_read(addr).u16(),
         })
     }
 
@@ -140,9 +152,19 @@ impl GameGirlAdv {
             0x0400_0000..=0x04FF_FFFF => {
                 word(this.get_mmio(addr), this.get_mmio(addr.wrapping_add(2)))
             }
+
             // Account for unmapped last page due to EEPROM
             0x0DFF_8000..=0x0DFF_FFFF => word(this.get_hword(addr), this.get_hword(addr + 2)),
-            _ => 0,
+
+            // Other saves
+            0x0E00_0000..=0x0FFF_FFFF => {
+                // Reading words causes the byte to be repeated
+                let byte = this.cart.read_ram_byte(addr.us() & 0xFFFF);
+                let hword = hword(byte, byte);
+                word(hword, hword)
+            }
+
+            _ => this.invalid_read(addr),
         })
     }
 
@@ -163,6 +185,18 @@ impl GameGirlAdv {
             }
 
             _ => self[a],
+        }
+    }
+
+    fn invalid_read(&self, addr: u32) -> u32 {
+        match addr {
+            0x0800_0000..=0x0DFF_FFFF => {
+                // Out of bounds ROM read
+                let addr = addr >> 1;
+                addr & 0xFFFF
+            }
+
+            _ => 0,
         }
     }
 
@@ -218,7 +252,7 @@ impl GameGirlAdv {
             0x0400_0000..=0x04FF_FFFF => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
             // Cart save
-            0x0E00_0000..=0x0E00_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
+            0x0E00_0000..=0x0FFF_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
 
             // VRAM weirdness
             0x0500_0000..=0x07FF_FFFF => self.set_hword(addr, hword(value, value)),
@@ -229,24 +263,51 @@ impl GameGirlAdv {
 
     /// Write a half-word from the bus (LE). Does no timing-related things;
     /// simply sets the value.
-    pub(super) fn set_hword(&mut self, addr: u32, value: u16) {
-        let addr = addr & !1; // Forcibly align: All write instructions do this
+    pub(super) fn set_hword(&mut self, addr_unaligned: u32, value: u16) {
+        let addr = addr_unaligned & !1; // Forcibly align: All write instructions do this
         self.set(addr, value, |this, addr, value| match addr {
             0x0400_0000..=0x04FF_FFFF => this.set_mmio(addr, value),
+
+            // Maybe write EEPROM
             0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
                 this.cart.write_ram_hword(value)
             }
+
+            // Other saves
+            0x0E00_0000..=0x0FFF_FFFF => {
+                // Writing halfwords causes a byte from it to be written
+                let byte = if addr_unaligned.is_bit(0) {
+                    value.high()
+                } else {
+                    value.low()
+                };
+                this.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
+            }
+
             _ => (),
         });
     }
 
     /// Write a word from the bus (LE). Does no timing-related things; simply
     /// sets the value.
-    pub(super) fn set_word(&mut self, addr: u32, value: u32) {
-        let addr = addr & !3; // Forcibly align: All write instructions do this
-        self.set(addr, value, |this, addr, value| {
-            this.set_hword(addr, value.low());
-            this.set_hword(addr.wrapping_add(2), value.high());
+    pub(super) fn set_word(&mut self, addr_unaligned: u32, value: u32) {
+        let addr = addr_unaligned & !3; // Forcibly align: All write instructions do this
+        self.set(addr, value, |this, addr, value| match addr {
+            0x0400_0000..=0x04FF_FFFF => {
+                this.set_mmio(addr, value.low());
+                this.set_mmio(addr.wrapping_add(2), value.high());
+            }
+
+            // Saves
+            0x0E00_0000..=0x0FFF_FFFF => {
+                // Writing words causes a byte from it to be written
+                let byte_shift = (addr_unaligned & 3) * 8;
+                let byte = (value >> byte_shift) & 0xFF;
+                this.cart
+                    .write_ram_byte(addr_unaligned.us() & 0xFFFF, byte.u8());
+            }
+
+            _ => (),
         });
     }
 
@@ -307,7 +368,7 @@ impl GameGirlAdv {
     /// Get a value in memory. Will try to do a fast read from page tables,
     /// falls back to given closure if no page table is mapped at that address.
     #[inline]
-    fn get<T>(&self, addr: u32, slow: fn(&GameGirlAdv, u32) -> T) -> T {
+    fn get<T>(&self, addr: u32, slow: impl FnOnce(&GameGirlAdv, u32) -> T) -> T {
         let ptr = self.page::<false>(addr);
         if ptr as usize > 0x8000 {
             unsafe { mem::transmute::<_, *const T>(ptr).read() }
@@ -319,7 +380,12 @@ impl GameGirlAdv {
     /// Sets a value in memory. Will try to do a fast write with page tables,
     /// falls back to given closure if no page table is mapped at that address.
     #[inline]
-    fn set<T: UpperHex>(&mut self, addr: u32, value: T, slow: fn(&mut GameGirlAdv, u32, T)) {
+    fn set<T: UpperHex>(
+        &mut self,
+        addr: u32,
+        value: T,
+        slow: impl FnOnce(&mut GameGirlAdv, u32, T),
+    ) {
         let ptr = self.page::<true>(addr);
         if ptr as usize > 0x8000 {
             unsafe { ptr::write(mem::transmute::<_, *mut T>(ptr), value) }
@@ -406,9 +472,15 @@ impl GameGirlAdv {
             0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
             0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
             0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
-            // Does not go all the way due to EEPROM, also does not mirror
-            0x0800_0000..=0x0DFF_7FFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
+            0x0800_0000..=0x09FF_FFFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
                 offs(&self.cart.rom, a - 0x800_0000)
+            }
+            0x0A00_0000..=0x0BFF_FFFF if R && self.cart.rom.len() >= (a - 0xA00_0000) => {
+                offs(&self.cart.rom, a - 0xA00_0000)
+            }
+            // Does not go all the way due to EEPROM
+            0x0C00_0000..=0x0DFF_7FFF if R && self.cart.rom.len() >= (a - 0xC00_0000) => {
+                offs(&self.cart.rom, a - 0xC00_0000)
             }
 
             // VRAM mirror weirdness

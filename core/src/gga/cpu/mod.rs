@@ -29,6 +29,7 @@ pub struct Cpu {
     pub pc: u32,
     pub cpsr: u32,
     pub spsr: ModeReg,
+    pipeline: [u32; 2],
 }
 
 impl Cpu {
@@ -43,7 +44,9 @@ impl Cpu {
         gg.cpu.inc_pc();
 
         if gg.cpu.flag(Thumb) {
-            let inst = gg.read_hword(gg.cpu.pc - 4, Access::Seq).u16();
+            let inst = gg.cpu.pipeline[0].u16();
+            gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
+            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc, Access::Seq);
             gg.execute_inst_thumb(inst);
 
             if crate::TRACING {
@@ -51,7 +54,9 @@ impl Cpu {
                 println!("0x{:08X} {}", gg.cpu.pc, mnem);
             }
         } else {
-            let inst = gg.read_word(gg.cpu.pc - 8, Access::Seq);
+            let inst = gg.cpu.pipeline[0];
+            gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
+            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc, Access::Seq);
             gg.execute_inst_arm(inst);
 
             if crate::TRACING {
@@ -71,7 +76,7 @@ impl Cpu {
         }
     }
 
-    /// An exception occured, jump to the bootrom handler and deal with it.
+    /// An exception occurred, jump to the bootrom handler and deal with it.
     fn exception_occurred(gg: &mut GameGirlAdv, kind: Exception) {
         if gg.cpu.flag(Thumb) {
             gg.cpu.inc_pc_by(2); // ??
@@ -92,14 +97,13 @@ impl Cpu {
     }
 
     /// Emulate a pipeline stall / fill; used when PC changes.
-    /// This emulator does not emulate the pipeline.
     pub fn pipeline_stall(gg: &mut GameGirlAdv) {
         if gg.cpu.flag(Thumb) {
-            gg.add_wait_cycles(gg.wait_time::<2>(gg.cpu.pc, Access::NonSeq));
-            gg.add_wait_cycles(gg.wait_time::<2>(gg.cpu.pc + 4, Access::Seq));
+            gg.cpu.pipeline[0] = gg.read_hword(gg.cpu.pc, Access::NonSeq);
+            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc + 2, Access::Seq);
         } else {
-            gg.add_wait_cycles(gg.wait_time::<4>(gg.cpu.pc, Access::NonSeq));
-            gg.add_wait_cycles(gg.wait_time::<4>(gg.cpu.pc + 4, Access::Seq));
+            gg.cpu.pipeline[0] = gg.read_word(gg.cpu.pc, Access::NonSeq);
+            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc + 4, Access::Seq);
         };
         gg.cpu.inc_pc();
     }
@@ -145,6 +149,7 @@ impl Default for Cpu {
             pc: 0,
             cpsr: 0xD3,
             spsr: ModeReg::default(),
+            pipeline: [0; 2],
         }
     }
 }

@@ -27,9 +27,9 @@ impl Cartridge {
 
             Flash128 { bank: 1, .. } => self.ram[addr | 0x10000],
             Flash64(_) | Flash128 { .. } => self.ram[addr],
-            Sram if addr < 0x8000 => self.ram[addr],
+            Sram => self.ram[addr & 0x7FFF],
 
-            _ => 0,
+            _ => 0xFF,
         }
     }
 
@@ -44,7 +44,7 @@ impl Cartridge {
         match &mut self.save_type {
             Flash64(state) => state.write(addr, value, &mut self.ram, None),
             Flash128 { state, bank } => state.write(addr, value, &mut self.ram, Some(bank)),
-            Sram if addr < 0x8000 => self.ram[addr] = value,
+            Sram => self.ram[addr & 0x7FFF] = value,
             _ => (),
         }
     }
@@ -64,14 +64,14 @@ impl Cartridge {
         self.rom = rom;
         self.save_type = self.detect_save();
 
-        let zero_iter = iter::repeat(0);
+        let ff_iter = iter::repeat(0xFF);
         let len = self.ram.len();
         match self.save_type {
             Nothing => {}
-            Eeprom(_) => self.ram.extend(zero_iter.take((8 * KB) - len)),
-            Sram => self.ram.extend(zero_iter.take((32 * KB) - len)),
-            Flash64(_) => self.ram.extend(zero_iter.take((64 * KB) - len)),
-            Flash128 { .. } => self.ram.extend(zero_iter.take((128 * KB) - len)),
+            Eeprom(_) => self.ram.extend(ff_iter.take((8 * KB) - len)),
+            Sram => self.ram.extend(ff_iter.take((32 * KB) - len)),
+            Flash64(_) => self.ram.extend(ff_iter.take((64 * KB) - len)),
+            Flash128 { .. } => self.ram.extend(ff_iter.take((128 * KB) - len)),
         }
     }
 

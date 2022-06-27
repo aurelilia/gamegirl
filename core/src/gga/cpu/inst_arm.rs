@@ -132,11 +132,13 @@ impl GameGirlAdv {
 
                 // TODO mehhh, this entire implementation is terrible
                 let mut addr = self.reg(n);
-                let mut regs = (0..=15).filter(|b| r.is_bit(*b)).collect::<Vec<u16>>();
+                let initial_addr = addr;
+                let regs = (0..=15).filter(|b| r.is_bit(*b)).collect::<Vec<u16>>();
                 let first_reg = *regs.get(0).unwrap_or(&12323);
                 let end_offs = regs.len().u32() * 4;
                 if u == 0 {
-                    regs.reverse();
+                    addr = Self::mod_with_offs(addr, 4, p == 0);
+                    addr -= end_offs;
                 }
                 let mut kind = NonSeq;
                 let mut set_n = false;
@@ -144,10 +146,10 @@ impl GameGirlAdv {
                 for reg in regs {
                     set_n |= reg == n.u16();
                     if p == 1 {
-                        addr = Self::mod_with_offs(addr, 4, u == 1);
+                        addr += 4;
                     }
                     if l == 0 && reg == n.u16() && reg != first_reg {
-                        self.set_reg(n, Self::mod_with_offs(self.reg(n), end_offs, u == 1));
+                        self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, u == 1));
                     }
 
                     if l == 0 {
@@ -159,12 +161,12 @@ impl GameGirlAdv {
 
                     kind = Seq;
                     if p == 0 {
-                        addr = Self::mod_with_offs(addr, 4, u == 1);
+                        addr += 4;
                     }
                 }
 
                 if w == 1 && (l == 0 || !set_n) {
-                    self.set_reg(n, addr);
+                    self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, u == 1));
                 }
 
                 self.cpu.cpsr = cpsr;

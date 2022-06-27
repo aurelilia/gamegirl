@@ -152,7 +152,11 @@ cargo run -p tests --release -- --gg
   - [x] `arm`
   - [x] `memory`
   - [x] `thumb`
-  - Everything else untested
+  - [x] `save` (All of them)
+  - [x] `ppu` (All of them)
+  - [x] `nes`
+  - [ ] `unsafe` (Fails at 002, OOB ROM reads)
+  - [ ] `bios`
 - [x] [FuzzARM](https://github.com/DenSinH/FuzzARM), all 5 precompiled tests
 - [x] ARMWrestler
 

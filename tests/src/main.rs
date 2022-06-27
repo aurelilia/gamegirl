@@ -34,13 +34,14 @@ fn main() {
                 .description("Mark the given test as good by making a comparison image for it")
                 .usage("tests good [path]")
                 .action(|c| {
-                    let path = c.args.first().unwrap();
-                    let test_rom = fs::read(path).unwrap();
-                    let img_path = format!("{}.png", path);
-                    let img_path = PathBuf::from(img_path);
-                    let img =
-                        run::<false, true>(test_rom, None, |_| ControlFlow::Continue(())).unwrap();
-                    save_png(&img_path, img);
+                    for path in &c.args {
+                        let test_rom = fs::read(path).unwrap();
+                        let img_path = format!("{}.png", path);
+                        let img_path = PathBuf::from(img_path);
+                        let img = run::<false, true>(test_rom, None, |_| ControlFlow::Continue(()))
+                            .unwrap();
+                        save_png(&img_path, img);
+                    }
                 }),
         )
         .command(
