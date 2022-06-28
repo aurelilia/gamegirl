@@ -16,11 +16,13 @@ use crate::{
 /// This implementation writes everything at once
 /// once the timer of 648 cycles is up.
 pub fn do_oam_dma(gg: &mut GameGirl) {
-    let mut src = gg[DMA].u16() * 0x100;
+    let src = gg[DMA].u16() * 0x100;
+    let mut src = if src > 0xDF00 { src - 0x2000 } else { src };
     for dest in 0..0xA0 {
         gg.mem.oam[dest] = gg.get8(src);
         src += 1;
     }
+    gg.mem.dma_active = false;
 }
 
 /// HDMA VRAM transfer available only on CGB.

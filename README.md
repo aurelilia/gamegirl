@@ -140,7 +140,7 @@ cargo run -p tests --release -- --gg
 ### GG/GGC
 - [x] Blargg (except `oam_bug`)
 - [ ] Mooneye
-  - [ ] `acceptance`: 30/71
+  - [ ] `acceptance`: 33/70
   - [x] `emulator-only`: 27/28 (MBC1M, not supported)
 - [x] Acid2
   - [x] dmg-acid2

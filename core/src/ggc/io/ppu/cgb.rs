@@ -167,7 +167,7 @@ impl Ppu {
         map_line: u8,
         correct_tile_addr: bool,
     ) {
-        let line = gg[LY];
+        let line = gg.ppu.line;
         let bg_en = gg.lcdc(BG_EN);
 
         let mut tile_x = scroll_x & 7;

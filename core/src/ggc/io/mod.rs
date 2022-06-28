@@ -45,6 +45,7 @@ pub struct Memory {
     oam: [u8; 160],
     #[serde(with = "serde_arrays")]
     high: [u8; 256],
+    dma_active: bool,
 
     #[serde(skip)]
     #[serde(default = "serde_pages")]
@@ -80,8 +81,8 @@ impl GameGirl {
     }
 
     pub fn write16(&mut self, addr: u16, value: u16) {
-        self.write8(addr, value.u8());
         self.write8(addr.wrapping_add(1), (value >> 8).u8());
+        self.write8(addr, value.u8());
     }
 
     /// Get an 8-bit argument for the current CPU instruction.
@@ -110,8 +111,9 @@ impl GameGirl {
     pub fn get8(&self, addr: u16) -> u8 {
         self.get(addr, |this, addr| match addr {
             0xA000..=0xBFFF => this.cart.read(addr),
-            0xFE00..=0xFE9F => this.mem.oam[addr.us() & 0xFF],
-            _ => this.get_high(addr & 0x00FF),
+            0xFE00..=0xFE9F if !this.mem.dma_active => this.mem.oam[addr.us() & 0xFF],
+            0xFF00..=0xFFFF => this.get_high(addr & 0x00FF),
+            _ => 0xFF,
         })
     }
 
@@ -161,6 +163,7 @@ impl GameGirl {
             0xD000..=0xDFFF => {
                 self.mem.wram[(a & 0x0FFF) + (self.mem.wram_bank.us() * 0x1000)] = value
             }
+            0xE000..=0xFDFF => self.mem.wram[a & 0x1FFF] = value,
             0xFE00..=0xFE9F => self.mem.oam[a & 0xFF] = value,
             0xFF00..=0xFFFF => self.set_high(addr & 0x00FF, value),
             _ => (),
@@ -205,6 +208,7 @@ impl GameGirl {
                 let time = 648 / self.speed.u32();
                 self.scheduler.cancel(GGEvent::DMAFinish);
                 self.scheduler.schedule(GGEvent::DMAFinish, time);
+                self.mem.dma_active = true;
             }
             BCPS..=OPRI => self.ppu.write_high(addr, value),
             NR10..=WAV_END => Apu::write(self, HIGH_START + addr, value),
@@ -326,6 +330,7 @@ impl Memory {
             wram: [0; 32768],
             wram_bank: 1,
             oam: [0; 160],
+            dma_active: false,
             high: [0xFF; 256],
 
             read_pages: serde_pages(),

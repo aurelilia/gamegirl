@@ -73,6 +73,8 @@ pub enum PpuEvent {
     UploadEnd,
     HblankEnd,
     VblankEnd,
+    // This happens a little after HBlank end
+    LYIncrement,
 }
 
 impl PpuEvent {
@@ -83,6 +85,7 @@ impl PpuEvent {
             PpuEvent::VblankEnd => 1,
             PpuEvent::OamScanEnd => 2,
             PpuEvent::UploadEnd => 3,
+            _ => panic!("Not applicable!"),
         }
     }
 }

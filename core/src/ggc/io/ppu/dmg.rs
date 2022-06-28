@@ -1,7 +1,7 @@
 use crate::{
     ggc::{
         io::{
-            addr::{BGP, LY},
+            addr::BGP,
             ppu::{cgb::Cgb, Ppu, PpuKind},
         },
         GameGirl,
@@ -23,7 +23,7 @@ impl Ppu {
         correct_tile_addr: bool,
     ) {
         let colours = Self::get_bg_colours(gg);
-        let line = gg[LY];
+        let line = gg.ppu.line;
         let mut tile_x = scroll_x & 7;
         let tile_y = map_line & 7;
         let mut tile_addr = map_addr + ((map_line / 8).u16() * 0x20) + (scroll_x >> 3).u16();
@@ -55,7 +55,7 @@ impl Ppu {
     }
 
     pub fn clear_line(gg: &mut GameGirl) {
-        let y = gg[LY];
+        let y = gg.ppu.line;
         for idx in 0..160 {
             let col = COLOURS[0];
             gg.ppu().set_pixel(idx, y, [col, col, col, 255]);

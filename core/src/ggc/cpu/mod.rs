@@ -47,20 +47,37 @@ impl Cpu {
 
     /// Check if any interrupts occurred.
     fn check_interrupts(gg: &mut GameGirl, ime: bool) {
-        let bits = gg[IE] & gg[IF] & 0x1F;
+        let mut bits = gg[IE] & gg[IF] & 0x1F;
         if !ime || (bits == 0) {
             return;
         }
 
         for bit in 0..5 {
             if bits.is_bit(bit) {
-                gg[IF] = gg[IF].set_bit(bit, false) as u8;
-                gg.cpu.ime = false;
-                gg.push_stack(gg.cpu.pc);
-                gg.cpu.pc = Interrupt::from_index(bit).addr();
-                gg.advance_clock(5);
-                return;
+                if Self::dispatch_intr(gg, bit) {
+                    return;
+                } else {
+                    bits = gg[IE] & gg[IF] & 0x1F;
+                }
             }
+        }
+    }
+
+    fn dispatch_intr(gg: &mut GameGirl, intr: u16) -> bool {
+        gg.cpu.ime = false;
+        // If the PC push will overwrite IE with the high byte.
+        let upper_ie_push = gg.cpu.sp == 0;
+        gg.push_stack(gg.cpu.pc);
+
+        if !upper_ie_push || gg[IE].is_bit(intr) {
+            gg[IF] = gg[IF].set_bit(intr, false) as u8;
+            gg.cpu.pc = Interrupt::from_index(intr).addr();
+            gg.advance_clock(3);
+            true
+        } else {
+            // Edge case: If the PC push overwrote IE on the high byte, jump to 0 instead
+            gg.cpu.pc = 0;
+            false
         }
     }
 

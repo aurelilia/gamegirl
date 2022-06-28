@@ -45,6 +45,7 @@ pub struct Ppu {
     #[serde(default = "serde_bool_arr")]
     bg_occupied_pixels: [bool; 160],
     window_line: u8,
+    line: u8,
     kind: PpuKind,
 
     #[serde(skip)]
@@ -72,10 +73,13 @@ impl Ppu {
             }
 
             PpuEvent::HblankEnd => {
-                gg[LY] += 1;
+                gg.ppu.line += 1;
+                // TODO
+                gg.scheduler
+                    .schedule(GGEvent::PpuEvent(PpuEvent::LYIncrement), 0);
+
                 Self::stat_interrupt(gg, 5);
-                Self::lyc_interrupt(gg);
-                if gg[LY] == 144 {
+                if gg.ppu.line == 144 {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
                     gg.ppu().last_frame = Some(gg.ppu.pixels.to_vec());
@@ -86,9 +90,11 @@ impl Ppu {
             }
 
             PpuEvent::VblankEnd => {
+                gg.ppu.line += 1;
                 gg[LY] += 1;
                 Self::lyc_interrupt(gg);
-                if gg[LY] > 153 {
+                if gg.ppu.line > 153 {
+                    gg.ppu.line = 0;
                     gg[LY] = 0;
                     gg.ppu.window_line = 0;
                     (gg.options.frame_finished)(BorrowedSystem::GGC(gg));
@@ -98,9 +104,16 @@ impl Ppu {
                     (PpuEvent::VblankEnd, 456)
                 }
             }
+
+            PpuEvent::LYIncrement => {
+                gg[LY] += 1;
+                Self::lyc_interrupt(gg);
+                gg[STAT] = gg[STAT].set_bit(2, gg[LYC] == gg[LY]);
+                return;
+            }
         };
 
-        gg[STAT] = gg[STAT].set_bit(2, gg[LYC] == gg[LY]).u8() & 0xFC | next_mode.ordinal();
+        gg[STAT] = gg[STAT] & 0xFC | next_mode.ordinal();
 
         gg.scheduler
             .schedule(GGEvent::PpuEvent(next_mode), time - late_by);
@@ -164,7 +177,7 @@ impl Ppu {
 
     fn render_bg(gg: &mut GameGirl) {
         // Only render until the point where the window starts, should it be active
-        let end_x = if gg.lcdc(WIN_EN) && (7u8..166u8).contains(&gg[WX]) && gg[WY] <= gg[LY] {
+        let end_x = if gg.lcdc(WIN_EN) && (7u8..166u8).contains(&gg[WX]) && gg[WY] <= gg.ppu.line {
             gg[WX] - 7
         } else {
             160
@@ -175,14 +188,14 @@ impl Ppu {
             0,
             end_x,
             gg.map_addr(BG_MAP),
-            gg[SCY].wrapping_add(gg[LY]),
+            gg[SCY].wrapping_add(gg.ppu.line),
             true,
         )
     }
 
     fn render_window(gg: &mut GameGirl) {
         let wx = gg[WX] as i16 - 7;
-        if !(0..=159).contains(&wx) || gg[WY] > gg[LY] {
+        if !(0..=159).contains(&wx) || gg[WY] > gg.ppu.line {
             return;
         }
 
@@ -225,7 +238,7 @@ impl Ppu {
     fn render_objs(gg: &mut GameGirl) {
         let mut count = 0;
         let sprite_offs = 8 + gg.lcdc(BIG_OBJS) as i16 * 8;
-        let ly = gg[LY] as i16;
+        let ly = gg.ppu.line as i16;
 
         for idx in 0..40 {
             let sprite = Sprite::from(&gg.mem, idx);
@@ -345,6 +358,7 @@ impl Ppu {
         Self {
             bg_occupied_pixels: [false; 160],
             window_line: 0,
+            line: 0,
             kind: PpuKind::Dmg {
                 used_x_obj_coords: [None; 10],
             },
