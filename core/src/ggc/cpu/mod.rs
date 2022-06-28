@@ -37,11 +37,10 @@ impl Cpu {
             gg.cpu.halt_bug = false;
         }
 
-        let (cycles, inc) = inst::execute(gg, inst);
+        let inc = inst::execute(gg, inst);
         if inc {
             gg.cpu.pc += inst.size().u16();
         }
-        gg.advance_clock(cycles.u16());
 
         Self::check_interrupts(gg, ime && gg.cpu.ime);
     }

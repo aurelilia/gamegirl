@@ -242,7 +242,7 @@ impl GameGirl {
 
     pub fn skip_bootrom(&mut self) {
         self.cpu.pc = 0x100;
-        self.write(BOOTROM_DISABLE, 1);
+        self.set8(BOOTROM_DISABLE, 1);
     }
 }
 

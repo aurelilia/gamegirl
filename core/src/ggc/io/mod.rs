@@ -17,7 +17,7 @@ use crate::{
         scheduling::{GGEvent, PpuEvent},
         timer::Timer,
     },
-    numutil::NumExt,
+    numutil::{hword, NumExt},
 };
 
 pub(super) mod addr;
@@ -58,19 +58,70 @@ pub struct Memory {
 }
 
 impl GameGirl {
-    pub fn read(&self, addr: u16) -> u8 {
+    pub fn read8(&mut self, addr: u16) -> u8 {
+        self.advance_clock(1);
+        self.get8(addr)
+    }
+
+    pub fn read_s8(&mut self, addr: u16) -> i8 {
+        self.read8(addr) as i8
+    }
+
+    pub fn write8(&mut self, addr: u16, value: u8) {
+        self.debugger.write_occurred(addr);
+        self.advance_clock(1);
+        self.set8(addr, value);
+    }
+
+    pub fn read16(&mut self, addr: u16) -> u16 {
+        let low = self.read8(addr);
+        let high = self.read8(addr.wrapping_add(1));
+        (high.u16() << 8) | low.u16()
+    }
+
+    pub fn write16(&mut self, addr: u16, value: u16) {
+        self.write8(addr, value.u8());
+        self.write8(addr.wrapping_add(1), (value >> 8).u8());
+    }
+
+    /// Get an 8-bit argument for the current CPU instruction.
+    pub fn arg8(&mut self) -> u8 {
+        self.read8(self.cpu.pc + 1)
+    }
+
+    /// Get a 16-bit argument for the current CPU instruction.
+    pub fn arg16(&mut self) -> u16 {
+        self.read16(self.cpu.pc + 1)
+    }
+
+    /// Pop the current value off the SP.
+    pub fn pop_stack(&mut self) -> u16 {
+        let val = self.read16(self.cpu.sp);
+        self.cpu.sp = self.cpu.sp.wrapping_add(2);
+        val
+    }
+
+    /// Push the given value to the current SP.
+    pub fn push_stack(&mut self, value: u16) {
+        self.cpu.sp = self.cpu.sp.wrapping_sub(2);
+        self.write16(self.cpu.sp, value)
+    }
+
+    pub fn get8(&self, addr: u16) -> u8 {
         self.get(addr, |this, addr| match addr {
             0xA000..=0xBFFF => this.cart.read(addr),
             0xFE00..=0xFE9F => this.mem.oam[addr.us() & 0xFF],
-            _ => this.read_high(addr & 0x00FF),
+            _ => this.get_high(addr & 0x00FF),
         })
     }
 
-    pub(super) fn read_signed(&self, addr: u16) -> i8 {
-        self.read(addr) as i8
+    pub fn get16(&self, addr: u16) -> u16 {
+        let low = self.get8(addr);
+        let high = self.get8(addr.wrapping_add(1));
+        hword(low, high)
     }
 
-    fn read_high(&self, addr: u16) -> u8 {
+    fn get_high(&self, addr: u16) -> u8 {
         match addr {
             JOYP => self.joypad.read(self[JOYP]),
             DIV | TIMA | TAC => Timer::read(self, addr),
@@ -89,8 +140,7 @@ impl GameGirl {
         }
     }
 
-    pub fn write(&mut self, addr: u16, value: u8) {
-        self.debugger.write_occurred(addr);
+    pub fn set8(&mut self, addr: u16, value: u8) {
         let a = addr.us();
         match addr {
             0x0000..=0x7FFF => {
@@ -112,12 +162,12 @@ impl GameGirl {
                 self.mem.wram[(a & 0x0FFF) + (self.mem.wram_bank.us() * 0x1000)] = value
             }
             0xFE00..=0xFE9F => self.mem.oam[a & 0xFF] = value,
-            0xFF00..=0xFFFF => self.write_high(addr & 0x00FF, value),
+            0xFF00..=0xFFFF => self.set_high(addr & 0x00FF, value),
             _ => (),
         }
     }
 
-    fn write_high(&mut self, addr: u16, value: u8) {
+    fn set_high(&mut self, addr: u16, value: u8) {
         match addr {
             VRAM_SELECT if self.cgb => {
                 self.mem.vram_bank = value & 1;
@@ -165,40 +215,6 @@ impl GameGirl {
             LY | SC | 0x03 | 0x08..=0x0E | 0x4C..=0x7F => (),
             _ => self[addr] = value,
         }
-    }
-
-    pub fn read16(&self, addr: u16) -> u16 {
-        let low = self.read(addr);
-        let high = self.read(addr.wrapping_add(1));
-        (high.u16() << 8) | low.u16()
-    }
-
-    pub fn write16(&mut self, addr: u16, value: u16) {
-        self.write(addr, value.u8());
-        self.write(addr.wrapping_add(1), (value >> 8).u8());
-    }
-
-    /// Get an 8-bit argument for the current CPU instruction.
-    pub fn arg8(&self) -> u8 {
-        self.read(self.cpu.pc + 1)
-    }
-
-    /// Get a 16-bit argument for the current CPU instruction.
-    pub fn arg16(&self) -> u16 {
-        self.read16(self.cpu.pc + 1)
-    }
-
-    /// Pop the current value off the SP.
-    pub fn pop_stack(&mut self) -> u16 {
-        let val = self.read16(self.cpu.sp);
-        self.cpu.sp = self.cpu.sp.wrapping_add(2);
-        val
-    }
-
-    /// Push the given value to the current SP.
-    pub fn push_stack(&mut self, value: u16) {
-        self.cpu.sp = self.cpu.sp.wrapping_sub(2);
-        self.write16(self.cpu.sp, value)
     }
 
     pub(super) fn load_cart_mem(&mut self, cart: Cartridge, conf: &SystemConfig) {

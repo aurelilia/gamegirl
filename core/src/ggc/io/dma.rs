@@ -18,7 +18,7 @@ use crate::{
 pub fn do_oam_dma(gg: &mut GameGirl) {
     let mut src = gg[DMA].u16() * 0x100;
     for dest in 0..0xA0 {
-        gg.mem.oam[dest] = gg.read(src);
+        gg.mem.oam[dest] = gg.get8(src);
         src += 1;
     }
 }
@@ -77,7 +77,7 @@ impl Hdma {
 
     fn advance_transfer(gg: &mut GameGirl) {
         for _ in 0..0x10 {
-            gg.write(gg.hdma.dest, gg.read(gg.hdma.source));
+            gg.set8(gg.hdma.dest, gg.get8(gg.hdma.source));
             gg.hdma.source += 1;
             gg.hdma.dest += 1;
         }

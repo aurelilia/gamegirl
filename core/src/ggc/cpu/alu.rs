@@ -50,7 +50,8 @@ impl GameGirl {
             .set_fli16(Flag::HalfCarry, ((hl & 0xFFF) + (other & 0xFFF)) & 0x1000);
         self.cpu
             .set_fl(Flag::Carry, ((hl as u32 + other as u32) & 0x10000) != 0);
-        self.cpu.set_dreg(DReg::HL, result)
+        self.cpu.set_dreg(DReg::HL, result);
+        self.advance_clock(1); // Internal delay
     }
 
     pub(super) fn mod_ret_hl(&mut self, mod_: i32) -> u16 {
@@ -63,7 +64,7 @@ impl GameGirl {
     // as well as kotcrab's xgbc emulator for showing me correct behavior for 0xE8 &
     // 0xF8!
     pub(super) fn add_sp(&mut self) -> u16 {
-        let value = self.read_signed(self.cpu.pc + 1) as i16;
+        let value = self.read_s8(self.cpu.pc + 1) as i16;
         self.cpu.set_fl(Flag::Zero, false);
         self.cpu.set_fl(Flag::Negative, false);
         self.cpu.set_fli16(

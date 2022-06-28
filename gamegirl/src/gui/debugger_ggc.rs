@@ -33,7 +33,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             ui.set_min_width(150.0);
             let mut pc = gg.cpu.pc;
             let inst = inst::get_at(gg, pc);
-            let arg = gg.read16(pc + 1);
+            let arg = gg.get16(pc + 1);
             ui.add(
                 Label::new(
                     RichText::new(format!("0x{:04X} {}", pc, inst.formatted_name(arg)))
@@ -45,7 +45,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             pc += inst.size().u16();
             for _ in 0..0xF {
                 let inst = inst::get_at(gg, pc);
-                let arg = gg.read16(pc + 1);
+                let arg = gg.get16(pc + 1);
                 ui.add(
                     Label::new(
                         RichText::new(format!("0x{:04X} {}", pc, inst.formatted_name(arg)))
@@ -63,7 +63,7 @@ pub fn debugger(gg: &mut GameGirl, ui: &mut Ui) {
             for _ in 0..0xF {
                 ui.add(
                     Label::new(
-                        RichText::new(format!("0x{:04X} - {:04X}", sp, gg.read16(sp))).monospace(),
+                        RichText::new(format!("0x{:04X} - {:04X}", sp, gg.get16(sp))).monospace(),
                     )
                     .wrap(false),
                 );
@@ -162,7 +162,7 @@ pub fn memory(gg: &mut GameGirl, ui: &mut Ui) {
             let row_start = row_start * 0x10;
             write!(&mut buf, "{:04X} -", row_start).unwrap();
             for offset in 0..0x10 {
-                write!(&mut buf, " {:02X}", gg.read(row_start + offset)).unwrap();
+                write!(&mut buf, " {:02X}", gg.get8(row_start + offset)).unwrap();
             }
 
             let label = ui.add(Label::new(RichText::new(&buf).monospace()).wrap(false));

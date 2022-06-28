@@ -23,7 +23,7 @@ making the emulation overall more accurate and fast. Most games are playable, bu
 graphical glitches.
 
 ### Features
-- Complete DMG/CGB implementation, including running DMG games on CGB
+- Complete and M-cycle cycle-accurate DMG/CGB implementation, including running DMG games on CGB
 - Colour correction for CGB
 - Highly configurable, including input
 - Savegame support in common `.sav` format (Basic RTC support)
@@ -43,7 +43,7 @@ graphical glitches.
   - [x] Most commercial games running glitch-free 
   - [ ] Full SM83 CPU
     - [x] Full instruction set implemented and passing tests
-    - [ ] M-cycle accuracy
+    - [x] M-cycle accuracy
     - [ ] Highly accurate interrupts (Pinball Fantasy)
   - [ ] PPU
     - [x] Passing visual tests
