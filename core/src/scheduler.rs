@@ -39,6 +39,10 @@ impl<E: Kind> Scheduler<E> {
         }
         // The loop exited without finding a bigger element, this new one is the biggest
         self.events[0] = event;
+
+        // We run this here since it is probably the least-run function.
+        // We want to check the time as little as possible to save perf.
+        self.check_time();
     }
 
     /// Advance the timer by the given amount of ticks.
@@ -80,9 +84,6 @@ impl<E: Kind> Scheduler<E> {
     /// Somewhat expensive.
     pub fn cancel(&mut self, evt: E) {
         self.events.retain(|e| e.kind != evt);
-        // We run this here since it is probably the least-run function.
-        // We want to check the time as little as possible to save perf.
-        self.check_time();
     }
 
     pub fn now(&self) -> u32 {

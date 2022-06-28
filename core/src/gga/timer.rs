@@ -15,6 +15,8 @@ const DIVS: [u16; 4] = [1, 64, 256, 1024];
 
 /// Timers on the GGA.
 /// They run on the scheduler when in regular counting mode.
+/// The scheduler variables have a bunch of small additions that work for some
+/// reason, still not sure why. Some other timings that are inaccurate?
 #[derive(Default, Deserialize, Serialize)]
 pub struct Timers {
     /// Counter value. Used for cascading counters; for scheduled counters this
@@ -32,7 +34,7 @@ impl Timers {
         // Reschedule event
         // Edge case: with high reload and fast timers, sometimes (late_by > until_ov).
         // In this case, we simply schedule the next overflow event to be immediately.
-        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by;
+        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by + 2;
         gg.scheduler.schedule(
             AdvEvent::TimerOverflow(idx),
             until_ov.saturating_sub(late_by),
@@ -70,16 +72,16 @@ impl Timers {
             gg.scheduler.cancel(AdvEvent::TimerOverflow(TIM.u8()));
         }
         if is_scheduled {
-            // Need to start scheduling this timer
-            let until_ov = Self::next_overflow_time(gg[addr - 2], new_ctrl);
-            gg.timers.scheduled_at[TIM] = gg.scheduler.now();
-            gg.scheduler
-                .schedule(AdvEvent::TimerOverflow(TIM.u8()), until_ov);
-
             if !was_scheduled {
                 // Reload counter.
                 gg.timers.counters[TIM] = gg[addr - 2];
             }
+
+            // Need to start scheduling this timer
+            let until_ov = Self::next_overflow_time(gg.timers.counters[TIM], new_ctrl);
+            gg.timers.scheduled_at[TIM] = gg.scheduler.now() + 2;
+            gg.scheduler
+                .schedule(AdvEvent::TimerOverflow(TIM.u8()), until_ov);
         }
 
         gg[addr] = new_ctrl;
@@ -119,7 +121,7 @@ impl Timers {
     /// Time until next overflow, for scheduling.
     fn next_overflow_time(reload: u16, ctrl: u16) -> u32 {
         let scaler = DIVS[(ctrl & 3).us()].u32();
-        scaler * (0x1_0000 - reload.u32())
+        (scaler * (0x1_0000 - reload.u32())) + 6
     }
 
     /// Increment a timer. Used for cascading timers.

@@ -274,7 +274,6 @@ impl GameGirlAdv {
                     let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF);
                     self.alu::<true>(o, n, second_op, d, c == 1, cpsr);
                 }
-                self.add_wait_cycles(1);
             }
 
             "001_oooocnnnnddddssssmmmmmmmm" => {

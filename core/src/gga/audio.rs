@@ -148,39 +148,33 @@ impl Apu {
 impl GenericApu {
     pub fn read_register_gga(&self, addr: u16) -> u8 {
         match addr {
-            0x60 => 0x80 | self.pulse1.channel().read_sweep_register(),
-            0x62 => 0x3F | (self.pulse1.channel().read_pattern_duty() << 6),
+            0x60 => self.pulse1.channel().read_sweep_register(),
+            0x62 => (self.pulse1.channel().read_pattern_duty() << 6),
             0x63 => self.pulse1.channel().envelope().read_envelope_register(),
-            0x64 => 0xFF,
-            0x65 => 0xBF | ((self.pulse1.read_length_enable() as u8) << 6),
+            0x65 => ((self.pulse1.read_length_enable() as u8) << 6),
 
-            0x68 => 0x3F | (self.pulse2.channel().read_pattern_duty() << 6),
+            0x68 => (self.pulse2.channel().read_pattern_duty() << 6),
             0x69 => self.pulse2.channel().envelope().read_envelope_register(),
-            0x6C => 0xFF,
-            0x6D => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
+            0x6D => ((self.pulse2.read_length_enable() as u8) << 6),
 
-            0x70 => 0x7F | ((self.wave.dac_enabled() as u8) << 7),
-            0x72 => 0xFF,
-            0x73 => 0x9F | ((self.wave.channel().read_volume()) << 5),
-            0x74 => 0xFF,
-            0x75 => 0xBF | ((self.wave.read_length_enable() as u8) << 6),
+            0x70 => 0xE0 | ((self.wave.dac_enabled() as u8) << 7),
+            0x73 => 0x80 | ((self.wave.channel().read_volume()) << 5),
+            0x75 => ((self.wave.read_length_enable() as u8) << 6),
 
-            0x78 => 0xFF,
             0x79 => self.noise.channel().envelope().read_envelope_register(),
             0x7C => self.noise.channel().read_noise_register(),
-            0x7D => 0xBF | ((self.noise.read_length_enable() as u8) << 6),
+            0x7D => ((self.noise.read_length_enable() as u8) << 6),
 
-            0x80 => self.channels_control.bits(),
+            0x80 => 0x77 & self.channels_control.bits(),
             0x81 => self.channels_selection.bits(),
             0x84 => {
-                0x70 | ((self.power as u8) << 7)
+                ((self.power as u8) << 7)
                     | ((self.noise.enabled() as u8) << 3)
-                    | ((self.wave.enabled() as u8) << 2)
                     | ((self.pulse2.enabled() as u8) << 1)
                     | self.pulse1.enabled() as u8
             }
 
-            0x90..=0x9E => self.wave.channel().read_buffer((addr & 0xF) as u8),
+            0x90..=0x9F => self.wave.channel().read_buffer((addr & 0xF) as u8),
             _ => 0,
         }
     }
@@ -326,7 +320,7 @@ impl GenericApu {
                 self.power = new_power;
             }
 
-            0x90..=0x9E => {
+            0x90..=0x9F => {
                 self.wave
                     .channel_mut()
                     .write_buffer((addr & 0xF) as u8, data);

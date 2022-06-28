@@ -11,6 +11,9 @@ use crate::{
     numutil::{word, NumExt},
 };
 
+const SRC_MASK: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
+const DST_MASK: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
+
 /// GGA's 4 DMA channels.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Dmas {
@@ -40,11 +43,11 @@ impl Dmas {
             // Reload SRC/DST
             let src = word(gg[base], gg[base + 2]);
             let dst = word(gg[base + 4], gg[base + 6]);
-            gg.dma.src[idx.us()] = src;
-            gg.dma.dst[idx.us()] = dst;
+            gg.dma.src[idx.us()] = src & SRC_MASK[idx.us()];
+            gg.dma.dst[idx.us()] = dst & DST_MASK[idx.us()];
         }
 
-        gg[base + 0xA] = new_ctrl;
+        gg[base + 0xA] = new_ctrl & if idx == 3 { 0xFFE0 } else { 0xF7E0 };
         Self::step_dma::<false>(gg, idx, base, new_ctrl);
     }
 
@@ -89,7 +92,7 @@ impl Dmas {
             3 => {
                 // Reload DST + Increment
                 let dst = word(gg[base + 4], gg[base + 6]);
-                gg.dma.dst[idx.us()] = dst;
+                gg.dma.dst[idx.us()] = dst & DST_MASK[idx.us()];
                 2
             }
             _ => Self::get_step(dst_raw),
@@ -126,14 +129,12 @@ impl Dmas {
         src_mod: i32,
         dst_mod: i32,
     ) {
-        if !gg.dma.check_valid_addr::<true>(idx, gg.dma.dst[idx]) {
+        if gg.dma.dst[idx] < 0x200_0000 {
             return;
         }
 
         let mut kind = Access::NonSeq;
-        let valid_src = gg.dma.check_valid_addr::<false>(idx, gg.dma.src[idx]);
-
-        if valid_src {
+        if gg.dma.src[idx] >= 0x200_0000 {
             // First, align SRC/DST
             let align = if WORD { 3 } else { 1 };
             gg.dma.src[idx] &= !align;
@@ -164,6 +165,8 @@ impl Dmas {
             for _ in 0..count {
                 if WORD {
                     gg.write_word(gg.dma.dst[idx], gg.dma.cache, kind);
+                } else if gg.dma.dst[idx].is_bit(1) {
+                    gg.write_hword(gg.dma.dst[idx], (gg.dma.cache >> 16).u16(), kind);
                 } else {
                     gg.write_hword(gg.dma.dst[idx], gg.dma.cache.u16(), kind);
                 }
@@ -183,24 +186,6 @@ impl Dmas {
             1 => -2,
             2 => 0,
             _ => 0, // TODO
-        }
-    }
-
-    // Checks if a given addr is valid for a DMA.
-    fn check_valid_addr<const DST: bool>(&mut self, dma: usize, addr: u32) -> bool {
-        match addr {
-            0x0200_0000..=0x0400_0300 | 0x0500_0000..=0x07FF_FFFF => true,
-
-            // All SRAM reads return 0 with DMA0
-            0x0E00_0000..=0x0FFF_FFFF if !DST && dma == 0 => {
-                self.cache = 0;
-                false
-            }
-            // Only DMA3 can write SRAM
-            0x0E00_0000..=0x0FFF_FFFF if DST => dma == 3,
-            // DMA0 cannot access cartridge
-            0x0800_0000..=0x0FFF_FFFF => dma != 0,
-            _ => false,
         }
     }
 

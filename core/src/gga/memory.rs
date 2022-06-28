@@ -179,6 +179,11 @@ impl GameGirlAdv {
     }
 
     fn get_mmio(&self, addr: u32) -> u16 {
+        if addr == 0x400_100C {
+            // annoying edge case register
+            return self.invalid_read::<false>(addr).u16();
+        }
+
         let a = addr & 0x3FE;
         match a {
             // Timers
@@ -187,27 +192,27 @@ impl GameGirlAdv {
             TM2CNT_L => Timers::time_read::<2>(self),
             TM3CNT_L => Timers::time_read::<3>(self),
 
-            // Nonexistent registers between sound
-            0x66 | 0x6A | 0x6E | 0x76 | 0x7A | 0x7E | 0x86 | 0x8A => {
-                self.invalid_read::<false>(addr).u16()
-            }
-
             // Old sound
-            0x60..=0x80 | 0x84 | 0x90..=0x9F => {
+            0x60..=0x80 | 0x84 | 0x86 | 0x8A | 0x90..=0x9F => {
                 let low = self.apu.cgb_chans.read_register_gga(a.u16());
                 let high = self.apu.cgb_chans.read_register_gga(a.u16() + 1);
                 hword(low, high)
             }
+            // Sound register with some write-only bits
+            SOUNDCNT_H => self[a] & 0x770F,
 
             // Write-only registers (PPU)
             BG0HOFS..=WIN1V | MOSAIC | BLDY => self.invalid_read::<false>(addr).u16(),
             // Write-only registers (DMA)
-            0xB0..=0xB8 | 0xBC..=0xC4 | 0xC8..=0xD0 | 0xD4..=0xDC => {
+            0xB0..0xB8 | 0xBC..0xC4 | 0xC8..0xD0 | 0xD4..0xDC => {
                 self.invalid_read::<false>(addr).u16()
             }
+            // Zero registers (DMA)
+            0xB8 | 0xC4 | 0xD0 | 0xDC => 0,
 
             0x4E
             | 0x56..=0x5E
+            | 0x8C..=0x8E
             | 0xA0..=0xAF
             | 0xE0..=0xFF
             | 0x110..=0x12F
@@ -572,7 +577,7 @@ impl GameGirlAdv {
         }
     }
 
-    const WS_NONSEQ: [u16; 4] = [4, 3, 2, 8];
+    const WS_NONSEQ: [u16; 4] = [5, 4, 3, 9];
 
     fn calc_wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         match (addr, W, ty) {
@@ -580,26 +585,22 @@ impl GameGirlAdv {
             (0x0200_0000..=0x02FF_FFFF, _, _) => 3,
             (0x0500_0000..=0x06FF_FFFF, 4, _) => 2,
 
-            (0x0800_0000..=0x09FF_FFFF, _, Seq) => 2 - self[WAITCNT].bit(4),
-            (0x0800_0000..=0x09FF_FFFF, 4, NonSeq) => {
-                Self::WS_NONSEQ[self[WAITCNT].bits(2, 2).us()] + (2 - self[WAITCNT].bit(4))
+            (0x0800_0000..=0x0DFF_FFFF, 4, _) => {
+                // Cart bus is 16bit, word access is therefore 2x
+                self.calc_wait_time::<2>(addr, ty) + self.calc_wait_time::<2>(addr, Seq)
             }
+
+            (0x0800_0000..=0x09FF_FFFF, _, Seq) => 3 - self[WAITCNT].bit(4),
             (0x0800_0000..=0x09FF_FFFF, _, NonSeq) => {
                 Self::WS_NONSEQ[self[WAITCNT].bits(2, 2).us()]
             }
 
-            (0x0A00_0000..=0x0BFF_FFFF, _, Seq) => 4 - (self[WAITCNT].bit(7) * 3),
-            (0x0A00_0000..=0x0BFF_FFFF, 4, NonSeq) => {
-                Self::WS_NONSEQ[self[WAITCNT].bits(5, 2).us()] + (4 - (self[WAITCNT].bit(7) * 3))
-            }
+            (0x0A00_0000..=0x0BFF_FFFF, _, Seq) => 5 - (self[WAITCNT].bit(7) * 3),
             (0x0A00_0000..=0x0BFF_FFFF, _, NonSeq) => {
                 Self::WS_NONSEQ[self[WAITCNT].bits(5, 2).us()]
             }
 
-            (0x0C00_0000..=0x0DFF_FFFF, _, Seq) => 8 - (self[WAITCNT].bit(10) * 7),
-            (0x0C00_0000..=0x0DFF_FFFF, 4, NonSeq) => {
-                Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()] + (8 - (self[WAITCNT].bit(10) * 7))
-            }
+            (0x0C00_0000..=0x0DFF_FFFF, _, Seq) => 9 - (self[WAITCNT].bit(10) * 7),
             (0x0C00_0000..=0x0DFF_FFFF, _, NonSeq) => {
                 Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()]
             }

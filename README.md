@@ -153,16 +153,15 @@ cargo run -p tests --release -- --gg
 ### GGA
 - [ ] mgba's suite
   - [x] Memory: 1552/1552
-  - [ ] I/O read: 91/123
-    - Various bit masks are wrong
-  - [ ] Timing: 176/1660
+  - [x] I/O read: 123/123
+  - [ ] Timing: 355/1660
   - [ ] Timer count-up: Freezes...
-  - [ ] Timer IRQ: 0/90 (ouch!)
+  - [ ] Timer IRQ: 65/90
   - [x] Shifter: 140/140
   - [x] Carry: 93/93
   - [x] BIOS math: 625/625
-  - [ ] DMA tests: 1196/1256
-    - Hard to find what failed, assuming related to ROM OOB or SRAM
+  - [ ] DMA tests: 1212/1256
+    - Tests related to DMA1-3 with ROM source fail
   - [ ] Misc. edge case tests: 1/10
   - [ ] Video Tests
     - [x] Basic Mode 3
