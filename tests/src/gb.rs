@@ -7,7 +7,9 @@ pub fn blargg() {
     crate::run_dir::<true, true>("blargg", |gg| {
         let gg = gg.as_ggc();
         let serial = &gg.debugger.serial_output;
-        if serial.contains("Failed") {
+        if serial.contains("Passed") {
+            Break(Status::Success)
+        } else if serial.contains("Failed") {
             Break(Status::FailAt(serial.lines().last().unwrap().to_string()))
         } else {
             Continue(())

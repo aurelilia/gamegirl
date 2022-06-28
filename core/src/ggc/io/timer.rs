@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ggc::{
-        cpu::Interrupt,
         io::{addr::*, scheduling::GGEvent},
         GameGirl,
     },
@@ -24,8 +23,6 @@ impl Timer {
     /// Timer overflow event happened, reset TIMA, fire interrupt and
     /// reschedule.
     pub fn on_overflow(gg: &mut GameGirl, late_by: u32) {
-        gg[TIMA] = gg[TMA];
-        gg.request_interrupt(Interrupt::Timer);
         gg.timer.scheduled_at = gg.scheduler.now();
         let time = Self::next_overflow_time(gg);
 
@@ -62,8 +59,7 @@ impl Timer {
         if gg.timer.counter_running {
             // Make sure we account for DIV being the timer's source of increases
             // properly, would count too little if not
-            let time_elapsed = gg.scheduler.now()
-                - (gg.timer.scheduled_at & !(gg.timer.counter_divider.u32() - 1));
+            let time_elapsed = gg.scheduler.now() - gg.timer.scheduled_at;
             let time_ds = time_elapsed.u16() * gg.speed.u16();
             gg[TIMA] + (time_ds / gg.timer.counter_divider).u8()
         } else {
@@ -127,7 +123,8 @@ impl Timer {
     fn reschedule(gg: &mut GameGirl) {
         gg.scheduler.cancel(GGEvent::TimerOverflow);
         if gg.timer.counter_running {
-            gg.timer.scheduled_at = gg.scheduler.now();
+            gg.timer.scheduled_at =
+                gg.scheduler.now() - (Self::div(gg) & (gg.timer.counter_divider - 1)).u32();
             gg.scheduler
                 .schedule(GGEvent::TimerOverflow, Self::next_overflow_time(gg));
         }
@@ -143,6 +140,118 @@ impl Default for Timer {
             counter_running: false,
             counter_divider: 1024,
             counter_bit: 9,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        ggc::{
+            io::{
+                addr::{DIV, TAC, TIMA},
+                timer::Timer,
+            },
+            GameGirl,
+        },
+        numutil::NumExt,
+    };
+
+    #[test]
+    fn div_starts_at_0() {
+        for_all_speeds(|gg, _| assert_eq!(0, Timer::read(&gg, DIV)));
+    }
+
+    #[test]
+    fn div_inc() {
+        for_all_speeds(|gg, _| {
+            gg.scheduler.advance(255);
+            assert_eq!(0, Timer::read(&gg, DIV));
+            gg.scheduler.advance(1);
+            assert_eq!(1, Timer::read(&gg, DIV))
+        });
+    }
+
+    #[test]
+    fn div_reset() {
+        for_all_speeds(|gg, _| {
+            gg.scheduler.advance(512);
+            assert_eq!(2, Timer::read(&gg, DIV));
+            Timer::write(gg, DIV, 234);
+            assert_eq!(0, Timer::read(&gg, DIV));
+
+            gg.scheduler.advance(255);
+            assert_eq!(0, Timer::read(&gg, DIV));
+            gg.scheduler.advance(1);
+            assert_eq!(1, Timer::read(&gg, DIV));
+        });
+    }
+
+    #[test]
+    fn starts_at_0() {
+        for_all_speeds(|gg, _| assert_eq!(0, Timer::read(&gg, TIMA)));
+    }
+
+    #[test]
+    fn is_0_before_divider() {
+        for_all_speeds(|gg, _| {
+            gg.scheduler.advance(gg.timer.counter_divider.u32() - 1);
+            assert_eq!(0, Timer::read(&gg, TIMA));
+        });
+    }
+
+    #[test]
+    fn is_1_after_divider() {
+        for_all_speeds(|gg, _| {
+            gg.scheduler.advance(gg.timer.counter_divider.u32());
+            assert_eq!(1, Timer::read(&gg, TIMA));
+        });
+    }
+
+    #[test]
+    fn is_1_before_divider() {
+        for_all_speeds(|gg, _| {
+            gg.scheduler
+                .advance((gg.timer.counter_divider.u32() * 2) - 1);
+            assert_eq!(1, Timer::read(&gg, TIMA));
+        });
+    }
+
+    #[test]
+    fn is_2_after_divider() {
+        for_all_speeds(|gg, _| {
+            gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
+            assert_eq!(2, Timer::read(&gg, TIMA));
+        });
+    }
+
+    #[test]
+    fn reschedule() {
+        for_all_speeds(|gg, speed| {
+            gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
+            assert_eq!(2, Timer::read(&gg, TIMA));
+
+            Timer::write(gg, TAC, speed);
+            gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
+            assert_eq!(2, Timer::read(&gg, TIMA));
+
+            Timer::write(gg, TAC, speed | 4);
+            gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
+            assert_eq!(4, Timer::read(&gg, TIMA));
+        });
+    }
+
+    fn setup(run: bool, speed: u8) -> GameGirl {
+        let mut gg = GameGirl::default();
+        gg.init_high();
+        Timer::write(&mut gg, TAC, speed | ((run as u8) << 2));
+        gg
+    }
+
+    fn for_all_speeds(mut inner: impl FnMut(&mut GameGirl, u8)) {
+        for speed in 0..4 {
+            let mut gg = setup(true, speed);
+            inner(&mut gg, speed)
         }
     }
 }
