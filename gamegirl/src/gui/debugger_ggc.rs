@@ -101,10 +101,10 @@ pub fn breakpoints(gg: &mut GameGirl, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.label("0x");
             if ui
-                .add(TextEdit::singleline(&mut bp.addr_text).desired_width(40.0))
+                .add(TextEdit::singleline(&mut bp.value_text).desired_width(40.0))
                 .changed()
             {
-                bp.addr = u16::from_str_radix(&bp.addr_text, 16).ok();
+                bp.value = u16::from_str_radix(&bp.value_text, 16).ok();
             }
             ui.checkbox(&mut bp.pc, "PC");
             ui.checkbox(&mut bp.write, "Write");

@@ -31,6 +31,7 @@ mod dma;
 mod graphics;
 mod input;
 mod memory;
+pub mod remote_debugger;
 mod scheduling;
 mod timer;
 

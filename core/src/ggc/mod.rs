@@ -92,8 +92,8 @@ impl GameGirl {
         }
 
         while self.ppu.last_frame == None {
-            if self.debugger.breakpoint_hit {
-                self.debugger.breakpoint_hit = false;
+            if self.debugger.is_breakpoint_hit {
+                self.debugger.is_breakpoint_hit = false;
                 self.options.running = false;
                 return None;
             }
@@ -114,8 +114,8 @@ impl GameGirl {
 
         let target = samples.len() * self.options.speed_multiplier;
         while self.apu.buffer.len() < target {
-            if self.debugger.breakpoint_hit {
-                self.debugger.breakpoint_hit = false;
+            if self.debugger.is_breakpoint_hit {
+                self.debugger.is_breakpoint_hit = false;
                 self.options.running = false;
                 samples.fill(0.0);
                 return;

@@ -7,13 +7,13 @@ mod rewind;
 
 use core::{
     common::{BorrowedSystem, System},
-    gga::GameGirlAdv,
+    gga::{remote_debugger::DebuggerStatus, GameGirlAdv},
     ggc::GameGirl,
 };
 use std::{
     fs, mem,
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Mutex, RwLock},
     time::Duration,
 };
 
@@ -66,13 +66,14 @@ const DBG_WINDOWS: [(
 ];
 
 /// Count of GUI windows that take the App as a parameter.
-const APP_WINDOW_COUNT: usize = 4;
+const APP_WINDOW_COUNT: usize = 5;
 /// GUI windows that take the App as a parameter.
 const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] = [
     ("Options", options::options),
     ("About", options::about),
     ("VRAM", debugger_ggc::vram_viewer),
     ("Background Map", debugger_ggc::bg_map_viewer),
+    ("Remote Debugger", debugger_gga::remote_debugger),
 ];
 
 /// Start the GUI. Since this is native, this call will never return.
@@ -97,6 +98,7 @@ fn make_app(gg: Arc<Mutex<System>>) -> App {
         current_rom_path: None,
         rewinder: Rewinding::default(),
         visual_debug: VisualDebugState::default(),
+        remote_dbg: Arc::new(RwLock::new(DebuggerStatus::NotActive)),
         fast_forward_toggled: false,
 
         texture: TextureId::default(),
@@ -121,6 +123,8 @@ struct App {
     rewinder: Rewinding,
     /// State for visual debugging tools.
     visual_debug: VisualDebugState,
+    /// Remote debugger status.
+    remote_dbg: Arc<RwLock<DebuggerStatus>>,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     fast_forward_toggled: bool,
 
@@ -378,6 +382,8 @@ impl App {
             ui.separator();
             self.window_states[6] |= ui.button("VRAM Viewer").clicked();
             self.window_states[7] |= ui.button("Background Map Viewer").clicked();
+            ui.separator();
+            self.window_states[8] |= ui.button("Remote Debugger").clicked();
         });
 
         ui.menu_button("Savestates", |ui| {

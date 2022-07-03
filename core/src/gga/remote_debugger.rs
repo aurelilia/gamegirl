@@ -1,0 +1,354 @@
+use std::{
+    net::{SocketAddr, TcpListener, TcpStream},
+    sync::{Arc, Mutex, MutexGuard, RwLock},
+};
+
+use gdbstub::{
+    arch::Arch,
+    common::Signal,
+    conn::{Connection, ConnectionExt},
+    stub::{
+        run_blocking::{BlockingEventLoop, Event, WaitForStopReasonError},
+        GdbStub, SingleThreadStopReason,
+    },
+    target::{
+        ext::{
+            base::{
+                single_register_access::{SingleRegisterAccess, SingleRegisterAccessOps},
+                singlethread::{
+                    SingleThreadBase, SingleThreadResume, SingleThreadResumeOps,
+                    SingleThreadSingleStep, SingleThreadSingleStepOps,
+                },
+                BaseOps,
+            },
+            breakpoints::{
+                Breakpoints, BreakpointsOps, HwWatchpoint, HwWatchpointOps, SwBreakpoint,
+                SwBreakpointOps, WatchKind,
+            },
+        },
+        Target, TargetResult,
+    },
+};
+use gdbstub_arch::arm::{reg::id::ArmCoreRegId, Armv4t};
+
+use crate::{
+    debugger::Breakpoint,
+    gga::remote_debugger::DebuggerStatus::{Disconnected, Running, WaitingForConnection},
+    numutil::NumExt,
+    System,
+};
+
+pub struct SyncSys(Arc<Mutex<System>>, bool);
+
+impl SyncSys {
+    fn lock(&mut self) -> MutexGuard<System> {
+        self.0.lock().unwrap()
+    }
+}
+
+impl Target for SyncSys {
+    type Arch = Armv4t;
+    type Error = String;
+
+    fn base_ops(&mut self) -> BaseOps<'_, Self::Arch, Self::Error> {
+        BaseOps::SingleThread(self)
+    }
+
+    fn support_breakpoints(&mut self) -> Option<BreakpointsOps<'_, Self>> {
+        Some(self)
+    }
+}
+
+impl SingleThreadBase for SyncSys {
+    fn read_registers(
+        &mut self,
+        regs: &mut <Self::Arch as Arch>::Registers,
+    ) -> TargetResult<(), Self> {
+        let gg = self.lock();
+        let gg = gg.as_gga();
+
+        for (i, reg) in regs.r.iter_mut().enumerate() {
+            *reg = gg.cpu.reg(i.u32());
+        }
+        regs.sp = gg.cpu.sp();
+        regs.lr = gg.cpu.lr();
+        regs.pc = gg.cpu.pc;
+        regs.cpsr = gg.cpu.cpsr;
+
+        Ok(())
+    }
+
+    fn write_registers(
+        &mut self,
+        regs: &<Self::Arch as Arch>::Registers,
+    ) -> TargetResult<(), Self> {
+        let mut gg = self.lock();
+        let mut gg = gg.gga_mut();
+
+        for (i, reg) in regs.r.iter().enumerate() {
+            gg.set_reg(i.u32(), *reg);
+        }
+        gg.cpu.set_sp(regs.sp);
+        gg.cpu.set_lr(regs.lr);
+        if regs.pc != gg.cpu.pc {
+            gg.set_pc(regs.pc);
+        }
+        gg.cpu.cpsr = regs.cpsr;
+
+        Ok(())
+    }
+
+    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<'_, (), Self>> {
+        Some(self)
+    }
+
+    fn read_addrs(
+        &mut self,
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &mut [u8],
+    ) -> TargetResult<(), Self> {
+        let gg = self.lock();
+        let gg = gg.as_gga();
+        for (offs, data) in data.iter_mut().enumerate() {
+            *data = gg.get_byte(start_addr + offs.u32());
+        }
+        Ok(())
+    }
+
+    fn write_addrs(
+        &mut self,
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &[u8],
+    ) -> TargetResult<(), Self> {
+        let mut gg = self.lock();
+        let gg = gg.gga_mut();
+        for (offs, data) in data.iter().enumerate() {
+            gg.set_byte(start_addr + offs.u32(), *data);
+        }
+        Ok(())
+    }
+
+    fn support_resume(&mut self) -> Option<SingleThreadResumeOps<'_, Self>> {
+        Some(self)
+    }
+}
+
+impl SingleRegisterAccess<()> for SyncSys {
+    fn read_register(
+        &mut self,
+        _tid: (),
+        reg_id: <Self::Arch as Arch>::RegId,
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
+        let gg = self.lock();
+        let gg = gg.as_gga();
+
+        let value = match reg_id {
+            ArmCoreRegId::Gpr(id) => gg.reg(id.u32()),
+            ArmCoreRegId::Sp => gg.cpu.sp(),
+            ArmCoreRegId::Lr => gg.cpu.lr(),
+            ArmCoreRegId::Pc => gg.cpu.pc,
+            ArmCoreRegId::Cpsr => gg.cpu.cpsr,
+            _ => return Ok(0),
+        };
+        for (src, dst) in value.to_le_bytes().iter().zip(buf.iter_mut()) {
+            *dst = *src;
+        }
+
+        Ok(4)
+    }
+
+    fn write_register(
+        &mut self,
+        _tid: (),
+        reg_id: <Self::Arch as Arch>::RegId,
+        val: &[u8],
+    ) -> TargetResult<(), Self> {
+        let value = u32::from_le_bytes([val[0], val[1], val[2], val[3]]);
+        let mut gg = self.lock();
+        let gg = gg.gga_mut();
+
+        match reg_id {
+            ArmCoreRegId::Gpr(id) => gg.set_reg(id.u32(), value),
+            ArmCoreRegId::Sp => gg.cpu.set_sp(value),
+            ArmCoreRegId::Lr => gg.cpu.set_lr(value),
+            ArmCoreRegId::Pc => gg.set_pc(value),
+            ArmCoreRegId::Cpsr => gg.cpu.cpsr = value,
+            _ => (),
+        };
+        Ok(())
+    }
+}
+
+impl SingleThreadResume for SyncSys {
+    fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
+        self.0.lock().unwrap().gga_mut().options.running = true;
+        Ok(())
+    }
+
+    fn support_single_step(&mut self) -> Option<SingleThreadSingleStepOps<'_, Self>> {
+        Some(self)
+    }
+}
+
+impl SingleThreadSingleStep for SyncSys {
+    fn step(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
+        self.0.lock().unwrap().gga_mut().advance();
+        self.1 = true;
+        Ok(())
+    }
+}
+
+impl Breakpoints for SyncSys {
+    fn support_sw_breakpoint(&mut self) -> Option<SwBreakpointOps<'_, Self>> {
+        Some(self)
+    }
+
+    fn support_hw_watchpoint(&mut self) -> Option<HwWatchpointOps<'_, Self>> {
+        Some(self)
+    }
+}
+
+impl SwBreakpoint for SyncSys {
+    fn add_sw_breakpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        _kind: <Self::Arch as Arch>::BreakpointKind,
+    ) -> TargetResult<bool, Self> {
+        let mut gg = self.lock();
+        let gg = gg.gga_mut();
+        gg.debugger.breakpoints.push(Breakpoint {
+            value: Some(addr),
+            value_text: addr.to_string(),
+            pc: true,
+            write: false,
+        });
+        Ok(true)
+    }
+
+    fn remove_sw_breakpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        _kind: <Self::Arch as Arch>::BreakpointKind,
+    ) -> TargetResult<bool, Self> {
+        let mut gg = self.lock();
+        let gg = gg.gga_mut();
+        let count = gg
+            .debugger
+            .breakpoints
+            .drain_filter(|bp| bp.pc && bp.value == Some(addr))
+            .count();
+        Ok(count != 0)
+    }
+}
+
+impl HwWatchpoint for SyncSys {
+    fn add_hw_watchpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        _len: <Self::Arch as Arch>::Usize,
+        kind: WatchKind,
+    ) -> TargetResult<bool, Self> {
+        if let WatchKind::Read | WatchKind::ReadWrite = kind {
+            return Ok(false);
+        }
+
+        let mut gg = self.lock();
+        let gg = gg.gga_mut();
+        gg.debugger.breakpoints.push(Breakpoint {
+            value: Some(addr),
+            value_text: addr.to_string(),
+            pc: false,
+            write: true,
+        });
+        Ok(true)
+    }
+
+    fn remove_hw_watchpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        _len: <Self::Arch as Arch>::Usize,
+        kind: WatchKind,
+    ) -> TargetResult<bool, Self> {
+        if let WatchKind::Read | WatchKind::ReadWrite = kind {
+            return Ok(false);
+        }
+
+        let mut gg = self.lock();
+        let gg = gg.gga_mut();
+        let count = gg
+            .debugger
+            .breakpoints
+            .drain_filter(|bp| bp.write && bp.value == Some(addr))
+            .count();
+        Ok(count != 0)
+    }
+}
+
+enum EventLoop {}
+
+impl BlockingEventLoop for EventLoop {
+    type Target = SyncSys;
+    type Connection = TcpStream;
+    type StopReason = SingleThreadStopReason<u32>;
+
+    fn wait_for_stop_reason(
+        target: &mut Self::Target,
+        conn: &mut Self::Connection,
+    ) -> Result<
+        Event<Self::StopReason>,
+        WaitForStopReasonError<
+            <Self::Target as Target>::Error,
+            <Self::Connection as Connection>::Error,
+        >,
+    > {
+        let hit_bp = target.0.lock().unwrap().as_gga().options.running;
+        match () {
+            _ if hit_bp => Ok(Event::TargetStopped(SingleThreadStopReason::SwBreak(()))),
+            _ if target.1 => {
+                target.1 = false;
+                Ok(Event::TargetStopped(SingleThreadStopReason::DoneStep))
+            }
+            _ => Ok(Event::IncomingData(
+                conn.read().map_err(WaitForStopReasonError::Connection)?,
+            )),
+        }
+    }
+
+    fn on_interrupt(
+        _target: &mut Self::Target,
+    ) -> Result<Option<Self::StopReason>, <Self::Target as Target>::Error> {
+        // TODO handle this in the GUI
+        Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT).into()))
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum DebuggerStatus {
+    NotActive,
+    WaitingForConnection,
+    Running(SocketAddr),
+    Disconnected,
+}
+
+pub fn init(sys: Arc<Mutex<System>>, status: Arc<RwLock<DebuggerStatus>>) {
+    {
+        *status.write().unwrap() = WaitingForConnection;
+    }
+    let sock = TcpListener::bind("localhost:17633").unwrap();
+    let (stream, address) = sock.accept().unwrap();
+    {
+        *status.write().unwrap() = Running(address);
+    }
+
+    let mut sys = SyncSys(sys, false);
+    let debugger = GdbStub::new(stream);
+    match debugger.run_blocking::<EventLoop>(&mut sys) {
+        Ok(_) => {
+            *status.write().unwrap() = Disconnected;
+        }
+        Err(e) => {
+            eprintln!("gdbstub encountered an error: {}", e)
+        }
+    }
+}

@@ -1,12 +1,13 @@
 use core::{
     debugger::Breakpoint,
-    gga::{addr::IME, GameGirlAdv},
+    gga::{self, addr::IME, remote_debugger::DebuggerStatus, GameGirlAdv},
     numutil::NumExt,
 };
+use std::thread;
 
-use eframe::egui::{Label, RichText, TextEdit, Ui};
+use eframe::egui::{Context, Label, RichText, TextEdit, Ui};
 
-use crate::Colour;
+use crate::{gui::App, Colour, System};
 
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.
@@ -95,10 +96,10 @@ pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.label("0x");
             if ui
-                .add(TextEdit::singleline(&mut bp.addr_text).desired_width(80.0))
+                .add(TextEdit::singleline(&mut bp.value_text).desired_width(80.0))
                 .changed()
             {
-                bp.addr = u32::from_str_radix(&bp.addr_text, 16).ok();
+                bp.value = u32::from_str_radix(&bp.value_text, 16).ok();
             }
             ui.checkbox(&mut bp.pc, "PC");
             ui.checkbox(&mut bp.write, "Write");
@@ -129,4 +130,46 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui) {
     ui.label(format!("Reported Title: {}", gg.cart.title()));
     ui.label(format!("Reported Game Code: AGB-{}", gg.cart.game_code()));
     ui.label(format!("Detected Save Type: {:?}", gg.cart.save_type));
+}
+
+/// Window showing status of the remote debugger.
+pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
+    {
+        let gg = app.gg.lock().unwrap();
+        if !matches!(&*gg, System::GGA(_)) {
+            ui.label("Only available on GGA!");
+            return;
+        }
+    }
+
+    let stat = *app.remote_dbg.read().unwrap();
+    match stat {
+        DebuggerStatus::NotActive => {
+            ui.label("Remote debugger is not active.");
+            if ui.button("Launch Server").clicked() {
+                launch_debugger(app)
+            }
+        }
+        DebuggerStatus::WaitingForConnection => {
+            ui.label("Server running at localhost:17633");
+            ui.label("Awaiting connection, if you are using lldb:");
+            ui.monospace("> target remote localhost:17633");
+        }
+        DebuggerStatus::Running(addr) => {
+            ui.label("Remote debugger is running.");
+            ui.label(format!("Client address: {addr}"));
+        }
+        DebuggerStatus::Disconnected => {
+            ui.label("Remote debugger disconnected/exited.");
+            if ui.button("Relaunch Server").clicked() {
+                launch_debugger(app)
+            }
+        }
+    }
+}
+
+fn launch_debugger(app: &mut App) {
+    let gg = app.gg.clone();
+    let remote = app.remote_dbg.clone();
+    thread::spawn(|| gga::remote_debugger::init(gg, remote));
 }

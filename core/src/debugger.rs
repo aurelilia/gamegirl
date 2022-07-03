@@ -9,7 +9,9 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     /// A list of breakpoints the system should stop on.
     pub breakpoints: Vec<Breakpoint<Ptr>>,
     /// If a breakpoint was hit.
-    pub breakpoint_hit: bool,
+    pub is_breakpoint_hit: bool,
+    /// The hit breakpoint.
+    pub breakpoint_hit: Option<Breakpoint<Ptr>>,
 }
 
 impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
@@ -18,10 +20,15 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
         if self.breakpoints.is_empty() {
             return;
         }
-        self.breakpoint_hit |= self
+
+        let bp = self
             .breakpoints
             .iter()
-            .any(|bp| bp.addr == Some(addr) && bp.write);
+            .find(|bp| bp.value == Some(addr) && bp.write);
+        if let Some(bp) = bp {
+            self.breakpoint_hit = Some(bp.clone());
+            self.is_breakpoint_hit = true;
+        }
     }
 
     /// Called before an instruction is executed, which might trigger a BP.
@@ -30,21 +37,27 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
         if self.breakpoints.is_empty() {
             return true;
         }
-        !self
+
+        let bp = self
             .breakpoints
             .iter()
-            .any(|bp| bp.addr == Some(pc) && bp.pc)
+            .find(|bp| bp.value == Some(pc) && bp.pc);
+        if let Some(bp) = bp {
+            self.breakpoint_hit = Some(bp.clone());
+            self.is_breakpoint_hit = true;
+        }
+        !self.is_breakpoint_hit
     }
 }
 
 /// A breakpoint.
 #[derive(Clone, Debug, Default)]
 pub struct Breakpoint<Ptr> {
-    /// Address that this breakpoint is at.
-    pub addr: Option<Ptr>,
-    /// String representation of the address; used by egui as a text buffer.
-    /// TODO: kinda unclean to have GUI state here...
-    pub addr_text: String,
+    /// Address/value that this breakpoint is at.
+    pub value: Option<Ptr>,
+    /// String representation of the address/value; used by egui as a text
+    /// buffer. TODO: kinda unclean to have GUI state here...
+    pub value_text: String,
     /// If this breakpoint triggers on the PC.
     pub pc: bool,
     /// If this breakpoint triggers on a write.

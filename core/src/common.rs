@@ -140,6 +140,13 @@ impl System {
         }
     }
 
+    pub fn gga_mut(&mut self) -> &mut GameGirlAdv {
+        match self {
+            System::GGA(gg) => gg,
+            _ => panic!(),
+        }
+    }
+
     /// Load a cart. Automatically picks the right system kind.
     pub fn load_cart(&mut self, mut cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
         // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
