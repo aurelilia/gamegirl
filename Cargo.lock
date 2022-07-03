@@ -510,6 +510,8 @@ dependencies = [
  "bincode",
  "bitflags",
  "bitmatch",
+ "gdbstub",
+ "gdbstub_arch",
  "serde",
  "serde_arrays",
  "web-sys",
@@ -1128,6 +1130,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "gdbstub"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c1f9371c87c11642ee94dcf92cb48b1484ba250b8e8bff3df71c28651f3f4e7"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "log",
+ "managed",
+ "num-traits",
+ "paste",
+]
+
+[[package]]
+name = "gdbstub_arch"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c24f469ba9556c5a063d6df35a8a338025fccf96ecae44f330a156b686f7a268"
+dependencies = [
+ "gdbstub",
+ "num-traits",
+]
+
+[[package]]
 name = "gdk-pixbuf-sys"
 version = "0.15.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1559,6 +1585,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "managed"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
+
+[[package]]
 name = "matches"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1947,6 +1979,12 @@ dependencies = [
  "smallvec",
  "winapi",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c520e05135d6e763148b6426a837e239041653ba7becd2e538c076c738025fc"
 
 [[package]]
 name = "peeking_take_while"

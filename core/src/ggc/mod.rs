@@ -169,7 +169,10 @@ impl GameGirl {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
         self.speed = if self.t_shift == 1 { 2 } else { 1 };
         self[KEY1] = (self.t_shift & 1) << 7;
-        self.advance_clock(2048);
+
+        for _ in 0..16 {
+            self.advance_clock(2048 / 16);
+        }
     }
 
     /// Request an interrupt. Sets the bit in IF.
