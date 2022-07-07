@@ -1,5 +1,5 @@
 # GameGirl
-A Gameboy (Color/Advance) emulator written in Rust, whose GG/GGC core is a rewrite of 
+A Gameboy (Color/Advance) emulator and debugger written in Rust, whose GG/GGC core is a rewrite of 
 [gamelin](https://git.angm.xyz/ellie/gamelin).  
 [Try it in your browser!](https://gamegirl.angm.xyz)
 
@@ -23,8 +23,7 @@ making the emulation overall more accurate and fast. Most games are playable, bu
 graphical glitches.
 
 ### Features
-- Complete and M-cycle cycle-accurate DMG/CGB implementation, including running DMG games on CGB
-- Colour correction for CGB
+#### General
 - Highly configurable, including input
 - Savegame support in common `.sav` format (Basic RTC support)
 - Support for creating and loading save states with "undo last load" function
@@ -37,6 +36,16 @@ graphical glitches.
     - Cartridge Info Viewer
     - Visual debugging tools: VRAM and map viewers
 - Automated running of a bunch of different tests
+
+#### GG(C)
+- Accurate scheduler-based emulation of the system
+- Complete and M-cycle cycle-accurate DMG/CGB implementation, including running DMG games on CGB
+- Colour correction for CGB
+
+#### GGA
+- Accurate scheduler-based emulation of the system
+- Remote debugger support (GDB server)
+- Support for playing ELF files
 
 ### System emulation
 - [ ] DMG/CGB
@@ -104,7 +113,6 @@ graphical glitches.
 - [ ] Controller support
 - [ ] Save export on Web/WASM
 - [ ] Fix savestates/rewinding on WASM
-- [ ] Proper GBA support, someday?
 
 
 ## Goals

@@ -2,6 +2,7 @@
 
 use std::{iter, mem, path::PathBuf};
 
+use elf_rs::{Elf, ElfFile};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -148,7 +149,7 @@ impl System {
     }
 
     /// Load a cart. Automatically picks the right system kind.
-    pub fn load_cart(&mut self, mut cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+    pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
         // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
         // that is present on every cartridge.
         let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
@@ -167,6 +168,12 @@ impl System {
             );
             *self = Self::GGC(ggc);
         } else {
+            let (mut cart, elf) = if let Some(elf_read) = Self::decode_elf(&cart) {
+                (elf_read, true)
+            } else {
+                (cart, false)
+            };
+
             // Paging implementation requires this to prevent reading unallocated memory
             let until_full_page = 0x7FFF - (cart.len() & 0x7FFF);
             cart.extend(iter::repeat(0).take(until_full_page));
@@ -183,7 +190,11 @@ impl System {
                 EmulateOptions::serde_frame_finished(),
             );
 
-            // Fake filling the prefetch
+            if elf {
+                gga.skip_bootrom();
+            }
+
+            // Fill the prefetch
             Cpu::pipeline_stall(&mut gga);
             *self = Self::GGA(gga);
         }
@@ -193,6 +204,28 @@ impl System {
         if crate::TRACING {
             self.skip_bootrom();
         }
+    }
+
+    fn decode_elf(cart: &[u8]) -> Option<Vec<u8>> {
+        let elf = Elf::from_bytes(cart).ok()?;
+        let mut buf = Vec::with_capacity(0x1FF_FFFF);
+        buf.extend(iter::repeat(0).take(0x1FF_FFFF));
+
+        for header in elf
+            .section_header_iter()
+            .filter(|h| (0x800_0000..=0x9FF_FFFF).contains(&h.addr()))
+        {
+            let dst_offs = header.addr() - 0x800_0000;
+            for (src, dst) in header
+                .content()
+                .iter()
+                .zip(buf.iter_mut().skip(dst_offs as usize))
+            {
+                *dst = *src;
+            }
+        }
+
+        Some(buf)
     }
 }
 

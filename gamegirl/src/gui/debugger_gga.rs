@@ -153,6 +153,9 @@ pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
         DebuggerStatus::WaitingForConnection => {
             ui.label("Server running at localhost:17633");
             ui.label("Awaiting connection, if you are using lldb:");
+            ui.monospace("> platform select remote-gdb-server");
+            ui.monospace("> platform connect connect://localhost:17633");
+            ui.label("If you are using gdb:");
             ui.monospace("> target remote localhost:17633");
         }
         DebuggerStatus::Running(addr) => {
@@ -170,6 +173,7 @@ pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
 
 fn launch_debugger(app: &mut App) {
     let gg = app.gg.clone();
+    let path = app.current_rom_path.clone().unwrap();
     let remote = app.remote_dbg.clone();
-    thread::spawn(|| gga::remote_debugger::init(gg, remote));
+    thread::spawn(|| gga::remote_debugger::init(gg, path, remote));
 }

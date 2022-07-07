@@ -382,8 +382,12 @@ impl App {
             ui.separator();
             self.window_states[6] |= ui.button("VRAM Viewer").clicked();
             self.window_states[7] |= ui.button("Background Map Viewer").clicked();
-            ui.separator();
-            self.window_states[8] |= ui.button("Remote Debugger").clicked();
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                ui.separator();
+                self.window_states[8] |= ui.button("Remote Debugger").clicked();
+            }
         });
 
         ui.menu_button("Savestates", |ui| {

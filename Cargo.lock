@@ -510,6 +510,7 @@ dependencies = [
  "bincode",
  "bitflags",
  "bitmatch",
+ "elf_rs",
  "gdbstub",
  "gdbstub_arch",
  "serde",
@@ -946,6 +947,16 @@ name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
+
+[[package]]
+name = "elf_rs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1822fbb5193550bcbd7833ac15365da49917ad7ae396a07cb71443b38e398602"
+dependencies = [
+ "bitflags",
+ "num-traits",
+]
 
 [[package]]
 name = "emath"

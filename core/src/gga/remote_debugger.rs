@@ -1,11 +1,13 @@
 use std::{
     net::{SocketAddr, TcpListener, TcpStream},
+    os::unix::ffi::OsStrExt,
+    path::PathBuf,
     sync::{Arc, Mutex, MutexGuard, RwLock},
 };
 
 use gdbstub::{
     arch::Arch,
-    common::Signal,
+    common::{Pid, Signal},
     conn::{Connection, ConnectionExt},
     stub::{
         run_blocking::{BlockingEventLoop, Event, WaitForStopReasonError},
@@ -25,6 +27,7 @@ use gdbstub::{
                 Breakpoints, BreakpointsOps, HwWatchpoint, HwWatchpointOps, SwBreakpoint,
                 SwBreakpointOps, WatchKind,
             },
+            exec_file::{ExecFile, ExecFileOps},
         },
         Target, TargetResult,
     },
@@ -38,7 +41,7 @@ use crate::{
     System,
 };
 
-pub struct SyncSys(Arc<Mutex<System>>, bool);
+pub struct SyncSys(Arc<Mutex<System>>, bool, PathBuf);
 
 impl SyncSys {
     fn lock(&mut self) -> MutexGuard<System> {
@@ -55,6 +58,10 @@ impl Target for SyncSys {
     }
 
     fn support_breakpoints(&mut self) -> Option<BreakpointsOps<'_, Self>> {
+        Some(self)
+    }
+
+    fn support_exec_file(&mut self) -> Option<ExecFileOps<'_, Self>> {
         Some(self)
     }
 }
@@ -285,6 +292,30 @@ impl HwWatchpoint for SyncSys {
     }
 }
 
+impl ExecFile for SyncSys {
+    fn get_exec_file(
+        &self,
+        _pid: Option<Pid>,
+        offset: u64,
+        length: usize,
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
+        let path = self.2.canonicalize().unwrap();
+        let path = path.as_os_str().as_bytes();
+        let mut count = 0;
+        for (src, dst) in path
+            .iter()
+            .skip(offset as usize)
+            .zip(buf.iter_mut())
+            .take(length)
+        {
+            *dst = *src;
+            count += 1
+        }
+        Ok(count)
+    }
+}
+
 enum EventLoop {}
 
 impl BlockingEventLoop for EventLoop {
@@ -331,7 +362,7 @@ pub enum DebuggerStatus {
     Disconnected,
 }
 
-pub fn init(sys: Arc<Mutex<System>>, status: Arc<RwLock<DebuggerStatus>>) {
+pub fn init(sys: Arc<Mutex<System>>, rom_path: PathBuf, status: Arc<RwLock<DebuggerStatus>>) {
     {
         *status.write().unwrap() = WaitingForConnection;
     }
@@ -341,7 +372,7 @@ pub fn init(sys: Arc<Mutex<System>>, status: Arc<RwLock<DebuggerStatus>>) {
         *status.write().unwrap() = Running(address);
     }
 
-    let mut sys = SyncSys(sys, false);
+    let mut sys = SyncSys(sys, false, rom_path);
     let debugger = GdbStub::new(stream);
     match debugger.run_blocking::<EventLoop>(&mut sys) {
         Ok(_) => {
