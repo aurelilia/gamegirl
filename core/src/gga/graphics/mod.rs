@@ -15,7 +15,7 @@ use super::memory::KB;
 use crate::{
     common::BorrowedSystem,
     gga::{
-        addr::{DISPCNT, DISPSTAT, VCOUNT},
+        addr::{BG2PA, BG3PA, DISPCNT, DISPSTAT, VCOUNT},
         cpu::{Cpu, Interrupt},
         dma::Dmas,
         scheduling::{AdvEvent, PpuEvent},
@@ -66,6 +66,9 @@ pub struct Ppu {
     #[serde(default = "serde_layer_arr")]
     obj_layers: [Layer; 4],
 
+    bg_x: [i32; 2],
+    bg_y: [i32; 2],
+
     #[serde(skip)]
     #[serde(default)]
     pub last_frame: Option<Vec<Colour>>,
@@ -99,6 +102,7 @@ impl Ppu {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                     Dmas::update(gg);
+                    Self::reload_affine_bgs(gg);
                     gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
                 } else if gg[VCOUNT] > 227 {
                     gg[VCOUNT] = 0;
@@ -176,6 +180,13 @@ impl Ppu {
         gg.ppu.obj_layers = serde_layer_arr();
     }
 
+    fn reload_affine_bgs(gg: &mut GameGirlAdv) {
+        gg.ppu.bg_x[0] = Self::get_affine_offs(gg[BG2PA + 0x8], gg[BG2PA + 0xA]);
+        gg.ppu.bg_y[0] = Self::get_affine_offs(gg[BG2PA + 0xC], gg[BG2PA + 0xE]);
+        gg.ppu.bg_x[1] = Self::get_affine_offs(gg[BG3PA + 0x8], gg[BG3PA + 0xA]);
+        gg.ppu.bg_y[1] = Self::get_affine_offs(gg[BG3PA + 0xC], gg[BG3PA + 0xE]);
+    }
+
     #[inline]
     fn adjust_pixel(pixel: &mut Colour) {
         for col in pixel.iter_mut().take(3) {
@@ -190,6 +201,10 @@ impl Default for Ppu {
             palette: [0; KB],
             vram: [0; 96 * KB],
             oam: [0; KB],
+
+            bg_x: [0; 2],
+            bg_y: [0; 2],
+
             pixels: serde_colour_arr(),
             bg_layers: serde_layer_arr(),
             obj_layers: serde_layer_arr(),

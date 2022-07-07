@@ -88,7 +88,7 @@ graphical glitches.
     - [x] Objects
     - [x] Priority
     - [ ] Blending
-    - [ ] Affine BGs/objects
+    - [x] Affine BGs/objects
     - [ ] Windows
   - [x] APU
     - [x] CGB sound channels

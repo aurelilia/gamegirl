@@ -1,10 +1,10 @@
 use crate::{
     gga::{
-        addr::{BG0CNT, BG0HOFS, BG0VOFS, DISPCNT},
+        addr::{BG0CNT, BG0HOFS, BG0VOFS, BG2PA, BG3PA, DISPCNT},
         graphics::{Ppu, BG0_EN},
         GameGirlAdv,
     },
-    numutil::{hword, NumExt},
+    numutil::{hword, word, NumExt},
 };
 
 impl Ppu {
@@ -19,13 +19,13 @@ impl Ppu {
     pub fn render_mode1(gg: &mut GameGirlAdv, line: u16) {
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
-        Self::render_bg_affine::<2>(gg, line);
+        Self::render_bg_affine::<2>(gg, BG2PA);
         Self::render_objs::<0>(gg, line);
     }
 
     pub fn render_mode2(gg: &mut GameGirlAdv, line: u16) {
-        Self::render_bg_affine::<2>(gg, line);
-        Self::render_bg_affine::<3>(gg, line);
+        Self::render_bg_affine::<2>(gg, BG2PA);
+        Self::render_bg_affine::<3>(gg, BG3PA);
         Self::render_objs::<0>(gg, line);
     }
 
@@ -78,13 +78,63 @@ impl Ppu {
         }
     }
 
-    fn render_bg_affine<const IDX: u16>(gg: &mut GameGirlAdv, line: u16) {
+    fn render_bg_affine<const IDX: u16>(gg: &mut GameGirlAdv, offset: u32) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
         }
 
-        // TODO, for now just pretend it's a text mode BG
-        Self::render_bg_text::<IDX>(gg, line)
+        let offs = IDX.u32() * 2;
+        let cnt = gg[BG0CNT + offs];
+        let prio = cnt & 3;
+        let mosaic = cnt.is_bit(6); // TODO
+        let tile_base_addr = cnt.bits(2, 2).us() * 0x4000;
+        let map_base = cnt.bits(8, 5).us() * 0x800;
+
+        let size = cnt.bits(14, 2);
+        let size = [128, 256, 512, 1024][size.us()];
+        let overflow = cnt.is_bit(13);
+
+        let bg_x = gg.ppu.bg_x[IDX.us() - 2];
+        let bg_y = gg.ppu.bg_y[IDX.us() - 2];
+        let pa = gg[offset] as i16 as i32;
+        let pb = gg[offset + 2] as i16 as i32;
+        let pc = gg[offset + 4] as i16 as i32;
+        let pd = gg[offset + 6] as i16 as i32;
+
+        for pixel_x in 0..240 {
+            let mut x = (bg_x + pa * pixel_x) >> 8;
+            let mut y = (bg_y + pc * pixel_x) >> 8;
+
+            let range = 0..size;
+            if !range.contains(&x) || !range.contains(&y) {
+                if !overflow {
+                    continue;
+                } else {
+                    x &= size - 1;
+                    y &= size - 1;
+                }
+            }
+
+            let map_addr = map_base + (((y >> 3) * (size >> 3)) + (x >> 3)) as usize;
+            let map = gg.ppu.vram[map_addr];
+
+            let tile_x = (x & 7) as usize;
+            let tile_y = (y & 7) as usize;
+            let tile_addr = tile_base_addr + (map.us() * 64) + (tile_y * 8) + tile_x;
+            let colour = gg.ppu.vram[tile_addr];
+            Self::set_pixel::<false>(gg, pixel_x as i16, prio, 0, colour, mosaic);
+        }
+
+        gg.ppu.bg_x[IDX.us() - 2] += pb;
+        gg.ppu.bg_y[IDX.us() - 2] += pd;
+    }
+
+    pub(crate) fn get_affine_offs(lo: u16, hi: u16) -> i32 {
+        if hi.is_bit(11) {
+            (word(lo, hi & 0x7FF) | 0xF800_0000) as i32
+        } else {
+            word(lo, hi & 0x7FF) as i32
+        }
     }
 
     // Adapted from https://github.com/DenSinH/GBAC-/blob/f460ad61fcd4c90429f47435d49b23310185f916/GBAEmulator/PPU/PPU.Render.BG.cs#L49
