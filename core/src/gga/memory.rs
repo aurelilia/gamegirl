@@ -37,6 +37,8 @@ pub struct Memory {
 
     /// Value to return when trying to read BIOS outside of it
     pub(crate) bios_value: u32,
+    /// Length of the prefetch buffer at the current PC.
+    pub(crate) prefetch_len: u16,
 
     #[serde(skip)]
     #[serde(default = "serde_pages")]
@@ -52,14 +54,16 @@ pub struct Memory {
 impl GameGirlAdv {
     /// Read a byte from the bus. Also enforces timing.
     pub(super) fn read_byte(&mut self, addr: u32, kind: Access) -> u8 {
-        self.add_wait_cycles(self.wait_time::<1>(addr, kind));
+        let time = self.wait_time::<1>(addr, kind);
+        self.add_sn_cycles(time);
         self.get_byte(addr)
     }
 
     /// Read a half-word from the bus (LE). Also enforces timing.
     /// Also handles unaligned reads, which is why ret is u32.
     pub(super) fn read_hword(&mut self, addr: u32, kind: Access) -> u32 {
-        self.add_wait_cycles(self.wait_time::<2>(addr, kind));
+        let time = self.wait_time::<2>(addr, kind);
+        self.add_sn_cycles(time);
         if addr.is_bit(0) {
             // Unaligned
             let val = self.get_hword(addr);
@@ -73,7 +77,8 @@ impl GameGirlAdv {
     /// Read a half-word from the bus (LE). Also enforces timing.
     /// If address is unaligned, do LDRSH behavior.
     pub(super) fn read_hword_ldrsh(&mut self, addr: u32, kind: Access) -> u32 {
-        self.add_wait_cycles(self.wait_time::<2>(addr, kind));
+        let time = self.wait_time::<2>(addr, kind);
+        self.add_sn_cycles(time);
         if addr.is_bit(0) {
             // Unaligned
             let val = self.get_hword(addr) >> 8;
@@ -86,7 +91,8 @@ impl GameGirlAdv {
 
     /// Read a word from the bus (LE). Also enforces timing.
     pub(super) fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
-        self.add_wait_cycles(self.wait_time::<4>(addr, kind));
+        let time = self.wait_time::<4>(addr, kind);
+        self.add_sn_cycles(time);
         self.get_word(addr)
     }
 
@@ -265,19 +271,22 @@ impl GameGirlAdv {
     }
     /// Write a byte to the bus. Handles timing.
     pub(super) fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
-        self.add_wait_cycles(self.wait_time::<1>(addr, kind));
+        let time = self.wait_time::<1>(addr, kind);
+        self.add_sn_cycles(time);
         self.set_byte(addr, value)
     }
 
     /// Write a half-word from the bus (LE). Handles timing.
     pub(super) fn write_hword(&mut self, addr: u32, value: u16, kind: Access) {
-        self.add_wait_cycles(self.wait_time::<2>(addr, kind));
+        let time = self.wait_time::<2>(addr, kind);
+        self.add_sn_cycles(time);
         self.set_hword(addr, value)
     }
 
     /// Write a word from the bus (LE). Handles timing.
     pub(super) fn write_word(&mut self, addr: u32, value: u32, kind: Access) {
-        self.add_wait_cycles(self.wait_time::<4>(addr, kind));
+        let time = self.wait_time::<4>(addr, kind);
+        self.add_sn_cycles(time);
         self.set_word(addr, value)
     }
 
@@ -402,6 +411,7 @@ impl GameGirlAdv {
             }
             WAITCNT => {
                 self[a] = value;
+                self.memory.prefetch_len = 0;
                 self.update_wait_times();
             }
 
@@ -537,7 +547,13 @@ impl GameGirlAdv {
 
     /// Get wait time for a given address.
     #[inline]
-    pub fn wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
+    pub fn wait_time<const W: u32>(&mut self, addr: u32, ty: Access) -> u16 {
+        let prefetch_size = if W == 4 { 2 } else { 1 };
+        if addr == self.cpu.pc && self.memory.prefetch_len >= prefetch_size {
+            self.memory.prefetch_len -= prefetch_size;
+            return prefetch_size;
+        }
+
         let idx = ((addr.us() >> 24) & 0xF) + ty as usize;
         if W == 4 {
             self.memory.wait_word[idx]
@@ -637,6 +653,7 @@ impl Default for Memory {
             iwram: [0; 32 * KB],
             mmio: [0; KB / 2],
             bios_value: 0xE129F000,
+            prefetch_len: 0,
             read_pages: serde_pages(),
             write_pages: serde_pages(),
             wait_word: [0; 32],

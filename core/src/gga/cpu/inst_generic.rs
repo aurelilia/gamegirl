@@ -2,6 +2,7 @@ use std::fmt::UpperHex;
 
 use crate::gga::{
     cpu::{registers::Flag::*, Cpu},
+    Access,
     Access::NonSeq,
     GameGirlAdv,
 };
@@ -34,6 +35,24 @@ impl GameGirlAdv {
             value.wrapping_add(offs)
         } else {
             value.wrapping_sub(offs)
+        }
+    }
+
+    pub fn idle_nonseq(&mut self) {
+        self.add_i_cycles(1);
+        self.cpu.access_type = Access::NonSeq;
+    }
+
+    pub fn mul_wait_cycles(&mut self, mut value: u32, signed: bool) {
+        self.idle_nonseq();
+        let mut mask = 0xFFFF_FF00;
+        loop {
+            value &= mask;
+            if value == 0 || (signed && value == mask) {
+                break;
+            }
+            self.add_i_cycles(1);
+            mask <<= 8;
         }
     }
 

@@ -11,7 +11,7 @@ use crate::{
     common::{self, EmulateOptions, SystemConfig},
     debugger::Debugger,
     gga::{
-        addr::{KEYINPUT, SOUNDBIAS},
+        addr::{KEYINPUT, SOUNDBIAS, WAITCNT},
         audio::SAMPLE_EVERY_N_CLOCKS,
         cpu::registers::Flag,
         dma::Dmas,
@@ -147,10 +147,23 @@ impl GameGirlAdv {
         }
     }
 
-    /// Add wait cycles, which advance the system besides the CPU.
+    /// Add S/N cycles, which advance the system besides the CPU.
     #[inline]
-    fn add_wait_cycles(&mut self, count: u16) {
+    fn add_sn_cycles(&mut self, count: u16) {
         self.scheduler.advance(count.u32());
+    }
+
+    /// Add I cycles, which advance the system besides the CPU.
+    #[inline]
+    fn add_i_cycles(&mut self, count: u16) {
+        self.scheduler.advance(count.u32());
+        if self.cpu.pc > 0x800_0000 {
+            if self[WAITCNT].is_bit(14) {
+                self.memory.prefetch_len += 1;
+            } else {
+                self.cpu.access_type = Access::NonSeq;
+            }
+        }
     }
 
     fn reg(&self, idx: u32) -> u32 {

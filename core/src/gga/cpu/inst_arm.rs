@@ -68,18 +68,21 @@ impl GameGirlAdv {
                     self.write_word(addr, reg, NonSeq)
                 }
                 self.set_reg(d, mem_value);
-                self.add_wait_cycles(1);
+                self.idle_nonseq();
             }
 
             "000_000lcddddnnnnssss1001mmmm" => {
                 // MUL/MLA
                 let cpsr = self.cpu.cpsr;
-                let mut res = self.cpu.mul(self.cpu.reg(m), self.cpu.reg(s));
+                let rs = self.cpu.reg(s);
+                let mut res = self.cpu.mul(self.cpu.reg(m), rs);
+                self.mul_wait_cycles(rs, true);
+
                 if l == 1 {
                     // MLA
                     res = res.wrapping_add(self.cpu.reg(n));
                     self.cpu.set_zn(res);
-                    self.add_wait_cycles(1);
+                    self.add_i_cycles(1);
                 }
 
                 self.set_reg(d, res);
@@ -87,9 +90,6 @@ impl GameGirlAdv {
                     // Restore CPSR if we weren't supposed to set flags
                     self.cpu.cpsr = cpsr;
                 }
-
-                // TODO proper stall
-                self.add_wait_cycles(1);
             }
 
             "000_0ooocddddnnnnssss1001mmmm" => {
@@ -102,12 +102,28 @@ impl GameGirlAdv {
 
                 let out: u64 = match o {
                     0b010 => a.wrapping_mul(b).wrapping_add(dhi).wrapping_add(dlo), // UMAAL
-                    0b100 => a.wrapping_mul(b),                                     // UMULL
-                    0b101 => a.wrapping_mul(b).wrapping_add(dlo | (dhi << 32)),     // UMLAL
-                    0b110 => (a as i32 as i64).wrapping_mul(b as i32 as i64) as u64, // SMULL
-                    _ => (a as i32 as i64)
-                        .wrapping_mul(b as i32 as i64)
-                        .wrapping_add((dlo | (dhi << 32)) as i64) as u64, // SMLAL
+                    0b100 => {
+                        // UMULL
+                        self.add_i_cycles(1);
+                        a.wrapping_mul(b)
+                    }
+                    0b101 => {
+                        // UMLAL
+                        self.add_i_cycles(2);
+                        a.wrapping_mul(b).wrapping_add(dlo | (dhi << 32))
+                    }
+                    0b110 => {
+                        // SMULL
+                        self.add_i_cycles(1);
+                        (a as i32 as i64).wrapping_mul(b as i32 as i64) as u64
+                    }
+                    _ => {
+                        // SMLAL
+                        self.add_i_cycles(2);
+                        (a as i32 as i64)
+                            .wrapping_mul(b as i32 as i64)
+                            .wrapping_add((dlo | (dhi << 32)) as i64) as u64
+                    }
                 };
 
                 self.cpu.set_flag(Flag::Zero, out == 0);
@@ -119,8 +135,7 @@ impl GameGirlAdv {
                     self.cpu.cpsr = cpsr;
                 }
 
-                // TODO proper stall
-                self.add_wait_cycles(1);
+                self.mul_wait_cycles(b as u32, o.is_bit(1));
             }
 
             "100_puswlnnnnrrrrrrrrrrrrrrrr" => {
@@ -174,9 +189,10 @@ impl GameGirlAdv {
                 if kind == NonSeq {
                     self.on_empty_rlist(n, l == 0, u == 1, p == 1);
                 }
+                self.cpu.access_type = NonSeq;
                 if l == 1 {
                     // All LDR stall by 1I
-                    self.add_wait_cycles(1);
+                    self.add_i_cycles(1);
                 }
             }
 
@@ -429,9 +445,10 @@ impl GameGirlAdv {
             self.set_reg(n, addr);
         }
 
+        self.cpu.access_type = NonSeq;
         if !str {
             // All LDR stall by 1I
-            self.add_wait_cycles(1);
+            self.add_i_cycles(1);
         }
     }
 

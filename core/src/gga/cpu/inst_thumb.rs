@@ -3,6 +3,7 @@ use bitmatch::bitmatch;
 use crate::{
     gga::{
         cpu::{registers::Flag::*, Cpu, Exception},
+        Access,
         Access::*,
         GameGirlAdv,
     },
@@ -55,21 +56,21 @@ impl GameGirlAdv {
                     0x0 => self.cpu.and(rd, rs),
                     0x1 => self.cpu.xor(rd, rs),
                     0x2 => {
-                        self.add_wait_cycles(1);
+                        self.idle_nonseq();
                         self.cpu.lsl(rd, rs & 0xFF)
                     }
                     0x3 => {
-                        self.add_wait_cycles(1);
+                        self.idle_nonseq();
                         self.cpu.lsr::<false>(rd, rs & 0xFF)
                     }
                     0x4 => {
-                        self.add_wait_cycles(1);
+                        self.idle_nonseq();
                         self.cpu.asr::<false>(rd, rs & 0xFF)
                     }
                     0x5 => self.cpu.adc(rd, rs, self.cpu.flag(Carry) as u32),
                     0x6 => self.cpu.sbc(rd, rs, self.cpu.flag(Carry) as u32),
                     0x7 => {
-                        self.add_wait_cycles(1);
+                        self.idle_nonseq();
                         self.cpu.ror::<false>(rd, rs & 0xFF)
                     }
                     0x8 => {
@@ -90,8 +91,7 @@ impl GameGirlAdv {
                     }
                     0xC => self.cpu.or(rd, rs),
                     0xD => {
-                        // TODO proper stall amount
-                        self.add_wait_cycles(1);
+                        self.mul_wait_cycles(rd, true);
                         self.cpu.mul(rd, rs)
                     }
                     0xE => self.cpu.bit_clear(rd, rs),
@@ -125,7 +125,7 @@ impl GameGirlAdv {
             // THUMB.6
             "01001_dddnnnnnnnn" => {
                 // LDR has +1I
-                self.add_wait_cycles(1);
+                self.idle_nonseq();
                 self.cpu.low[d.us()] =
                     self.read_word_ldrswp(self.cpu.adj_pc() + (n.u32() << 2), NonSeq)
             }
@@ -136,6 +136,7 @@ impl GameGirlAdv {
                 let ro = self.cpu.low(b);
                 let rd = self.cpu.low(d);
                 let addr = rb.wrapping_add(ro);
+                self.cpu.access_type = NonSeq;
 
                 match o {
                     0 => self.write_word(addr, rd, NonSeq),        // STR
@@ -154,7 +155,7 @@ impl GameGirlAdv {
                 }
                 if o > 2 {
                     // LDR has +1I
-                    self.add_wait_cycles(1);
+                    self.add_i_cycles(1);
                 }
             }
 
@@ -162,6 +163,7 @@ impl GameGirlAdv {
             "011_oonnnnnbbbddd" => {
                 let rb = self.cpu.low(b);
                 let rd = self.cpu.low(d);
+                self.cpu.access_type = NonSeq;
 
                 match o {
                     0 => self.write_word(rb + (n.u32() << 2), rd, NonSeq), // STR
@@ -172,7 +174,7 @@ impl GameGirlAdv {
 
                 if o.is_bit(0) {
                     // LDR has +1I
-                    self.add_wait_cycles(1);
+                    self.add_i_cycles(1);
                 }
             }
 
@@ -182,23 +184,25 @@ impl GameGirlAdv {
                 let ro = n.u32() << 1; // Step 2
                 let rd = self.cpu.low(d);
                 let addr = rb + ro;
+                self.cpu.access_type = NonSeq;
 
                 if o == 0 {
                     self.write_hword(addr, rd.u16(), NonSeq);
                 } else {
                     // LDR has +1I
-                    self.add_wait_cycles(1);
+                    self.add_i_cycles(1);
                     self.cpu.low[d.us()] = self.read_hword(addr, NonSeq).u32();
                 }
             }
 
             // THUMB.11
             "1001_0dddnnnnnnnn" => {
+                self.cpu.access_type = NonSeq;
                 self.write_word(self.cpu.sp() + (n.u32() << 2), self.cpu.low(d), NonSeq)
             }
             "1001_1dddnnnnnnnn" => {
                 // LDR has +1I
-                self.add_wait_cycles(1);
+                self.idle_nonseq();
                 self.cpu.low[d.us()] =
                     self.read_word_ldrswp(self.cpu.sp() + (n.u32() << 2), NonSeq);
             }
@@ -231,6 +235,7 @@ impl GameGirlAdv {
                 }
                 assert!(kind == Seq);
                 self.cpu.set_sp(sp);
+                self.cpu.access_type = NonSeq;
             }
             "1011_110brrrrrrrr" => {
                 let mut sp = self.cpu.sp();
@@ -251,6 +256,7 @@ impl GameGirlAdv {
                 }
                 assert!(kind == Seq);
                 self.cpu.set_sp(sp);
+                self.idle_nonseq();
             }
 
             // THUMB.15
@@ -276,6 +282,7 @@ impl GameGirlAdv {
                 if kind == NonSeq {
                     self.on_empty_rlist(b.u32(), true, true, false);
                 }
+                self.cpu.access_type = NonSeq;
             }
             "1100_1bbbrrrrrrrr" => {
                 // LDMIA
@@ -290,7 +297,7 @@ impl GameGirlAdv {
                 if kind == NonSeq {
                     self.on_empty_rlist(b.u32(), false, true, false);
                 }
-                self.add_wait_cycles(1);
+                self.idle_nonseq();
             }
 
             // THUMB.16

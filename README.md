@@ -162,7 +162,7 @@ cargo run -p tests --release -- --gg
 - [ ] mgba's suite
   - [x] Memory: 1552/1552
   - [x] I/O read: 123/123
-  - [ ] Timing: 355/1660
+  - [ ] Timing: 1025/1660
   - [ ] Timer count-up: Freezes...
   - [ ] Timer IRQ: 65/90
   - [x] Shifter: 140/140

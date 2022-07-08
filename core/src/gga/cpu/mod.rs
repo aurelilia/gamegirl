@@ -30,6 +30,7 @@ pub struct Cpu {
     pub cpsr: u32,
     pub spsr: ModeReg,
     pipeline: [u32; 2],
+    pub(crate) access_type: Access,
 }
 
 impl Cpu {
@@ -46,7 +47,8 @@ impl Cpu {
         if gg.cpu.flag(Thumb) {
             let inst = gg.cpu.pipeline[0].u16();
             gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
-            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc, Access::Seq);
+            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc, gg.cpu.access_type);
+            gg.cpu.access_type = Access::Seq;
             gg.execute_inst_thumb(inst);
 
             if crate::TRACING {
@@ -56,7 +58,8 @@ impl Cpu {
         } else {
             let inst = gg.cpu.pipeline[0];
             gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
-            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc, Access::Seq);
+            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc, gg.cpu.access_type);
+            gg.cpu.access_type = Access::Seq;
             gg.execute_inst_arm(inst);
 
             if crate::TRACING {
@@ -101,6 +104,7 @@ impl Cpu {
 
     /// Emulate a pipeline stall / fill; used when PC changes.
     pub fn pipeline_stall(gg: &mut GameGirlAdv) {
+        gg.memory.prefetch_len = 0; // Discard prefetch
         if gg.cpu.flag(Thumb) {
             gg.cpu.pipeline[0] = gg.read_hword(gg.cpu.pc, Access::NonSeq);
             gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc + 2, Access::Seq);
@@ -108,6 +112,7 @@ impl Cpu {
             gg.cpu.pipeline[0] = gg.read_word(gg.cpu.pc, Access::NonSeq);
             gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc + 4, Access::Seq);
         };
+        gg.cpu.access_type = Access::Seq;
         gg.cpu.inc_pc();
     }
 
@@ -153,6 +158,7 @@ impl Default for Cpu {
             cpsr: 0xD3,
             spsr: ModeReg::default(),
             pipeline: [0; 2],
+            access_type: Access::NonSeq,
         }
     }
 }
