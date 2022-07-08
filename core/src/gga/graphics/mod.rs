@@ -79,12 +79,15 @@ impl Ppu {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 Self::render_line(gg);
-
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
-                gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, true);
                 Dmas::update(gg, true);
 
-                (PpuEvent::HblankEnd, 272u32)
+                (PpuEvent::SetHblank, 46u32)
+            }
+
+            PpuEvent::SetHblank => {
+                gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, true);
+                (PpuEvent::HblankEnd, 226)
             }
 
             PpuEvent::HblankEnd => {
@@ -97,16 +100,21 @@ impl Ppu {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, false);
                 }
 
-                if gg[VCOUNT] == 160 {
-                    gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
-                    Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
-                    Dmas::update(gg, false);
-                    Self::reload_affine_bgs(gg);
-                    gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
-                } else if gg[VCOUNT] > 227 {
-                    gg[VCOUNT] = 0;
-                    gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false);
-                    (gg.options.frame_finished)(BorrowedSystem::GGA(gg));
+                match gg[VCOUNT] {
+                    160 => {
+                        gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
+                        Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
+                        Dmas::update(gg, false);
+                        Self::reload_affine_bgs(gg);
+                        gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
+                    }
+                    // VBlank flag gets set one scanline early
+                    227 => gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false),
+                    228 => {
+                        gg[VCOUNT] = 0;
+                        (gg.options.frame_finished)(BorrowedSystem::GGA(gg));
+                    }
+                    _ => (),
                 }
 
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, false);

@@ -179,7 +179,7 @@ cargo run -p tests --release -- --gg
     - [ ] OAM Update Delay
 - [ ] AGS Aging Cartridge
   - [ ] Memory: 8/9 (Prefetch buffer fails)
-  - [ ] LCD: 5/7 (H/VBlank status fail)
+  - [x] LCD
   - [ ] Timer: 2/3 (Timer Connect fails)
   - [ ] DMA: 8/9 (Priority fails)
   - [x] COM

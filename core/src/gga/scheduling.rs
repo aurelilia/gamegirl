@@ -52,6 +52,8 @@ impl Kind for AdvEvent {}
 pub enum PpuEvent {
     /// Start of HBlank.
     HblankStart,
+    /// Set HBlank flag in DISPSTAT (this is delayed by 46 cycles)
+    SetHblank,
     /// End of HBlank, which is the start of the next scanline.
     HblankEnd,
 }
