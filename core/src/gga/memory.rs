@@ -453,7 +453,9 @@ impl GameGirlAdv {
             // TODO this is not how serial actually works but it tricks some tests...
             SIOCNT => {
                 self[a] = value.set_bit(7, false);
-                Cpu::request_interrupt(self, Interrupt::Serial);
+                if value == 0x4003 {
+                    Cpu::request_interrupt(self, Interrupt::Serial);
+                }
             }
 
             _ => self[a] = value,
