@@ -127,7 +127,7 @@ impl Apu {
             let dest = 0x400_0000 | (FIFO_A_L + CH.u32() * 4);
             for dma in 1..=2 {
                 if Dmas::get_dest(gg, dma) == dest {
-                    Dmas::check_special_transfer(gg, dma)
+                    Dmas::try_fifo_transfer(gg, dma)
                 }
             }
         }

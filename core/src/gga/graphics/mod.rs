@@ -17,7 +17,7 @@ use crate::{
     gga::{
         addr::{BG2PA, BG3PA, DISPCNT, DISPSTAT, VCOUNT},
         cpu::{Cpu, Interrupt},
-        dma::Dmas,
+        dma::{DmaReason, Dmas},
         scheduling::{AdvEvent, PpuEvent},
         GameGirlAdv,
     },
@@ -80,7 +80,7 @@ impl Ppu {
             PpuEvent::HblankStart => {
                 Self::render_line(gg);
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
-                Dmas::update(gg, true);
+                Dmas::update_all(gg, DmaReason::HBlank);
 
                 (PpuEvent::SetHblank, 46i32)
             }
@@ -104,7 +104,7 @@ impl Ppu {
                     160 => {
                         gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                         Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
-                        Dmas::update(gg, false);
+                        Dmas::update_all(gg, DmaReason::VBlank);
                         Self::reload_affine_bgs(gg);
                         gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
                     }

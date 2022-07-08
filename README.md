@@ -181,7 +181,7 @@ cargo run -p tests --release -- --gg
   - [ ] Memory: 8/9 (Prefetch buffer fails)
   - [x] LCD
   - [ ] Timer: 2/3 (Timer Connect fails)
-  - [ ] DMA: 8/9 (Priority fails)
+  - [x] DMA
   - [x] COM
   - [x] Key Input
   - [ ] Interrupt: 5/7 (Serial and Keypad fail)

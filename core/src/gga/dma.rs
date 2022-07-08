@@ -4,10 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     gga::{
-        addr::{DISPSTAT, VCOUNT},
+        addr::VCOUNT,
         cartridge::SaveType,
         cpu::{Cpu, Interrupt},
-        graphics::VBLANK,
         Access, GameGirlAdv,
     },
     numutil::{word, NumExt},
@@ -31,16 +30,15 @@ pub struct Dmas {
 
 impl Dmas {
     /// Update all DMAs to see if they need ticking.
-    /// Called on V/Hblank.
-    pub fn update(gg: &mut GameGirlAdv, hblank: bool) {
+    pub fn update_all(gg: &mut GameGirlAdv, reason: DmaReason) {
         for idx in 0..4 {
             let base = Self::base_addr(idx);
-            Self::step_dma::<false>(gg, idx, base, gg[base + 0xA], hblank);
+            Self::step_dma(gg, idx, base, gg[base + 0xA], reason);
         }
     }
 
     /// Update a given DMA after it's control register was written.
-    pub fn update_idx(gg: &mut GameGirlAdv, idx: u16, new_ctrl: u16) {
+    pub fn ctrl_write(gg: &mut GameGirlAdv, idx: u16, new_ctrl: u16) {
         let base = Self::base_addr(idx);
         let old_ctrl = gg[base + 0xA];
         if !old_ctrl.is_bit(15) && new_ctrl.is_bit(15) {
@@ -52,14 +50,14 @@ impl Dmas {
         }
 
         gg[base + 0xA] = new_ctrl & if idx == 3 { 0xFFE0 } else { 0xF7E0 };
-        Self::step_dma::<false>(gg, idx, base, new_ctrl, false);
+        Self::step_dma(gg, idx, base, new_ctrl, DmaReason::CtrlWrite);
     }
 
-    /// Try to perform a special transfer, if the DMA is otherwise configured
-    /// for it.
-    pub fn check_special_transfer(gg: &mut GameGirlAdv, idx: u16) {
+    /// Try to perform a FIFO transfer, if the DMA is otherwise configured for
+    /// it.
+    pub fn try_fifo_transfer(gg: &mut GameGirlAdv, idx: u16) {
         let base = Self::base_addr(idx);
-        Self::step_dma::<true>(gg, idx, base, gg[base + 0xA], false);
+        Self::step_dma(gg, idx, base, gg[base + 0xA], DmaReason::Fifo);
     }
 
     /// Get the destination register for a DMA; this is not the internal one.
@@ -69,30 +67,27 @@ impl Dmas {
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma<const FIFO: bool>(
-        gg: &mut GameGirlAdv,
-        idx: u16,
-        base: u32,
-        ctrl: u16,
-        hblank: bool,
-    ) {
-        let vid_capture =
-            idx == 3 && (2..162).contains(&gg[VCOUNT]) && hblank && ctrl.bits(12, 2) == 3;
+    fn step_dma(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16, reason: DmaReason) {
+        let fifo = reason == DmaReason::Fifo;
+        let vid_capture = idx == 3
+            && (2..162).contains(&gg[VCOUNT])
+            && reason == DmaReason::HBlank
+            && ctrl.bits(12, 2) == 3;
         let on = ctrl.is_bit(15)
             && match ctrl.bits(12, 2) {
-                0 => true,
-                1 => gg[DISPSTAT].is_bit(VBLANK),
-                2 => hblank && gg[VCOUNT] < 160,
-                _ => FIFO || vid_capture,
+                0 => reason == DmaReason::CtrlWrite,
+                1 => reason == DmaReason::VBlank,
+                2 => reason == DmaReason::HBlank && gg[VCOUNT] < 160,
+                _ => fifo || vid_capture,
             };
-        if !on || gg.dma.running < idx {
+        if !on || gg.dma.running <= idx {
             return;
         }
         let prev_dma = mem::replace(&mut gg.dma.running, idx);
 
         let count = gg[base + 8];
         let count = match count {
-            _ if FIFO => 4,
+            _ if fifo => 4,
             0 if idx == 3 => 0x1_0000,
             0 => 0x4000,
             _ => count.u32(),
@@ -101,7 +96,7 @@ impl Dmas {
 
         let dst_raw = ctrl.bits(5, 2);
         let dst_mod = match dst_raw {
-            _ if FIFO => 0,
+            _ if fifo => 0,
             3 => {
                 // Reload DST + Increment
                 let dst = word(gg[base + 4], gg[base + 6]);
@@ -112,7 +107,7 @@ impl Dmas {
         };
 
         let word_transfer = ctrl.is_bit(10);
-        if FIFO || word_transfer {
+        if fifo || word_transfer {
             Self::perform_transfer::<true>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
         } else if idx == 3 {
             // Maybe alert EEPROM, if the cart has one
@@ -168,6 +163,7 @@ impl Dmas {
                 gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
                 kind = Access::Seq;
+                gg.advance_clock();
             }
 
             // Put last value into cache
@@ -190,6 +186,7 @@ impl Dmas {
                 gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
                 kind = Access::Seq;
+                gg.advance_clock();
             }
         }
     }
@@ -209,4 +206,17 @@ impl Dmas {
     fn base_addr(idx: u16) -> u32 {
         0xB0 + (idx.u32() * 0xC)
     }
+}
+
+/// Reason for why a DMA transfer attempt was initiated.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum DmaReason {
+    /// The control register was written.
+    CtrlWrite,
+    /// The PPU entered HBlank.
+    HBlank,
+    /// The PPU entered VBlank.
+    VBlank,
+    /// A FIFO sound channel is requesting new samples.
+    Fifo,
 }

@@ -424,10 +424,10 @@ impl GameGirlAdv {
             TM3CNT_H => Timers::hi_write::<3>(self, a, value),
 
             // DMAs
-            0xBA => Dmas::update_idx(self, 0, value),
-            0xC6 => Dmas::update_idx(self, 1, value),
-            0xD2 => Dmas::update_idx(self, 2, value),
-            0xDE => Dmas::update_idx(self, 3, value),
+            0xBA => Dmas::ctrl_write(self, 0, value),
+            0xC6 => Dmas::ctrl_write(self, 1, value),
+            0xD2 => Dmas::ctrl_write(self, 2, value),
+            0xDE => Dmas::ctrl_write(self, 3, value),
 
             // CGB audio
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
