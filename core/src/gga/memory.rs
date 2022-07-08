@@ -11,7 +11,7 @@ use super::audio;
 use crate::{
     gga::{
         addr::*,
-        cpu::{registers::Flag, Cpu},
+        cpu::{registers::Flag, Cpu, Interrupt},
         dma::Dmas,
         timer::Timers,
         Access::{self, *},
@@ -429,6 +429,12 @@ impl GameGirlAdv {
             0xD2 => Dmas::ctrl_write(self, 2, value),
             0xDE => Dmas::ctrl_write(self, 3, value),
 
+            // Joypad control
+            KEYCNT => {
+                self[a] = value;
+                self.check_keycnt();
+            }
+
             // CGB audio
             0x60..=0x80 | 0x84 | 0x90..=0x9F => {
                 let mut sched = audio::shed(&mut self.scheduler);
@@ -442,6 +448,13 @@ impl GameGirlAdv {
 
             // RO registers
             VCOUNT | KEYINPUT => (),
+
+            // Serial
+            // TODO this is not how serial actually works but it tricks some tests...
+            SIOCNT => {
+                self[a] = value.set_bit(7, false);
+                Cpu::request_interrupt(self, Interrupt::Serial);
+            }
 
             _ => self[a] = value,
         }

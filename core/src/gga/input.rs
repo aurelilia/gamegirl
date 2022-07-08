@@ -14,15 +14,15 @@ use crate::{
 impl GameGirlAdv {
     pub fn set_button(&mut self, btn: Button, state: bool) {
         self[KEYINPUT] = self[KEYINPUT].set_bit(btn as u16, !state);
-        self.check_cnt();
+        self.check_keycnt();
     }
 
-    fn check_cnt(&mut self) {
+    pub fn check_keycnt(&mut self) {
         let input = self[KEYINPUT];
         let cnt = self[KEYCNT];
         if cnt.is_bit(14) {
             let cond = cnt.bits(0, 10);
-            let fire = if cnt.is_bit(15) {
+            let fire = if !cnt.is_bit(15) {
                 cond & input != 0
             } else {
                 cond & input == cond

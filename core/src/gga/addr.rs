@@ -45,3 +45,6 @@ pub const FIFO_A_L: u32 = 0xA0;
 pub const FIFO_A_H: u32 = 0xA2;
 pub const FIFO_B_L: u32 = 0xA4;
 pub const FIFO_B_H: u32 = 0xA6;
+
+// Serial
+pub const SIOCNT: u32 = 0x128;

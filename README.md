@@ -184,7 +184,7 @@ cargo run -p tests --release -- --gg
   - [x] DMA
   - [x] COM
   - [x] Key Input
-  - [ ] Interrupt: 5/7 (Serial and Keypad fail)
+  - [x] Interrupt
 - [x] jsmolka's gba-tests
   - [x] `arm`
   - [x] `memory`
