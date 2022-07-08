@@ -1,5 +1,6 @@
 use std::mem;
 
+use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -26,6 +27,8 @@ pub struct Dmas {
     cache: u32,
     /// Currently running DMA, or 99
     pub(super) running: u16,
+    /// DMAs waiting to run after current.
+    queued: ArrayVec<(u16, DmaReason), 3>,
 }
 
 impl Dmas {
@@ -80,9 +83,14 @@ impl Dmas {
                 2 => reason == DmaReason::HBlank && gg[VCOUNT] < 160,
                 _ => fifo || vid_capture,
             };
-        if !on || gg.dma.running <= idx {
+        if !on {
             return;
         }
+        if gg.dma.running <= idx {
+            gg.dma.queued.push((idx, reason));
+            return;
+        }
+
         let prev_dma = mem::replace(&mut gg.dma.running, idx);
 
         let count = gg[base + 8];
@@ -130,6 +138,10 @@ impl Dmas {
         }
 
         gg.dma.running = prev_dma;
+        if let Some((dma, reason)) = gg.dma.queued.pop() {
+            let base = Self::base_addr(dma);
+            Self::step_dma(gg, dma, base, gg[base + 0xA], reason);
+        }
     }
 
     /// Perform a transfer.
@@ -209,7 +221,7 @@ impl Dmas {
 }
 
 /// Reason for why a DMA transfer attempt was initiated.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub enum DmaReason {
     /// The control register was written.
     CtrlWrite,
