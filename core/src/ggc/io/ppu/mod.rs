@@ -58,7 +58,7 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub(super) fn handle_event(gg: &mut GameGirl, evt: PpuEvent, late_by: u32) {
+    pub(super) fn handle_event(gg: &mut GameGirl, evt: PpuEvent, late_by: i32) {
         let (next_mode, time) = match evt {
             PpuEvent::OamScanEnd => (PpuEvent::UploadEnd, 172),
 

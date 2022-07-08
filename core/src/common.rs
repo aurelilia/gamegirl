@@ -208,8 +208,7 @@ impl System {
 
     fn decode_elf(cart: &[u8]) -> Option<Vec<u8>> {
         let elf = Elf::from_bytes(cart).ok()?;
-        let mut buf = Vec::with_capacity(0x1FF_FFFF);
-        buf.extend(iter::repeat(0).take(0x1FF_FFFF));
+        let mut buf = vec![0; 0x1FF_FFFF];
 
         for header in elf
             .section_header_iter()

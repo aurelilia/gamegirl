@@ -75,14 +75,14 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: u32) {
+    pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: i32) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 Self::render_line(gg);
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
                 Dmas::update(gg, true);
 
-                (PpuEvent::SetHblank, 46u32)
+                (PpuEvent::SetHblank, 46i32)
             }
 
             PpuEvent::SetHblank => {
@@ -121,10 +121,8 @@ impl Ppu {
                 (PpuEvent::HblankStart, 960)
             }
         };
-        gg.scheduler.schedule(
-            AdvEvent::PpuEvent(next_event),
-            cycles.saturating_sub(late_by),
-        );
+        gg.scheduler
+            .schedule(AdvEvent::PpuEvent(next_event), cycles - late_by);
     }
 
     fn maybe_interrupt(gg: &mut GameGirlAdv, int: Interrupt, bit: u16) {

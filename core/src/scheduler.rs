@@ -16,8 +16,11 @@ pub struct Scheduler<E: Kind> {
 impl<E: Kind> Scheduler<E> {
     /// Schedule an event of the given kind after the given amount
     /// of cycles have elapsed from now.
-    pub fn schedule(&mut self, kind: E, after: u32) {
-        let time = self.time + after;
+    /// Number can be negative; this is mainly used for events where
+    /// they were quite a bit late and the followup event also needed to happen
+    /// already.
+    pub fn schedule(&mut self, kind: E, after: i32) {
+        let time = self.time.saturating_add_signed(after);
         let event = ScheduledEvent {
             kind,
             execute_at: time,
@@ -65,7 +68,7 @@ impl<E: Kind> Scheduler<E> {
             self.events.truncate(idx);
             Some(Event {
                 kind: event.kind,
-                late_by: self.time - event.execute_at,
+                late_by: (self.time - event.execute_at) as i32,
             })
         } else {
             None
@@ -129,5 +132,5 @@ pub struct Event<E: Kind> {
     /// - Event was scheduled to be executed at tick 1000
     /// - Scheduler ran until 1010 before the event got handled
     /// - `late_by` will be 1010 - 1000 = 10.
-    pub late_by: u32,
+    pub late_by: i32,
 }

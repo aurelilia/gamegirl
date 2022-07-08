@@ -71,7 +71,7 @@ impl GameGirlAdv {
             return;
         }
 
-        let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as u32;
+        let target = (CPU_CLOCK * delta * self.options.speed_multiplier as f32) as i32;
         self.scheduler.schedule(AdvEvent::PauseEmulation, target);
 
         self.ticking = true;

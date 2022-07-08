@@ -16,8 +16,8 @@ use crate::{
     scheduler::Scheduler,
 };
 
-pub const SAMPLE_EVERY_N_CLOCKS: u32 = (CPU_CLOCK / SAMPLE_RATE as f32) as u32;
-const GG_OFFS: u32 = 4;
+pub const SAMPLE_EVERY_N_CLOCKS: i32 = (CPU_CLOCK / SAMPLE_RATE as f32) as i32;
+const GG_OFFS: i32 = 4;
 
 /// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
 #[derive(Default, Deserialize, Serialize)]
@@ -34,22 +34,20 @@ pub struct Apu {
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this
     /// function returns the time after which the event should repeat.
-    pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: u32) -> u32 {
+    pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: i32) -> i32 {
         match event {
             // We multiply the time by 4 since the generic APU expects GG t-cycles,
             // which are 1/4th of GGA CPU clock
-            ApuEvent::Gen(gen) => (gen.dispatch(&mut gg.apu.cgb_chans) * GG_OFFS)
-                .checked_sub(late_by)
-                .unwrap_or(GG_OFFS),
+            ApuEvent::Gen(gen) => (gen.dispatch(&mut gg.apu.cgb_chans) * GG_OFFS) - late_by,
 
             ApuEvent::Sequencer => {
                 gg.apu.cgb_chans.tick_sequencer();
-                0x8000u32.saturating_sub(late_by)
+                0x8000 - late_by
             }
 
             ApuEvent::PushSample => {
                 Self::push_output(gg);
-                SAMPLE_EVERY_N_CLOCKS.saturating_sub(late_by)
+                SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
     }

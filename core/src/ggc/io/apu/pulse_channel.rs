@@ -186,7 +186,7 @@ impl<const T: bool> ApuChannel for PulseChannel<T> {
         } else {
             GenApuEvent::Pulse1Reload
         };
-        sched(evt, (0x7FF - self.frequency).u32() << 2);
+        sched(evt, ((0x7FF - self.frequency) as i32) << 2);
         self.envelope.trigger();
         self.sweep_trigger();
     }

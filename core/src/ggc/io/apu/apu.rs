@@ -267,7 +267,7 @@ impl Default for GenericApu {
     }
 }
 
-pub trait ScheduleFn = FnMut(GenApuEvent, u32);
+pub trait ScheduleFn = FnMut(GenApuEvent, i32);
 
 #[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub enum GenApuEvent {
@@ -278,7 +278,7 @@ pub enum GenApuEvent {
 }
 
 impl GenApuEvent {
-    pub fn dispatch(&self, apu: &mut GenericApu) -> u32 {
+    pub fn dispatch(&self, apu: &mut GenericApu) -> i32 {
         if !apu.power {
             // Just wait a while.
             return 0xFF;
@@ -290,6 +290,6 @@ impl GenApuEvent {
             Self::WaveReload => apu.wave.channel_mut().clock(),
             Self::NoiseReload => apu.noise.channel_mut().clock(),
         }
-        .max(1)
+        .max(1) as i32
     }
 }

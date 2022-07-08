@@ -75,7 +75,7 @@ impl GameGirl {
             return;
         }
 
-        let target = (T_CLOCK_HZ as f32 * delta * self.options.speed_multiplier as f32) as u32;
+        let target = (T_CLOCK_HZ as f32 * delta * self.options.speed_multiplier as f32) as i32;
         self.scheduler.schedule(GGEvent::PauseEmulation, target);
 
         self.ticking = true;

@@ -205,7 +205,7 @@ impl GameGirl {
             STAT => self[STAT] = value | 0x80, // Bit 7 unavailable
             DMA => {
                 self[addr] = value;
-                let time = 648 / self.speed.u32();
+                let time = 648 / self.speed as i32;
                 self.scheduler.cancel(GGEvent::DMAFinish);
                 self.scheduler.schedule(GGEvent::DMAFinish, time);
                 self.mem.dma_active = true;

@@ -115,7 +115,7 @@ impl ApuChannel for WaveChannel {
         // in other emulators
         sched(
             GenApuEvent::WaveReload,
-            (0x7FF - self.frequency + 3).u32() << 2,
+            ((0x7FF - self.frequency + 3) as i32) << 2,
         );
     }
 

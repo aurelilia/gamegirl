@@ -28,17 +28,15 @@ pub struct Timers {
 
 impl Timers {
     /// Handle overflow of a scheduled timer.
-    pub fn handle_overflow_event(gg: &mut GameGirlAdv, idx: u8, late_by: u32) {
+    pub fn handle_overflow_event(gg: &mut GameGirlAdv, idx: u8, late_by: i32) {
         // Handle overflow
-        let until_ov = Self::overflow(gg, idx);
+        let until_ov = Self::overflow(gg, idx) as i32;
         // Reschedule event
         // Edge case: with high reload and fast timers, sometimes (late_by > until_ov).
         // In this case, we simply schedule the next overflow event to be immediately.
-        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by + 2;
-        gg.scheduler.schedule(
-            AdvEvent::TimerOverflow(idx),
-            until_ov.saturating_sub(late_by),
-        );
+        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by as u32 + 2;
+        gg.scheduler
+            .schedule(AdvEvent::TimerOverflow(idx), until_ov - late_by);
     }
 
     /// Read current time of the given timer. Might be a bit expensive, since
@@ -81,7 +79,7 @@ impl Timers {
             let until_ov = Self::next_overflow_time(gg.timers.counters[TIM], new_ctrl);
             gg.timers.scheduled_at[TIM] = gg.scheduler.now() + 2;
             gg.scheduler
-                .schedule(AdvEvent::TimerOverflow(TIM.u8()), until_ov);
+                .schedule(AdvEvent::TimerOverflow(TIM.u8()), until_ov as i32);
         }
 
         gg[addr] = new_ctrl;

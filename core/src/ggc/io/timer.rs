@@ -22,19 +22,16 @@ pub struct Timer {
 impl Timer {
     /// Timer overflow event happened, reset TIMA, fire interrupt and
     /// reschedule.
-    pub fn on_overflow(gg: &mut GameGirl, late_by: u32) {
+    pub fn on_overflow(gg: &mut GameGirl, late_by: i32) {
         gg.timer.scheduled_at = gg.scheduler.now();
-        let time = Self::next_overflow_time(gg);
+        let time = Self::next_overflow_time(gg) as i32;
 
         // Obscure behavior: It takes 1 M-cycle for the timer to actually reload
         gg[TIMA] = 0;
-        gg.scheduler
-            .schedule(GGEvent::TmaReload, 4u32.saturating_sub(late_by));
+        gg.scheduler.schedule(GGEvent::TmaReload, 4 - late_by);
 
-        gg.scheduler.schedule(
-            GGEvent::TimerOverflow,
-            time.checked_sub(late_by).unwrap_or(1),
-        );
+        gg.scheduler
+            .schedule(GGEvent::TimerOverflow, time - late_by);
     }
 
     /// Get the time when the next overflow will occur, in t-cycles.
@@ -126,7 +123,7 @@ impl Timer {
             gg.timer.scheduled_at =
                 gg.scheduler.now() - (Self::div(gg) & (gg.timer.counter_divider - 1)).u32();
             gg.scheduler
-                .schedule(GGEvent::TimerOverflow, Self::next_overflow_time(gg));
+                .schedule(GGEvent::TimerOverflow, Self::next_overflow_time(gg) as i32);
         }
     }
 }

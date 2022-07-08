@@ -43,7 +43,7 @@ pub enum GGEvent {
 
 impl GGEvent {
     /// Handle the event by delegating to the appropriate handler.
-    pub fn dispatch(&self, gg: &mut GameGirl, late_by: u32) {
+    pub fn dispatch(&self, gg: &mut GameGirl, late_by: i32) {
         match self {
             PauseEmulation => gg.ticking = false,
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),

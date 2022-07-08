@@ -18,7 +18,7 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
-pub const SAMPLE_EVERY_N_CLOCKS: u32 = T_CLOCK_HZ / SAMPLE_RATE;
+pub const SAMPLE_EVERY_N_CLOCKS: i32 = (T_CLOCK_HZ / SAMPLE_RATE) as i32;
 
 /// APU variant used by DMG/CGB.
 #[derive(Deserialize, Serialize)]
@@ -28,7 +28,7 @@ pub struct Apu {
 }
 
 impl Apu {
-    pub fn handle_event(gg: &mut GameGirl, event: ApuEvent, late_by: u32) {
+    pub fn handle_event(gg: &mut GameGirl, event: ApuEvent, late_by: i32) {
         match event {
             ApuEvent::PushSample => {
                 let sample = gg.apu.inner.make_sample();
@@ -46,10 +46,8 @@ impl Apu {
 
             ApuEvent::Gen(gen) => {
                 let next = gen.dispatch(&mut gg.apu.inner);
-                gg.scheduler.schedule(
-                    GGEvent::ApuEvent(event),
-                    next.checked_sub(late_by).unwrap_or(1),
-                );
+                gg.scheduler
+                    .schedule(GGEvent::ApuEvent(event), next - late_by);
             }
         }
     }
