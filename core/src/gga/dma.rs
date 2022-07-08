@@ -1,11 +1,13 @@
+use std::mem;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
     gga::{
-        addr::DISPSTAT,
+        addr::{DISPSTAT, VCOUNT},
         cartridge::SaveType,
         cpu::{Cpu, Interrupt},
-        graphics::{HBLANK, VBLANK},
+        graphics::VBLANK,
         Access, GameGirlAdv,
     },
     numutil::{word, NumExt},
@@ -23,15 +25,17 @@ pub struct Dmas {
     dst: [u32; 4],
     /// Internal cache shared between DMAs
     cache: u32,
+    /// Currently running DMA, or 99
+    pub(super) running: u16,
 }
 
 impl Dmas {
     /// Update all DMAs to see if they need ticking.
     /// Called on V/Hblank.
-    pub fn update(gg: &mut GameGirlAdv) {
+    pub fn update(gg: &mut GameGirlAdv, hblank: bool) {
         for idx in 0..4 {
             let base = Self::base_addr(idx);
-            Self::step_dma::<false>(gg, idx, base, gg[base + 0xA]);
+            Self::step_dma::<false>(gg, idx, base, gg[base + 0xA], hblank);
         }
     }
 
@@ -48,14 +52,14 @@ impl Dmas {
         }
 
         gg[base + 0xA] = new_ctrl & if idx == 3 { 0xFFE0 } else { 0xF7E0 };
-        Self::step_dma::<false>(gg, idx, base, new_ctrl);
+        Self::step_dma::<false>(gg, idx, base, new_ctrl, false);
     }
 
     /// Try to perform a special transfer, if the DMA is otherwise configured
     /// for it.
     pub fn check_special_transfer(gg: &mut GameGirlAdv, idx: u16) {
         let base = Self::base_addr(idx);
-        Self::step_dma::<true>(gg, idx, base, gg[base + 0xA]);
+        Self::step_dma::<true>(gg, idx, base, gg[base + 0xA], false);
     }
 
     /// Get the destination register for a DMA; this is not the internal one.
@@ -65,17 +69,26 @@ impl Dmas {
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma<const FIFO: bool>(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16) {
+    fn step_dma<const FIFO: bool>(
+        gg: &mut GameGirlAdv,
+        idx: u16,
+        base: u32,
+        ctrl: u16,
+        hblank: bool,
+    ) {
+        let vid_capture =
+            idx == 3 && (2..162).contains(&gg[VCOUNT]) && hblank && ctrl.bits(12, 2) == 3;
         let on = ctrl.is_bit(15)
             && match ctrl.bits(12, 2) {
                 0 => true,
                 1 => gg[DISPSTAT].is_bit(VBLANK),
-                2 => gg[DISPSTAT].is_bit(HBLANK),
-                _ => FIFO,
+                2 => hblank && gg[VCOUNT] < 160,
+                _ => FIFO || vid_capture,
             };
-        if !on {
+        if !on || gg.dma.running < idx {
             return;
         }
+        let prev_dma = mem::replace(&mut gg.dma.running, idx);
 
         let count = gg[base + 8];
         let count = match count {
@@ -111,14 +124,17 @@ impl Dmas {
             Self::perform_transfer::<false>(gg, idx.us(), count, src_mod, dst_mod);
         }
 
-        if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 {
-            // Disable if reload is not enabled
+        if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 || (vid_capture && gg[VCOUNT] == 161) {
+            // Disable if reload is not enabled, it's an immediate transfer, or end of video
+            // capture
             gg[base + 0xA] = ctrl.set_bit(15, false)
         }
         if ctrl.is_bit(14) {
             // Fire interrupt if configured
             Cpu::request_interrupt_idx(gg, Interrupt::Dma0 as u16 + idx)
         }
+
+        gg.dma.running = prev_dma;
     }
 
     /// Perform a transfer.
@@ -180,12 +196,12 @@ impl Dmas {
 
     /// Get the step with which to change SRC/DST registers after every write.
     /// Multiplied by 2 for word-sized DMAs.
+    /// Inc+Reload handled separately.
     fn get_step(bits: u16) -> i32 {
         match bits {
             0 => 2,
             1 => -2,
-            2 => 0,
-            _ => 0, // TODO
+            _ => 0,
         }
     }
 

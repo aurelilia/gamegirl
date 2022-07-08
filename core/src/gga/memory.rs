@@ -236,6 +236,10 @@ impl GameGirlAdv {
 
             _ => {
                 // Open bus
+                if self.cpu.pc > 0xFFF_FFFF || (self.cpu.pc > 0x3FFF && self.cpu.pc < 0x200_0000) {
+                    return 0;
+                }
+
                 if !self.cpu.flag(Flag::Thumb) {
                     // Simple case: just read PC in ARM mode
                     self.get_word(self.cpu.pc)
@@ -259,7 +263,6 @@ impl GameGirlAdv {
             }
         }
     }
-
     /// Write a byte to the bus. Handles timing.
     pub(super) fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
         self.add_wait_cycles(self.wait_time::<1>(addr, kind));

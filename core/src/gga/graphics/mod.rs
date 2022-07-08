@@ -82,7 +82,7 @@ impl Ppu {
 
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
                 gg[DISPSTAT] = gg[DISPSTAT].set_bit(HBLANK, true);
-                Dmas::update(gg);
+                Dmas::update(gg, true);
 
                 (PpuEvent::HblankEnd, 272u32)
             }
@@ -90,7 +90,6 @@ impl Ppu {
             PpuEvent::HblankEnd => {
                 gg[VCOUNT] += 1;
 
-                gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, false);
                 if gg[VCOUNT] == gg[DISPSTAT].bits(8, 8) {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, true);
                     Self::maybe_interrupt(gg, Interrupt::VCounter, LYC_IRQ);
@@ -101,7 +100,7 @@ impl Ppu {
                 if gg[VCOUNT] == 160 {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                     Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
-                    Dmas::update(gg);
+                    Dmas::update(gg, false);
                     Self::reload_affine_bgs(gg);
                     gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
                 } else if gg[VCOUNT] > 227 {

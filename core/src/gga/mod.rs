@@ -255,6 +255,9 @@ impl Default for GameGirlAdv {
             SAMPLE_EVERY_N_CLOCKS,
         );
 
+        // Initialize DMA
+        gg.dma.running = 99;
+
         gg
     }
 }

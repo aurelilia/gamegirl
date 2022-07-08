@@ -94,12 +94,12 @@ graphical glitches.
     - [x] CGB sound channels
     - [x] DMA sound channels
     - [x] All Volume control registers
-  - [ ] DMAs
+  - [x] DMAs
     - [x] General transfers
     - [x] Fine register behavior (Not replacing address if invalid, etc)
     - [x] APU FIFO transfers
     - [x] GamePak EEPROM transfers
-    - [ ] DMA3 Video Capture
+    - [x] DMA3 Video Capture
   - [x] Timers
     - [x] Scheduled timers
     - [x] Cascading timers
@@ -177,8 +177,15 @@ cargo run -p tests --release -- --gg
     - [x] Degenerate OBJ transforms
     - [ ] Layer toggle
     - [ ] OAM Update Delay
-  
-- [ ] jsmolka's gba-tests
+- [ ] AGS Aging Cartridge
+  - [ ] Memory: 8/9 (Prefetch buffer fails)
+  - [ ] LCD: 5/7 (H/VBlank status fail)
+  - [ ] Timer: 2/3 (Timer Connect fails)
+  - [ ] DMA: 8/9 (Priority fails)
+  - [x] COM
+  - [x] Key Input
+  - [ ] Interrupt: 5/7 (Serial and Keypad fail)
+- [x] jsmolka's gba-tests
   - [x] `arm`
   - [x] `memory`
   - [x] `thumb`
@@ -186,7 +193,6 @@ cargo run -p tests --release -- --gg
   - [x] `ppu` (All of them)
   - [x] `nes`
   - [x] `bios`
-  - [ ] `unsafe` (Fails at 002, OOB ROM reads)
 - [ ] destoer's gba_tests
   - [x] `cond_invalid`
   - [ ] `dma_priority` (Causes stack overflow even...)
