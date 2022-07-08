@@ -45,7 +45,7 @@ impl Timers {
     /// time needs to be calculated for timers on the scheduler.
     pub fn time_read<const TIM: usize>(gg: &GameGirlAdv) -> u16 {
         let ctrl = gg[Self::hi_addr(TIM.u8())];
-        let is_scheduled = ctrl.is_bit(7) && !ctrl.is_bit(2);
+        let is_scheduled = ctrl.is_bit(7) && (TIM == 0 || !ctrl.is_bit(2));
 
         if is_scheduled {
             // Is on scheduler, calculate current value
@@ -64,8 +64,8 @@ impl Timers {
         gg.timers.counters[TIM] = Self::time_read::<TIM>(gg);
 
         let old_ctrl = gg[addr];
-        let was_scheduled = old_ctrl.is_bit(7) && !old_ctrl.is_bit(2);
-        let is_scheduled = new_ctrl.is_bit(7) && !new_ctrl.is_bit(2);
+        let was_scheduled = old_ctrl.is_bit(7) && (TIM == 0 || !old_ctrl.is_bit(2));
+        let is_scheduled = new_ctrl.is_bit(7) && (TIM == 0 || !new_ctrl.is_bit(2));
 
         if was_scheduled {
             // Need to cancel current scheduled event

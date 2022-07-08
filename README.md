@@ -170,7 +170,7 @@ cargo run -p tests --release -- --gg
   - [x] BIOS math: 625/625
   - [ ] DMA tests: 1212/1256
     - Tests related to DMA1-3 with ROM source fail
-  - [ ] Misc. edge case tests: 1/10
+  - [ ] Misc. edge case tests: 6/10
   - [ ] Video Tests
     - [x] Basic Mode 3
     - [x] Basic Mode 4
