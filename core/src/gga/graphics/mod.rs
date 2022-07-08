@@ -15,13 +15,13 @@ use super::memory::KB;
 use crate::{
     common::BorrowedSystem,
     gga::{
-        addr::{BG2PA, BG3PA, DISPCNT, DISPSTAT, VCOUNT},
+        addr::{BG2PA, BG3PA, DISPCNT, DISPSTAT, VCOUNT, WIN0H, WIN0V, WININ, WINOUT},
         cpu::{Cpu, Interrupt},
         dma::{DmaReason, Dmas},
         scheduling::{AdvEvent, PpuEvent},
         GameGirlAdv,
     },
-    numutil::NumExt,
+    numutil::{NumExt, U16Ext},
     Colour,
 };
 
@@ -46,6 +46,7 @@ const HBLANK_IRQ: u16 = 4;
 const LYC_IRQ: u16 = 5;
 
 type Layer = [Colour; 240];
+type WindowMask = [bool; 240];
 
 #[derive(Deserialize, Serialize)]
 pub struct Ppu {
@@ -65,6 +66,10 @@ pub struct Ppu {
     #[serde(skip)]
     #[serde(default = "serde_layer_arr")]
     obj_layers: [Layer; 4],
+
+    #[serde(skip)]
+    #[serde(default = "serde_mask_arr")]
+    win_masks: [WindowMask; 5],
 
     bg_x: [i32; 2],
     bg_y: [i32; 2],
@@ -144,6 +149,7 @@ impl Ppu {
             return;
         }
 
+        Self::calc_windows(gg, line.u8());
         match gg[DISPCNT] & 7 {
             0 => Self::render_mode0(gg, line),
             1 => Self::render_mode1(gg, line),
@@ -155,6 +161,64 @@ impl Ppu {
         }
 
         Self::finish_line(gg, line);
+    }
+
+    fn calc_windows(gg: &mut GameGirlAdv, line: u8) {
+        let cnt = gg[DISPCNT];
+        let win0_en = cnt.is_bit(WIN0_EN);
+        let win1_en = cnt.is_bit(WIN1_EN);
+        let win_obj_en = cnt.is_bit(WIN_OBJS);
+        if !win0_en && !win1_en && !win_obj_en {
+            // No windows enabled, allow everything to draw
+            gg.ppu.win_masks = serde_mask_arr();
+            return;
+        }
+
+        let win = gg[WININ];
+        let wout = gg[WINOUT];
+
+        // First set parameters for the outside region, anything in windows
+        // will be overwritten later.
+        for mask in 0..5 {
+            let enable = wout.is_bit(mask);
+            gg.ppu.win_masks[mask.us()] = [enable; 240];
+        }
+
+        // Do window 1 first, since it has lower priority and we want
+        // window 0 to overwrite it
+        for window in (0..2).rev() {
+            if !cnt.is_bit(WIN0_EN + window.u16()) {
+                // Window disabled.
+                continue;
+            }
+
+            let win_offs = (window * 8).u16();
+            let (x1, x2) = Self::window_coords::<240>(gg[WIN0H + window * 2]);
+            let (y1, y2) = Self::window_coords::<160>(gg[WIN0V + window * 2]);
+
+            if !(y1..y2).contains(&line) {
+                // Window outside this line.
+                continue;
+            }
+
+            for mask in 0..5 {
+                let enable = win.is_bit(win_offs + mask);
+                for pixel in x1..x2 {
+                    gg.ppu.win_masks[mask.us()][pixel.us()] = enable;
+                }
+            }
+        }
+    }
+
+    // Return WIN0/WIN1 coordinates, first is start, second is end.
+    fn window_coords<const MAX: u8>(value: u16) -> (u8, u8) {
+        let x1 = value.high();
+        let x2 = value.low().saturating_add(1).min(MAX);
+        if x1 > x2 {
+            (x1, MAX)
+        } else {
+            (x1, x2)
+        }
     }
 
     fn finish_line(gg: &mut GameGirlAdv, line: u16) {
@@ -213,6 +277,7 @@ impl Default for Ppu {
             pixels: serde_colour_arr(),
             bg_layers: serde_layer_arr(),
             obj_layers: serde_layer_arr(),
+            win_masks: serde_mask_arr(),
             last_frame: None,
         }
     }
@@ -223,6 +288,9 @@ fn serde_colour_arr() -> [Colour; 240 * 160] {
 }
 fn serde_layer_arr() -> [Layer; 4] {
     [[EMPTY; 240]; 4]
+}
+fn serde_mask_arr() -> [WindowMask; 5] {
+    [[true; 240]; 5]
 }
 
 const EMPTY: Colour = [0, 0, 0, 0];

@@ -3,7 +3,6 @@ use bitmatch::bitmatch;
 use crate::{
     gga::{
         cpu::{registers::Flag::*, Cpu, Exception},
-        Access,
         Access::*,
         GameGirlAdv,
     },

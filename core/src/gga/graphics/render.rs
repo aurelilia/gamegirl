@@ -17,12 +17,13 @@ impl Ppu {
         tile_addr: usize,
         palette: u8,
         mosaic: bool,
+        window: usize,
     ) {
         for idx in 0..4 {
             let byte = gg.ppu.vram(tile_addr + idx);
-            Self::set_pixel::<OBJ>(gg, x, prio, palette, byte & 0xF, mosaic);
+            Self::set_pixel::<OBJ>(gg, x, prio, palette, byte & 0xF, mosaic, window);
             x += x_step;
-            Self::set_pixel::<OBJ>(gg, x, prio, palette, byte >> 4, mosaic);
+            Self::set_pixel::<OBJ>(gg, x, prio, palette, byte >> 4, mosaic, window);
             x += x_step;
         }
     }
@@ -34,10 +35,11 @@ impl Ppu {
         x_step: i16,
         tile_addr: usize,
         mosaic: bool,
+        window: usize,
     ) {
         for idx in 0..8 {
             let colour = gg.ppu.vram(tile_addr + idx);
-            Self::set_pixel::<OBJ>(gg, x, prio, 0, colour, mosaic);
+            Self::set_pixel::<OBJ>(gg, x, prio, 0, colour, mosaic, window);
             x += x_step;
         }
     }
@@ -61,8 +63,13 @@ impl Ppu {
         palette: u8,
         colour_idx: u8,
         mosaic: bool,
+        window: usize,
     ) {
-        if !(0..240).contains(&x) || colour_idx == 0 || gg.ppu.is_occupied::<OBJ>(x as u16, prio) {
+        if !(0..240).contains(&x)
+            || colour_idx == 0
+            || gg.ppu.is_occupied::<OBJ>(x as u16, prio)
+            || !gg.ppu.win_masks[window][x as usize]
+        {
             return;
         }
         let x = x as u16;

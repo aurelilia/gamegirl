@@ -1,7 +1,7 @@
 use crate::{
     gga::{
-        addr::{DISPCNT, MOSAIC},
-        graphics::{Ppu, OBJ_EN, OBJ_MAPPING_1D},
+        addr::{DISPCNT, MOSAIC, WINOUT},
+        graphics::{Ppu, OBJ_EN, OBJ_MAPPING_1D, WIN_OBJS},
         GameGirlAdv,
     },
     numutil::{hword, NumExt},
@@ -54,6 +54,7 @@ impl Ppu {
         let tile_count = size.0 >> 3;
         let prio = obj.attr2.bits(10, 2);
         let mosaic = obj.attr2.is_bit(4);
+        let is_window = gg[DISPCNT].is_bit(WIN_OBJS) && obj.attr0.bits(10, 2) == 2;
 
         if obj.attr0.is_bit(5) {
             let tile_addr = 0x1_0000
@@ -64,9 +65,25 @@ impl Ppu {
                 };
             let mut tile_line_addr = tile_addr + (tile_y.us() * 8);
             for _ in 0..tile_count {
-                Self::render_tile_8bpp::<true>(gg, prio, obj_x, x_step, tile_line_addr, mosaic);
-                obj_x += x_step * 8;
-                tile_line_addr += 64;
+                if is_window {
+                    for idx in 0..8 {
+                        let colour = gg.ppu.vram(tile_addr + idx);
+                        Self::set_window_pixel(gg, obj_x, colour);
+                        obj_x += x_step;
+                    }
+                } else {
+                    Self::render_tile_8bpp::<true>(
+                        gg,
+                        prio,
+                        obj_x,
+                        x_step,
+                        tile_line_addr,
+                        mosaic,
+                        4,
+                    );
+                    obj_x += x_step * 8;
+                    tile_line_addr += 64;
+                }
             }
         } else {
             let adj_tile_idx =
@@ -75,17 +92,28 @@ impl Ppu {
             let mut tile_line_addr = tile_addr + (tile_y.us() * 4);
             let palette = obj.attr2.bits(12, 4).u8();
             for _ in 0..tile_count {
-                Self::render_tile_4bpp::<true>(
-                    gg,
-                    prio,
-                    obj_x,
-                    x_step,
-                    tile_line_addr,
-                    palette,
-                    mosaic,
-                );
-                obj_x += x_step * 8;
-                tile_line_addr += 32;
+                if is_window {
+                    for idx in 0..4 {
+                        let byte = gg.ppu.vram(tile_addr + idx);
+                        Self::set_window_pixel(gg, obj_x, byte & 0xF);
+                        obj_x += x_step;
+                        Self::set_window_pixel(gg, obj_x, byte >> 4);
+                        obj_x += x_step;
+                    }
+                } else {
+                    Self::render_tile_4bpp::<true>(
+                        gg,
+                        prio,
+                        obj_x,
+                        x_step,
+                        tile_line_addr,
+                        palette,
+                        mosaic,
+                        4,
+                    );
+                    obj_x += x_step * 8;
+                    tile_line_addr += 32;
+                }
             }
         }
     }
@@ -121,6 +149,7 @@ impl Ppu {
             let palette = obj.attr2.bits(12, 4).u8();
             (false, palette)
         };
+        let is_window = gg[DISPCNT].is_bit(WIN_OBJS) && obj.attr0.bits(10, 2) == 2;
 
         for x in 0..obj_width {
             let pixel_x = obj_x + x as i16;
@@ -139,9 +168,14 @@ impl Ppu {
                 continue;
             }
 
+            // OBJ window
             let colour =
                 Self::get_affine_pixel(gg, base_tile_idx, size, trans_x, trans_y, is_2d, is_8bpp);
-            Self::set_pixel::<true>(gg, pixel_x, prio, palette, colour, false);
+            if is_window {
+                Self::set_window_pixel(gg, pixel_x, colour);
+            } else {
+                Self::set_pixel::<true>(gg, pixel_x, prio, palette, colour, false, 4);
+            }
         }
     }
 
@@ -186,6 +220,18 @@ impl Ppu {
             offs += 8;
         }
         out
+    }
+
+    fn set_window_pixel(gg: &mut GameGirlAdv, pixel: i16, colour: u8) {
+        if !(0..240).contains(&pixel) || colour == 0 {
+            return;
+        }
+
+        let wout = gg[WINOUT];
+        for mask in 0..5 {
+            let enable = wout.is_bit(8 + mask);
+            gg.ppu.win_masks[mask.us()][pixel as usize] = enable;
+        }
     }
 }
 

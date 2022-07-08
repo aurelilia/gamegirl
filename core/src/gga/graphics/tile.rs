@@ -9,24 +9,24 @@ use crate::{
 
 impl Ppu {
     pub fn render_mode0(gg: &mut GameGirlAdv, line: u16) {
+        Self::render_objs::<0>(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
         Self::render_bg_text::<2>(gg, line);
         Self::render_bg_text::<3>(gg, line);
-        Self::render_objs::<0>(gg, line);
     }
 
     pub fn render_mode1(gg: &mut GameGirlAdv, line: u16) {
+        Self::render_objs::<0>(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
-        Self::render_objs::<0>(gg, line);
     }
 
     pub fn render_mode2(gg: &mut GameGirlAdv, line: u16) {
+        Self::render_objs::<0>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
         Self::render_bg_affine::<3>(gg, BG3PA);
-        Self::render_objs::<0>(gg, line);
     }
 
     fn render_bg_text<const IDX: u16>(gg: &mut GameGirlAdv, line: u16) {
@@ -69,11 +69,20 @@ impl Ppu {
 
             if bpp8 {
                 let tile_addr = tile_base_addr + (tile_idx.us() * 64) + (tile_y.us() * 8);
-                Self::render_tile_8bpp::<false>(gg, prio, x, x_step, tile_addr, mosaic);
+                Self::render_tile_8bpp::<false>(gg, prio, x, x_step, tile_addr, mosaic, IDX.us());
             } else {
                 let tile_addr = tile_base_addr + (tile_idx.us() * 32) + (tile_y.us() * 4);
                 let palette = map.bits(12, 4).u8();
-                Self::render_tile_4bpp::<false>(gg, prio, x, x_step, tile_addr, palette, mosaic);
+                Self::render_tile_4bpp::<false>(
+                    gg,
+                    prio,
+                    x,
+                    x_step,
+                    tile_addr,
+                    palette,
+                    mosaic,
+                    IDX.us(),
+                );
             }
         }
     }
@@ -122,7 +131,7 @@ impl Ppu {
             let tile_y = (y & 7) as usize;
             let tile_addr = tile_base_addr + (map.us() * 64) + (tile_y * 8) + tile_x;
             let colour = gg.ppu.vram[tile_addr];
-            Self::set_pixel::<false>(gg, pixel_x as i16, prio, 0, colour, mosaic);
+            Self::set_pixel::<false>(gg, pixel_x as i16, prio, 0, colour, mosaic, IDX.us());
         }
 
         gg.ppu.bg_x[IDX.us() - 2] += pb;

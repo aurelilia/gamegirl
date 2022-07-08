@@ -201,6 +201,7 @@ impl Dmas {
                 gg.advance_clock();
             }
         }
+        gg.add_i_cycles(2);
     }
 
     /// Get the step with which to change SRC/DST registers after every write.

@@ -89,7 +89,7 @@ graphical glitches.
     - [x] Priority
     - [ ] Blending
     - [x] Affine BGs/objects
-    - [ ] Windows
+    - [x] Windows
   - [x] APU
     - [x] CGB sound channels
     - [x] DMA sound channels
@@ -162,11 +162,12 @@ cargo run -p tests --release -- --gg
 - [ ] mgba's suite
   - [x] Memory: 1552/1552
   - [x] I/O read: 123/123
-  - [ ] Timing: 1025/1660
+  - [ ] Timing: 1294/2020
   - [ ] Timer count-up: Freezes...
   - [ ] Timer IRQ: 65/90
   - [x] Shifter: 140/140
   - [x] Carry: 93/93
+  - [x] Multiply long: 52/72 (cosidered complete; carry is still not researched in general)
   - [x] BIOS math: 625/625
   - [ ] DMA tests: 1212/1256
     - Tests related to DMA1-3 with ROM source fail
