@@ -183,6 +183,7 @@ impl epi::App for App {
             match &mut *gg {
                 System::GGC(gg) => win.show(ctx, |ui| ggc(gg, ui)),
                 System::GGA(gg) => win.show(ctx, |ui| gga(gg, ui)),
+                System::PSX(_) => todo!(),
             };
         }
 

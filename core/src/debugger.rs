@@ -16,9 +16,10 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
 
 impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
     /// Called before a memory write is executed, which might trigger a BP.
-    pub fn write_occurred(&mut self, addr: Ptr) {
+    /// Returns if emulation should continue.
+    pub fn write_occurred(&mut self, addr: Ptr) -> bool {
         if self.breakpoints.is_empty() {
-            return;
+            return true;
         }
 
         let bp = self
@@ -29,6 +30,8 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
             self.breakpoint_hit = Some(bp.clone());
             self.is_breakpoint_hit = true;
         }
+
+        !self.is_breakpoint_hit
     }
 
     /// Called before an instruction is executed, which might trigger a BP.

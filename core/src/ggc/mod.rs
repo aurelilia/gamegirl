@@ -87,19 +87,9 @@ impl GameGirl {
     /// Step until the PPU has finished producing the current frame.
     /// Only used for rewinding since it causes audio desync very easily.
     pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
-        if !self.options.running {
-            return None;
-        }
-
-        while self.ppu.last_frame == None {
-            if self.debugger.is_breakpoint_hit {
-                self.debugger.is_breakpoint_hit = false;
-                self.options.running = false;
-                return None;
-            }
+        while self.options.running && self.ppu.last_frame == None {
             self.advance();
         }
-
         self.ppu.last_frame.take()
     }
 
@@ -114,9 +104,7 @@ impl GameGirl {
 
         let target = samples.len() * self.options.speed_multiplier;
         while self.apu.buffer.len() < target {
-            if self.debugger.is_breakpoint_hit {
-                self.debugger.is_breakpoint_hit = false;
-                self.options.running = false;
+            if !self.options.running {
                 samples.fill(0.0);
                 return;
             }

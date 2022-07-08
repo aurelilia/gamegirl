@@ -11,6 +11,7 @@ use crate::{
         io::{cartridge::Cartridge, joypad::Joypad},
         GameGirl,
     },
+    psx::PlayStation,
     storage::Storage,
     Colour,
 };
@@ -26,6 +27,7 @@ macro_rules! forward {
             match self {
                 System::GGC(gg) => gg.$name(arg),
                 System::GGA(gg) => gg.$name(arg),
+                System::PSX(_ps) => todo!(),
             }
         }
     };
@@ -34,6 +36,7 @@ macro_rules! forward {
             match self {
                 System::GGC(gg) => gg.$name(),
                 System::GGA(gg) => gg.$name(),
+                System::PSX(ps) => ps.$name(),
             }
         }
     };
@@ -49,6 +52,8 @@ pub enum System {
     GGC(Box<GameGirl>),
     /// A GGA. Only used for GGA games.
     GGA(Box<GameGirlAdv>),
+    /// A PSX. Only used for PSX games, obviously.
+    PSX(Box<PlayStation>),
 }
 
 impl System {
@@ -68,6 +73,7 @@ impl System {
         match self {
             System::GGC(gg) => Joypad::set(gg, btn, pressed),
             System::GGA(gg) => gg.set_button(btn, pressed),
+            System::PSX(_ps) => todo!(),
         }
     }
 
@@ -76,6 +82,7 @@ impl System {
         match self {
             System::GGC(gg) => gg.ppu.last_frame.take(),
             System::GGA(gg) => gg.ppu.last_frame.take(),
+            System::PSX(_ps) => todo!(),
         }
     }
 
@@ -84,6 +91,7 @@ impl System {
         match self {
             System::GGC(gg) => &mut gg.options,
             System::GGA(gg) => &mut gg.options,
+            System::PSX(ps) => &mut ps.options,
         }
     }
 
@@ -92,6 +100,7 @@ impl System {
         match self {
             System::GGC(gg) => &gg.config,
             System::GGA(gg) => &gg.config,
+            System::PSX(ps) => &ps.config,
         }
     }
 
@@ -100,6 +109,7 @@ impl System {
         match self {
             System::GGC(gg) => &mut gg.config,
             System::GGA(gg) => &mut gg.config,
+            System::PSX(ps) => &mut ps.config,
         }
     }
 
@@ -108,6 +118,7 @@ impl System {
         match self {
             System::GGC(_) => [160, 144],
             System::GGA(_) => [240, 160],
+            System::PSX(_) => [640, 480],
         }
     }
 
@@ -124,6 +135,7 @@ impl System {
                     Storage::save(path, save);
                 }
             }
+            System::PSX(_ps) => todo!(),
         }
     }
 

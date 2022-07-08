@@ -1,3 +1,4 @@
+#![feature(const_mut_refs)]
 #![feature(drain_filter)]
 #![feature(duration_consts_float)]
 #![feature(exclusive_range_pattern)]
@@ -10,6 +11,7 @@ pub mod debugger;
 pub mod gga;
 pub mod ggc;
 pub mod numutil;
+pub mod psx;
 mod scheduler;
 pub mod storage;
 
