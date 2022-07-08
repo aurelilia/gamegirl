@@ -27,7 +27,7 @@ use crate::{
 
 // DISPCNT
 const FRAME_SELECT: u16 = 4;
-const OAM_HBLANK_FREE: u16 = 5;
+const _OAM_HBLANK_FREE: u16 = 5;
 const OBJ_MAPPING_1D: u16 = 6;
 const FORCED_BLANK: u16 = 7;
 const BG0_EN: u16 = 8;
