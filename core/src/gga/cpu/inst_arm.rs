@@ -51,8 +51,8 @@ impl GameGirlAdv {
                 self.memory.bios_value = 0xE3A02004;
             }
 
-            "00010_0001111dddd000000000000" => self.set_reg(d, self.cpu.cpsr),
-            "00010_1001111dddd000000000000" => self.set_reg(d, self.cpu.spsr()),
+            "00010_0001111dddd000000000000" => self.set_reg(d, self.cpu.cpsr.set_bit(4, true)),
+            "00010_1001111dddd000000000000" => self.set_reg(d, self.cpu.spsr().set_bit(4, true)),
 
             "00010_d10f??c111100000000mmmm" => self.msr(self.cpu.reg(m), f == 1, c == 1, d == 1),
             "00110_d10f??c1111mmmmnnnnnnnn" => {
