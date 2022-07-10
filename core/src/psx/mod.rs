@@ -12,7 +12,7 @@ use crate::{
     common,
     common::{EmulateOptions, SystemConfig},
     debugger::Debugger,
-    psx::{apu::Apu, cpu::Cpu, gpu::Gpu, scheduling::PsxEvent},
+    psx::{apu::Apu, cpu::Cpu, gpu::Gpu, memory::Memory, scheduling::PsxEvent},
     scheduler::Scheduler,
     Colour,
 };
@@ -31,6 +31,7 @@ pub struct PlayStation {
     cpu: Cpu,
     gpu: Gpu,
     apu: Apu,
+    memory: Memory,
 
     #[serde(skip)]
     #[serde(default)]
@@ -155,6 +156,7 @@ impl Default for PlayStation {
             cpu: Cpu::default(),
             gpu: Gpu::default(),
             apu: Apu::default(),
+            memory: Memory::default(),
             debugger: Debugger::default(),
             scheduler: Scheduler::default(),
             options: EmulateOptions::default(),

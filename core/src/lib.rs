@@ -11,6 +11,7 @@
 #![feature(is_some_with)]
 #![feature(mixed_integer_ops)]
 #![feature(trait_alias)]
+#![feature(adt_const_params)]
 
 pub mod common;
 pub mod debugger;

@@ -6,7 +6,10 @@
 
 use crate::{
     numutil::{NumExt, U32Ext},
-    psx::PlayStation,
+    psx::{
+        cpu::{Cpu, Exception, PendingLoad},
+        PlayStation,
+    },
 };
 
 macro_rules! check_cache {
@@ -41,68 +44,79 @@ impl PlayStation {
         lut[0x06] = Self::blez;
         lut[0x07] = Self::bgtz;
 
-        lut[0x08] = Self::addi;
-        lut[0x09] = Self::addiu;
-        lut[0x0A] = Self::slti;
-        lut[0x0B] = Self::sltiu;
-        lut[0x0C] = Self::andi;
-        lut[0x0D] = Self::ori;
-        lut[0x0E] = Self::xori;
-        lut[0x0F] = Self::lui;
+        lut[0x08] = Self::math_signed::<true, "ADD">; // ADDI
+        lut[0x09] = Self::math_signed::<true, "ADDU">; // ADDIU
+        lut[0x0A] = Self::math_signed::<true, "SLT">; // SLTI
+        lut[0x0B] = Self::math_unsigned::<true, "SLT">; // SLTIU
+        lut[0x0C] = Self::math_unsigned::<true, "AND">; // ANDI
+        lut[0x0D] = Self::math_unsigned::<true, "OR">; // ORI
+        lut[0x0E] = Self::math_unsigned::<true, "XOR">; // XORI
+        lut[0x0F] = Self::math_unsigned::<true, "LUI">; // LUI
 
         lut[0x10] = Self::cop0;
-        lut[0x11] = Self::cop1;
+        lut[0x11] = Self::exception_inst::<{ Exception::CopError }>; // COP1
         lut[0x12] = Self::cop2;
-        lut[0x13] = Self::cop3;
+        lut[0x13] = Self::exception_inst::<{ Exception::CopError }>; // COP3
 
-        lut[0x20] = Self::lb;
-        lut[0x21] = Self::lh;
+        lut[0x20] = Self::load::<1, true>; // LB
+        lut[0x21] = Self::load::<2, true>; // LH
         lut[0x22] = Self::lwl;
-        lut[0x23] = Self::lw;
-        lut[0x24] = Self::lbu;
-        lut[0x25] = Self::lhu;
+        lut[0x23] = Self::load::<4, true>; // LW
+        lut[0x24] = Self::load::<1, false>; // LBU
+        lut[0x25] = Self::load::<2, false>; // LHU
         lut[0x26] = Self::lwr;
 
-        lut[0x28] = Self::sb;
-        lut[0x29] = Self::sh;
+        lut[0x28] = Self::store::<1>; // SB
+        lut[0x29] = Self::store::<2>; // SH
         lut[0x2A] = Self::swl;
-        lut[0x2B] = Self::sw;
+        lut[0x2B] = Self::store::<4>; // SW
         lut[0x2E] = Self::swr;
 
-        lut[0x30] = Self::lwc0;
-        lut[0x31] = Self::lwc1;
+        lut[0x30] = Self::exception_inst::<{ Exception::CopError }>; // LWC0
+        lut[0x31] = Self::exception_inst::<{ Exception::CopError }>; // LWC1
         lut[0x32] = Self::lwc2;
-        lut[0x33] = Self::lwc3;
-        lut[0x38] = Self::swc0;
-        lut[0x39] = Self::swc1;
+        lut[0x33] = Self::exception_inst::<{ Exception::CopError }>; // LWC3
+        lut[0x38] = Self::exception_inst::<{ Exception::CopError }>; // SWC0
+        lut[0x39] = Self::exception_inst::<{ Exception::CopError }>; // SWC1
         lut[0x3A] = Self::swc2;
-        lut[0x3B] = Self::swc3;
+        lut[0x3B] = Self::exception_inst::<{ Exception::CopError }>; // SWC3
 
         lut
     }
 
     const fn secondary_table() -> Lut {
         let mut lut: Lut = [Self::unknown_instruction; 64];
-        lut[0x00] = Self::sll;
-        lut[0x02] = Self::srl;
-        lut[0x03] = Self::sra;
-        lut[0x04] = Self::sllv;
-        lut[0x06] = Self::srlv;
-        lut[0x07] = Self::srav;
+        lut[0x00] = Self::shift::<true, "SLL">; // SLL
+        lut[0x02] = Self::shift::<true, "SRL">; // SRL
+        lut[0x03] = Self::shift::<true, "SRA">; // SRA
+        lut[0x04] = Self::shift::<false, "SLL">; // SLLV
+        lut[0x06] = Self::shift::<false, "SRL">; // SRLV
+        lut[0x07] = Self::shift::<false, "SRA">; // SRAV
 
         lut[0x08] = Self::jr;
         lut[0x09] = Self::jalr;
-        lut[0x0C] = Self::syscall;
-        lut[0x0D] = Self::break_;
+        lut[0x0C] = Self::exception_inst::<{ Exception::Syscall }>; // SYSCALL
+        lut[0x0D] = Self::exception_inst::<{ Exception::Break }>; // BREAK
 
-        lut[0x10] = Self::mfhi;
-        lut[0x11] = Self::mthi;
-        lut[0x12] = Self::mflo;
-        lut[0x13] = Self::mtlo;
-        lut[0x18] = Self::mult;
-        lut[0x19] = Self::multu;
-        lut[0x1A] = Self::div;
-        lut[0x1B] = Self::divu;
+        lut[0x10] = Self::lohi_mov::<false, false>; // MTLO
+        lut[0x11] = Self::lohi_mov::<false, true>; // MTHI
+        lut[0x12] = Self::lohi_mov::<true, false>; // MFLO
+        lut[0x13] = Self::lohi_mov::<true, true>; // MFHI
+        lut[0x18] = Self::muldiv::<false, true>; // MULT
+        lut[0x19] = Self::muldiv::<false, false>; // MULTU
+        lut[0x1A] = Self::muldiv::<true, true>; // DIV
+        lut[0x1B] = Self::muldiv::<true, false>; // DIVU
+
+        lut[0x20] = Self::math_signed::<false, "ADD">; // ADD
+        lut[0x21] = Self::math_unsigned::<false, "ADDU">; // ADDU
+        lut[0x22] = Self::math_signed::<false, "SUB">; // SUB
+        lut[0x23] = Self::math_unsigned::<false, "SUB">; // SUBU
+        lut[0x24] = Self::math_unsigned::<false, "AND">; // AND
+        lut[0x25] = Self::math_unsigned::<false, "OR">; // OR
+        lut[0x26] = Self::math_unsigned::<false, "XOR">; // XOR
+        lut[0x27] = Self::math_unsigned::<false, "NOR">; // NOR
+        lut[0x2A] = Self::math_signed::<false, "SLT">; // SLT
+        lut[0x2B] = Self::math_unsigned::<false, "SLT">; // SLTU
 
         lut
     }
@@ -113,8 +127,8 @@ impl PlayStation {
     fn branch(&mut self, imm: i32) {
         // Always word-aligned
         let offs = imm << 2;
-        // Account for Pc increment after instruction
-        self.set_pc(self.cpu.pc.wrapping_add_signed(offs).wrapping_sub(4));
+        // Account for Pc increment after instruction, TODO correct?
+        self.jump_pc(self.cpu.pc.wrapping_add_signed(offs).wrapping_sub(4));
     }
 
     fn cache_isolated(&self) -> bool {
@@ -124,21 +138,97 @@ impl PlayStation {
     fn addr_with_imm(&self, inst: Inst) -> u32 {
         self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s())
     }
+
+    fn exception_inst<const EX: Exception>(&mut self, _inst: Inst) {
+        Cpu::exeception_occured(self, EX);
+    }
+
+    fn math_unsigned<const IMM: bool, const OP: &'static str>(&mut self, inst: Inst) {
+        let a = self.cpu.reg(inst.rs());
+        let b = if IMM {
+            inst.imm16()
+        } else {
+            self.cpu.reg(inst.rt())
+        };
+
+        let value = match OP {
+            "ADD" => a.wrapping_add(b),
+            "SUB" => a.wrapping_sub(b),
+            "AND" => a & b,
+            "OR" => a | b,
+            "XOR" => a ^ b,
+            "LUI" => b << 16,
+            "SLT" => (a < b) as u32,
+            "NOR" => u32::MAX ^ (a | b),
+            _ => panic!("Unknown math operation"),
+        };
+
+        self.cpu.set_reg(inst.rt(), value);
+    }
+
+    fn math_signed<const IMM: bool, const OP: &'static str>(&mut self, inst: Inst) {
+        let a = self.cpu.reg(inst.rs()) as i32;
+        let b = if IMM {
+            inst.imm16s()
+        } else {
+            self.cpu.reg(inst.rt()) as i32
+        };
+
+        let value = match OP {
+            "ADDU" => a.wrapping_add(b),
+            "SUBU" => a.wrapping_sub(b),
+            "ADD" => match a.checked_add(b) {
+                Some(value) => value,
+                None => {
+                    Cpu::exeception_occured(self, Exception::Overflow);
+                    return;
+                }
+            },
+            "SUB" => match a.checked_sub(b) {
+                Some(value) => value,
+                None => {
+                    Cpu::exeception_occured(self, Exception::Overflow);
+                    return;
+                }
+            },
+            "SLT" => (a < b) as i32,
+            _ => panic!("Unknown math operation"),
+        };
+
+        self.cpu.set_reg(inst.rt(), value as u32);
+    }
+
+    fn unknown_instruction(&mut self, inst: Inst) {
+        log::warn!("Unknown opcode 0x{:08X}", inst.0);
+        self.exception_inst::<{ Exception::UnknownOpcode }>(inst);
+    }
 }
 
 // Primary
 impl PlayStation {
     fn bcondz(&mut self, inst: Inst) {
-        todo!();
+        let is_ge = inst.0.is_bit(16);
+        let link = inst.0.bits(17, 4) == 0x8;
+
+        let cond = (self.cpu.reg(inst.rs()) as i32) < 0;
+        let cond = cond != is_ge;
+
+        if link {
+            self.cpu.set_reg(31, self.cpu.pc);
+        }
+        if cond {
+            self.branch(inst.imm16s());
+        }
     }
 
     fn j(&mut self, inst: Inst) {
         let pc = (self.cpu.pc & 0xF000_0000) | (inst.imm26() << 2);
-        self.set_pc(pc);
+        self.jump_pc(pc);
     }
 
     fn jal(&mut self, inst: Inst) {
-        todo!();
+        self.cpu.set_reg(31, self.cpu.pc);
+        self.j(inst);
     }
 
     fn beq(&mut self, inst: Inst) {
@@ -154,162 +244,122 @@ impl PlayStation {
     }
 
     fn blez(&mut self, inst: Inst) {
-        todo!();
+        if (self.cpu.reg(inst.rs()) as i32) <= 0 {
+            self.branch(inst.imm16s());
+        }
     }
 
     fn bgtz(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn addi(&mut self, inst: Inst) {
-        let rt = self.cpu.reg(inst.rt()) as i32;
-        let rs = self.cpu.reg(inst.rs()) as i32;
-        let value = match rs.checked_add(rt) {
-            Some(value) => value as u32,
-            None => todo!("exceptions"),
-        };
-        self.cpu.set_reg(inst.rt(), value);
-    }
-
-    fn addiu(&mut self, inst: Inst) {
-        let value = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
-        self.cpu.set_reg(inst.rt(), value);
-    }
-
-    fn slti(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn sltiu(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn andi(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn ori(&mut self, inst: Inst) {
-        let rs = self.cpu.reg(inst.rs());
-        self.cpu.set_reg(inst.rt(), rs | inst.imm16());
-    }
-
-    fn xori(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn lui(&mut self, inst: Inst) {
-        self.cpu.set_reg(inst.rt(), inst.imm16() << 16);
-    }
-
-    fn cop1(&mut self, inst: Inst) {
-        todo!();
+        if self.cpu.reg(inst.rs()) as i32 > 0 {
+            self.branch(inst.imm16s());
+        }
     }
 
     fn cop2(&mut self, inst: Inst) {
         todo!();
     }
 
-    fn cop3(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn lb(&mut self, inst: Inst) {
+    fn load<const SIZE: u8, const SIGN: bool>(&mut self, inst: Inst) {
         check_cache!(self);
         let addr = self.addr_with_imm(inst);
-        let value = self.read_byte(addr);
-        self.cpu.set_reg(inst.rt(), value.u32());
-    }
+        Cpu::ensure_aligned(self, addr, SIZE.u32(), Exception::UnalignedLoad);
 
-    fn lh(&mut self, inst: Inst) {
-        check_cache!(self);
-        let addr = self.addr_with_imm(inst);
-        let value = self.read_hword(addr);
-        self.cpu.set_reg(inst.rt(), value.u32());
-    }
-
-    fn lwl(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn lw(&mut self, inst: Inst) {
-        check_cache!(self);
-        let addr = self.addr_with_imm(inst);
-        let value = self.read_word(addr);
-        self.cpu.set_reg(inst.rt(), value);
-    }
-
-    fn lbu(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn lhu(&mut self, inst: Inst) {
-        todo!();
+        let value = match (SIZE, SIGN) {
+            (1, false) => self.read_byte(addr).u32(),
+            (1, true) => self.read_byte(addr) as i8 as i32 as u32,
+            (2, false) => self.read_hword(addr).u32(),
+            (2, true) => self.read_hword(addr) as i16 as i32 as u32,
+            (4, _) => self.read_word(addr).u32(),
+            _ => panic!("Invalid load parameters"),
+        };
+        self.cpu.pending_load = PendingLoad {
+            reg: inst.rt(),
+            value,
+        };
     }
 
     fn lwr(&mut self, inst: Inst) {
-        todo!();
+        let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
+        let value = self.cpu.next_regs[inst.rt().us()];
+
+        let mem_aligned = self.read_word(addr & !3);
+        let value = match addr & 3 {
+            0 => mem_aligned,
+            1 => (value & 0xFF00_0000) | (mem_aligned >> 8),
+            2 => (value & 0xFFFF_0000) | (mem_aligned >> 16),
+            _ => (value & 0xFFFF_FF00) | (mem_aligned >> 24),
+        };
+        self.cpu.pending_load = PendingLoad {
+            reg: inst.rt(),
+            value,
+        };
     }
 
-    fn sb(&mut self, inst: Inst) {
-        check_cache!(self);
-        let addr = self.addr_with_imm(inst);
-        self.write_byte(addr, self.cpu.reg(inst.rt()).u8());
+    fn lwl(&mut self, inst: Inst) {
+        let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
+        let value = self.cpu.next_regs[inst.rt().us()];
+
+        let mem_aligned = self.read_word(addr & !3);
+        let value = match addr & 3 {
+            0 => (value & 0x00FF_FFFF) | (mem_aligned << 24),
+            1 => (value & 0x0000_FFFF) | (mem_aligned << 16),
+            2 => (value & 0x0000_00FF) | (mem_aligned << 8),
+            _ => mem_aligned,
+        };
+        self.cpu.pending_load = PendingLoad {
+            reg: inst.rt(),
+            value,
+        };
     }
 
-    fn sh(&mut self, inst: Inst) {
+    fn store<const SIZE: u8>(&mut self, inst: Inst) {
         check_cache!(self);
         let addr = self.addr_with_imm(inst);
-        self.write_hword(addr, self.cpu.reg(inst.rt()).u16());
+        Cpu::ensure_aligned(self, addr, SIZE.u32(), Exception::UnalignedStore);
+
+        let value = self.cpu.reg(inst.rt());
+        match SIZE {
+            1 => self.write_byte(addr, value.u8()),
+            2 => self.write_hword(addr, value.u16()),
+            4 => self.write_word(addr, value.u32()),
+            _ => panic!("Invalid store parameters"),
+        };
     }
 
     fn swl(&mut self, inst: Inst) {
-        todo!();
-    }
+        let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
+        let value = self.cpu.reg(inst.rt());
 
-    fn sw(&mut self, inst: Inst) {
-        check_cache!(self);
-        let addr = self.addr_with_imm(inst);
-        self.write_word(addr, self.cpu.reg(inst.rt()));
+        let mem_aligned = self.read_word(addr & !3);
+        let value = match addr & 3 {
+            0 => (value & 0xFFFF_FF00) | (mem_aligned >> 24),
+            1 => (value & 0xFFFF_0000) | (mem_aligned >> 16),
+            2 => (value & 0xFF00_0000) | (mem_aligned >> 8),
+            _ => mem_aligned,
+        };
+        self.write_word(addr & !3, value);
     }
 
     fn swr(&mut self, inst: Inst) {
-        todo!();
-    }
+        let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
+        let value = self.cpu.reg(inst.rt());
 
-    fn lwc0(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn lwc1(&mut self, inst: Inst) {
-        todo!();
+        let mem_aligned = self.read_word(addr & !3);
+        let value = match addr & 3 {
+            0 => mem_aligned,
+            1 => (value & 0x0000_00FF) | (mem_aligned << 8),
+            2 => (value & 0x0000_FFFF) | (mem_aligned << 16),
+            _ => (value & 0x00FF_FFFF) | (mem_aligned << 24),
+        };
+        self.write_word(addr & !3, value);
     }
 
     fn lwc2(&mut self, inst: Inst) {
         todo!();
     }
 
-    fn lwc3(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn swc0(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn swc1(&mut self, inst: Inst) {
-        todo!();
-    }
-
     fn swc2(&mut self, inst: Inst) {
         todo!();
-    }
-
-    fn swc3(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn unknown_instruction(&mut self, inst: Inst) {
-        eprintln!("Unknown opcode 0x{:08X}", inst.0);
     }
 }
 
@@ -321,124 +371,79 @@ impl PlayStation {
         handler(self, inst);
     }
 
-    fn sll(&mut self, inst: Inst) {
-        let value = self.cpu.reg(inst.rt()) << inst.imm5();
+    fn shift<const IMM: bool, const OP: &'static str>(&mut self, inst: Inst) {
+        let a = self.cpu.reg(inst.rt());
+        let b = if IMM {
+            inst.imm5()
+        } else {
+            self.cpu.reg(inst.rs()) & 0x1F
+        };
+
+        let value = match OP {
+            "SLL" => a << b,
+            "SRL" => a >> b,
+            "SRA" => ((a as i32) >> b) as u32,
+            _ => panic!("Unknown shift operation"),
+        };
+
         self.cpu.set_reg(inst.rd(), value);
-    }
-
-    fn srl(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn sra(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn sllv(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn srlv(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn srav(&mut self, inst: Inst) {
-        todo!();
     }
 
     fn jr(&mut self, inst: Inst) {
-        todo!();
+        self.cpu.pc = self.cpu.reg(inst.rs());
     }
 
     fn jalr(&mut self, inst: Inst) {
-        todo!();
+        self.cpu.set_reg(inst.rd(), self.cpu.pc);
+        self.cpu.pc = self.cpu.reg(inst.rs())
     }
 
-    fn syscall(&mut self, inst: Inst) {
-        todo!();
+    fn lohi_mov<const TO_REG: bool, const HI: bool>(&mut self, inst: Inst) {
+        match (TO_REG, HI) {
+            (true, true) => self.cpu.set_reg(inst.rd(), self.cpu.hi),
+            (true, false) => self.cpu.set_reg(inst.rd(), self.cpu.lo),
+            (false, true) => self.cpu.hi = self.cpu.reg(inst.rs()),
+            (false, false) => self.cpu.lo = self.cpu.reg(inst.rs()),
+        }
     }
 
-    fn break_(&mut self, inst: Inst) {
-        todo!();
-    }
+    fn muldiv<const DIV: bool, const SIGN: bool>(&mut self, inst: Inst) {
+        let a = self.cpu.reg(inst.rs()) as u64;
+        let b = self.cpu.reg(inst.rt()) as u64;
 
-    fn mfhi(&mut self, inst: Inst) {
-        todo!();
-    }
+        (self.cpu.lo, self.cpu.hi) = match (DIV, SIGN) {
+            (false, false) => {
+                let res = a.wrapping_mul(b);
+                (res as u32, (res >> 32) as u32)
+            }
 
-    fn mthi(&mut self, inst: Inst) {
-        todo!();
-    }
+            (false, true) => {
+                let res = (a as i64).wrapping_mul(b as i64) as u64;
+                (res as u32, (res >> 32) as u32)
+            }
 
-    fn mflo(&mut self, inst: Inst) {
-        todo!();
-    }
+            (true, false) if b == 0 => (u32::MAX, a as u32),
+            (true, false) => (a.wrapping_div(b) as u32, (a % b) as u32),
 
-    fn mtlo(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn mult(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn multu(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn div(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn divu(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn add(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn addu(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn sub(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn subu(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn and(&mut self, inst: Inst) {
-        let value = self.cpu.reg(inst.rs()) & self.cpu.reg(inst.rt());
-        self.cpu.set_reg(inst.rd(), value);
-    }
-
-    fn or(&mut self, inst: Inst) {
-        let value = self.cpu.reg(inst.rs()) | self.cpu.reg(inst.rt());
-        self.cpu.set_reg(inst.rd(), value);
-    }
-
-    fn xor(&mut self, inst: Inst) {
-        let value = self.cpu.reg(inst.rs()) ^ self.cpu.reg(inst.rt());
-        self.cpu.set_reg(inst.rd(), value);
-    }
-
-    fn nor(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn slt(&mut self, inst: Inst) {
-        todo!();
-    }
-
-    fn sltu(&mut self, inst: Inst) {
-        todo!();
+            (true, true) if b == 0 => {
+                if (a as i32) < 0 {
+                    (u32::MAX, a as u32)
+                } else {
+                    (1, a as u32)
+                }
+            }
+            (true, true) if a == 0x8000_0000 && b as u32 == u32::MAX => (a as u32, 0),
+            (true, true) => {
+                let a = a as i64;
+                let b = b as i64;
+                (a.wrapping_div(b) as u32, (a % b) as u32)
+            }
+        };
     }
 }
 
-pub struct Inst(u32);
+#[derive(Copy, Clone)]
+pub struct Inst(pub(crate) u32);
 
 impl Inst {
     pub fn rs(&self) -> u32 {

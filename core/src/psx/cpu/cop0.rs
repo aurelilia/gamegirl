@@ -6,9 +6,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::psx::{
-    cpu::inst::{Inst, InstructionHandler},
-    PlayStation,
+use crate::{
+    numutil::NumExt,
+    psx::{
+        cpu::inst::{Inst, InstructionHandler},
+        PlayStation,
+    },
 };
 
 type CopLut = [InstructionHandler; 32];
@@ -17,7 +20,8 @@ const COP0: CopLut = PlayStation::cop0_table();
 #[derive(Default, Deserialize, Serialize)]
 pub struct Cop0 {
     pub(crate) sr: u32,
-    cause: u32,
+    pub(crate) cause: u32,
+    pub(crate) epc: u32,
 }
 
 impl PlayStation {
@@ -28,6 +32,7 @@ impl PlayStation {
         lut[0x04] = Self::mtc0;
         lut[0x06] = Self::ctc0;
         lut[0x08] = Self::bc0;
+        lut[0x10] = Self::rfe;
         lut
     }
 }
@@ -42,7 +47,9 @@ impl PlayStation {
     fn mfc0(&mut self, inst: Inst) {
         match inst.rd() {
             12 => self.cpu.set_reg(inst.rt(), self.cpu.cop0.sr),
-            _ => (),
+            13 => self.cpu.set_reg(inst.rt(), self.cpu.cop0.cause),
+            14 => self.cpu.set_reg(inst.rt(), self.cpu.cop0.epc),
+            unknown => log::debug!("Unhandled read from COP0 register {unknown}, ignoring"),
         }
     }
 
@@ -53,7 +60,7 @@ impl PlayStation {
     fn mtc0(&mut self, inst: Inst) {
         match inst.rd() {
             12 => self.cpu.cop0.sr = self.cpu.reg(inst.rt()),
-            _ => (),
+            unknown => log::debug!("Unhandled write to COP0 register {unknown}, ignoring"),
         }
     }
 
@@ -63,6 +70,16 @@ impl PlayStation {
 
     fn bc0(&mut self, inst: Inst) {
         todo!();
+    }
+
+    fn rfe(&mut self, inst: Inst) {
+        if inst.0 & 0x3F != 0x10 {
+            log::warn!("COP0 virtual memory instruction encountered, executing as RFE");
+        }
+
+        let context = self.cpu.cop0.sr & 0x3F;
+        self.cpu.cop0.sr &= !0x3F;
+        self.cpu.cop0.sr |= context >> 2;
     }
 
     fn cop0_inst(&mut self, inst: Inst) {
