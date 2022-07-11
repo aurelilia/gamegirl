@@ -63,7 +63,7 @@ impl GameGirlAdv {
     }
 
     pub fn log_unknown_opcode<T: UpperHex>(code: T) {
-        eprintln!("Unknown opcode '{:08X}'", code);
+        log::warn!("Unknown opcode '{:08X}'", code);
     }
 }
 
