@@ -7,13 +7,18 @@
 use std::fmt::UpperHex;
 
 use crate::gga::{
-    cpu::{registers::Flag::*, Cpu},
+    cpu::{registers::Flag::*, Cpu, Exception},
     Access,
     Access::NonSeq,
     GameGirlAdv,
 };
 
 impl GameGirlAdv {
+    pub fn swi(&mut self) {
+        Cpu::exception_occurred(self, Exception::Swi);
+        self.memory.bios_value = 0xE3A02004;
+    }
+
     /// Called by multiple load/store instructions when the Rlist was
     /// empty, which causes R15 to be loaded/stored and Rb to be
     /// incremented/decremented by 0x40.
@@ -62,14 +67,27 @@ impl GameGirlAdv {
         }
     }
 
+    pub const fn lut_span<T: Copy>(lut: &mut [T], idx: usize, size: usize, handler: T) {
+        let inst = 8 - size;
+        let start = idx << inst;
+
+        let until = 1 << inst;
+        let mut idx = 0;
+        while idx < until {
+            lut[start | idx] = handler;
+            idx += 1;
+        }
+    }
+
     pub fn log_unknown_opcode<T: UpperHex>(code: T) {
-        log::warn!("Unknown opcode '{:08X}'", code);
+        eprintln!("Unknown opcode '{:08X}'", code);
     }
 }
 
 impl Cpu {
     pub fn eval_condition(&self, cond: u16) -> bool {
         match cond {
+            0xE => true,                                                        // BAL
             0x0 => self.flag(Zero),                                             // BEQ
             0x1 => !self.flag(Zero),                                            // BNE
             0x2 => self.flag(Carry),                                            // BCS/BHS
@@ -84,7 +102,6 @@ impl Cpu {
             0xB => self.flag(Neg) != self.flag(Overflow),                       // BLT
             0xC => !self.flag(Zero) && (self.flag(Neg) == self.flag(Overflow)), // BGT
             0xD => self.flag(Zero) || (self.flag(Neg) != self.flag(Overflow)),  // BLE
-            0xE => true,                                                        // BAL
             _ => false,                                                         // BNV
         }
     }

@@ -220,6 +220,7 @@ impl System {
         self.options().running = true;
         self.options().rom_loaded = true;
         if crate::TRACING {
+            self.options().running = false;
             self.skip_bootrom();
         }
     }

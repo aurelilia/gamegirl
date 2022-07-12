@@ -18,304 +18,446 @@ use crate::{
     numutil::{NumExt, U32Ext},
 };
 
+type ArmHandler = fn(&mut GameGirlAdv, ArmInst);
+type ArmLut = [ArmHandler; 256];
+const ARM_LUT: ArmLut = GameGirlAdv::make_arm_lut();
+
 impl GameGirlAdv {
-    #[bitmatch]
+    const fn make_arm_lut() -> ArmLut {
+        let mut lut: ArmLut = [Self::arm_unknown_opcode; 256];
+
+        Self::lut_span(&mut lut, 0b1010, 4, Self::arm_b::<false>);
+        Self::lut_span(&mut lut, 0b1011, 4, Self::arm_b::<true>);
+
+        Self::lut_span(&mut lut, 0b1111, 4, Self::arm_swi);
+
+        // Ew.
+        lut[0b000_0000_0] = Self::arm_alu_mul_psr_reg::<0b0000, false>;
+        lut[0b000_0001_0] = Self::arm_alu_mul_psr_reg::<0b0001, false>;
+        lut[0b000_0010_0] = Self::arm_alu_mul_psr_reg::<0b0010, false>;
+        lut[0b000_0011_0] = Self::arm_alu_mul_psr_reg::<0b0011, false>;
+        lut[0b000_0100_0] = Self::arm_alu_mul_psr_reg::<0b0100, false>;
+        lut[0b000_0101_0] = Self::arm_alu_mul_psr_reg::<0b0101, false>;
+        lut[0b000_0110_0] = Self::arm_alu_mul_psr_reg::<0b0110, false>;
+        lut[0b000_0111_0] = Self::arm_alu_mul_psr_reg::<0b0111, false>;
+        lut[0b000_1000_0] = Self::arm_alu_mul_psr_reg::<0b1000, false>;
+        lut[0b000_1001_0] = Self::arm_alu_mul_psr_reg::<0b1001, false>;
+        lut[0b000_1010_0] = Self::arm_alu_mul_psr_reg::<0b1010, false>;
+        lut[0b000_1011_0] = Self::arm_alu_mul_psr_reg::<0b1011, false>;
+        lut[0b000_1100_0] = Self::arm_alu_mul_psr_reg::<0b1100, false>;
+        lut[0b000_1101_0] = Self::arm_alu_mul_psr_reg::<0b1101, false>;
+        lut[0b000_1110_0] = Self::arm_alu_mul_psr_reg::<0b1110, false>;
+        lut[0b000_1111_0] = Self::arm_alu_mul_psr_reg::<0b1111, false>;
+        lut[0b000_0000_1] = Self::arm_alu_mul_psr_reg::<0b0000, true>;
+        lut[0b000_0001_1] = Self::arm_alu_mul_psr_reg::<0b0001, true>;
+        lut[0b000_0010_1] = Self::arm_alu_mul_psr_reg::<0b0010, true>;
+        lut[0b000_0011_1] = Self::arm_alu_mul_psr_reg::<0b0011, true>;
+        lut[0b000_0100_1] = Self::arm_alu_mul_psr_reg::<0b0100, true>;
+        lut[0b000_0101_1] = Self::arm_alu_mul_psr_reg::<0b0101, true>;
+        lut[0b000_0110_1] = Self::arm_alu_mul_psr_reg::<0b0110, true>;
+        lut[0b000_0111_1] = Self::arm_alu_mul_psr_reg::<0b0111, true>;
+        lut[0b000_1000_1] = Self::arm_alu_mul_psr_reg::<0b1000, true>;
+        lut[0b000_1001_1] = Self::arm_alu_mul_psr_reg::<0b1001, true>;
+        lut[0b000_1010_1] = Self::arm_alu_mul_psr_reg::<0b1010, true>;
+        lut[0b000_1011_1] = Self::arm_alu_mul_psr_reg::<0b1011, true>;
+        lut[0b000_1100_1] = Self::arm_alu_mul_psr_reg::<0b1100, true>;
+        lut[0b000_1101_1] = Self::arm_alu_mul_psr_reg::<0b1101, true>;
+        lut[0b000_1110_1] = Self::arm_alu_mul_psr_reg::<0b1110, true>;
+        lut[0b000_1111_1] = Self::arm_alu_mul_psr_reg::<0b1111, true>;
+        lut[0b001_0000_0] = Self::arm_alu_imm::<0b0000, false>;
+        lut[0b001_0001_0] = Self::arm_alu_imm::<0b0001, false>;
+        lut[0b001_0010_0] = Self::arm_alu_imm::<0b0010, false>;
+        lut[0b001_0011_0] = Self::arm_alu_imm::<0b0011, false>;
+        lut[0b001_0100_0] = Self::arm_alu_imm::<0b0100, false>;
+        lut[0b001_0101_0] = Self::arm_alu_imm::<0b0101, false>;
+        lut[0b001_0110_0] = Self::arm_alu_imm::<0b0110, false>;
+        lut[0b001_0111_0] = Self::arm_alu_imm::<0b0111, false>;
+        lut[0b001_1000_0] = Self::arm_alu_imm::<0b1000, false>;
+        lut[0b001_1001_0] = Self::arm_alu_imm::<0b1001, false>;
+        lut[0b001_1010_0] = Self::arm_alu_imm::<0b1010, false>;
+        lut[0b001_1011_0] = Self::arm_alu_imm::<0b1011, false>;
+        lut[0b001_1100_0] = Self::arm_alu_imm::<0b1100, false>;
+        lut[0b001_1101_0] = Self::arm_alu_imm::<0b1101, false>;
+        lut[0b001_1110_0] = Self::arm_alu_imm::<0b1110, false>;
+        lut[0b001_1111_0] = Self::arm_alu_imm::<0b1111, false>;
+        lut[0b001_0000_1] = Self::arm_alu_imm::<0b0000, true>;
+        lut[0b001_0001_1] = Self::arm_alu_imm::<0b0001, true>;
+        lut[0b001_0010_1] = Self::arm_alu_imm::<0b0010, true>;
+        lut[0b001_0011_1] = Self::arm_alu_imm::<0b0011, true>;
+        lut[0b001_0100_1] = Self::arm_alu_imm::<0b0100, true>;
+        lut[0b001_0101_1] = Self::arm_alu_imm::<0b0101, true>;
+        lut[0b001_0110_1] = Self::arm_alu_imm::<0b0110, true>;
+        lut[0b001_0111_1] = Self::arm_alu_imm::<0b0111, true>;
+        lut[0b001_1000_1] = Self::arm_alu_imm::<0b1000, true>;
+        lut[0b001_1001_1] = Self::arm_alu_imm::<0b1001, true>;
+        lut[0b001_1010_1] = Self::arm_alu_imm::<0b1010, true>;
+        lut[0b001_1011_1] = Self::arm_alu_imm::<0b1011, true>;
+        lut[0b001_1100_1] = Self::arm_alu_imm::<0b1100, true>;
+        lut[0b001_1101_1] = Self::arm_alu_imm::<0b1101, true>;
+        lut[0b001_1110_1] = Self::arm_alu_imm::<0b1110, true>;
+        lut[0b001_1111_1] = Self::arm_alu_imm::<0b1111, true>;
+
+        lut[0b100_00000] = Self::arm_stm_ldm::<0b00000>;
+        lut[0b100_00001] = Self::arm_stm_ldm::<0b00001>;
+        lut[0b100_00010] = Self::arm_stm_ldm::<0b00010>;
+        lut[0b100_00011] = Self::arm_stm_ldm::<0b00011>;
+        lut[0b100_00100] = Self::arm_stm_ldm::<0b00100>;
+        lut[0b100_00101] = Self::arm_stm_ldm::<0b00101>;
+        lut[0b100_00110] = Self::arm_stm_ldm::<0b00110>;
+        lut[0b100_00111] = Self::arm_stm_ldm::<0b00111>;
+        lut[0b100_01000] = Self::arm_stm_ldm::<0b01000>;
+        lut[0b100_01001] = Self::arm_stm_ldm::<0b01001>;
+        lut[0b100_01010] = Self::arm_stm_ldm::<0b01010>;
+        lut[0b100_01011] = Self::arm_stm_ldm::<0b01011>;
+        lut[0b100_01100] = Self::arm_stm_ldm::<0b01100>;
+        lut[0b100_01101] = Self::arm_stm_ldm::<0b01101>;
+        lut[0b100_01110] = Self::arm_stm_ldm::<0b01110>;
+        lut[0b100_01111] = Self::arm_stm_ldm::<0b01111>;
+        lut[0b100_10000] = Self::arm_stm_ldm::<0b10000>;
+        lut[0b100_10001] = Self::arm_stm_ldm::<0b10001>;
+        lut[0b100_10010] = Self::arm_stm_ldm::<0b10010>;
+        lut[0b100_10011] = Self::arm_stm_ldm::<0b10011>;
+        lut[0b100_10100] = Self::arm_stm_ldm::<0b10100>;
+        lut[0b100_10101] = Self::arm_stm_ldm::<0b10101>;
+        lut[0b100_10110] = Self::arm_stm_ldm::<0b10110>;
+        lut[0b100_10111] = Self::arm_stm_ldm::<0b10111>;
+        lut[0b100_11000] = Self::arm_stm_ldm::<0b11000>;
+        lut[0b100_11001] = Self::arm_stm_ldm::<0b11001>;
+        lut[0b100_11010] = Self::arm_stm_ldm::<0b11010>;
+        lut[0b100_11011] = Self::arm_stm_ldm::<0b11011>;
+        lut[0b100_11100] = Self::arm_stm_ldm::<0b11100>;
+        lut[0b100_11101] = Self::arm_stm_ldm::<0b11101>;
+        lut[0b100_11110] = Self::arm_stm_ldm::<0b11110>;
+        lut[0b100_11111] = Self::arm_stm_ldm::<0b11111>;
+
+        lut[0b010_00000] = Self::arm_ldrstr::<0b00000, true>;
+        lut[0b010_00001] = Self::arm_ldrstr::<0b00001, true>;
+        lut[0b010_00010] = Self::arm_ldrstr::<0b00010, true>;
+        lut[0b010_00011] = Self::arm_ldrstr::<0b00011, true>;
+        lut[0b010_00100] = Self::arm_ldrstr::<0b00100, true>;
+        lut[0b010_00101] = Self::arm_ldrstr::<0b00101, true>;
+        lut[0b010_00110] = Self::arm_ldrstr::<0b00110, true>;
+        lut[0b010_00111] = Self::arm_ldrstr::<0b00111, true>;
+        lut[0b010_01000] = Self::arm_ldrstr::<0b01000, true>;
+        lut[0b010_01001] = Self::arm_ldrstr::<0b01001, true>;
+        lut[0b010_01010] = Self::arm_ldrstr::<0b01010, true>;
+        lut[0b010_01011] = Self::arm_ldrstr::<0b01011, true>;
+        lut[0b010_01100] = Self::arm_ldrstr::<0b01100, true>;
+        lut[0b010_01101] = Self::arm_ldrstr::<0b01101, true>;
+        lut[0b010_01110] = Self::arm_ldrstr::<0b01110, true>;
+        lut[0b010_01111] = Self::arm_ldrstr::<0b01111, true>;
+        lut[0b010_10000] = Self::arm_ldrstr::<0b10000, true>;
+        lut[0b010_10001] = Self::arm_ldrstr::<0b10001, true>;
+        lut[0b010_10010] = Self::arm_ldrstr::<0b10010, true>;
+        lut[0b010_10011] = Self::arm_ldrstr::<0b10011, true>;
+        lut[0b010_10100] = Self::arm_ldrstr::<0b10100, true>;
+        lut[0b010_10101] = Self::arm_ldrstr::<0b10101, true>;
+        lut[0b010_10110] = Self::arm_ldrstr::<0b10110, true>;
+        lut[0b010_10111] = Self::arm_ldrstr::<0b10111, true>;
+        lut[0b010_11000] = Self::arm_ldrstr::<0b11000, true>;
+        lut[0b010_11001] = Self::arm_ldrstr::<0b11001, true>;
+        lut[0b010_11010] = Self::arm_ldrstr::<0b11010, true>;
+        lut[0b010_11011] = Self::arm_ldrstr::<0b11011, true>;
+        lut[0b010_11100] = Self::arm_ldrstr::<0b11100, true>;
+        lut[0b010_11101] = Self::arm_ldrstr::<0b11101, true>;
+        lut[0b010_11110] = Self::arm_ldrstr::<0b11110, true>;
+        lut[0b010_11111] = Self::arm_ldrstr::<0b11111, true>;
+        lut[0b011_00000] = Self::arm_ldrstr::<0b00000, false>;
+        lut[0b011_00001] = Self::arm_ldrstr::<0b00001, false>;
+        lut[0b011_00010] = Self::arm_ldrstr::<0b00010, false>;
+        lut[0b011_00011] = Self::arm_ldrstr::<0b00011, false>;
+        lut[0b011_00100] = Self::arm_ldrstr::<0b00100, false>;
+        lut[0b011_00101] = Self::arm_ldrstr::<0b00101, false>;
+        lut[0b011_00110] = Self::arm_ldrstr::<0b00110, false>;
+        lut[0b011_00111] = Self::arm_ldrstr::<0b00111, false>;
+        lut[0b011_01000] = Self::arm_ldrstr::<0b01000, false>;
+        lut[0b011_01001] = Self::arm_ldrstr::<0b01001, false>;
+        lut[0b011_01010] = Self::arm_ldrstr::<0b01010, false>;
+        lut[0b011_01011] = Self::arm_ldrstr::<0b01011, false>;
+        lut[0b011_01100] = Self::arm_ldrstr::<0b01100, false>;
+        lut[0b011_01101] = Self::arm_ldrstr::<0b01101, false>;
+        lut[0b011_01110] = Self::arm_ldrstr::<0b01110, false>;
+        lut[0b011_01111] = Self::arm_ldrstr::<0b01111, false>;
+        lut[0b011_10000] = Self::arm_ldrstr::<0b10000, false>;
+        lut[0b011_10001] = Self::arm_ldrstr::<0b10001, false>;
+        lut[0b011_10010] = Self::arm_ldrstr::<0b10010, false>;
+        lut[0b011_10011] = Self::arm_ldrstr::<0b10011, false>;
+        lut[0b011_10100] = Self::arm_ldrstr::<0b10100, false>;
+        lut[0b011_10101] = Self::arm_ldrstr::<0b10101, false>;
+        lut[0b011_10110] = Self::arm_ldrstr::<0b10110, false>;
+        lut[0b011_10111] = Self::arm_ldrstr::<0b10111, false>;
+        lut[0b011_11000] = Self::arm_ldrstr::<0b11000, false>;
+        lut[0b011_11001] = Self::arm_ldrstr::<0b11001, false>;
+        lut[0b011_11010] = Self::arm_ldrstr::<0b11010, false>;
+        lut[0b011_11011] = Self::arm_ldrstr::<0b11011, false>;
+        lut[0b011_11100] = Self::arm_ldrstr::<0b11100, false>;
+        lut[0b011_11101] = Self::arm_ldrstr::<0b11101, false>;
+        lut[0b011_11110] = Self::arm_ldrstr::<0b11110, false>;
+        lut[0b011_11111] = Self::arm_ldrstr::<0b11111, false>;
+
+        lut
+    }
+
     pub fn execute_inst_arm(&mut self, inst: u32) {
         if !self.cpu.eval_condition(inst.bits(28, 4).u16()) {
             return;
         }
 
-        #[bitmatch]
-        match inst {
-            "101_lnnnnnnnnnnnnnnnnnnnnnnnn" => {
-                let nn = n.i24() * 4; // Step 4
-                if l == 1 {
-                    // BL
-                    self.cpu.set_lr(self.cpu.pc - 4);
-                } // else: B
-                self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
-            }
+        let handler = ARM_LUT[(inst.us() >> 20) & 0xFF];
+        handler(self, ArmInst(inst))
+    }
 
-            "000100101111111111110001_nnnn" => {
-                let rn = self.reg(n);
-                if rn.is_bit(0) {
-                    self.cpu.set_flag(Thumb, true);
-                    self.set_pc(rn - 1);
-                } else {
-                    self.set_pc(rn);
-                }
-            }
+    fn arm_b<const BL: bool>(&mut self, inst: ArmInst) {
+        let nn = inst.0.i24() * 4; // Step 4
+        if BL {
+            self.cpu.set_lr(self.cpu.pc - 4);
+        }
+        self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+    }
 
-            "1111_????????????????????????" => {
-                Cpu::exception_occurred(self, Exception::Swi);
-                self.memory.bios_value = 0xE3A02004;
-            }
-
-            "00010_0001111dddd000000000000" => self.set_reg(d, self.cpu.cpsr.set_bit(4, true)),
-            "00010_1001111dddd000000000000" => self.set_reg(d, self.cpu.spsr().set_bit(4, true)),
-
-            "00010_d10f??c111100000000mmmm" => self.msr(self.cpu.reg(m), f == 1, c == 1, d == 1),
-            "00110_d10f??c1111mmmmnnnnnnnn" => {
-                let imm = Cpu::ror_s0(n, m << 1);
-                self.msr(imm, f == 1, c == 1, d == 1);
-            }
-
-            "00010_b00nnnndddd00001001mmmm" => {
-                let addr = self.reg(n);
-                let mem_value = if b == 1 {
-                    self.read_byte(addr, NonSeq).u32()
-                } else {
-                    self.read_word_ldrswp(addr, NonSeq)
-                };
-                let reg = self.reg(m);
-                if b == 1 {
-                    self.write_byte(addr, reg.u8(), NonSeq)
-                } else {
-                    self.write_word(addr, reg, NonSeq)
-                }
-                self.set_reg(d, mem_value);
-                self.idle_nonseq();
-            }
-
-            "000_000lcddddnnnnssss1001mmmm" => {
-                // MUL/MLA
-                let cpsr = self.cpu.cpsr;
-                let rs = self.cpu.reg(s);
-                let mut res = self.cpu.mul(self.cpu.reg(m), rs);
-                self.mul_wait_cycles(rs, true);
-
-                if l == 1 {
-                    // MLA
-                    res = res.wrapping_add(self.cpu.reg(n));
-                    self.cpu.set_zn(res);
-                    self.add_i_cycles(1);
-                }
-
-                self.set_reg(d, res);
-                if c == 0 {
-                    // Restore CPSR if we weren't supposed to set flags
-                    self.cpu.cpsr = cpsr;
-                }
-            }
-
-            "000_0ooocddddnnnnssss1001mmmm" => {
-                // MULL/MLAL
-                let cpsr = self.cpu.cpsr;
-                let a = self.reg(m) as u64;
-                let b = self.reg(s) as u64;
-                let dhi = self.reg(d) as u64;
-                let dlo = self.reg(n) as u64;
-
-                let out: u64 = match o {
-                    0b010 => a.wrapping_mul(b).wrapping_add(dhi).wrapping_add(dlo), // UMAAL
-                    0b100 => {
-                        // UMULL
-                        self.add_i_cycles(1);
-                        a.wrapping_mul(b)
-                    }
-                    0b101 => {
-                        // UMLAL
-                        self.add_i_cycles(2);
-                        a.wrapping_mul(b).wrapping_add(dlo | (dhi << 32))
-                    }
-                    0b110 => {
-                        // SMULL
-                        self.add_i_cycles(1);
-                        (a as i32 as i64).wrapping_mul(b as i32 as i64) as u64
-                    }
-                    _ => {
-                        // SMLAL
-                        self.add_i_cycles(2);
-                        (a as i32 as i64)
-                            .wrapping_mul(b as i32 as i64)
-                            .wrapping_add((dlo | (dhi << 32)) as i64) as u64
-                    }
-                };
-
-                self.cpu.set_flag(Flag::Zero, out == 0);
-                self.cpu.set_flag(Flag::Neg, out.is_bit(63));
-                self.set_reg(d, (out >> 32).u32());
-                self.set_reg(n, out.u32());
-                if c == 0 {
-                    // Restore CPSR if we weren't supposed to set flags
-                    self.cpu.cpsr = cpsr;
-                }
-
-                self.mul_wait_cycles(b as u32, o.is_bit(1));
-            }
-
-            "100_puswlnnnnrrrrrrrrrrrrrrrr" => {
-                // STM/LDM
-                let cpsr = self.cpu.cpsr;
-                if s == 1 {
-                    // Use user mode regs
-                    self.cpu.set_mode(Mode::System);
-                }
-
-                // TODO mehhh, this entire implementation is terrible
-                let mut addr = self.reg(n);
-                let initial_addr = addr;
-                let regs = (0..=15).filter(|b| r.is_bit(*b)).collect::<Vec<u16>>();
-                let first_reg = *regs.get(0).unwrap_or(&12323);
-                let end_offs = regs.len().u32() * 4;
-                if u == 0 {
-                    addr = Self::mod_with_offs(addr, 4, p == 0);
-                    addr -= end_offs;
-                }
-                let mut kind = NonSeq;
-                let mut set_n = false;
-
-                for reg in regs {
-                    set_n |= reg == n.u16();
-                    if p == 1 {
-                        addr += 4;
-                    }
-                    if l == 0 && reg == n.u16() && reg != first_reg {
-                        self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, u == 1));
-                    }
-
-                    if l == 0 {
-                        self.write_word(addr, self.cpu.reg_pc4(reg.u32()), kind);
-                    } else {
-                        let val = self.read_word(addr, kind);
-                        self.set_reg(reg.u32(), val);
-                    }
-
-                    kind = Seq;
-                    if p == 0 {
-                        addr += 4;
-                    }
-                }
-
-                if w == 1 && (l == 0 || !set_n) {
-                    self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, u == 1));
-                }
-
-                self.cpu.cpsr = cpsr;
-                if kind == NonSeq {
-                    self.on_empty_rlist(n, l == 0, u == 1, p == 1);
-                }
-                self.cpu.access_type = NonSeq;
-                if l == 1 {
-                    // All LDR stall by 1I
-                    self.add_i_cycles(1);
-                }
-            }
-
-            "01_0pubwlnnnnddddmmmmmmmmmmmm" => {
-                // LDR/STR with imm
-                let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr::<false>(p == 0, u == 1, width, (p == 0) || (w == 1), l == 0, n, d, m);
-            }
-            "01_1pubwlnnnnddddssssstt0mmmm" => {
-                // LDR/STR with reg
-                let cpsr = self.cpu.cpsr;
-                let offs = self.shifted_op::<true>(self.cpu.reg(m), t, s);
-                self.cpu.cpsr = cpsr;
-                let width = if b == 1 { 1 } else { 4 };
-                self.ldrstr::<false>(
-                    p == 0,
-                    u == 1,
-                    width,
-                    (p == 0) || (w == 1),
-                    l == 0,
-                    n,
-                    d,
-                    offs,
-                );
-            }
-
-            "000_pu1wlnnnnddddiiii1011iiii" => {
-                // LDRH/STRH with imm
-                self.ldrstr::<true>(p == 0, u == 1, 2, (p == 0) || (w == 1), l == 0, n, d, i);
-            }
-            "000_pu0wlnnnndddd00001011mmmm" => {
-                // LDRH/STRH with reg
-                self.ldrstr::<true>(
-                    p == 0,
-                    u == 1,
-                    2,
-                    (p == 0) || (w == 1),
-                    l == 0,
-                    n,
-                    d,
-                    self.cpu.reg(m),
-                );
-            }
-
-            "000_pu1w1nnnnddddiiii1101iiii" => {
-                // LDRSB with imm
-                self.ldrstr::<true>(p == 0, u == 1, 1, (p == 0) || (w == 1), false, n, d, i);
-                self.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
-            }
-            "000_pu0w1nnnndddd00001101mmmm" => {
-                // LDRSB with reg
-                self.ldrstr::<true>(
-                    p == 0,
-                    u == 1,
-                    1,
-                    (p == 0) || (w == 1),
-                    false,
-                    n,
-                    d,
-                    self.cpu.reg(m),
-                );
-                self.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
-            }
-            "000_pu1w1nnnnddddiiii1111iiii" => {
-                // LDRSH with imm
-                self.ldrstr::<false>(p == 0, u == 1, 2, (p == 0) || (w == 1), false, n, d, i);
-                self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
-            }
-            "000_pu0w1nnnndddd00001111mmmm" => {
-                // LDRSH with reg
-                self.ldrstr::<false>(
-                    p == 0,
-                    u == 1,
-                    2,
-                    (p == 0) || (w == 1),
-                    false,
-                    n,
-                    d,
-                    self.cpu.reg(m),
-                );
-                self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
-            }
-
-            "000_oooocnnnnddddaaaaattrmmmm" => {
-                // ALU with register
-                let cpsr = self.cpu.cpsr;
-                if r == 0 {
-                    // Shift by imm
-                    let rm = self.cpu.reg(m);
-                    let second_op = self.shifted_op::<true>(rm, t, a);
-                    self.alu::<false>(o, n, second_op, d, c == 1, cpsr);
-                } else {
-                    // Shift by reg
-                    let rm = self.cpu.reg_pc4(m);
-                    let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a >> 1) & 0xFF);
-                    self.alu::<true>(o, n, second_op, d, c == 1, cpsr);
-                }
-            }
-
-            "001_oooocnnnnddddssssmmmmmmmm" => {
-                // ALU with immediate
-                let cpsr = self.cpu.cpsr;
-                let second_op = self.cpu.ror::<false>(m, s << 1);
-                self.alu::<false>(o, n, second_op, d, c == 1, cpsr);
-            }
-
-            _ => Self::log_unknown_opcode(inst),
+    fn arm_bx(&mut self, inst: ArmInst) {
+        let rn = self.reg(inst.reg(0));
+        if rn.is_bit(0) {
+            self.cpu.set_flag(Thumb, true);
+            self.set_pc(rn - 1);
+        } else {
+            self.set_pc(rn);
         }
     }
 
-    fn alu<const SHIFT_REG: bool>(
+    fn arm_swi(&mut self, _inst: ArmInst) {
+        self.swi();
+    }
+
+    fn arm_alu_mul_psr_reg<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+        // ALU with register OR mul OR psr OR SWP OR BX OR LDR/STR
+        // ARM please... what is this instruction encoding
+        if OP == 0b1001 && inst.0.bits(8, 13) == 0xFFF {
+            // BX
+            self.arm_bx(inst);
+        } else if !CPSR && (0x8..=0xB).contains(&OP) {
+            // MRS/MSR/SWP/LDRSTR
+            let bit_1 = OP.is_bit(1);
+            let msr = OP.is_bit(0);
+
+            if !msr {
+                let n = inst.reg(16);
+                let d = inst.reg(12);
+                if n != 15 {
+                    if inst.0.bits(4, 8) == 0b00001001 {
+                        // SWP
+                        self.arm_swp(inst, n, d, bit_1);
+                    } else {
+                        // STRH/LDRH
+                        self.arm_strh_ldr::<OP, CPSR>(inst);
+                    }
+                } else {
+                    // MRS
+                    let psr = if bit_1 {
+                        self.cpu.spsr()
+                    } else {
+                        self.cpu.cpsr
+                    };
+                    self.set_reg(d, psr.set_bit(4, true));
+                }
+            } else {
+                // MSR
+                let m = inst.reg(0);
+                self.msr(self.cpu.reg(m), inst.0.is_bit(19), inst.0.is_bit(16), bit_1)
+            }
+        } else if inst.0.bits(4, 4) == 0b1001 {
+            // MUL
+            self.arm_mul::<OP, CPSR>(inst);
+        } else if inst.0.is_bit(4) && inst.0.is_bit(7) {
+            self.arm_strh_ldr::<OP, CPSR>(inst);
+        } else {
+            // ALU
+            let m = inst.reg(0);
+            let d = inst.reg(12);
+            let n = inst.reg(16);
+            let t = inst.0.bits(5, 2);
+            let cpsr = self.cpu.cpsr;
+
+            if !inst.0.is_bit(4) {
+                // Shift by imm
+                let a = inst.0.bits(7, 5);
+                let rm = self.cpu.reg(m);
+                let second_op = self.shifted_op::<true>(rm, t, a);
+                self.alu::<OP, CPSR, false>(n, second_op, d, cpsr);
+            } else {
+                // Shift by reg
+                let a = inst.0.bits(8, 4);
+                let rm = self.cpu.reg_pc4(m);
+                let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a) & 0xFF);
+                self.alu::<OP, CPSR, true>(n, second_op, d, cpsr);
+            }
+        }
+    }
+
+    fn arm_alu_imm<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+        // ALU with register OR MSR
+        if !CPSR && (0x8..=0xB).contains(&OP) {
+            // MSR
+            let spsr = OP.is_bit(1);
+            let m = inst.0.bits(8, 4);
+            let imm = Cpu::ror_s0(inst.0 & 0xFF, m << 1);
+            self.msr(imm, inst.0.is_bit(19), inst.0.is_bit(16), spsr);
+        } else {
+            // ALU with immediate
+            let cpsr = self.cpu.cpsr;
+            let s = inst.0.bits(8, 4);
+            let d = inst.reg(12);
+            let n = inst.reg(16);
+            let second_op = self.cpu.ror::<false>(inst.0 & 0xFF, s << 1);
+            self.alu::<OP, CPSR, false>(n, second_op, d, cpsr);
+        }
+    }
+
+    #[inline]
+    fn arm_swp(&mut self, inst: ArmInst, n: u32, d: u32, byte: bool) {
+        let m = inst.reg(0);
+        let addr = self.reg(n);
+        let mem_value = if byte {
+            self.read_byte(addr, NonSeq).u32()
+        } else {
+            self.read_word_ldrswp(addr, NonSeq)
+        };
+        let reg = self.reg(m);
+        if byte {
+            self.write_byte(addr, reg.u8(), NonSeq)
+        } else {
+            self.write_word(addr, reg, NonSeq)
+        }
+        self.set_reg(d, mem_value);
+        self.idle_nonseq();
+    }
+
+    fn arm_strh_ldr<const OP: u16, const LDR: bool>(&mut self, inst: ArmInst) {
+        let pre = OP.is_bit(3);
+        let up = OP.is_bit(2);
+        let imm = OP.is_bit(1);
+        let writeback = !pre || OP.is_bit(0);
+
+        let n = inst.reg(16);
+        let d = inst.reg(12);
+
+        let offs = if imm {
+            inst.0 & 0xF | (inst.0.bits(8, 4) << 4)
+        } else {
+            self.cpu.reg(inst.reg(0))
+        };
+        match inst.0.bits(5, 2) {
+            1 => {
+                // LDRH/STRH
+                self.ldrstr::<true>(!pre, up, 2, writeback, !LDR, n, d, offs);
+            }
+            2 => {
+                // LDRSB
+                self.ldrstr::<true>(!pre, up, 1, writeback, !LDR, n, d, offs);
+                self.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
+            }
+            _ => {
+                // LDRSH
+                self.ldrstr::<false>(!pre, up, 2, writeback, !LDR, n, d, offs);
+                self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
+            }
+        }
+    }
+
+    fn arm_stm_ldm<const OP: u16>(&mut self, inst: ArmInst) {
+        let ldr = OP.is_bit(0);
+        let writeback = OP.is_bit(1);
+        let user = OP.is_bit(2);
+        let up = OP.is_bit(3);
+        let pre = OP.is_bit(4);
+        let n = inst.reg(16);
+        let regs = inst.0 & 0xFFFF;
+
+        let cpsr = self.cpu.cpsr;
+        if user {
+            self.cpu.set_mode(Mode::System);
+        }
+
+        // TODO mehhh, this entire implementation is terrible
+        let mut addr = self.reg(n);
+        let initial_addr = addr;
+        let regs = (0..=15).filter(|b| regs.is_bit(*b)).collect::<Vec<u16>>();
+        let first_reg = *regs.get(0).unwrap_or(&12323);
+        let end_offs = regs.len().u32() * 4;
+        if !up {
+            addr = Self::mod_with_offs(addr, 4, !pre);
+            addr -= end_offs;
+        }
+        let mut kind = NonSeq;
+        let mut set_n = false;
+
+        for reg in regs {
+            set_n |= reg == n.u16();
+            if pre {
+                addr += 4;
+            }
+            if !ldr && reg == n.u16() && reg != first_reg {
+                self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
+            }
+
+            if !ldr {
+                self.write_word(addr, self.cpu.reg_pc4(reg.u32()), kind);
+            } else {
+                let val = self.read_word(addr, kind);
+                self.set_reg(reg.u32(), val);
+            }
+
+            kind = Seq;
+            if !pre {
+                addr += 4;
+            }
+        }
+
+        if writeback && (!ldr || !set_n) {
+            self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
+        }
+
+        self.cpu.cpsr = cpsr;
+        if kind == NonSeq {
+            self.on_empty_rlist(n, !ldr, up, pre);
+        }
+        self.cpu.access_type = NonSeq;
+        if ldr {
+            // All LDR stall by 1I
+            self.add_i_cycles(1);
+        }
+    }
+
+    fn arm_ldrstr<const OP: u16, const IMM: bool>(&mut self, inst: ArmInst) {
+        let ldr = OP.is_bit(0);
+        let writeback = OP.is_bit(1);
+        let byte = OP.is_bit(2);
+        let up = OP.is_bit(3);
+        let pre = OP.is_bit(4);
+        let n = inst.reg(16);
+        let d = inst.reg(12);
+        let width = if byte { 1 } else { 4 };
+
+        let offs = if IMM {
+            inst.0 & 0x7FF
+        } else {
+            let m = inst.reg(0);
+            let s = inst.0.bits(7, 5);
+            let t = inst.0.bits(5, 2);
+
+            let cpsr = self.cpu.cpsr;
+            let offs = self.shifted_op::<true>(self.cpu.reg(m), t, s);
+            self.cpu.cpsr = cpsr;
+            offs
+        };
+        self.ldrstr::<false>(!pre, up, width, !pre || writeback, !ldr, n, d, offs);
+    }
+
+    fn alu<const OP: u16, const CPSR: bool, const SHIFT_REG: bool>(
         &mut self,
-        op: u32,
         reg_a: u32,
         b: u32,
         dest: u32,
-        flags: bool,
         cpsr: u32,
     ) {
         let d = self.cpu.reg(dest);
@@ -326,7 +468,7 @@ impl GameGirlAdv {
         } else {
             self.reg(reg_a)
         };
-        let value = match op {
+        let value = match OP {
             0x0 => self.cpu.and(reg_a, b),
             0x1 => self.cpu.xor(reg_a, b),
             0x2 => self.cpu.sub(reg_a, b),
@@ -364,7 +506,7 @@ impl GameGirlAdv {
             _ => self.cpu.not(b),
         };
 
-        if !flags {
+        if !CPSR {
             // Restore CPSR if we weren't supposed to set flags
             self.cpu.cpsr = cpsr;
         } else if dest == 15 && self.cpu.mode() != Mode::User && self.cpu.mode() != Mode::System {
@@ -374,13 +516,14 @@ impl GameGirlAdv {
             // Cpu::check_if_interrupt(self); todo ?
         }
 
-        if !(0x8..=0xB).contains(&op) {
+        if !(0x8..=0xB).contains(&OP) {
             // Only write if needed - 8-B should not
             // since they might set PC when they should not
             self.set_reg(dest, value);
         }
     }
 
+    #[inline]
     fn msr(&mut self, src: u32, flags: bool, ctrl: bool, spsr: bool) {
         let mut dest = if spsr { self.cpu.spsr() } else { self.cpu.cpsr };
 
@@ -401,6 +544,69 @@ impl GameGirlAdv {
         }
     }
 
+    #[inline]
+    fn arm_mul<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+        let rm = self.cpu.reg(inst.reg(0));
+        let rs = self.cpu.reg(inst.reg(8));
+        let rn = self.cpu.reg(inst.reg(12));
+
+        let a = rm as u64;
+        let b = rs as u64;
+        let dhi = self.reg(inst.reg(16)) as u64;
+        let dlo = rn as u64;
+
+        let out: u64 = match OP {
+            0b000 => rm.wrapping_mul(rs) as u64,
+            0b001 => {
+                let r = rm.wrapping_mul(rs);
+                let r = r.wrapping_add(rn);
+                self.add_i_cycles(1);
+                r as u64
+            }
+            0b010 => a.wrapping_mul(b).wrapping_add(dhi).wrapping_add(dlo), // UMAAL
+            0b100 => {
+                // UMULL
+                self.add_i_cycles(1);
+                a.wrapping_mul(b)
+            }
+            0b101 => {
+                // UMLAL
+                self.add_i_cycles(2);
+                a.wrapping_mul(b).wrapping_add(dlo | (dhi << 32))
+            }
+            0b110 => {
+                // SMULL
+                self.add_i_cycles(1);
+                (a as i32 as i64).wrapping_mul(b as i32 as i64) as u64
+            }
+            _ => {
+                // SMLAL
+                self.add_i_cycles(2);
+                (a as i32 as i64)
+                    .wrapping_mul(b as i32 as i64)
+                    .wrapping_add((dlo | (dhi << 32)) as i64) as u64
+            }
+        };
+
+        if OP > 0b001 {
+            // Don't set high reg on MUL/MLA
+            self.set_reg(inst.reg(16), (out >> 32).u32());
+            self.set_reg(inst.reg(12), out.u32());
+        } else {
+            self.set_reg(inst.reg(16), out.u32());
+        }
+        if CPSR {
+            let neg_bit = if OP > 0b001 { 63 } else { 31 };
+            self.cpu.set_flag(Zero, out == 0);
+            self.cpu.set_flag(Neg, out.is_bit(neg_bit));
+            self.cpu.set_flag(Carry, false);
+        }
+
+        // TODO signed might be wrong
+        self.mul_wait_cycles(b as u32, OP.is_bit(1));
+    }
+
+    #[inline]
     fn ldrstr<const ALIGN: bool>(
         &mut self,
         post: bool,
@@ -470,6 +676,10 @@ impl GameGirlAdv {
                 _ => self.cpu.ror::<IMM>(nn, shift_amount),
             }
         }
+    }
+
+    fn arm_unknown_opcode(&mut self, inst: ArmInst) {
+        Self::log_unknown_opcode(inst.0);
     }
 
     #[bitmatch]
@@ -635,5 +845,14 @@ impl GameGirlAdv {
             2 => "asr",
             _ => "ror",
         }
+    }
+}
+
+#[derive(Copy, Clone)]
+struct ArmInst(u32);
+
+impl ArmInst {
+    fn reg(&self, idx: u32) -> u32 {
+        self.0.bits(idx, 4)
     }
 }

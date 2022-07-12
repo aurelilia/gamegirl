@@ -21,7 +21,7 @@ const THUMB_LUT: ThumbLut = GameGirlAdv::make_thumb_lut();
 
 impl GameGirlAdv {
     const fn make_thumb_lut() -> ThumbLut {
-        let mut lut: ThumbLut = [Self::unknown_opcode; 256];
+        let mut lut: ThumbLut = [Self::thumb_unknown_opcode; 256];
 
         lut[0b11011111] = Self::thumb_swi;
         lut[0b10110000] = Self::thumb_sp_offs;
@@ -100,24 +100,12 @@ impl GameGirlAdv {
         lut
     }
 
-    const fn lut_span(lut: &mut ThumbLut, idx: usize, size: usize, handler: ThumbHandler) {
-        let inst = 8 - size;
-        let start = idx << inst;
-
-        let until = 1 << inst;
-        let mut idx = 0;
-        while idx < until {
-            lut[start | idx] = handler;
-            idx += 1;
-        }
-    }
-
     pub fn execute_inst_thumb(&mut self, inst: u16) {
         let handler = THUMB_LUT[inst.us() >> 8];
         handler(self, ThumbInst(inst))
     }
 
-    fn unknown_opcode(&mut self, inst: ThumbInst) {
+    fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
         Self::log_unknown_opcode(inst.0);
     }
 
@@ -472,8 +460,7 @@ impl GameGirlAdv {
 
     // THUMB.17
     fn thumb_swi(&mut self, _inst: ThumbInst) {
-        Cpu::exception_occurred(self, Exception::Swi);
-        self.memory.bios_value = 0xE3A02004;
+        self.swi();
     }
 
     // THUMB.18
