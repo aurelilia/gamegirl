@@ -14,8 +14,8 @@ use crate::{
 
 /// Macro for creating accessors for mode-dependent registers.
 macro_rules! mode_reg {
-    ($reg:ident, $set:ident) => {
-        pub fn $reg(&self) -> u32 {
+    ($reg:ident, $get:ident, $set:ident) => {
+        pub fn $get(&self) -> u32 {
             let mode = self.mode();
             if mode == Mode::System {
                 self.$reg[0]
@@ -102,6 +102,31 @@ pub enum Flag {
 }
 
 impl Cpu {
+    #[inline]
+    pub fn sp(&self) -> u32 {
+        self.registers[13]
+    }
+
+    #[inline]
+    pub fn lr(&self) -> u32 {
+        self.registers[14]
+    }
+
+    #[inline]
+    pub fn pc(&self) -> u32 {
+        self.registers[15]
+    }
+
+    #[inline]
+    pub fn set_sp(&mut self, value: u32) {
+        self.registers[13] = value;
+    }
+
+    #[inline]
+    pub fn set_lr(&mut self, value: u32) {
+        self.registers[14] = value;
+    }
+
     /// Get the current CPU mode.
     pub fn mode(&self) -> Mode {
         Mode::get(self.cpsr & 0x1F)
@@ -109,7 +134,7 @@ impl Cpu {
 
     /// Set the mode bits inside CPSR.
     pub fn set_mode(&mut self, ctx: Mode) {
-        self.cpsr = (self.cpsr & !0x1F) | ctx.to_u32()
+        self.set_cpsr((self.cpsr & !0x1F) | ctx.to_u32());
     }
 
     #[inline]
@@ -125,42 +150,55 @@ impl Cpu {
     /// Get the 'adjusted' value of the PC that some instructions need.
     #[inline]
     pub fn adj_pc(&self) -> u32 {
-        self.pc & !2
+        self.registers[15] & !2
     }
 
-    mode_reg!(sp, set_sp);
-    mode_reg!(lr, set_lr);
-    mode_reg!(spsr, set_spsr);
+    mode_reg!(sp, cpsr_sp, set_cpsr_sp);
+    mode_reg!(lr, cpsr_lr, set_cpsr_lr);
+    mode_reg!(spsr, spsr, set_spsr);
 
     #[inline]
     pub fn low(&self, idx: u16) -> u32 {
-        self.low[idx.us()]
-    }
-
-    #[inline]
-    pub fn set_low(&mut self, inst: u32, pos: u32, val: u32) {
-        self.low[((inst >> pos) & 7) as usize] = val;
+        self.registers[idx.us()]
     }
 
     pub fn reg(&self, idx: u32) -> u32 {
-        match idx {
-            0..=7 => self.low[idx.us()],
-            8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq,
-            8..=12 => self.fiqs[(idx - 8).us()].reg,
-            13 => self.sp(),
-            14 => self.lr(),
-            _ => self.pc,
-        }
+        self.registers[idx.us()]
     }
 
     pub fn reg_pc4(&self, idx: u32) -> u32 {
+        let mut regs = self.registers;
+        regs[15] += 4;
+        regs[idx.us()]
+    }
+
+    fn get_cpsr_reg(&self, idx: u32) -> u32 {
         match idx {
-            0..=7 => self.low[idx.us()],
             8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq,
             8..=12 => self.fiqs[(idx - 8).us()].reg,
-            13 => self.sp(),
-            14 => self.lr(),
-            _ => self.pc + 4,
+            13 => self.cpsr_sp(),
+            14 => self.cpsr_lr(),
+            _ => panic!("invalid reg"),
+        }
+    }
+
+    fn set_cpsr_reg(&mut self, idx: u32, val: u32) {
+        match idx {
+            8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq = val,
+            8..=12 => self.fiqs[(idx - 8).us()].reg = val,
+            13 => self.set_cpsr_sp(val),
+            14 => self.set_cpsr_lr(val),
+            _ => panic!("invalid reg"),
+        }
+    }
+
+    pub fn set_cpsr(&mut self, value: u32) {
+        for reg in 8..15 {
+            self.set_cpsr_reg(reg, self.registers[reg.us()]);
+        }
+        self.cpsr = value;
+        for reg in 8..15 {
+            self.registers[reg.us()] = self.get_cpsr_reg(reg);
         }
     }
 }
@@ -170,18 +208,15 @@ impl GameGirlAdv {
     #[inline]
     pub fn set_pc(&mut self, val: u32) {
         // Align to 2/4 depending on mode
-        self.cpu.pc = val & (!(self.cpu.inst_size() - 1));
+        self.cpu.registers[15] = val & (!(self.cpu.inst_size() - 1));
         Cpu::pipeline_stall(self);
     }
 
     pub fn set_reg(&mut self, idx: u32, val: u32) {
-        match idx {
-            0..=7 => self.cpu.low[idx.us()] = val,
-            8..=12 if self.cpu.mode() == Mode::Fiq => self.cpu.fiqs[(idx - 8).us()].fiq = val,
-            8..=12 => self.cpu.fiqs[(idx - 8).us()].reg = val,
-            13 => self.cpu.set_sp(val),
-            14 => self.cpu.set_lr(val),
-            _ => self.set_pc(val),
+        if idx == 15 {
+            self.set_pc(val);
+        } else {
+            self.cpu.registers[idx.us()] = val;
         }
     }
 }

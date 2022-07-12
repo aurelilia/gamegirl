@@ -121,7 +121,7 @@ impl GameGirlAdv {
     #[inline]
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
         self.get(addr, !0, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => this.bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u8(),
 
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
@@ -142,7 +142,7 @@ impl GameGirlAdv {
     #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, !1, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => this.bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u16(),
 
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
@@ -168,7 +168,7 @@ impl GameGirlAdv {
     #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
         self.get(addr, !3, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => this.bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value,
 
             0x0400_0000..=0x04FF_FFFF => {
@@ -248,28 +248,35 @@ impl GameGirlAdv {
 
             _ => {
                 // Open bus
-                if self.cpu.pc > 0xFFF_FFFF || (self.cpu.pc > 0x3FFF && self.cpu.pc < 0x200_0000) {
+                if self.cpu.pc() > 0xFFF_FFFF
+                    || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
+                {
                     return 0;
                 }
 
                 if !self.cpu.flag(Flag::Thumb) {
                     // Simple case: just read PC in ARM mode
-                    self.get_word(self.cpu.pc)
+                    self.get_word(self.cpu.pc())
                 } else {
                     // Thumb mode... complicated.
                     // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
-                    match self.cpu.pc >> 24 {
+                    match self.cpu.pc() >> 24 {
                         0x02 | 0x05 | 0x06 | 0x08..=0xD => {
-                            let hword = self.get_hword(self.cpu.pc);
+                            let hword = self.get_hword(self.cpu.pc());
                             word(hword, hword)
                         }
-                        _ if self.cpu.pc.is_bit(1) => {
-                            word(self.get_hword(self.cpu.pc - 2), self.get_hword(self.cpu.pc))
-                        }
-                        0x00 | 0x07 => {
-                            word(self.get_hword(self.cpu.pc), self.get_hword(self.cpu.pc + 2))
-                        }
-                        _ => word(self.get_hword(self.cpu.pc), self.get_hword(self.cpu.pc - 2)),
+                        _ if self.cpu.pc().is_bit(1) => word(
+                            self.get_hword(self.cpu.pc() - 2),
+                            self.get_hword(self.cpu.pc()),
+                        ),
+                        0x00 | 0x07 => word(
+                            self.get_hword(self.cpu.pc()),
+                            self.get_hword(self.cpu.pc() + 2),
+                        ),
+                        _ => word(
+                            self.get_hword(self.cpu.pc()),
+                            self.get_hword(self.cpu.pc() - 2),
+                        ),
                     }
                 }
             }
@@ -555,7 +562,7 @@ impl GameGirlAdv {
     #[inline]
     pub fn wait_time<const W: u32>(&mut self, addr: u32, ty: Access) -> u16 {
         let prefetch_size = if W == 4 { 2 } else { 1 };
-        if addr == self.cpu.pc && self.memory.prefetch_len >= prefetch_size {
+        if addr == self.cpu.pc() && self.memory.prefetch_len >= prefetch_size {
             self.memory.prefetch_len -= prefetch_size;
             return prefetch_size;
         }

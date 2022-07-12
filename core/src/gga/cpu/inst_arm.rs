@@ -9,9 +9,9 @@ use bitmatch::bitmatch;
 use crate::{
     gga::{
         cpu::{
-            registers::{Flag, Flag::*, Mode},
+            registers::{Flag::*, Mode},
             Access::*,
-            Cpu, Exception,
+            Cpu,
         },
         GameGirlAdv,
     },
@@ -210,9 +210,9 @@ impl GameGirlAdv {
     fn arm_b<const BL: bool>(&mut self, inst: ArmInst) {
         let nn = inst.0.i24() * 4; // Step 4
         if BL {
-            self.cpu.set_lr(self.cpu.pc - 4);
+            self.cpu.set_lr(self.cpu.pc() - 4);
         }
-        self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+        self.set_pc(self.cpu.pc().wrapping_add_signed(nn));
     }
 
     fn arm_bx(&mut self, inst: ArmInst) {
@@ -417,7 +417,9 @@ impl GameGirlAdv {
             self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
         }
 
-        self.cpu.cpsr = cpsr;
+        if user {
+            self.cpu.set_cpsr(cpsr);
+        }
         if kind == NonSeq {
             self.on_empty_rlist(n, !ldr, up, pre);
         }
@@ -512,7 +514,7 @@ impl GameGirlAdv {
         } else if dest == 15 && self.cpu.mode() != Mode::User && self.cpu.mode() != Mode::System {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
-            self.cpu.cpsr = self.cpu.spsr();
+            self.cpu.set_cpsr(self.cpu.spsr());
             // Cpu::check_if_interrupt(self); todo ?
         }
 
@@ -539,7 +541,7 @@ impl GameGirlAdv {
         } else {
             // Thumb flag may not be changed
             dest = dest.set_bit(5, false);
-            self.cpu.cpsr = dest;
+            self.cpu.set_cpsr(dest);
             Cpu::check_if_interrupt(self);
         }
     }

@@ -61,7 +61,6 @@ fn main() {
                         None,
                         &SystemConfig::default(),
                     );
-                    gg.skip_bootrom();
                     for _ in 0..30 {
                         gg.advance_delta(1.0);
                     }

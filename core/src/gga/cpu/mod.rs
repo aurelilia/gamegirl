@@ -28,13 +28,13 @@ use crate::{
 /// Represents the CPU of the console - an ARM7TDMI.
 #[derive(Deserialize, Serialize)]
 pub struct Cpu {
-    pub low: [u32; 8],
     pub fiqs: [FiqReg; 5],
     pub sp: ModeReg,
     pub lr: ModeReg,
-    pub pc: u32,
     pub cpsr: u32,
     pub spsr: ModeReg,
+
+    registers: [u32; 16],
     pipeline: [u32; 2],
     pub(crate) access_type: Access,
 }
@@ -42,7 +42,7 @@ pub struct Cpu {
 impl Cpu {
     /// Execute the next instruction and advance the scheduler.
     pub fn exec_next_inst(gg: &mut GameGirlAdv) {
-        if !gg.debugger.should_execute(gg.cpu.pc) {
+        if !gg.debugger.should_execute(gg.cpu.pc()) {
             gg.options.running = false; // Pause emulation, we hit a BP
             return;
         }
@@ -53,24 +53,24 @@ impl Cpu {
         if gg.cpu.flag(Thumb) {
             let inst = gg.cpu.pipeline[0].u16();
             gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
-            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc, gg.cpu.access_type);
+            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc(), gg.cpu.access_type);
             gg.cpu.access_type = Access::Seq;
             gg.execute_inst_thumb(inst);
 
             if crate::TRACING {
                 let mnem = GameGirlAdv::get_mnemonic_thumb(inst);
-                println!("0x{:08X} {}", gg.cpu.pc, mnem);
+                println!("0x{:08X} {}", gg.cpu.pc(), mnem);
             }
         } else {
             let inst = gg.cpu.pipeline[0];
             gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
-            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc, gg.cpu.access_type);
+            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc(), gg.cpu.access_type);
             gg.cpu.access_type = Access::Seq;
             gg.execute_inst_arm(inst);
 
             if crate::TRACING {
                 let mnem = GameGirlAdv::get_mnemonic_arm(inst);
-                println!("0x{:08X} {}", gg.cpu.pc, mnem);
+                println!("0x{:08X} {}", gg.cpu.pc(), mnem);
             }
         }
     }
@@ -87,7 +87,7 @@ impl Cpu {
 
     /// An exception occurred, jump to the bootrom handler and deal with it.
     fn exception_occurred(gg: &mut GameGirlAdv, kind: Exception) {
-        if gg.cpu.pc > 0x100_0000 {
+        if gg.cpu.pc() > 0x100_0000 {
             gg.memory.bios_value = 0xE25EF004;
         }
         if gg.cpu.flag(Thumb) {
@@ -103,7 +103,7 @@ impl Cpu {
             gg.cpu.set_flag(FiqDisable, true);
         }
 
-        gg.cpu.set_lr(gg.cpu.pc - gg.cpu.inst_size());
+        gg.cpu.set_lr(gg.cpu.pc() - gg.cpu.inst_size());
         gg.cpu.set_spsr(cpsr);
         gg.set_pc(kind.vector());
     }
@@ -112,11 +112,11 @@ impl Cpu {
     pub fn pipeline_stall(gg: &mut GameGirlAdv) {
         gg.memory.prefetch_len = 0; // Discard prefetch
         if gg.cpu.flag(Thumb) {
-            gg.cpu.pipeline[0] = gg.read_hword(gg.cpu.pc, Access::NonSeq);
-            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc + 2, Access::Seq);
+            gg.cpu.pipeline[0] = gg.read_hword(gg.cpu.pc(), Access::NonSeq);
+            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc() + 2, Access::Seq);
         } else {
-            gg.cpu.pipeline[0] = gg.read_word(gg.cpu.pc, Access::NonSeq);
-            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc + 4, Access::Seq);
+            gg.cpu.pipeline[0] = gg.read_word(gg.cpu.pc(), Access::NonSeq);
+            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc() + 4, Access::Seq);
         };
         gg.cpu.access_type = Access::Seq;
         gg.cpu.inc_pc();
@@ -129,7 +129,7 @@ impl Cpu {
 
     #[inline]
     fn inc_pc_by(&mut self, count: u32) {
-        self.pc = self.pc.wrapping_add(count);
+        self.registers[15] = self.registers[15].wrapping_add(count);
     }
 
     #[inline]
@@ -156,13 +156,12 @@ impl Cpu {
 impl Default for Cpu {
     fn default() -> Self {
         Self {
-            low: [0; 8],
             fiqs: [FiqReg::default(); 5],
             sp: [0x0300_7F00, 0x0, 0x0300_7FE0, 0x0, 0x0300_7FA0, 0x0],
             lr: ModeReg::default(),
-            pc: 0,
             cpsr: 0xD3,
             spsr: ModeReg::default(),
+            registers: [0; 16],
             pipeline: [0; 2],
             access_type: Access::NonSeq,
         }

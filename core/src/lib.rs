@@ -4,6 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+#![allow(incomplete_features)]
 #![feature(const_mut_refs)]
 #![feature(drain_filter)]
 #![feature(duration_consts_float)]

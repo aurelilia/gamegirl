@@ -26,7 +26,7 @@ pub fn exec_jsmolka() {
 pub fn exec_fuzzarm() {
     crate::run_dir::<true, false>("fuzzarm", |gg| {
         let gg = gg.as_gga();
-        if gg.cpu.pc == 0x0800_00F4 {
+        if gg.cpu.pc() == 0x0800_00F4 {
             // These tests set PC to this value; the current instruction is always 'b 0x0'
             Break(Status::Success)
         } else {

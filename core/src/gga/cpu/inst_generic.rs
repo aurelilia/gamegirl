@@ -33,7 +33,7 @@ impl GameGirlAdv {
                 (false, true) => addr - 0x40,
                 (false, false) => addr - 0x3C,
             };
-            self.write_word(addr, self.cpu.pc + self.cpu.inst_size(), NonSeq);
+            self.write_word(addr, self.cpu.pc() + self.cpu.inst_size(), NonSeq);
         } else {
             let val = self.read_word(addr, NonSeq);
             self.set_pc(val);

@@ -8,7 +8,7 @@ use bitmatch::bitmatch;
 
 use crate::{
     gga::{
-        cpu::{registers::Flag::*, Cpu, Exception},
+        cpu::{registers::Flag::*, Cpu},
         Access::*,
         GameGirlAdv,
     },
@@ -124,7 +124,7 @@ impl GameGirlAdv {
             "SUBI" => self.cpu.sub(self.low(s), (n & 7).u32()),
             _ => panic!("Invalid arithmetic"),
         };
-        self.cpu.low[d.us()] = value;
+        self.cpu.registers[d.us()] = value;
     }
 
     // THUMB.3
@@ -134,14 +134,14 @@ impl GameGirlAdv {
         match KIND {
             "MOV" => {
                 self.cpu.set_zn(n.u32());
-                self.cpu.low[d.us()] = n.u32();
+                self.cpu.registers[d.us()] = n.u32();
             }
             "CMP" => {
                 let rd = self.low(d);
                 self.cpu.sub(rd, n.u32());
             }
-            "ADD" => self.cpu.low[d.us()] = self.cpu.add(self.low(d), n.u32()),
-            "SUB" => self.cpu.low[d.us()] = self.cpu.sub(self.low(d), n.u32()),
+            "ADD" => self.cpu.registers[d.us()] = self.cpu.add(self.low(d), n.u32()),
+            "SUB" => self.cpu.registers[d.us()] = self.cpu.sub(self.low(d), n.u32()),
             _ => panic!("Invalid arithmetic"),
         };
     }
@@ -155,7 +155,7 @@ impl GameGirlAdv {
         let rd = self.low(d);
         let rs = self.low(s);
 
-        self.cpu.low[d.us()] = match o {
+        self.cpu.registers[d.us()] = match o {
             0x0 => self.cpu.and(rd, rs),
             0x1 => self.cpu.xor(rd, rs),
             0x2 => {
@@ -230,7 +230,7 @@ impl GameGirlAdv {
         } else if s == 15 {
             // BX ARM switch
             self.cpu.set_flag(Thumb, false);
-            self.set_pc(self.cpu.pc); // Align
+            self.set_pc(self.cpu.pc()); // Align
         } else {
             // BX
             if !self.reg(s.u32()).is_bit(0) {
@@ -249,7 +249,8 @@ impl GameGirlAdv {
 
         // LDR has +1I
         self.idle_nonseq();
-        self.cpu.low[d.us()] = self.read_word_ldrswp(self.cpu.adj_pc() + (n.u32() << 2), NonSeq)
+        self.cpu.registers[d.us()] =
+            self.read_word_ldrswp(self.cpu.adj_pc() + (n.u32() << 2), NonSeq)
     }
 
     // THUMB.7/8
@@ -265,16 +266,16 @@ impl GameGirlAdv {
             0 => self.write_word(addr, rd, NonSeq),        // STR
             1 => self.write_hword(addr, rd.u16(), NonSeq), // STRH
             2 => self.write_byte(addr, rd.u8(), NonSeq),   // STRB
-            3 => self.cpu.low[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32, // LDSB
-            4 => self.cpu.low[d.us()] = self.read_word_ldrswp(addr, NonSeq), // LDR
-            5 => self.cpu.low[d.us()] = self.read_hword(addr, NonSeq), // LDRH
-            6 => self.cpu.low[d.us()] = self.read_byte(addr, NonSeq).u32(), // LDRB
+            3 => self.cpu.registers[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32, /* LDSB */
+            4 => self.cpu.registers[d.us()] = self.read_word_ldrswp(addr, NonSeq), // LDR
+            5 => self.cpu.registers[d.us()] = self.read_hword(addr, NonSeq),       // LDRH
+            6 => self.cpu.registers[d.us()] = self.read_byte(addr, NonSeq).u32(),  // LDRB
             // LDSH, needs special handling for unaligned reads which makes it behave as
             // LBSB
             _ if addr.is_bit(0) => {
-                self.cpu.low[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32
+                self.cpu.registers[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32
             }
-            _ => self.cpu.low[d.us()] = self.read_hword(addr, NonSeq) as i16 as i32 as u32,
+            _ => self.cpu.registers[d.us()] = self.read_hword(addr, NonSeq) as i16 as i32 as u32,
         }
         if O > 2 {
             // LDR has +1I
@@ -292,9 +293,9 @@ impl GameGirlAdv {
 
         match O {
             0 => self.write_word(rb + (n.u32() << 2), rd, NonSeq), // STR
-            1 => self.cpu.low[d.us()] = self.read_word_ldrswp(rb + (n.u32() << 2), NonSeq), // LDR
-            2 => self.write_byte(rb + n.u32(), rd.u8(), NonSeq),   // STRB
-            _ => self.cpu.low[d.us()] = self.read_byte(rb + n.u32(), NonSeq).u32(), // LDRB
+            1 => self.cpu.registers[d.us()] = self.read_word_ldrswp(rb + (n.u32() << 2), NonSeq), /* LDR */
+            2 => self.write_byte(rb + n.u32(), rd.u8(), NonSeq), // STRB
+            _ => self.cpu.registers[d.us()] = self.read_byte(rb + n.u32(), NonSeq).u32(), // LDRB
         }
 
         if O.is_bit(0) {
@@ -318,7 +319,7 @@ impl GameGirlAdv {
         } else {
             // LDR has +1I
             self.add_i_cycles(1);
-            self.cpu.low[d.us()] = self.read_hword(addr, NonSeq).u32();
+            self.cpu.registers[d.us()] = self.read_hword(addr, NonSeq).u32();
         }
     }
 
@@ -335,7 +336,7 @@ impl GameGirlAdv {
         let d = inst.low(8);
         // LDR has +1I
         self.idle_nonseq();
-        self.cpu.low[d.us()] = self.read_word_ldrswp(self.cpu.sp() + (n.u32() << 2), NonSeq);
+        self.cpu.registers[d.us()] = self.read_word_ldrswp(self.cpu.sp() + (n.u32() << 2), NonSeq);
     }
 
     // THUMB.12
@@ -343,9 +344,9 @@ impl GameGirlAdv {
         let n = inst.0 & 0xFF;
         let d = inst.low(8);
         if SP {
-            self.cpu.low[d.us()] = self.cpu.sp() + (n.u32() << 2);
+            self.cpu.registers[d.us()] = self.cpu.sp() + (n.u32() << 2);
         } else {
-            self.cpu.low[d.us()] = self.cpu.adj_pc() + (n.u32() << 2);
+            self.cpu.registers[d.us()] = self.cpu.adj_pc() + (n.u32() << 2);
         }
     }
 
@@ -373,7 +374,7 @@ impl GameGirlAdv {
         for reg in (0..8).rev() {
             if inst.0.is_bit(reg) {
                 sp -= 4;
-                self.write_word(sp, self.cpu.low[reg.us()], kind);
+                self.write_word(sp, self.cpu.registers[reg.us()], kind);
                 kind = Seq;
             }
         }
@@ -388,7 +389,7 @@ impl GameGirlAdv {
         // POP
         for reg in 0..8 {
             if inst.0.is_bit(reg) {
-                self.cpu.low[reg.us()] = self.read_word(sp, kind);
+                self.cpu.registers[reg.us()] = self.read_word(sp, kind);
                 sp += 4;
                 kind = Seq;
             }
@@ -414,15 +415,15 @@ impl GameGirlAdv {
                 if reg == b && kind != NonSeq {
                     base_rlist_addr = Some(self.cpu.low(b))
                 }
-                self.write_word(self.cpu.low(b), self.cpu.low[reg.us()], kind);
-                self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
+                self.write_word(self.cpu.low(b), self.cpu.registers[reg.us()], kind);
+                self.cpu.registers[b.us()] = self.low(b).wrapping_add(4);
                 kind = Seq;
             }
         }
         if let Some(addr) = base_rlist_addr {
             // If base was in Rlist and not the first, write final address to that location.
             // We ignore timing since this was already (wrongly) written in the loop above.
-            self.set_word(addr, self.cpu.low[b.us()]);
+            self.set_word(addr, self.cpu.registers[b.us()]);
         }
         if kind == NonSeq {
             self.on_empty_rlist(b.u32(), true, true, false);
@@ -435,8 +436,8 @@ impl GameGirlAdv {
         let mut kind = NonSeq;
         for reg in 0..8 {
             if inst.0.is_bit(reg) {
-                self.cpu.low[reg.us()] = self.read_word(self.cpu.low(b), kind);
-                self.cpu.low[b.us()] = self.low(b).wrapping_add(4);
+                self.cpu.registers[reg.us()] = self.read_word(self.cpu.low(b), kind);
+                self.cpu.registers[b.us()] = self.low(b).wrapping_add(4);
                 kind = Seq;
             }
         }
@@ -454,7 +455,7 @@ impl GameGirlAdv {
         let condition = self.cpu.eval_condition(COND);
         if condition {
             let nn = ((inst.0 & 0xFF) as i8 as i32) * 2; // Step 2
-            self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+            self.set_pc(self.cpu.pc().wrapping_add_signed(nn));
         }
     }
 
@@ -466,17 +467,20 @@ impl GameGirlAdv {
     // THUMB.18
     fn thumb_br(&mut self, inst: ThumbInst) {
         let nn = (inst.0.i10() as i32) * 2; // Step 2
-        self.set_pc(self.cpu.pc.wrapping_add_signed(nn));
+        self.set_pc(self.cpu.pc().wrapping_add_signed(nn));
     }
 
     // THUMB.19
     fn thumb_set_lr(&mut self, inst: ThumbInst) {
-        self.cpu
-            .set_lr(self.cpu.pc.wrapping_add_signed((inst.0.i10() as i32) << 12));
+        self.cpu.set_lr(
+            self.cpu
+                .pc()
+                .wrapping_add_signed((inst.0.i10() as i32) << 12),
+        );
     }
 
     fn thumb_bl<const THUMB: bool>(&mut self, inst: ThumbInst) {
-        let pc = self.cpu.pc;
+        let pc = self.cpu.pc();
         self.set_pc(self.cpu.lr().wrapping_add(inst.0.bits(0, 11).u32() << 1));
         self.cpu.set_lr(pc - 1);
         self.cpu.set_flag(Thumb, THUMB);

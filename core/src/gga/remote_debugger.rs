@@ -85,7 +85,7 @@ impl SingleThreadBase for SyncSys {
         }
         regs.sp = gg.cpu.sp();
         regs.lr = gg.cpu.lr();
-        regs.pc = gg.cpu.pc;
+        regs.pc = gg.cpu.pc();
         regs.cpsr = gg.cpu.cpsr;
 
         Ok(())
@@ -103,7 +103,7 @@ impl SingleThreadBase for SyncSys {
         }
         gg.cpu.set_sp(regs.sp);
         gg.cpu.set_lr(regs.lr);
-        if regs.pc != gg.cpu.pc {
+        if regs.pc != gg.cpu.pc() {
             gg.set_pc(regs.pc);
         }
         gg.cpu.cpsr = regs.cpsr;
@@ -160,7 +160,7 @@ impl SingleRegisterAccess<()> for SyncSys {
             ArmCoreRegId::Gpr(id) => gg.reg(id.u32()),
             ArmCoreRegId::Sp => gg.cpu.sp(),
             ArmCoreRegId::Lr => gg.cpu.lr(),
-            ArmCoreRegId::Pc => gg.cpu.pc,
+            ArmCoreRegId::Pc => gg.cpu.pc(),
             ArmCoreRegId::Cpsr => gg.cpu.cpsr,
             _ => return Ok(0),
         };

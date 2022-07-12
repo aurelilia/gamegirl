@@ -163,7 +163,7 @@ impl GameGirlAdv {
     #[inline]
     fn add_i_cycles(&mut self, count: u16) {
         self.scheduler.advance(count.u32());
-        if self.cpu.pc > 0x800_0000 {
+        if self.cpu.pc() > 0x800_0000 {
             if self[WAITCNT].is_bit(14) {
                 self.memory.prefetch_len += 1;
             } else {
@@ -233,7 +233,7 @@ impl GameGirlAdv {
     }
 
     pub fn skip_bootrom(&mut self) {
-        self.cpu.cpsr = 0x1F;
+        self.cpu.set_cpsr(0x1F);
         self.set_pc(0x0800_0000);
         self.cpu.sp[1] = 0x0300_7F00;
         self.cpu.sp[3] = 0x0300_7F00;

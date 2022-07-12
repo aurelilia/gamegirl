@@ -27,7 +27,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
         ui.vertical(|ui| {
             ui.set_min_width(200.0);
             // Account for prefetch
-            let mut pc = gg.cpu.pc.wrapping_sub(gg.cpu.inst_size());
+            let mut pc = gg.cpu.pc().wrapping_sub(gg.cpu.inst_size());
             ui.add(
                 Label::new(
                     RichText::new(format!("0x{:08X} {}", pc, gg.get_inst_mnemonic(pc)))
@@ -72,7 +72,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
             ui.monospace(format!("SP  = {:08X}", gg.cpu.sp()));
             ui.monospace(format!("LR  = {:08X}", gg.cpu.lr()));
             ui.add(
-                Label::new(RichText::new(format!("PC  = {:08X} ", gg.cpu.pc)).monospace())
+                Label::new(RichText::new(format!("PC  = {:08X} ", gg.cpu.pc())).monospace())
                     .wrap(false),
             );
         });
