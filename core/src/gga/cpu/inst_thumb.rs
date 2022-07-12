@@ -115,13 +115,13 @@ impl GameGirlAdv {
         let s = inst.low(3);
         let n = inst.0.bits(6, 5);
         let value = match KIND {
-            "LSL" => self.cpu.lsl(self.low(s), n.u32()),
-            "LSR" => self.cpu.lsr::<true>(self.low(s), n.u32()),
-            "ASR" => self.cpu.asr::<true>(self.low(s), n.u32()),
-            "ADDR" => self.cpu.add(self.low(s), self.low(n & 7)),
-            "ADDI" => self.cpu.add(self.low(s), (n & 7).u32()),
-            "SUBR" => self.cpu.sub(self.low(s), self.low(n & 7)),
-            "SUBI" => self.cpu.sub(self.low(s), (n & 7).u32()),
+            "LSL" => self.cpu.lsl::<true>(self.low(s), n.u32()),
+            "LSR" => self.cpu.lsr::<true, true>(self.low(s), n.u32()),
+            "ASR" => self.cpu.asr::<true, true>(self.low(s), n.u32()),
+            "ADDR" => self.cpu.add::<true>(self.low(s), self.low(n & 7)),
+            "ADDI" => self.cpu.add::<true>(self.low(s), (n & 7).u32()),
+            "SUBR" => self.cpu.sub::<true>(self.low(s), self.low(n & 7)),
+            "SUBI" => self.cpu.sub::<true>(self.low(s), (n & 7).u32()),
             _ => panic!("Invalid arithmetic"),
         };
         self.cpu.registers[d.us()] = value;
@@ -133,15 +133,15 @@ impl GameGirlAdv {
         let n = inst.0 & 0xFF;
         match KIND {
             "MOV" => {
-                self.cpu.set_zn(n.u32());
+                self.cpu.set_zn::<true>(n.u32());
                 self.cpu.registers[d.us()] = n.u32();
             }
             "CMP" => {
                 let rd = self.low(d);
-                self.cpu.sub(rd, n.u32());
+                self.cpu.sub::<true>(rd, n.u32());
             }
-            "ADD" => self.cpu.registers[d.us()] = self.cpu.add(self.low(d), n.u32()),
-            "SUB" => self.cpu.registers[d.us()] = self.cpu.sub(self.low(d), n.u32()),
+            "ADD" => self.cpu.registers[d.us()] = self.cpu.add::<true>(self.low(d), n.u32()),
+            "SUB" => self.cpu.registers[d.us()] = self.cpu.sub::<true>(self.low(d), n.u32()),
             _ => panic!("Invalid arithmetic"),
         };
     }
@@ -156,49 +156,49 @@ impl GameGirlAdv {
         let rs = self.low(s);
 
         self.cpu.registers[d.us()] = match o {
-            0x0 => self.cpu.and(rd, rs),
-            0x1 => self.cpu.xor(rd, rs),
+            0x0 => self.cpu.and::<true>(rd, rs),
+            0x1 => self.cpu.xor::<true>(rd, rs),
             0x2 => {
                 self.idle_nonseq();
-                self.cpu.lsl(rd, rs & 0xFF)
+                self.cpu.lsl::<true>(rd, rs & 0xFF)
             }
             0x3 => {
                 self.idle_nonseq();
-                self.cpu.lsr::<false>(rd, rs & 0xFF)
+                self.cpu.lsr::<true, false>(rd, rs & 0xFF)
             }
             0x4 => {
                 self.idle_nonseq();
-                self.cpu.asr::<false>(rd, rs & 0xFF)
+                self.cpu.asr::<true, false>(rd, rs & 0xFF)
             }
-            0x5 => self.cpu.adc(rd, rs, self.cpu.flag(Carry) as u32),
-            0x6 => self.cpu.sbc(rd, rs, self.cpu.flag(Carry) as u32),
+            0x5 => self.cpu.adc::<true>(rd, rs, self.cpu.flag(Carry) as u32),
+            0x6 => self.cpu.sbc::<true>(rd, rs, self.cpu.flag(Carry) as u32),
             0x7 => {
                 self.idle_nonseq();
-                self.cpu.ror::<false>(rd, rs & 0xFF)
+                self.cpu.ror::<true, false>(rd, rs & 0xFF)
             }
             0x8 => {
                 // TST
-                self.cpu.and(rd, rs);
+                self.cpu.and::<true>(rd, rs);
                 rd
             }
-            0x9 => self.cpu.neg(rs),
+            0x9 => self.cpu.neg::<true>(rs),
             0xA => {
                 // CMP
-                self.cpu.sub(rd, rs);
+                self.cpu.sub::<true>(rd, rs);
                 rd
             }
             0xB => {
                 // CMN
-                self.cpu.add(rd, rs);
+                self.cpu.add::<true>(rd, rs);
                 rd
             }
-            0xC => self.cpu.or(rd, rs),
+            0xC => self.cpu.or::<true>(rd, rs),
             0xD => {
                 self.mul_wait_cycles(rd, true);
-                self.cpu.mul(rd, rs)
+                self.cpu.mul::<true>(rd, rs)
             }
-            0xE => self.cpu.bit_clear(rd, rs),
-            _ => self.cpu.not(rs),
+            0xE => self.cpu.bit_clear::<true>(rd, rs),
+            _ => self.cpu.not::<true>(rs),
         }
     }
 
@@ -213,7 +213,7 @@ impl GameGirlAdv {
     fn thumb_hi_cmp(&mut self, inst: ThumbInst) {
         let s = inst.0.bits(3, 4);
         let d = inst.low(0) | (inst.0.bit(7) << 3);
-        self.cpu.sub(self.reg(d.u32()), self.reg(s.u32()));
+        self.cpu.sub::<true>(self.reg(d.u32()), self.reg(s.u32()));
     }
 
     fn thumb_hi_mov(&mut self, inst: ThumbInst) {

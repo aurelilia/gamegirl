@@ -276,20 +276,20 @@ impl GameGirlAdv {
             let d = inst.reg(12);
             let n = inst.reg(16);
             let t = inst.0.bits(5, 2);
-            let cpsr = self.cpu.cpsr;
+            let carry = self.cpu.flag(Carry);
 
             if !inst.0.is_bit(4) {
                 // Shift by imm
                 let a = inst.0.bits(7, 5);
                 let rm = self.cpu.reg(m);
-                let second_op = self.shifted_op::<true>(rm, t, a);
-                self.alu::<OP, CPSR, false>(n, second_op, d, cpsr);
+                let second_op = self.shifted_op::<CPSR, true>(rm, t, a);
+                self.alu::<OP, CPSR, false>(n, second_op, d, carry);
             } else {
                 // Shift by reg
                 let a = inst.0.bits(8, 4);
                 let rm = self.cpu.reg_pc4(m);
-                let second_op = self.shifted_op::<false>(rm, t, self.cpu.reg(a) & 0xFF);
-                self.alu::<OP, CPSR, true>(n, second_op, d, cpsr);
+                let second_op = self.shifted_op::<CPSR, false>(rm, t, self.cpu.reg(a) & 0xFF);
+                self.alu::<OP, CPSR, true>(n, second_op, d, carry);
             }
         }
     }
@@ -304,12 +304,12 @@ impl GameGirlAdv {
             self.msr(imm, inst.0.is_bit(19), inst.0.is_bit(16), spsr);
         } else {
             // ALU with immediate
-            let cpsr = self.cpu.cpsr;
+            let carry = self.cpu.flag(Carry);
             let s = inst.0.bits(8, 4);
             let d = inst.reg(12);
             let n = inst.reg(16);
-            let second_op = self.cpu.ror::<false>(inst.0 & 0xFF, s << 1);
-            self.alu::<OP, CPSR, false>(n, second_op, d, cpsr);
+            let second_op = self.cpu.ror::<CPSR, false>(inst.0 & 0xFF, s << 1);
+            self.alu::<OP, CPSR, false>(n, second_op, d, carry);
         }
     }
 
@@ -446,11 +446,7 @@ impl GameGirlAdv {
             let m = inst.reg(0);
             let s = inst.0.bits(7, 5);
             let t = inst.0.bits(5, 2);
-
-            let cpsr = self.cpu.cpsr;
-            let offs = self.shifted_op::<true>(self.cpu.reg(m), t, s);
-            self.cpu.cpsr = cpsr;
-            offs
+            self.shifted_op::<false, true>(self.cpu.reg(m), t, s)
         };
         self.ldrstr::<false>(!pre, up, width, !pre || writeback, !ldr, n, d, offs);
     }
@@ -460,10 +456,9 @@ impl GameGirlAdv {
         reg_a: u32,
         b: u32,
         dest: u32,
-        cpsr: u32,
+        carry: bool,
     ) {
         let d = self.cpu.reg(dest);
-        let carry = cpsr.is_bit(Carry as u16);
 
         let reg_a = if SHIFT_REG {
             self.cpu.reg_pc4(reg_a)
@@ -471,51 +466,47 @@ impl GameGirlAdv {
             self.reg(reg_a)
         };
         let value = match OP {
-            0x0 => self.cpu.and(reg_a, b),
-            0x1 => self.cpu.xor(reg_a, b),
-            0x2 => self.cpu.sub(reg_a, b),
-            0x3 => self.cpu.sub(b, reg_a),
-            0x4 => self.cpu.add(reg_a, b),
-            0x5 => self.cpu.adc(reg_a, b, carry as u32),
-            0x6 => self.cpu.sbc(reg_a, b, carry as u32),
-            0x7 => self.cpu.sbc(b, reg_a, carry as u32),
+            0x0 => self.cpu.and::<CPSR>(reg_a, b),
+            0x1 => self.cpu.xor::<CPSR>(reg_a, b),
+            0x2 => self.cpu.sub::<CPSR>(reg_a, b),
+            0x3 => self.cpu.sub::<CPSR>(b, reg_a),
+            0x4 => self.cpu.add::<CPSR>(reg_a, b),
+            0x5 => self.cpu.adc::<CPSR>(reg_a, b, carry as u32),
+            0x6 => self.cpu.sbc::<CPSR>(reg_a, b, carry as u32),
+            0x7 => self.cpu.sbc::<CPSR>(b, reg_a, carry as u32),
             0x8 => {
                 // TST
-                self.cpu.and(reg_a, b);
+                self.cpu.and::<true>(reg_a, b);
                 d
             }
             0x9 => {
                 // TEQ
-                self.cpu.xor(reg_a, b);
+                self.cpu.xor::<true>(reg_a, b);
                 d
             }
             0xA => {
                 // CMP
-                self.cpu.sub(reg_a, b);
+                self.cpu.sub::<true>(reg_a, b);
                 d
             }
             0xB => {
                 // CMN
-                self.cpu.add(reg_a, b);
+                self.cpu.add::<true>(reg_a, b);
                 d
             }
-            0xC => self.cpu.or(reg_a, b),
+            0xC => self.cpu.or::<CPSR>(reg_a, b),
             0xD => {
-                self.cpu.set_zn(b);
+                self.cpu.set_zn::<CPSR>(b);
                 b
             } // MOV
-            0xE => self.cpu.bit_clear(reg_a, b),
-            _ => self.cpu.not(b),
+            0xE => self.cpu.bit_clear::<CPSR>(reg_a, b),
+            _ => self.cpu.not::<CPSR>(b),
         };
 
-        if !CPSR {
-            // Restore CPSR if we weren't supposed to set flags
-            self.cpu.cpsr = cpsr;
-        } else if dest == 15 && self.cpu.mode() != Mode::User && self.cpu.mode() != Mode::System {
+        if CPSR && dest == 15 && self.cpu.mode() != Mode::User && self.cpu.mode() != Mode::System {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
             self.cpu.set_cpsr(self.cpu.spsr());
-            // Cpu::check_if_interrupt(self); todo ?
         }
 
         if !(0x8..=0xB).contains(&OP) {
@@ -666,16 +657,21 @@ impl GameGirlAdv {
         }
     }
 
-    fn shifted_op<const IMM: bool>(&mut self, nn: u32, op: u32, shift_amount: u32) -> u32 {
+    fn shifted_op<const CPSR: bool, const IMM: bool>(
+        &mut self,
+        nn: u32,
+        op: u32,
+        shift_amount: u32,
+    ) -> u32 {
         if op + shift_amount == 0 {
             // Special case: no shift
             nn
         } else {
             match op {
-                0 => self.cpu.lsl(nn, shift_amount),
-                1 => self.cpu.lsr::<IMM>(nn, shift_amount),
-                2 => self.cpu.asr::<IMM>(nn, shift_amount),
-                _ => self.cpu.ror::<IMM>(nn, shift_amount),
+                0 => self.cpu.lsl::<CPSR>(nn, shift_amount),
+                1 => self.cpu.lsr::<CPSR, IMM>(nn, shift_amount),
+                2 => self.cpu.asr::<CPSR, IMM>(nn, shift_amount),
+                _ => self.cpu.ror::<CPSR, IMM>(nn, shift_amount),
             }
         }
     }
