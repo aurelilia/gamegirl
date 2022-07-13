@@ -62,11 +62,11 @@ impl Cpu {
 
     fn ensure_aligned(ps: &mut PlayStation, addr: u32, by: u32, exception: Exception) {
         if addr & (by - 1) != 0 {
-            Cpu::exeception_occured(ps, exception);
+            Cpu::exception_occurred(ps, exception);
         }
     }
 
-    fn exeception_occured(ps: &mut PlayStation, kind: Exception) {
+    fn exception_occurred(ps: &mut PlayStation, kind: Exception) {
         let new_pc = if ps.cpu.cop0.sr.is_bit(22) {
             0xBFC0_0180
         } else {

@@ -162,16 +162,16 @@ mod tests {
 
     #[test]
     fn div_starts_at_0() {
-        for_all_speeds(|gg, _| assert_eq!(0, Timer::read(&gg, DIV)));
+        for_all_speeds(|gg, _| assert_eq!(0, Timer::read(gg, DIV)));
     }
 
     #[test]
     fn div_inc() {
         for_all_speeds(|gg, _| {
             gg.scheduler.advance(255);
-            assert_eq!(0, Timer::read(&gg, DIV));
+            assert_eq!(0, Timer::read(gg, DIV));
             gg.scheduler.advance(1);
-            assert_eq!(1, Timer::read(&gg, DIV))
+            assert_eq!(1, Timer::read(gg, DIV))
         });
     }
 
@@ -179,27 +179,27 @@ mod tests {
     fn div_reset() {
         for_all_speeds(|gg, _| {
             gg.scheduler.advance(512);
-            assert_eq!(2, Timer::read(&gg, DIV));
+            assert_eq!(2, Timer::read(gg, DIV));
             Timer::write(gg, DIV, 234);
-            assert_eq!(0, Timer::read(&gg, DIV));
+            assert_eq!(0, Timer::read(gg, DIV));
 
             gg.scheduler.advance(255);
-            assert_eq!(0, Timer::read(&gg, DIV));
+            assert_eq!(0, Timer::read(gg, DIV));
             gg.scheduler.advance(1);
-            assert_eq!(1, Timer::read(&gg, DIV));
+            assert_eq!(1, Timer::read(gg, DIV));
         });
     }
 
     #[test]
     fn starts_at_0() {
-        for_all_speeds(|gg, _| assert_eq!(0, Timer::read(&gg, TIMA)));
+        for_all_speeds(|gg, _| assert_eq!(0, Timer::read(gg, TIMA)));
     }
 
     #[test]
     fn is_0_before_divider() {
         for_all_speeds(|gg, _| {
             gg.scheduler.advance(gg.timer.counter_divider.u32() - 1);
-            assert_eq!(0, Timer::read(&gg, TIMA));
+            assert_eq!(0, Timer::read(gg, TIMA));
         });
     }
 
@@ -207,7 +207,7 @@ mod tests {
     fn is_1_after_divider() {
         for_all_speeds(|gg, _| {
             gg.scheduler.advance(gg.timer.counter_divider.u32());
-            assert_eq!(1, Timer::read(&gg, TIMA));
+            assert_eq!(1, Timer::read(gg, TIMA));
         });
     }
 
@@ -216,7 +216,7 @@ mod tests {
         for_all_speeds(|gg, _| {
             gg.scheduler
                 .advance((gg.timer.counter_divider.u32() * 2) - 1);
-            assert_eq!(1, Timer::read(&gg, TIMA));
+            assert_eq!(1, Timer::read(gg, TIMA));
         });
     }
 
@@ -224,7 +224,7 @@ mod tests {
     fn is_2_after_divider() {
         for_all_speeds(|gg, _| {
             gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
-            assert_eq!(2, Timer::read(&gg, TIMA));
+            assert_eq!(2, Timer::read(gg, TIMA));
         });
     }
 
@@ -232,15 +232,15 @@ mod tests {
     fn reschedule() {
         for_all_speeds(|gg, speed| {
             gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
-            assert_eq!(2, Timer::read(&gg, TIMA));
+            assert_eq!(2, Timer::read(gg, TIMA));
 
             Timer::write(gg, TAC, speed);
             gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
-            assert_eq!(2, Timer::read(&gg, TIMA));
+            assert_eq!(2, Timer::read(gg, TIMA));
 
             Timer::write(gg, TAC, speed | 4);
             gg.scheduler.advance(gg.timer.counter_divider.u32() * 2);
-            assert_eq!(4, Timer::read(&gg, TIMA));
+            assert_eq!(4, Timer::read(gg, TIMA));
         });
     }
 

@@ -23,6 +23,7 @@ type ArmLut = [ArmHandler; 256];
 const ARM_LUT: ArmLut = GameGirlAdv::make_arm_lut();
 
 impl GameGirlAdv {
+    #[allow(clippy::unusual_byte_groupings)]
     const fn make_arm_lut() -> ArmLut {
         let mut lut: ArmLut = [Self::arm_unknown_opcode; 256];
 

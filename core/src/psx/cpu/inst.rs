@@ -140,7 +140,7 @@ impl PlayStation {
     }
 
     fn exception_inst<const EX: Exception>(&mut self, _inst: Inst) {
-        Cpu::exeception_occured(self, EX);
+        Cpu::exception_occurred(self, EX);
     }
 
     fn math_unsigned<const IMM: bool, const OP: &'static str>(&mut self, inst: Inst) {
@@ -180,14 +180,14 @@ impl PlayStation {
             "ADD" => match a.checked_add(b) {
                 Some(value) => value,
                 None => {
-                    Cpu::exeception_occured(self, Exception::Overflow);
+                    Cpu::exception_occurred(self, Exception::Overflow);
                     return;
                 }
             },
             "SUB" => match a.checked_sub(b) {
                 Some(value) => value,
                 None => {
-                    Cpu::exeception_occured(self, Exception::Overflow);
+                    Cpu::exception_occurred(self, Exception::Overflow);
                     return;
                 }
             },

@@ -356,7 +356,7 @@ impl BlockingEventLoop for EventLoop {
         _target: &mut Self::Target,
     ) -> Result<Option<Self::StopReason>, <Self::Target as Target>::Error> {
         // TODO handle this in the GUI
-        Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT).into()))
+        Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT)))
     }
 }
 
