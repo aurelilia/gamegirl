@@ -8,7 +8,9 @@ use core::common::{Button, CgbMode, SystemConfig};
 
 use eframe::{
     egui,
-    egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui},
+    egui::{
+        vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui, WidgetType::ComboBox,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -66,6 +68,8 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 ui.selectable_value(&mut opt.gg.mode, CgbMode::Prefer, "Prefer");
                 ui.selectable_value(&mut opt.gg.mode, CgbMode::Never, "Never");
             });
+        ui.checkbox(&mut opt.gg.cached_interpreter, "GGA: Enable Cached Interpreter")
+            .on_hover_text("Enables caching in the interpreter. Speeds up emulation at the cost of RAM usage.");
         ui.separator();
 
         ui.horizontal(|ui| {

@@ -582,6 +582,9 @@ impl GameGirlAdv {
             self.memory.write_pages[i] = unsafe { self.get_page::<false>(i * PAGE_SIZE) };
         }
         self.update_wait_times();
+        if self.config.cached_interpreter {
+            self.cpu.cache.init(self.cart.rom.len());
+        }
     }
 
     fn update_wait_times(&mut self) {

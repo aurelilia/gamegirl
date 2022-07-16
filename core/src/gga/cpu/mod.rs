@@ -5,20 +5,28 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 mod alu;
+mod caching;
 mod inst_arm;
 mod inst_generic;
 mod inst_thumb;
 pub mod registers;
+
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     gga::{
         addr::*,
-        cpu::registers::{
-            FiqReg,
-            Flag::{FiqDisable, IrqDisable, Thumb},
-            Mode, ModeReg,
+        cpu::{
+            caching::{Cache, CacheEntry, CachedInst},
+            inst_arm::ArmInst,
+            inst_thumb::ThumbInst,
+            registers::{
+                FiqReg,
+                Flag::{FiqDisable, IrqDisable, Thumb},
+                Mode, ModeReg,
+            },
         },
         Access, GameGirlAdv,
     },
@@ -34,9 +42,19 @@ pub struct Cpu {
     pub cpsr: u32,
     pub spsr: ModeReg,
 
-    registers: [u32; 16],
+    pub registers: [u32; 16],
     pipeline: [u32; 2],
     pub(crate) access_type: Access,
+
+    block_ended: bool,
+    #[serde(default)]
+    #[serde(skip)]
+    pub(crate) cache: Cache,
+
+    #[cfg_attr(feature = "instruction-tracing", serde(default))]
+    #[cfg_attr(feature = "instruction-tracing", serde(skip))]
+    #[cfg(feature = "instruction-tracing")]
+    pub instruction_tracer: Option<Box<dyn Fn(&GameGirlAdv, u32) + Send + 'static>>,
 }
 
 impl Cpu {
@@ -47,31 +65,161 @@ impl Cpu {
             return;
         }
 
+        if gg.config.cached_interpreter {
+            if let Some(cache) = gg.cpu.cache.get(gg.cpu.pc()) {
+                Cpu::run_cache(gg, cache);
+                return;
+            } else if Cache::can_make_cache(gg.cpu.pc()) {
+                Cpu::try_make_cache(gg);
+                return;
+            }
+        }
+
         gg.advance_clock();
-        gg.cpu.inc_pc();
-
         if gg.cpu.flag(Thumb) {
-            let inst = gg.cpu.pipeline[0].u16();
-            gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
-            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc(), gg.cpu.access_type);
-            gg.cpu.access_type = Access::Seq;
-            gg.execute_inst_thumb(inst);
-
-            if crate::TRACING {
-                let mnem = GameGirlAdv::get_mnemonic_thumb(inst);
-                println!("0x{:08X} {}", gg.cpu.pc(), mnem);
-            }
+            let (inst, _) = Self::fetch_next_inst::<2, true>(gg);
+            gg.execute_inst_thumb(inst.u16());
         } else {
-            let inst = gg.cpu.pipeline[0];
-            gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
-            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc(), gg.cpu.access_type);
-            gg.cpu.access_type = Access::Seq;
+            let (inst, _) = Self::fetch_next_inst::<4, false>(gg);
             gg.execute_inst_arm(inst);
+        }
+    }
 
-            if crate::TRACING {
-                let mnem = GameGirlAdv::get_mnemonic_arm(inst);
-                println!("0x{:08X} {}", gg.cpu.pc(), mnem);
+    fn run_cache(gg: &mut GameGirlAdv, cache: CacheEntry) {
+        gg.cpu.block_ended = false;
+        match cache {
+            CacheEntry::Arm(cache) => {
+                assert!(!gg.cpu.flag(Thumb));
+                for inst in cache.iter() {
+                    gg.advance_clock();
+                    if gg.cpu.block_ended {
+                        // CPU got interrupted, stop
+                        return;
+                    }
+
+                    gg.cpu.inc_pc_by(4);
+                    Self::trace_inst::<false>(gg, inst.inst);
+                    gg.add_sn_cycles(inst.sn_cycles);
+                    if gg.check_arm_cond(inst.inst) {
+                        (inst.handler)(gg, ArmInst(inst.inst));
+                    }
+                }
             }
+            CacheEntry::Thumb(cache) => {
+                assert!(gg.cpu.flag(Thumb));
+                for inst in cache.iter() {
+                    gg.advance_clock();
+                    if gg.cpu.block_ended {
+                        // CPU got interrupted, stop
+                        return;
+                    }
+
+                    gg.cpu.inc_pc_by(2);
+                    Self::trace_inst::<true>(gg, inst.inst.u32());
+                    gg.add_sn_cycles(inst.sn_cycles);
+                    (inst.handler)(gg, ThumbInst(inst.inst));
+                }
+            }
+        }
+
+        if !gg.cpu.block_ended {
+            // The block ended on a branch instruction that wasn't taken
+            // and so the pipeline contents were not flushed.
+            // This means that we need to restore correct pipeline state
+            // to ensure the code after the block doesn't end up executing
+            // a stale/incorrect pipeline from before the cached block
+            if gg.cpu.flag(Thumb) {
+                gg.cpu.pipeline[0] = gg.get_hword(gg.cpu.pc() - 2).u32();
+                gg.cpu.pipeline[1] = gg.get_hword(gg.cpu.pc()).u32();
+            } else {
+                gg.cpu.pipeline[0] = gg.get_word(gg.cpu.pc() - 4);
+                gg.cpu.pipeline[1] = gg.get_word(gg.cpu.pc());
+            };
+        }
+    }
+
+    fn try_make_cache(gg: &mut GameGirlAdv) {
+        let start_pc = gg.cpu.pc();
+        gg.cpu.block_ended = false;
+        if gg.cpu.flag(Thumb) {
+            let mut block = Vec::with_capacity(5);
+            while !gg.cpu.block_ended {
+                gg.advance_clock();
+                if gg.cpu.block_ended {
+                    // CPU got interrupted by system, discard the block
+                    return;
+                }
+
+                let (inst, sn_cycles) = Self::fetch_next_inst::<2, true>(gg);
+                let inst = inst.u16();
+                let handler = gg.get_handler_thumb(inst);
+
+                handler(gg, ThumbInst(inst));
+                block.push(CachedInst {
+                    inst,
+                    handler,
+                    sn_cycles,
+                })
+            }
+            gg.cpu
+                .cache
+                .put(start_pc, CacheEntry::Thumb(Arc::new(block)));
+        } else {
+            let mut block = Vec::with_capacity(5);
+            while !gg.cpu.block_ended {
+                gg.advance_clock();
+                if gg.cpu.block_ended {
+                    // CPU got interrupted by system, discard the block
+                    return;
+                }
+
+                let (inst, sn_cycles) = Self::fetch_next_inst::<4, false>(gg);
+                let handler = gg.get_handler_arm(inst);
+
+                if gg.check_arm_cond(inst) {
+                    handler(gg, ArmInst(inst));
+                }
+                block.push(CachedInst {
+                    inst,
+                    handler,
+                    sn_cycles,
+                });
+            }
+            gg.cpu.cache.put(start_pc, CacheEntry::Arm(Arc::new(block)));
+        }
+    }
+
+    fn fetch_next_inst<const WAIT: u32, const THUMB: bool>(gg: &mut GameGirlAdv) -> (u32, u16) {
+        gg.cpu.inc_pc_by(WAIT);
+        let sn_cycles = gg.wait_time::<WAIT>(gg.cpu.pc(), gg.cpu.access_type);
+        gg.add_sn_cycles(sn_cycles);
+
+        let inst = gg.cpu.pipeline[0];
+        gg.cpu.pipeline[0] = gg.cpu.pipeline[1];
+        gg.cpu.pipeline[1] = if THUMB {
+            gg.get_hword(gg.cpu.pc()).u32()
+        } else {
+            gg.get_word(gg.cpu.pc())
+        };
+        gg.cpu.access_type = Access::Seq;
+
+        Self::trace_inst::<THUMB>(gg, inst);
+        (inst, sn_cycles)
+    }
+
+    fn trace_inst<const THUMB: bool>(gg: &mut GameGirlAdv, inst: u32) {
+        if crate::TRACING {
+            let mnem = if !THUMB {
+                GameGirlAdv::get_mnemonic_arm(inst)
+            } else {
+                GameGirlAdv::get_mnemonic_thumb(inst.u16())
+            };
+            eprintln!("0x{:08X} {}", gg.cpu.pc(), mnem);
+        }
+
+        #[cfg(feature = "instruction-tracing")]
+        if let Some(tracer) = &gg.cpu.instruction_tracer {
+            tracer(gg, inst);
         }
     }
 
@@ -120,6 +268,7 @@ impl Cpu {
         };
         gg.cpu.access_type = Access::Seq;
         gg.cpu.inc_pc();
+        gg.cpu.block_ended = true;
     }
 
     #[inline]
@@ -164,6 +313,11 @@ impl Default for Cpu {
             registers: [0; 16],
             pipeline: [0; 2],
             access_type: Access::NonSeq,
+            block_ended: false,
+            cache: Cache::default(),
+
+            #[cfg(feature = "instruction-tracing")]
+            instruction_tracer: None,
         }
     }
 }

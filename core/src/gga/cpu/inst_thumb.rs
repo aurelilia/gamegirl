@@ -15,7 +15,7 @@ use crate::{
     numutil::{NumExt, U16Ext},
 };
 
-type ThumbHandler = fn(&mut GameGirlAdv, ThumbInst);
+pub type ThumbHandler = fn(&mut GameGirlAdv, ThumbInst);
 type ThumbLut = [ThumbHandler; 256];
 const THUMB_LUT: ThumbLut = GameGirlAdv::make_thumb_lut();
 
@@ -101,8 +101,12 @@ impl GameGirlAdv {
     }
 
     pub fn execute_inst_thumb(&mut self, inst: u16) {
-        let handler = THUMB_LUT[inst.us() >> 8];
+        let handler = self.get_handler_thumb(inst);
         handler(self, ThumbInst(inst))
+    }
+
+    pub fn get_handler_thumb(&self, inst: u16) -> ThumbHandler {
+        THUMB_LUT[inst.us() >> 8]
     }
 
     fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
@@ -593,7 +597,7 @@ impl GameGirlAdv {
 }
 
 #[derive(Copy, Clone)]
-struct ThumbInst(u16);
+pub struct ThumbInst(pub u16);
 
 impl ThumbInst {
     fn low(&self, idx: u16) -> u16 {

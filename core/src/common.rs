@@ -306,6 +306,8 @@ pub struct SystemConfig {
     pub cgb_colour_correction: bool,
     /// Audio volume multiplier
     pub volume: f32,
+    /// If the interpreter should cache
+    pub cached_interpreter: bool,
 }
 
 impl Default for SystemConfig {
@@ -315,6 +317,7 @@ impl Default for SystemConfig {
             compress_savestates: false,
             cgb_colour_correction: false,
             volume: 0.5,
+            cached_interpreter: true,
         }
     }
 }

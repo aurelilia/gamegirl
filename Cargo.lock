@@ -522,7 +522,6 @@ dependencies = [
  "bitflags",
  "bitmatch",
  "elf_rs",
- "env_logger",
  "gdbstub",
  "gdbstub_arch",
  "log",
@@ -902,7 +901,7 @@ dependencies = [
  "nohash-hasher",
  "ron",
  "serde",
- "tracing",
+ "tracing 0.1.35",
 ]
 
 [[package]]
@@ -916,7 +915,7 @@ dependencies = [
  "epi",
  "instant",
  "serde",
- "tracing",
+ "tracing 0.1.35",
  "webbrowser",
  "winit",
 ]
@@ -933,7 +932,7 @@ dependencies = [
  "glow",
  "glutin",
  "memoffset",
- "tracing",
+ "tracing 0.1.35",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -949,7 +948,7 @@ dependencies = [
  "epi",
  "js-sys",
  "percent-encoding",
- "tracing",
+ "tracing 0.1.35",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1037,7 +1036,7 @@ dependencies = [
  "egui",
  "ron",
  "serde",
- "tracing",
+ "tracing 0.1.35",
 ]
 
 [[package]]
@@ -1158,6 +1157,7 @@ dependencies = [
  "core",
  "cpal",
  "eframe",
+ "env_logger",
  "futures-executor",
  "gilrs",
  "rfd",
@@ -2596,6 +2596,14 @@ dependencies = [
 
 [[package]]
 name = "tracing"
+version = "0.1.0"
+dependencies = [
+ "core",
+ "env_logger",
+]
+
+[[package]]
+name = "tracing"
 version = "0.1.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a400e31aa60b9d44a52a8ee0343b5b18566b03a8321e0d321f695cf56e940160"
@@ -2644,7 +2652,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
 dependencies = [
- "tracing",
+ "tracing 0.1.35",
  "tracing-subscriber",
  "wasm-bindgen",
 ]
@@ -3176,7 +3184,7 @@ dependencies = [
  "serde_repr",
  "sha1",
  "static_assertions",
- "tracing",
+ "tracing 0.1.35",
  "uds_windows",
  "winapi",
  "zbus_macros",

@@ -18,7 +18,7 @@ use crate::{
     numutil::{NumExt, U32Ext},
 };
 
-type ArmHandler = fn(&mut GameGirlAdv, ArmInst);
+pub type ArmHandler = fn(&mut GameGirlAdv, ArmInst);
 type ArmLut = [ArmHandler; 256];
 const ARM_LUT: ArmLut = GameGirlAdv::make_arm_lut();
 
@@ -200,12 +200,20 @@ impl GameGirlAdv {
     }
 
     pub fn execute_inst_arm(&mut self, inst: u32) {
-        if !self.cpu.eval_condition(inst.bits(28, 4).u16()) {
+        if !self.check_arm_cond(inst) {
             return;
         }
 
-        let handler = ARM_LUT[(inst.us() >> 20) & 0xFF];
+        let handler = self.get_handler_arm(inst);
         handler(self, ArmInst(inst))
+    }
+
+    pub fn check_arm_cond(&mut self, inst: u32) -> bool {
+        self.cpu.eval_condition(inst.bits(28, 4).u16())
+    }
+
+    pub fn get_handler_arm(&self, inst: u32) -> ArmHandler {
+        ARM_LUT[(inst.us() >> 20) & 0xFF]
     }
 
     fn arm_b<const BL: bool>(&mut self, inst: ArmInst) {
@@ -848,7 +856,7 @@ impl GameGirlAdv {
 }
 
 #[derive(Copy, Clone)]
-struct ArmInst(u32);
+pub struct ArmInst(pub u32);
 
 impl ArmInst {
     fn reg(&self, idx: u32) -> u32 {
