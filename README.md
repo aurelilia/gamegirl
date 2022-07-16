@@ -169,8 +169,8 @@ cargo run -p tests --release -- --gg
   - [x] Carry: 93/93
   - [x] Multiply long: 52/72 (cosidered complete; carry is still not researched in general)
   - [x] BIOS math: 625/625
-  - [ ] DMA tests: 1212/1256
-    - Tests related to DMA1-3 with ROM source fail
+  - [ ] DMA tests: 1248/1256
+    - "0 Imm W R+0x10" tests fail (DMA0 with ROM?)
   - [ ] Misc. edge case tests: 6/10
   - [ ] Video Tests
     - [x] Basic Mode 3

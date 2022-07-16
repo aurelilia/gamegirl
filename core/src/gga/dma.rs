@@ -106,7 +106,11 @@ impl Dmas {
             0 => 0x4000,
             _ => count.u32(),
         };
-        let src_mod = Self::get_step(ctrl.bits(7, 2));
+
+        let src_mod = match gg.dma.src[idx.us()] {
+            0x800_0000..=0xDFF_FFFF => 2,
+            _ => Self::get_step(ctrl.bits(7, 2)),
+        };
 
         let dst_raw = ctrl.bits(5, 2);
         let dst_mod = match dst_raw {
