@@ -60,7 +60,7 @@ impl Ppu {
         let tile_count = size.0 >> 3;
         let prio = obj.attr2.bits(10, 2);
         let mosaic = obj.attr2.is_bit(4);
-        let is_window = gg[DISPCNT].is_bit(WIN_OBJS) && obj.attr0.bits(10, 2) == 2;
+        let is_window = gg[DISPCNT].is_bit(WIN_OBJS) && obj.attr0.bits(2, 2) == 2;
 
         if obj.attr0.is_bit(5) {
             let tile_addr = 0x1_0000
@@ -155,7 +155,7 @@ impl Ppu {
             let palette = obj.attr2.bits(12, 4).u8();
             (false, palette)
         };
-        let is_window = gg[DISPCNT].is_bit(WIN_OBJS) && obj.attr0.bits(10, 2) == 2;
+        let is_window = gg[DISPCNT].is_bit(WIN_OBJS) && obj.attr0.bits(2, 2) == 2;
 
         for x in 0..obj_width {
             let pixel_x = obj_x + x as i16;

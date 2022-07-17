@@ -8,9 +8,14 @@ fn main() {
 
     let rom = include_bytes!("../../../bench.gb").to_vec();
     cached.load_cart(rom.clone(), None, &SystemConfig::default());
-    let mut conf = SystemConfig::default();
-    conf.cached_interpreter = false;
-    non_cached.load_cart(rom.clone(), None, &conf);
+    non_cached.load_cart(
+        rom,
+        None,
+        &SystemConfig {
+            cached_interpreter: false,
+            ..SystemConfig::default()
+        },
+    );
 
     let (c_tx, c_rx) = mpsc::channel();
     let (n_tx, n_rx) = mpsc::channel();

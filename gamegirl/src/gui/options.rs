@@ -8,9 +8,7 @@ use core::common::{Button, CgbMode, SystemConfig};
 
 use eframe::{
     egui,
-    egui::{
-        vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui, WidgetType::ComboBox,
-    },
+    egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui},
 };
 use serde::{Deserialize, Serialize};
 
@@ -107,16 +105,8 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         ComboBox::from_label("Texture filter")
             .selected_text(format!("{:?}", opt.tex_filter))
             .show_ui(ui, |ui| {
-                let a = ui
-                    .selectable_value(&mut opt.tex_filter, TextureFilter::Nearest, "Nearest")
-                    .changed();
-                let b = ui
-                    .selectable_value(&mut opt.tex_filter, TextureFilter::Linear, "Linear")
-                    .changed();
-                if a || b {
-                    let size = app.gg.lock().unwrap().screen_size();
-                    app.texture = App::make_screen_texture(ctx, size, opt.tex_filter);
-                }
+                ui.selectable_value(&mut opt.tex_filter, TextureFilter::Nearest, "Nearest");
+                ui.selectable_value(&mut opt.tex_filter, TextureFilter::Linear, "Linear");
             });
 
         ui.horizontal(|ui| {

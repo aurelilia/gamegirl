@@ -64,14 +64,10 @@ impl<E: Kind> Scheduler<E> {
     /// Note that this implementation assumes there is always at least one event
     /// scheduled.
     pub fn get_next_pending(&mut self) -> Option<Event<E>> {
-        if self.events.is_empty() {
-            return None;
-        }
-
         let idx = self.events.len() - 1;
         let event = self.events[idx];
         if event.execute_at <= self.time {
-            self.events.truncate(idx);
+            unsafe { self.events.set_len(idx) };
             Some(Event {
                 kind: event.kind,
                 late_by: (self.time - event.execute_at) as i32,

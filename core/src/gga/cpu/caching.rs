@@ -28,12 +28,12 @@ impl Cache {
         }
     }
 
-    fn insert(set: &mut Vec<Option<CacheEntry>>, location: u32, entry: CacheEntry) {
+    fn insert(set: &mut [Option<CacheEntry>], location: u32, entry: CacheEntry) {
         set[location.us()] = Some(entry);
     }
 
     pub fn can_make_cache(pc: u32) -> bool {
-        pc < 0x100_0000 || pc > 0x800_0000
+        !(0x100_0000..=0x800_0000).contains(&pc)
     }
 
     pub fn init(&mut self, cart_size: usize) {

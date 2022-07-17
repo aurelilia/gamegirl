@@ -253,7 +253,14 @@ pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
         );
     }
 
-    let img = upload_texture(ctx, 32, 24, &mut app.visual_debug.vram_texture, buf);
+    let img = upload_texture(
+        ctx,
+        32,
+        24,
+        &mut app.visual_debug.vram_texture,
+        buf,
+        TextureFilter::Nearest,
+    );
     ui.image(img, vec2(32. * 16., 24. * 16.));
 }
 
@@ -276,7 +283,7 @@ pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 data_addr,
             );
         }
-        upload_texture(ctx, 32, 32, id, buf)
+        upload_texture(ctx, 32, 32, id, buf, TextureFilter::Nearest)
     }
 
     let gg = app.gg.lock().unwrap();
@@ -322,12 +329,16 @@ fn upload_texture(
     y: usize,
     id: &mut Option<TextureId>,
     buf: Vec<Colour>,
+    filter: TextureFilter,
 ) -> TextureId {
     let id = get_or_make_texture(ctx, id);
-    let img = ImageDelta::full(ImageData::Color(ColorImage {
-        size: [x * 8, y * 8],
-        pixels: buf,
-    }));
+    let img = ImageDelta::full(
+        ImageData::Color(ColorImage {
+            size: [x * 8, y * 8],
+            pixels: buf,
+        }),
+        filter,
+    );
     let manager = ctx.tex_manager();
     manager.write().set(id, img);
     id

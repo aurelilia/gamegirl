@@ -29,8 +29,7 @@ use eframe::{
         Vec2,
     },
     epaint::{ColorImage, ImageDelta, TextureId},
-    epi,
-    epi::{Frame, Storage},
+    CreationContext, Frame, Storage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -89,7 +88,7 @@ pub fn start(gg: Arc<Mutex<System>>) {
         transparent: true,
         ..Default::default()
     };
-    eframe::run_native(Box::new(make_app(gg)), options)
+    eframe::run_native("gamegirl", options, Box::new(|ctx| make_app(ctx, gg)))
 }
 
 /// Start the GUI. Since this is WASM, this call will return.
@@ -98,8 +97,13 @@ pub fn start(gg: Arc<Mutex<System>>, canvas_id: &str) -> Result<(), eframe::wasm
     eframe::start_web(canvas_id, Box::new(make_app(gg)))
 }
 
-fn make_app(gg: Arc<Mutex<System>>) -> App {
-    App {
+fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
+    let state: State = ctx
+        .storage
+        .and_then(|s| eframe::get_value(s, "gamegirl_data"))
+        .unwrap_or_default();
+    let texture = App::make_screen_texture(&ctx.egui_ctx, [160, 144], state.options.tex_filter);
+    let mut app = App {
         gg,
         current_rom_path: None,
         rewinder: Rewinding::default(),
@@ -107,16 +111,15 @@ fn make_app(gg: Arc<Mutex<System>>) -> App {
         remote_dbg: Arc::new(RwLock::new(DebuggerStatus::NotActive)),
         fast_forward_toggled: false,
 
-        texture: TextureId::default(),
+        texture,
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
         frame_times: History::new(0..120, 2.0),
 
-        state: State {
-            last_opened: vec![],
-            options: Options::default(),
-        },
-    }
+        state,
+    };
+    app.setup_rewind();
+    Box::new(app)
 }
 
 /// The App state.
@@ -147,8 +150,30 @@ struct App {
     state: State,
 }
 
-impl epi::App for App {
-    fn update(&mut self, ctx: &Context, frame: &Frame) {
+impl App {
+    fn setup_rewind(&mut self) {
+        self.rewinder
+            .set_rw_buf_size(self.state.options.rewind_buffer_size);
+        let buffer = self.rewinder.rewind_buffer.clone();
+        if self.state.options.enable_rewind {
+            self.gg.lock().unwrap().options().frame_finished = Box::new(move |gg| {
+                // Kinda ugly duplication but it works ig?
+                match gg {
+                    BorrowedSystem::GGC(gg) if !gg.options.invert_audio_samples => {
+                        buffer.lock().unwrap().push(gg.save_state())
+                    }
+                    BorrowedSystem::GGA(gg) if !gg.options.invert_audio_samples => {
+                        buffer.lock().unwrap().push(gg.save_state())
+                    }
+                    _ => (),
+                }
+            });
+        }
+    }
+}
+
+impl eframe::App for App {
+    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         let size = self.update_gg(ctx, FRAME_LEN);
         self.process_messages();
 
@@ -198,39 +223,9 @@ impl epi::App for App {
         ctx.request_repaint();
     }
 
-    fn setup(&mut self, ctx: &Context, _frame: &Frame, storage: Option<&dyn Storage>) {
-        if let Some(state) = storage.and_then(|s| epi::get_value(s, "gamegirl_data")) {
-            self.state = state;
-        }
-
-        self.texture = Self::make_screen_texture(ctx, [160, 144], self.state.options.tex_filter);
-
-        self.rewinder
-            .set_rw_buf_size(self.state.options.rewind_buffer_size);
-        let buffer = self.rewinder.rewind_buffer.clone();
-        if self.state.options.enable_rewind {
-            self.gg.lock().unwrap().options().frame_finished = Box::new(move |gg| {
-                // Kinda ugly duplication but it works ig?
-                match gg {
-                    BorrowedSystem::GGC(gg) if !gg.options.invert_audio_samples => {
-                        buffer.lock().unwrap().push(gg.save_state())
-                    }
-                    BorrowedSystem::GGA(gg) if !gg.options.invert_audio_samples => {
-                        buffer.lock().unwrap().push(gg.save_state())
-                    }
-                    _ => (),
-                }
-            });
-        }
-    }
-
     fn save(&mut self, storage: &mut dyn Storage) {
         self.save_game();
-        epi::set_value(storage, "gamegirl_data", &self.state);
-    }
-
-    fn name(&self) -> &str {
-        "GameGirl"
+        eframe::set_value(storage, "gamegirl_data", &self.state);
     }
 
     fn max_size_points(&self) -> Vec2 {
@@ -244,7 +239,10 @@ impl App {
     fn update_gg(&mut self, ctx: &Context, advance_by: Duration) -> [usize; 2] {
         let (frame, size) = self.get_gg_frame(ctx, advance_by);
         if let Some(pixels) = frame {
-            let img = ImageDelta::full(ImageData::Color(ColorImage { size, pixels }));
+            let img = ImageDelta::full(
+                ImageData::Color(ColorImage { size, pixels }),
+                self.state.options.tex_filter,
+            );
             let manager = ctx.tex_manager();
             manager.write().set(self.texture, img);
         }
@@ -328,7 +326,7 @@ impl App {
     }
 
     /// Paint the navbar.
-    fn navbar(&mut self, now: f64, frame: &Frame, ui: &mut Ui) {
+    fn navbar(&mut self, now: f64, frame: &mut Frame, ui: &mut Ui) {
         widgets::global_dark_light_mode_switch(ui);
         ui.separator();
 
@@ -458,7 +456,7 @@ impl App {
 }
 
 /// State that is persisted on app reboot.
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct State {
     /// A list of last opened ROMs. Size is capped to 10, last opened
     /// ROM is at index 0. The oldest ROM gets removed first.

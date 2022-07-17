@@ -18,9 +18,9 @@ A Gameboy (Color/Advance) emulator and debugger written in Rust, whose GG/GGC co
 ## Status
 The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
 enough to make most commercial games run perfectly.  
-AGB support is early with some things still missing; still working on the PPU and
-making the emulation overall more accurate and fast. Most games are playable, but with
-graphical glitches.
+AGB support is getting there. Some things  are still missing; especially
+the PPU needs a few more features implemented. Most games are playable, but with
+minor graphical glitches.
 
 ### Features
 #### General
@@ -44,6 +44,7 @@ graphical glitches.
 
 #### GGA
 - Accurate scheduler-based emulation of the system
+- A cached interpreter
 - Remote debugger support (GDB server)
 - Support for playing ELF files
 
@@ -80,6 +81,7 @@ graphical glitches.
     - [x] Instruction-level accuracy
     - [x] Accurate interrupts
     - [x] Accurate waitstates
+    - [x] Cached interpreter
   - [x] Open bus behavior
   - [ ] PPU
     - [ ] Passing visual tests 
@@ -87,7 +89,7 @@ graphical glitches.
     - [x] Bitmap mode Backgrounds
     - [x] Objects
     - [x] Priority
-    - [ ] Blending
+    - [ ] Blending / special effects
     - [x] Affine BGs/objects
     - [x] Windows
   - [x] APU
@@ -121,7 +123,7 @@ to run well in the browser. Accuracy is also a goal however, with the only excep
 that noticeably hurt performance to implement.
 
 ### Missing console features
-- Some MBC3 controllers have a built-in RTC for keeping track of time; gamegirl implements it,
+- GG: Some MBC3 controllers have a built-in RTC for keeping track of time; gamegirl implements it,
   but in a very simple format incompatible with other emulators that has a high chance of
   not working with most games (it was tested with Pokemon Crystal and successfully kept time
   after turning the game off overnight - needs more testing).
@@ -170,7 +172,7 @@ cargo run -p tests --release -- --gg
   - [x] Multiply long: 52/72 (cosidered complete; carry is still not researched in general)
   - [x] BIOS math: 625/625
   - [ ] DMA tests: 1248/1256
-    - "0 Imm W R+0x10" tests fail (DMA0 with ROM?)
+    - "0 Imm H/W R+0x10" tests fail (DMA0 with ROM?)
   - [ ] Misc. edge case tests: 6/10
   - [ ] Video Tests
     - [x] Basic Mode 3
@@ -196,7 +198,6 @@ cargo run -p tests --release -- --gg
   - [x] `bios`
 - [ ] destoer's gba_tests
   - [x] `cond_invalid`
-  - [ ] `dma_priority` (Causes stack overflow even...)
   - [x] `hello_world`
   - [x] `if_ack`
   - Unsure of how to interpret results of the rest...
