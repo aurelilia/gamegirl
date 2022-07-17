@@ -99,6 +99,9 @@ impl Ppu {
         let colour = gg.ppu.idx_to_palette::<OBJ>((palette << 4) + colour_idx);
         let layers = Self::get_layers::<OBJ>(gg);
         layers[prio.us()][x.us()] = colour;
+        if !OBJ {
+            gg.ppu.bg_pixels[window][x.us()] = colour;
+        }
     }
 
     pub(super) fn is_occupied<const OBJ: bool>(&self, x: u16, prio: u16) -> bool {

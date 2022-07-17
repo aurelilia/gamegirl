@@ -89,9 +89,11 @@ minor graphical glitches.
     - [x] Bitmap mode Backgrounds
     - [x] Objects
     - [x] Priority
-    - [ ] Blending / special effects
+    - [x] Blending
     - [x] Affine BGs/objects
     - [x] Windows
+    - [ ] Window blending
+    - [ ] Semi-transparent OBJs
   - [x] APU
     - [x] CGB sound channels
     - [x] DMA sound channels

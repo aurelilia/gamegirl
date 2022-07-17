@@ -21,7 +21,10 @@ use super::memory::KB;
 use crate::{
     common::BorrowedSystem,
     gga::{
-        addr::{BG2PA, BG3PA, DISPCNT, DISPSTAT, VCOUNT, WIN0H, WIN0V, WININ, WINOUT},
+        addr::{
+            BG0CNT, BG2PA, BG3PA, BLDALPHA, BLDCNT, BLDY, DISPCNT, DISPSTAT, VCOUNT, WIN0H, WIN0V,
+            WININ, WINOUT,
+        },
         cpu::{Cpu, Interrupt},
         dma::{DmaReason, Dmas},
         scheduling::{AdvEvent, PpuEvent},
@@ -69,6 +72,9 @@ pub struct Ppu {
     #[serde(skip)]
     #[serde(default = "serde_layer_arr")]
     bg_layers: [Layer; 4],
+    #[serde(skip)]
+    #[serde(default = "serde_layer_arr")]
+    bg_pixels: [Layer; 4],
     #[serde(skip)]
     #[serde(default = "serde_layer_arr")]
     obj_layers: [Layer; 4],
@@ -230,29 +236,182 @@ impl Ppu {
     fn finish_line(gg: &mut GameGirlAdv, line: u16) {
         let start = line.us() * 240;
         let mut backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
-        Self::adjust_pixel(&mut backdrop);
 
-        'pixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
-            for prio in 0..4 {
-                if gg.ppu.obj_layers[prio][x] != EMPTY {
-                    *pixel = gg.ppu.obj_layers[prio][x];
-                    Self::adjust_pixel(pixel);
-                    continue 'pixels;
+        let bldcnt = gg[BLDCNT];
+        let blend_mode = bldcnt.bits(6, 2);
+
+        if blend_mode == 0 {
+            // Fast path: No blending
+            Self::adjust_pixel(&mut backdrop);
+
+            'pixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
+                for prio in 0..4 {
+                    if gg.ppu.obj_layers[prio][x] != EMPTY {
+                        *pixel = gg.ppu.obj_layers[prio][x];
+                        Self::adjust_pixel(pixel);
+                        continue 'pixels;
+                    }
+                    if gg.ppu.bg_layers[prio][x] != EMPTY {
+                        *pixel = gg.ppu.bg_layers[prio][x];
+                        Self::adjust_pixel(pixel);
+                        continue 'pixels;
+                    }
                 }
-                if gg.ppu.bg_layers[prio][x] != EMPTY {
-                    *pixel = gg.ppu.bg_layers[prio][x];
-                    Self::adjust_pixel(pixel);
-                    continue 'pixels;
+
+                // No matching pixel found...
+                *pixel = backdrop;
+            }
+        } else {
+            // Slow path: Blending
+            let firsts = [
+                bldcnt.is_bit(0),
+                bldcnt.is_bit(1),
+                bldcnt.is_bit(2),
+                bldcnt.is_bit(3),
+                bldcnt.is_bit(4),
+                bldcnt.is_bit(5),
+            ];
+            let seconds = [
+                bldcnt.is_bit(8),
+                bldcnt.is_bit(9),
+                bldcnt.is_bit(10),
+                bldcnt.is_bit(11),
+                bldcnt.is_bit(12),
+                bldcnt.is_bit(13),
+            ];
+            let cnt = gg[DISPCNT];
+            let enables = [
+                cnt.is_bit(BG0_EN),
+                cnt.is_bit(BG0_EN + 1),
+                cnt.is_bit(BG0_EN + 2),
+                cnt.is_bit(BG0_EN + 3),
+            ];
+            let bg_prio = [
+                gg[BG0CNT] & 3,
+                gg[BG0CNT + 2] & 3,
+                gg[BG0CNT + 4] & 3,
+                gg[BG0CNT + 6] & 3,
+            ];
+
+            let bld = if blend_mode == 1 {
+                gg[BLDALPHA]
+            } else {
+                gg[BLDY]
+            };
+
+            'bldpixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
+                *pixel = EMPTY;
+                let mut was_obj = false;
+                for prio in 0..4 {
+                    if gg.ppu.obj_layers[prio][x] != EMPTY {
+                        let done = Self::calc_pixel::<true>(
+                            pixel,
+                            gg.ppu.obj_layers[prio][x],
+                            blend_mode,
+                            firsts[4],
+                            seconds[4],
+                            was_obj,
+                            bld,
+                        );
+                        was_obj = true;
+
+                        if done {
+                            continue 'bldpixels;
+                        }
+                    }
+
+                    for bg in 0..4 {
+                        if enables[bg]
+                            && bg_prio[bg] == prio.u16()
+                            && gg.ppu.bg_pixels[bg][x] != EMPTY
+                        {
+                            let done = Self::calc_pixel::<true>(
+                                pixel,
+                                gg.ppu.bg_pixels[bg][x],
+                                blend_mode,
+                                firsts[bg],
+                                seconds[bg],
+                                was_obj,
+                                bld,
+                            );
+
+                            if done {
+                                continue 'bldpixels;
+                            }
+                        }
+                    }
                 }
+
+                // No matching pixel found...
+                Self::calc_pixel::<true>(
+                    pixel, backdrop, blend_mode, firsts[5], seconds[5], was_obj, bld,
+                );
             }
 
-            // No matching pixel found...
-            *pixel = backdrop;
+            for pixel in gg.ppu.pixels[start..].iter_mut().take(240) {
+                Self::adjust_pixel(pixel);
+            }
         }
 
         // Clear last line buffers
         gg.ppu.bg_layers = serde_layer_arr();
+        gg.ppu.bg_pixels = serde_layer_arr();
         gg.ppu.obj_layers = serde_layer_arr();
+    }
+
+    fn calc_pixel<const OBJ: bool>(
+        pixel: &mut Colour,
+        colour: Colour,
+        blend_mode: u16,
+        first: bool,
+        second: bool,
+        was_obj: bool,
+        bld: u16,
+    ) -> bool {
+        match blend_mode {
+            1 => {
+                // Regular alphablend.
+                if *pixel != EMPTY {
+                    if second {
+                        *pixel = Self::blend_pixel(*pixel, colour, bld.bits(0, 5), bld.bits(8, 5));
+                    }
+                    second
+                } else {
+                    *pixel = colour;
+                    !first
+                }
+            }
+
+            _ => {
+                // B/W alphablend.
+                let second_colour = if blend_mode == 2 {
+                    [31, 31, 31, 255]
+                } else {
+                    [0, 0, 0, 255]
+                };
+                let evy = (bld & 31).min(0x10);
+                if was_obj {
+                    *pixel = Self::blend_pixel(*pixel, second_colour, 0x10 - evy, evy);
+                    return true;
+                }
+
+                if first {
+                    *pixel = Self::blend_pixel(colour, second_colour, 0x10 - evy, evy);
+                } else {
+                    *pixel = colour;
+                }
+                !OBJ
+            }
+        }
+    }
+
+    fn blend_pixel(first: Colour, second: Colour, factor_a: u16, factor_b: u16) -> Colour {
+        let fa = factor_a.min(0x10);
+        let fb = factor_b.min(0x10);
+        let r = (first[0].u16() * fa + second[0].u16() * fb) >> 4;
+        let g = (first[1].u16() * fa + second[1].u16() * fb) >> 4;
+        let b = (first[2].u16() * fa + second[2].u16() * fb) >> 4;
+        [r.u8(), g.u8(), b.u8(), 255]
     }
 
     fn reload_affine_bgs(gg: &mut GameGirlAdv) {
@@ -282,6 +441,7 @@ impl Default for Ppu {
 
             pixels: serde_colour_arr(),
             bg_layers: serde_layer_arr(),
+            bg_pixels: serde_layer_arr(),
             obj_layers: serde_layer_arr(),
             win_masks: serde_mask_arr(),
             last_frame: None,
