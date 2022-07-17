@@ -37,9 +37,11 @@ mod dma;
 mod graphics;
 mod input;
 mod memory;
-pub mod remote_debugger;
 mod scheduling;
 mod timer;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod remote_debugger;
 
 pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 

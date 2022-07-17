@@ -11,15 +11,19 @@ mod input;
 mod options;
 mod rewind;
 
+#[cfg(not(target_arch = "wasm32"))]
+use core::gga::remote_debugger::DebuggerStatus;
 use core::{
     common::{BorrowedSystem, System},
-    gga::{remote_debugger::DebuggerStatus, GameGirlAdv},
+    gga::GameGirlAdv,
     ggc::GameGirl,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::RwLock;
 use std::{
     fs, mem,
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex, RwLock},
+    sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 
@@ -29,7 +33,7 @@ use eframe::{
         Vec2,
     },
     epaint::{ColorImage, ImageDelta, TextureId},
-    CreationContext, Frame, Storage,
+    CreationContext, Frame, Storage, Theme,
 };
 use serde::{Deserialize, Serialize};
 
@@ -86,6 +90,7 @@ const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] =
 pub fn start(gg: Arc<Mutex<System>>) {
     let options = eframe::NativeOptions {
         transparent: true,
+        default_theme: Theme::Dark,
         ..Default::default()
     };
     eframe::run_native("gamegirl", options, Box::new(|ctx| make_app(ctx, gg)))
@@ -94,7 +99,11 @@ pub fn start(gg: Arc<Mutex<System>>) {
 /// Start the GUI. Since this is WASM, this call will return.
 #[cfg(target_arch = "wasm32")]
 pub fn start(gg: Arc<Mutex<System>>, canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
-    eframe::start_web(canvas_id, Box::new(make_app(gg)))
+    let options = eframe::WebOptions {
+        default_theme: Theme::Dark,
+        ..Default::default()
+    };
+    eframe::start_web(canvas_id, options, Box::new(|ctx| make_app(ctx, gg)))
 }
 
 fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
@@ -108,6 +117,7 @@ fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
         current_rom_path: None,
         rewinder: Rewinding::default(),
         visual_debug: VisualDebugState::default(),
+        #[cfg(not(target_arch = "wasm32"))]
         remote_dbg: Arc::new(RwLock::new(DebuggerStatus::NotActive)),
         fast_forward_toggled: false,
 
@@ -133,6 +143,7 @@ struct App {
     /// State for visual debugging tools.
     visual_debug: VisualDebugState,
     /// Remote debugger status.
+    #[cfg(not(target_arch = "wasm32"))]
     remote_dbg: Arc<RwLock<DebuggerStatus>>,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     fast_forward_toggled: bool,

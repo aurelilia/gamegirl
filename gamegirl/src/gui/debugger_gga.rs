@@ -6,14 +6,13 @@
 
 use core::{
     debugger::Breakpoint,
-    gga::{self, addr::IME, remote_debugger::DebuggerStatus, GameGirlAdv},
+    gga::{addr::IME, GameGirlAdv},
     numutil::NumExt,
 };
-use std::thread;
 
 use eframe::egui::{Context, Label, RichText, TextEdit, Ui};
 
-use crate::{gui::App, Colour, System};
+use crate::{gui::App, Colour};
 
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.
@@ -139,15 +138,17 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui) {
 }
 
 /// Window showing status of the remote debugger.
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
     {
         let gg = app.gg.lock().unwrap();
-        if !matches!(&*gg, System::GGA(_)) {
+        if !matches!(&*gg, core::System::GGA(_)) {
             ui.label("Only available on GGA!");
             return;
         }
     }
 
+    use core::gga::remote_debugger::DebuggerStatus;
     let stat = *app.remote_dbg.read().unwrap();
     match stat {
         DebuggerStatus::NotActive => {
@@ -177,9 +178,13 @@ pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn launch_debugger(app: &mut App) {
     let gg = app.gg.clone();
     let path = app.current_rom_path.clone().unwrap();
     let remote = app.remote_dbg.clone();
-    thread::spawn(|| gga::remote_debugger::init(gg, path, remote));
+    std::thread::spawn(|| core::gga::remote_debugger::init(gg, path, remote));
 }
+
+#[cfg(target_arch = "wasm32")]
+pub(super) fn remote_debugger(_app: &mut App, _ctx: &Context, _ui: &mut Ui) {}

@@ -4,7 +4,6 @@ resolver = "2"
 
 [profile.release]
 debug = true
-codegen-units = 4
 lto = true
 panic = "abort"
 
