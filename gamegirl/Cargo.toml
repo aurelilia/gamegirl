@@ -29,3 +29,5 @@ console_error_panic_hook = "0.1.7"
 tracing-wasm = "0.2.1"
 wasm-bindgen-futures = "0.4.31"
 cpal = { version = "0.13.5", features = ["wasm-bindgen"] }
+# Disable the threaded PPU, wasm doesn't support std::thread
+core = { path = "../core", default-features = false }

@@ -7,8 +7,7 @@
 use crate::{
     gga::{
         addr::{DISPCNT, MOSAIC, WINOUT},
-        graphics::{Ppu, OBJ_EN, OBJ_MAPPING_1D, WIN_OBJS},
-        GameGirlAdv,
+        graphics::{threading::PpuType, Ppu, OBJ_EN, OBJ_MAPPING_1D, WIN_OBJS},
     },
     numutil::{hword, NumExt},
 };
@@ -17,7 +16,7 @@ const OBJ_X_SIZE: [u16; 16] = [8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32, 0, 0
 const OBJ_Y_SIZE: [u16; 16] = [8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64, 0, 0, 0, 0];
 
 impl Ppu {
-    pub fn render_objs<const _START: u16>(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_objs<const _START: u16>(gg: &mut PpuType, line: u16) {
         if !gg[DISPCNT].is_bit(OBJ_EN) {
             return;
         }
@@ -37,7 +36,7 @@ impl Ppu {
         }
     }
 
-    fn render_obj(gg: &mut GameGirlAdv, line: u16, obj: Object, is_2d: bool) {
+    fn render_obj(gg: &mut PpuType, line: u16, obj: Object, is_2d: bool) {
         match obj.attr0 & 3 {
             0 => Self::render_obj_regular(gg, line, obj, is_2d),
             1 => Self::render_obj_affine(gg, line, obj, is_2d, false),
@@ -46,7 +45,7 @@ impl Ppu {
         }
     }
 
-    fn render_obj_regular(gg: &mut GameGirlAdv, line: u16, obj: Object, is_2d: bool) {
+    fn render_obj_regular(gg: &mut PpuType, line: u16, obj: Object, is_2d: bool) {
         let size = obj.size();
         if !obj.draw_on(line, size.1.u8()) {
             return;
@@ -124,7 +123,7 @@ impl Ppu {
         }
     }
 
-    fn render_obj_affine(gg: &mut GameGirlAdv, line: u16, obj: Object, is_2d: bool, size_2x: bool) {
+    fn render_obj_affine(gg: &mut PpuType, line: u16, obj: Object, is_2d: bool, size_2x: bool) {
         let size = obj.size();
         if !obj.draw_on(line, if size_2x { size.1 << 1 } else { size.1 }.u8()) {
             return;
@@ -186,7 +185,7 @@ impl Ppu {
     }
 
     fn get_affine_pixel(
-        gg: &mut GameGirlAdv,
+        gg: &mut PpuType,
         base_tile_idx: usize,
         size: (u16, u16),
         trans_x: u16,
@@ -228,7 +227,7 @@ impl Ppu {
         out
     }
 
-    fn set_window_pixel(gg: &mut GameGirlAdv, pixel: i16, colour: u8) {
+    fn set_window_pixel(gg: &mut PpuType, pixel: i16, colour: u8) {
         if !(0..240).contains(&pixel) || colour == 0 {
             return;
         }

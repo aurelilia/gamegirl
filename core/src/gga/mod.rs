@@ -9,7 +9,6 @@ use std::mem;
 use audio::Apu;
 use cartridge::Cartridge;
 use cpu::Cpu;
-use graphics::Ppu;
 use memory::Memory;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +20,7 @@ use crate::{
         audio::SAMPLE_EVERY_N_CLOCKS,
         cpu::registers::Flag,
         dma::Dmas,
+        graphics::threading::{new_ppu, GgaPpu},
         scheduling::{AdvEvent, ApuEvent, PpuEvent},
         timer::Timers,
     },
@@ -53,7 +53,7 @@ pub type GGADebugger = Debugger<u32>;
 pub struct GameGirlAdv {
     pub cpu: Cpu,
     pub memory: Memory,
-    pub ppu: Ppu,
+    pub ppu: GgaPpu,
     pub apu: Apu,
     pub dma: Dmas,
     pub timers: Timers,
@@ -91,10 +91,10 @@ impl GameGirlAdv {
     /// Step until the PPU has finished producing the current frame.
     /// Only used for rewinding since it causes audio desync very easily.
     pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
-        while self.options.running && self.ppu.last_frame == None {
+        while self.options.running && self.ppu().last_frame == None {
             self.advance();
         }
-        self.ppu.last_frame.take()
+        self.ppu().last_frame.take()
     }
 
     /// Produce the next audio samples and write them to the given buffer.
@@ -248,7 +248,7 @@ impl Default for GameGirlAdv {
         let mut gg = Self {
             cpu: Cpu::default(),
             memory: Memory::default(),
-            ppu: Ppu::default(),
+            ppu: new_ppu(),
             apu: Apu::default(),
             dma: Dmas::default(),
             timers: Timers::default(),

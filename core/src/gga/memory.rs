@@ -606,9 +606,9 @@ impl GameGirlAdv {
         match a {
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
-            0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_nomut().palette, a - 0x500_0000),
+            0x0600_0000..=0x0601_7FFF => offs(&self.ppu_nomut().vram, a - 0x600_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_nomut().oam, a - 0x700_0000),
             0x0800_0000..=0x09FF_FFFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
                 offs(&self.cart.rom, a - 0x800_0000)
             }
@@ -621,7 +621,7 @@ impl GameGirlAdv {
             }
 
             // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
+            0x0601_8000..=0x0601_FFFF => offs(&self.ppu_nomut().vram, 0x1_0000 + (a - 0x600_0000)),
             0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),
             _ => ptr::null::<u8>() as *mut u8,
         }

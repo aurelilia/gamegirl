@@ -87,7 +87,7 @@ impl System {
     pub fn last_frame(&mut self) -> Option<Vec<Colour>> {
         match self {
             System::GGC(gg) => gg.ppu.last_frame.take(),
-            System::GGA(gg) => gg.ppu.last_frame.take(),
+            System::GGA(gg) => gg.ppu().last_frame.take(),
             System::PSX(_ps) => todo!(),
         }
     }

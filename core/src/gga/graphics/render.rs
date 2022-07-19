@@ -7,8 +7,7 @@
 use crate::{
     gga::{
         addr::MOSAIC,
-        graphics::{Ppu, EMPTY},
-        GameGirlAdv,
+        graphics::{threading::PpuType, Ppu, EMPTY},
     },
     numutil::NumExt,
     Colour,
@@ -16,7 +15,7 @@ use crate::{
 
 impl Ppu {
     pub(super) fn render_tile_4bpp<const OBJ: bool>(
-        gg: &mut GameGirlAdv,
+        gg: &mut PpuType,
         prio: u16,
         mut x: i16,
         x_step: i16,
@@ -35,7 +34,7 @@ impl Ppu {
     }
 
     pub(super) fn render_tile_8bpp<const OBJ: bool>(
-        gg: &mut GameGirlAdv,
+        gg: &mut PpuType,
         prio: u16,
         mut x: i16,
         x_step: i16,
@@ -63,7 +62,7 @@ impl Ppu {
     }
 
     pub(super) fn set_pixel<const OBJ: bool>(
-        gg: &mut GameGirlAdv,
+        gg: &mut PpuType,
         x: i16,
         prio: u16,
         palette: u8,
@@ -108,7 +107,7 @@ impl Ppu {
         self.get_pixel::<OBJ>(x, prio) != Some(EMPTY)
     }
 
-    fn get_layers<const OBJ: bool>(gg: &mut GameGirlAdv) -> &mut [[Colour; 240]; 4] {
+    fn get_layers<'l, const OBJ: bool>(gg: &'l mut PpuType) -> &'l mut [[Colour; 240]; 4] {
         if OBJ {
             &mut gg.ppu.obj_layers
         } else {

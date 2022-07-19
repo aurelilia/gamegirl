@@ -7,14 +7,13 @@
 use crate::{
     gga::{
         addr::{BG0CNT, BG0HOFS, BG0VOFS, BG2PA, BG3PA, DISPCNT},
-        graphics::{Ppu, BG0_EN},
-        GameGirlAdv,
+        graphics::{threading::PpuType, Ppu, BG0_EN},
     },
     numutil::{hword, word, NumExt},
 };
 
 impl Ppu {
-    pub fn render_mode0(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_mode0(gg: &mut PpuType, line: u16) {
         Self::render_objs::<0>(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
@@ -22,20 +21,20 @@ impl Ppu {
         Self::render_bg_text::<3>(gg, line);
     }
 
-    pub fn render_mode1(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_mode1(gg: &mut PpuType, line: u16) {
         Self::render_objs::<0>(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
     }
 
-    pub fn render_mode2(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_mode2(gg: &mut PpuType, line: u16) {
         Self::render_objs::<0>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
         Self::render_bg_affine::<3>(gg, BG3PA);
     }
 
-    fn render_bg_text<const IDX: u16>(gg: &mut GameGirlAdv, line: u16) {
+    fn render_bg_text<const IDX: u16>(gg: &mut PpuType, line: u16) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
         }
@@ -93,7 +92,7 @@ impl Ppu {
         }
     }
 
-    fn render_bg_affine<const IDX: u16>(gg: &mut GameGirlAdv, offset: u32) {
+    fn render_bg_affine<const IDX: u16>(gg: &mut PpuType, offset: u32) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
         }

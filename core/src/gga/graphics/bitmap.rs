@@ -7,14 +7,13 @@
 use crate::{
     gga::{
         addr::*,
-        graphics::{Ppu, BG2_EN, FRAME_SELECT},
-        GameGirlAdv,
+        graphics::{threading::PpuType, Ppu, BG2_EN, FRAME_SELECT},
     },
     numutil::NumExt,
 };
 
 impl Ppu {
-    pub fn render_mode3(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_mode3(gg: &mut PpuType, line: u16) {
         if !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
@@ -28,7 +27,7 @@ impl Ppu {
         Self::render_objs::<512>(gg, line);
     }
 
-    pub fn render_mode4(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_mode4(gg: &mut PpuType, line: u16) {
         if !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
@@ -45,7 +44,7 @@ impl Ppu {
         Self::render_objs::<512>(gg, line);
     }
 
-    pub fn render_mode5(gg: &mut GameGirlAdv, line: u16) {
+    pub fn render_mode5(gg: &mut PpuType, line: u16) {
         if line > 127 || !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
@@ -60,7 +59,7 @@ impl Ppu {
         Self::render_objs::<512>(gg, line);
     }
 
-    fn bitmap_start_addr(gg: &GameGirlAdv) -> usize {
+    fn bitmap_start_addr(gg: &PpuType) -> usize {
         if !gg[DISPCNT].is_bit(FRAME_SELECT) {
             0x0
         } else {

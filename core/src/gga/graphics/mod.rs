@@ -13,10 +13,12 @@ mod bitmap;
 mod objects;
 mod palette;
 mod render;
+pub mod threading;
 mod tile;
 
 use serde::{Deserialize, Serialize};
 
+use self::threading::PpuType;
 use super::memory::KB;
 use crate::{
     common::BorrowedSystem,
@@ -98,7 +100,7 @@ impl Ppu {
     pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: i32) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
-                Self::render_line(gg);
+                Self::render_line_maybe_threaded(gg);
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
                 Dmas::update_all(gg, DmaReason::HBlank);
 
@@ -126,7 +128,8 @@ impl Ppu {
                         Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                         Dmas::update_all(gg, DmaReason::VBlank);
                         Self::reload_affine_bgs(gg);
-                        gg.ppu.last_frame = Some(gg.ppu.pixels.to_vec());
+                        let mut ppu = gg.ppu();
+                        ppu.last_frame = Some(ppu.pixels.to_vec());
                     }
                     // VBlank flag gets set one scanline early
                     227 => gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false),
@@ -151,7 +154,19 @@ impl Ppu {
         }
     }
 
-    fn render_line(gg: &mut GameGirlAdv) {
+    #[cfg(not(feature = "threaded-ppu"))]
+    fn render_line_maybe_threaded(gg: &mut GameGirlAdv) {
+        Self::render_line(gg);
+    }
+
+    #[cfg(feature = "threaded-ppu")]
+    fn render_line_maybe_threaded(gg: &mut GameGirlAdv) {
+        let mut mmio = [0; 0x56 / 2];
+        mmio.copy_from_slice(&gg.memory.mmio[..0x56 / 2]);
+        gg.ppu.thread.render(mmio);
+    }
+
+    fn render_line(gg: &mut PpuType) {
         let line = gg[VCOUNT];
         if line >= 160 {
             return;
@@ -178,7 +193,7 @@ impl Ppu {
         Self::finish_line(gg, line);
     }
 
-    fn calc_windows(gg: &mut GameGirlAdv, line: u8) {
+    fn calc_windows(gg: &mut PpuType, line: u8) {
         let cnt = gg[DISPCNT];
         let win0_en = cnt.is_bit(WIN0_EN);
         let win1_en = cnt.is_bit(WIN1_EN);
@@ -243,7 +258,7 @@ impl Ppu {
         }
     }
 
-    fn finish_line(gg: &mut GameGirlAdv, line: u16) {
+    fn finish_line(gg: &mut PpuType, line: u16) {
         let start = line.us() * 240;
         let mut backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
 
@@ -254,15 +269,20 @@ impl Ppu {
             // Fast path: No blending
             Self::adjust_pixel(&mut backdrop);
 
-            'pixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
+            #[cfg(not(feature = "threaded-ppu"))]
+            let ppu = &mut gg.ppu;
+            #[cfg(feature = "threaded-ppu")]
+            let ppu = &mut *gg.ppu;
+
+            'pixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(240).enumerate() {
                 for prio in 0..4 {
-                    if gg.ppu.obj_layers[prio][x] != EMPTY {
-                        *pixel = gg.ppu.obj_layers[prio][x];
+                    if ppu.obj_layers[prio][x] != EMPTY {
+                        *pixel = ppu.obj_layers[prio][x];
                         Self::adjust_pixel(pixel);
                         continue 'pixels;
                     }
-                    if gg.ppu.bg_layers[prio][x] != EMPTY {
-                        *pixel = gg.ppu.bg_layers[prio][x];
+                    if ppu.bg_layers[prio][x] != EMPTY {
+                        *pixel = ppu.bg_layers[prio][x];
                         Self::adjust_pixel(pixel);
                         continue 'pixels;
                     }
@@ -309,17 +329,22 @@ impl Ppu {
                 gg[BLDY]
             };
 
-            'bldpixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
+            #[cfg(not(feature = "threaded-ppu"))]
+            let ppu = &mut gg.ppu;
+            #[cfg(feature = "threaded-ppu")]
+            let ppu = &mut *gg.ppu;
+
+            'bldpixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(240).enumerate() {
                 *pixel = EMPTY;
-                let enabled = gg.ppu.win_blend[x];
+                let enabled = ppu.win_blend[x];
 
                 let mut was_obj = false;
                 for prio in 0..4 {
-                    if gg.ppu.obj_layers[prio][x] != EMPTY {
+                    if ppu.obj_layers[prio][x] != EMPTY {
                         let done = Self::calc_pixel::<true>(
                             pixel,
                             enabled,
-                            gg.ppu.obj_layers[prio][x],
+                            ppu.obj_layers[prio][x],
                             blend_mode,
                             firsts[4],
                             seconds[4],
@@ -334,14 +359,12 @@ impl Ppu {
                     }
 
                     for bg in 0..4 {
-                        if enables[bg]
-                            && bg_prio[bg] == prio.u16()
-                            && gg.ppu.bg_pixels[bg][x] != EMPTY
+                        if enables[bg] && bg_prio[bg] == prio.u16() && ppu.bg_pixels[bg][x] != EMPTY
                         {
                             let done = Self::calc_pixel::<true>(
                                 pixel,
                                 enabled,
-                                gg.ppu.bg_pixels[bg][x],
+                                ppu.bg_pixels[bg][x],
                                 blend_mode,
                                 firsts[bg],
                                 seconds[bg],
@@ -436,10 +459,15 @@ impl Ppu {
     }
 
     fn reload_affine_bgs(gg: &mut GameGirlAdv) {
-        gg.ppu.bg_x[0] = Self::get_affine_offs(gg[BG2PA + 0x8], gg[BG2PA + 0xA]);
-        gg.ppu.bg_y[0] = Self::get_affine_offs(gg[BG2PA + 0xC], gg[BG2PA + 0xE]);
-        gg.ppu.bg_x[1] = Self::get_affine_offs(gg[BG3PA + 0x8], gg[BG3PA + 0xA]);
-        gg.ppu.bg_y[1] = Self::get_affine_offs(gg[BG3PA + 0xC], gg[BG3PA + 0xE]);
+        let bg_x0 = Self::get_affine_offs(gg[BG2PA + 0x8], gg[BG2PA + 0xA]);
+        let bg_y0 = Self::get_affine_offs(gg[BG2PA + 0xC], gg[BG2PA + 0xE]);
+        let bg_x1 = Self::get_affine_offs(gg[BG3PA + 0x8], gg[BG3PA + 0xA]);
+        let bg_y1 = Self::get_affine_offs(gg[BG3PA + 0xC], gg[BG3PA + 0xE]);
+        let mut ppu = gg.ppu();
+        ppu.bg_x[0] = bg_x0;
+        ppu.bg_y[0] = bg_y0;
+        ppu.bg_x[1] = bg_x1;
+        ppu.bg_y[1] = bg_y1;
     }
 
     #[inline]
