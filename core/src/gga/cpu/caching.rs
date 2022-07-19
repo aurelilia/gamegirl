@@ -24,7 +24,7 @@ impl Cache {
         match pc {
             0..=0x3FFF => Self::insert(&mut self.bios, pc >> 1, entry),
             0x800_0000..=0xDFF_FFFF => Self::insert(&mut self.rom, (pc - 0x800_0000) >> 1, entry),
-            _ => panic!("Not cacheable PC!"),
+            _ => (),
         }
     }
 
