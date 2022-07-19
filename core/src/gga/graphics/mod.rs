@@ -91,8 +91,9 @@ pub struct Ppu {
     bg_x: [i32; 2],
     bg_y: [i32; 2],
 
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(not(feature = "threaded-ppu"), serde(default))]
+    #[cfg_attr(not(feature = "threaded-ppu"), serde(skip))]
+    #[cfg(not(feature = "threaded-ppu"))]
     pub last_frame: Option<Vec<Colour>>,
 }
 
@@ -127,9 +128,9 @@ impl Ppu {
                         gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                         Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                         Dmas::update_all(gg, DmaReason::VBlank);
-                        Self::reload_affine_bgs(gg);
-                        let mut ppu = gg.ppu();
-                        ppu.last_frame = Some(ppu.pixels.to_vec());
+
+                        let frame = Self::end_frame(gg);
+                        gg.ppu.last_frame = Some(frame);
                     }
                     // VBlank flag gets set one scanline early
                     227 => gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false),
@@ -458,7 +459,8 @@ impl Ppu {
         [r.u8(), g.u8(), b.u8(), 255]
     }
 
-    fn reload_affine_bgs(gg: &mut GameGirlAdv) {
+    fn end_frame(gg: &mut GameGirlAdv) -> Vec<Colour> {
+        // Reload affine backgrounds
         let bg_x0 = Self::get_affine_offs(gg[BG2PA + 0x8], gg[BG2PA + 0xA]);
         let bg_y0 = Self::get_affine_offs(gg[BG2PA + 0xC], gg[BG2PA + 0xE]);
         let bg_x1 = Self::get_affine_offs(gg[BG3PA + 0x8], gg[BG3PA + 0xA]);
@@ -468,6 +470,8 @@ impl Ppu {
         ppu.bg_y[0] = bg_y0;
         ppu.bg_x[1] = bg_x1;
         ppu.bg_y[1] = bg_y1;
+
+        ppu.pixels.to_vec()
     }
 
     #[inline]
@@ -494,6 +498,8 @@ impl Default for Ppu {
             obj_layers: serde_layer_arr(),
             win_masks: serde_mask_arr(),
             win_blend: serde_mask2_arr(),
+
+            #[cfg(not(feature = "threaded-ppu"))]
             last_frame: None,
         }
     }

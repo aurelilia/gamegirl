@@ -91,10 +91,10 @@ impl GameGirlAdv {
     /// Step until the PPU has finished producing the current frame.
     /// Only used for rewinding since it causes audio desync very easily.
     pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
-        while self.options.running && self.ppu().last_frame == None {
+        while self.options.running && self.ppu.last_frame == None {
             self.advance();
         }
-        self.ppu().last_frame.take()
+        self.ppu.last_frame.take()
     }
 
     /// Produce the next audio samples and write them to the given buffer.

@@ -37,6 +37,7 @@ mod inner {
     use crate::{
         gga::{graphics::Ppu, GameGirlAdv},
         numutil::NumExt,
+        Colour,
     };
 
     pub type PpuType<'t> = Threaded<'t>;
@@ -72,12 +73,17 @@ mod inner {
     pub fn new_ppu() -> GgaPpu {
         let ppu = Arc::new(Mutex::new(Ppu::default()));
         let thread = RenderThread::new(&ppu);
-        GgaPpu { ppu, thread }
+        GgaPpu {
+            ppu,
+            thread,
+            last_frame: None,
+        }
     }
 
     pub struct GgaPpu {
         pub ppu: Arc<Mutex<Ppu>>,
         pub thread: RenderThread,
+        pub last_frame: Option<Vec<Colour>>,
     }
 
     impl<'de> Deserialize<'de> for GgaPpu {
@@ -87,7 +93,11 @@ mod inner {
         {
             let ppu = Arc::<Mutex<Ppu>>::deserialize(deserializer)?;
             let thread = RenderThread::new(&ppu);
-            Ok(GgaPpu { ppu, thread })
+            Ok(GgaPpu {
+                ppu,
+                thread,
+                last_frame: None,
+            })
         }
     }
 
