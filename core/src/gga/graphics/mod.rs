@@ -82,6 +82,9 @@ pub struct Ppu {
     #[serde(skip)]
     #[serde(default = "serde_mask_arr")]
     win_masks: [WindowMask; 5],
+    #[serde(skip)]
+    #[serde(default = "serde_mask2_arr")]
+    win_blend: [bool; 240],
 
     bg_x: [i32; 2],
     bg_y: [i32; 2],
@@ -183,6 +186,7 @@ impl Ppu {
         if !win0_en && !win1_en && !win_obj_en {
             // No windows enabled, allow everything to draw
             gg.ppu.win_masks = serde_mask_arr();
+            gg.ppu.win_blend = serde_mask2_arr();
             return;
         }
 
@@ -195,6 +199,8 @@ impl Ppu {
             let enable = wout.is_bit(mask);
             gg.ppu.win_masks[mask.us()] = [enable; 240];
         }
+        let blend = wout.is_bit(5);
+        gg.ppu.win_blend = [blend; 240];
 
         // Do window 1 first, since it has lower priority and we want
         // window 0 to overwrite it
@@ -218,6 +224,10 @@ impl Ppu {
                 for pixel in x1..x2 {
                     gg.ppu.win_masks[mask.us()][pixel.us()] = enable;
                 }
+            }
+            let blend = win.is_bit(win_offs + 5);
+            for pixel in x1..x2 {
+                gg.ppu.win_blend[pixel.us()] = blend;
             }
         }
     }
@@ -301,11 +311,14 @@ impl Ppu {
 
             'bldpixels: for (x, pixel) in gg.ppu.pixels[start..].iter_mut().take(240).enumerate() {
                 *pixel = EMPTY;
+                let enabled = gg.ppu.win_blend[x];
+
                 let mut was_obj = false;
                 for prio in 0..4 {
                     if gg.ppu.obj_layers[prio][x] != EMPTY {
                         let done = Self::calc_pixel::<true>(
                             pixel,
+                            enabled,
                             gg.ppu.obj_layers[prio][x],
                             blend_mode,
                             firsts[4],
@@ -327,6 +340,7 @@ impl Ppu {
                         {
                             let done = Self::calc_pixel::<true>(
                                 pixel,
+                                enabled,
                                 gg.ppu.bg_pixels[bg][x],
                                 blend_mode,
                                 firsts[bg],
@@ -344,7 +358,7 @@ impl Ppu {
 
                 // No matching pixel found...
                 Self::calc_pixel::<true>(
-                    pixel, backdrop, blend_mode, firsts[5], seconds[5], was_obj, bld,
+                    pixel, enabled, backdrop, blend_mode, firsts[5], seconds[5], was_obj, bld,
                 );
             }
 
@@ -361,6 +375,7 @@ impl Ppu {
 
     fn calc_pixel<const OBJ: bool>(
         pixel: &mut Colour,
+        enabled: bool,
         colour: Colour,
         blend_mode: u16,
         first: bool,
@@ -368,8 +383,14 @@ impl Ppu {
         was_obj: bool,
         bld: u16,
     ) -> bool {
-        match blend_mode {
-            1 => {
+        match () {
+            _ if !enabled => {
+                // Blending disabled here, can be with windowing
+                *pixel = colour;
+                true
+            }
+
+            _ if (was_obj && second) || blend_mode == 1 => {
                 // Regular alphablend.
                 if *pixel != EMPTY {
                     if second {
@@ -444,6 +465,7 @@ impl Default for Ppu {
             bg_pixels: serde_layer_arr(),
             obj_layers: serde_layer_arr(),
             win_masks: serde_mask_arr(),
+            win_blend: serde_mask2_arr(),
             last_frame: None,
         }
     }
@@ -457,6 +479,9 @@ fn serde_layer_arr() -> [Layer; 4] {
 }
 fn serde_mask_arr() -> [WindowMask; 5] {
     [[true; 240]; 5]
+}
+fn serde_mask2_arr() -> [bool; 240] {
+    [true; 240]
 }
 
 const EMPTY: Colour = [0, 0, 0, 0];

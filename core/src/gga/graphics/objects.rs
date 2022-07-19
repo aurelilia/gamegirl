@@ -238,6 +238,7 @@ impl Ppu {
             let enable = wout.is_bit(8 + mask);
             gg.ppu.win_masks[mask.us()][pixel as usize] = enable;
         }
+        gg.ppu.win_blend[pixel as usize] = wout.is_bit(8 + 5);
     }
 }
 

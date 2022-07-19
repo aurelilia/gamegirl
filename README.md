@@ -92,7 +92,7 @@ minor graphical glitches.
     - [x] Blending
     - [x] Affine BGs/objects
     - [x] Windows
-    - [ ] Window blending
+    - [x] Window blending
     - [ ] Semi-transparent OBJs
   - [x] APU
     - [x] CGB sound channels
