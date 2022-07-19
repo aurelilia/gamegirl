@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 pub struct Scheduler<E: Kind> {
     /// Current time of the scheduler.
     time: u32,
+    /// Time of the next event.
+    next: u32,
     /// Events currently awaiting execution.
     #[serde(bound = "")]
     events: ArrayVec<ScheduledEvent<E>, 16>,
@@ -43,11 +45,13 @@ impl<E: Kind> Scheduler<E> {
                 self.events[idx] = other;
             } else {
                 self.events[idx] = event;
+                self.next = self.events.last().unwrap().execute_at;
                 return;
             }
         }
         // The loop exited without finding a bigger element, this new one is the biggest
         self.events[0] = event;
+        self.next = self.events.last().unwrap().execute_at;
 
         // We run this here since it is probably the least-run function.
         // We want to check the time as little as possible to save perf.
@@ -64,10 +68,11 @@ impl<E: Kind> Scheduler<E> {
     /// Note that this implementation assumes there is always at least one event
     /// scheduled.
     pub fn get_next_pending(&mut self) -> Option<Event<E>> {
-        let idx = self.events.len() - 1;
-        let event = self.events[idx];
-        if event.execute_at <= self.time {
+        if self.next <= self.time {
+            let idx = self.events.len() - 1;
+            let event = self.events[idx];
             unsafe { self.events.set_len(idx) };
+            self.next = self.events.last().unwrap().execute_at;
             Some(Event {
                 kind: event.kind,
                 late_by: (self.time - event.execute_at) as i32,
@@ -77,12 +82,17 @@ impl<E: Kind> Scheduler<E> {
         }
     }
 
+    pub fn has_events(&self) -> bool {
+        self.next <= self.time
+    }
+
     /// Return the next event immediately, and set the current time to
     /// the event's execution time. This is useful during HALT or similar
     /// states.
     pub fn pop(&mut self) -> Event<E> {
         let event = self.events.pop().unwrap();
         self.time = event.execute_at;
+        self.next = self.events.last().unwrap().execute_at;
         Event {
             kind: event.kind,
             late_by: 0,
@@ -93,6 +103,7 @@ impl<E: Kind> Scheduler<E> {
     /// Somewhat expensive.
     pub fn cancel(&mut self, evt: E) {
         self.events.retain(|e| e.kind != evt);
+        self.next = self.events.last().unwrap().execute_at;
     }
 
     pub fn now(&self) -> u32 {

@@ -273,11 +273,6 @@ impl Cpu {
     }
 
     #[inline]
-    fn inc_pc(&mut self) {
-        self.inc_pc_by(self.inst_size());
-    }
-
-    #[inline]
     fn inc_pc_by(&mut self, count: u32) {
         self.registers[15] = self.registers[15].wrapping_add(count);
     }
