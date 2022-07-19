@@ -261,13 +261,14 @@ impl Cpu {
         gg.memory.prefetch_len = 0; // Discard prefetch
         if gg.cpu.flag(Thumb) {
             gg.cpu.pipeline[0] = gg.read_hword(gg.cpu.pc(), Access::NonSeq);
-            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc() + 2, Access::Seq);
+            gg.cpu.inc_pc_by(2);
+            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc(), Access::Seq);
         } else {
             gg.cpu.pipeline[0] = gg.read_word(gg.cpu.pc(), Access::NonSeq);
-            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc() + 4, Access::Seq);
+            gg.cpu.inc_pc_by(4);
+            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc(), Access::Seq);
         };
         gg.cpu.access_type = Access::Seq;
-        gg.cpu.inc_pc();
         gg.cpu.block_ended = true;
     }
 
