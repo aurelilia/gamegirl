@@ -349,6 +349,7 @@ impl GameGirlAdv {
 
             _ => self.set(addr, value, |_this, _addr, _value| ()),
         }
+        self.cpu.cache.write(addr);
     }
 
     /// Write a half-word from the bus (LE). Does no timing-related things;
@@ -376,6 +377,7 @@ impl GameGirlAdv {
 
             _ => (),
         });
+        self.cpu.cache.write(addr);
     }
 
     /// Write a word from the bus (LE). Does no timing-related things; simply
@@ -399,6 +401,7 @@ impl GameGirlAdv {
 
             _ => (),
         });
+        self.cpu.cache.write(addr);
     }
 
     fn set_mmio(&mut self, addr: u32, value: u16) {

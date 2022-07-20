@@ -153,7 +153,11 @@ impl Cpu {
                     inst,
                     handler,
                     sn_cycles,
-                })
+                });
+                if Cache::force_end_block(gg.cpu.pc()) {
+                    // Block is in IWRAM and hit a page boundary, finish the block
+                    break;
+                }
             }
             gg.cpu
                 .cache
@@ -179,6 +183,10 @@ impl Cpu {
                     handler,
                     sn_cycles,
                 });
+                if Cache::force_end_block(gg.cpu.pc()) {
+                    // Block is in IWRAM and hit a page boundary, finish the block
+                    break;
+                }
             }
             gg.cpu.cache.put(start_pc, CacheEntry::Arm(Arc::new(block)));
         }
