@@ -6,11 +6,14 @@
 
 use std::fmt::UpperHex;
 
-use crate::gga::{
-    cpu::{registers::Flag::*, Cpu, Exception},
-    Access,
-    Access::NonSeq,
-    GameGirlAdv,
+use crate::{
+    gga::{
+        cpu::{Cpu, Exception},
+        Access,
+        Access::NonSeq,
+        GameGirlAdv,
+    },
+    numutil::NumExt,
 };
 
 impl GameGirlAdv {
@@ -86,24 +89,30 @@ impl GameGirlAdv {
 
 impl Cpu {
     pub fn eval_condition(&self, cond: u16) -> bool {
-        match cond {
-            0xE => true,                                                        // BAL
-            0x0 => self.flag(Zero),                                             // BEQ
-            0x1 => !self.flag(Zero),                                            // BNE
-            0x2 => self.flag(Carry),                                            // BCS/BHS
-            0x3 => !self.flag(Carry),                                           // BCC/BLO
-            0x4 => self.flag(Neg),                                              // BMI
-            0x5 => !self.flag(Neg),                                             // BPL
-            0x6 => self.flag(Overflow),                                         // BVS
-            0x7 => !self.flag(Overflow),                                        // BVC
-            0x8 => !self.flag(Zero) && self.flag(Carry),                        // BHI
-            0x9 => !self.flag(Carry) || self.flag(Zero),                        // BLS
-            0xA => self.flag(Neg) == self.flag(Overflow),                       // BGE
-            0xB => self.flag(Neg) != self.flag(Overflow),                       // BLT
-            0xC => !self.flag(Zero) && (self.flag(Neg) == self.flag(Overflow)), // BGT
-            0xD => self.flag(Zero) || (self.flag(Neg) != self.flag(Overflow)),  // BLE
-            _ => false,                                                         // BNV
-        }
+        // This condition table is taken from mGBA sources, which are licensed under
+        // MPL2 at https://github.com/mgba-emu/mgba
+        // Thank you to endrift and other mGBA contributors!
+        const COND_MASKS: [u16; 16] = [
+            0xF0F0, // EQ [-Z--]
+            0x0F0F, // NE [-z--]
+            0xCCCC, // CS [--C-]
+            0x3333, // CC [--c-]
+            0xFF00, // MI [N---]
+            0x00FF, // PL [n---]
+            0xAAAA, // VS [---V]
+            0x5555, // VC [---v]
+            0x0C0C, // HI [-zC-]
+            0xF3F3, // LS [-Z--] || [--c-]
+            0xAA55, // GE [N--V] || [n--v]
+            0x55AA, // LT [N--v] || [n--V]
+            0x0A05, // GT [Nz-V] || [nz-v]
+            0xF5FA, // LE [-Z--] || [Nz-v] || [nz-V]
+            0xFFFF, // AL [----]
+            0x0000, // NV
+        ];
+
+        let flags = self.cpsr >> 28;
+        (COND_MASKS[cond.us()] & (1 << flags)) != 0
     }
 
     pub fn condition_mnemonic(cond: u16) -> &'static str {

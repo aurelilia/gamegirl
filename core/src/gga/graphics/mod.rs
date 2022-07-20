@@ -128,14 +128,13 @@ impl Ppu {
                         gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                         Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
                         Dmas::update_all(gg, DmaReason::VBlank);
-
-                        let frame = Self::end_frame(gg);
-                        gg.ppu.last_frame = Some(frame);
                     }
                     // VBlank flag gets set one scanline early
                     227 => gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false),
                     228 => {
                         gg[VCOUNT] = 0;
+                        let frame = Self::end_frame(gg);
+                        gg.ppu.last_frame = Some(frame);
                         (gg.options.frame_finished)(BorrowedSystem::GGA(gg));
                     }
                     _ => (),
@@ -277,12 +276,12 @@ impl Ppu {
 
             'pixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(240).enumerate() {
                 for prio in 0..4 {
-                    if ppu.obj_layers[prio][x] != EMPTY {
+                    if ppu.obj_layers[prio][x][3] != EMPTY_A {
                         *pixel = ppu.obj_layers[prio][x];
                         Self::adjust_pixel(pixel);
                         continue 'pixels;
                     }
-                    if ppu.bg_layers[prio][x] != EMPTY {
+                    if ppu.bg_layers[prio][x][3] != EMPTY_A {
                         *pixel = ppu.bg_layers[prio][x];
                         Self::adjust_pixel(pixel);
                         continue 'pixels;
@@ -311,18 +310,17 @@ impl Ppu {
                 bldcnt.is_bit(13),
             ];
             let cnt = gg[DISPCNT];
-            let enables = [
-                cnt.is_bit(BG0_EN),
-                cnt.is_bit(BG0_EN + 1),
-                cnt.is_bit(BG0_EN + 2),
-                cnt.is_bit(BG0_EN + 3),
-            ];
-            let bg_prio = [
+            let mut bg_prio = [
                 gg[BG0CNT] & 3,
                 gg[BG0CNT + 2] & 3,
                 gg[BG0CNT + 4] & 3,
                 gg[BG0CNT + 6] & 3,
             ];
+            for i in 0..4 {
+                if !cnt.is_bit(BG0_EN + i) {
+                    bg_prio[i.us()] = 42;
+                }
+            }
 
             let bld = if blend_mode == 1 {
                 gg[BLDALPHA]
@@ -336,12 +334,12 @@ impl Ppu {
             let ppu = &mut *gg.ppu;
 
             'bldpixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(240).enumerate() {
-                *pixel = EMPTY;
+                pixel[3] = EMPTY_A;
                 let enabled = ppu.win_blend[x];
 
                 let mut was_obj = false;
                 for prio in 0..4 {
-                    if ppu.obj_layers[prio][x] != EMPTY {
+                    if ppu.obj_layers[prio][x][3] != EMPTY_A {
                         let done = Self::calc_pixel::<true>(
                             pixel,
                             enabled,
@@ -360,8 +358,7 @@ impl Ppu {
                     }
 
                     for bg in 0..4 {
-                        if enables[bg] && bg_prio[bg] == prio.u16() && ppu.bg_pixels[bg][x] != EMPTY
-                        {
+                        if bg_prio[bg] == prio.u16() && ppu.bg_pixels[bg][x][3] != EMPTY_A {
                             let done = Self::calc_pixel::<true>(
                                 pixel,
                                 enabled,
@@ -416,7 +413,7 @@ impl Ppu {
 
             _ if (was_obj && second) || blend_mode == 1 => {
                 // Regular alphablend.
-                if *pixel != EMPTY {
+                if pixel[3] != EMPTY_A {
                     if second {
                         *pixel = Self::blend_pixel(*pixel, colour, bld.bits(0, 5), bld.bits(8, 5));
                     }
@@ -519,3 +516,4 @@ fn serde_mask2_arr() -> [bool; 240] {
 }
 
 const EMPTY: Colour = [0, 0, 0, 0];
+const EMPTY_A: u8 = 0;

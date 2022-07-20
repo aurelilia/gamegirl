@@ -54,15 +54,39 @@ fn main() {
             Command::new("bench")
                 .description("Run a benchmark ROM")
                 .usage("tests bench")
-                .action(|_| {
+                .flag(
+                    Flag::new("measure", FlagType::Bool)
+                        .description("Reset the console every 30 seconds and measure"),
+                )
+                .action(|c| {
                     let mut gg = System::default();
                     gg.load_cart(
                         include_bytes!("../../bench.gb").to_vec(),
                         None,
                         &SystemConfig::default(),
                     );
-                    for _ in 0..30 {
-                        gg.advance_delta(1.0);
+
+                    if c.bool_flag("measure") {
+                        let mut times = Vec::new();
+                        loop {
+                            let start = Instant::now();
+                            for _ in 0..30 {
+                                gg.advance_delta(1.0);
+                            }
+                            let time_taken = start.elapsed().as_secs_f64();
+                            times.push(time_taken);
+                            let avg: f64 =
+                                times.iter().copied().fold(0.0, |t, a| t + a) / times.len() as f64;
+                            println!(
+                                "Run {}: Took {time_taken:.2}s, average is now {avg:.2}s",
+                                times.len()
+                            );
+                            gg.reset();
+                        }
+                    } else {
+                        for _ in 0..120 {
+                            gg.advance_delta(1.0);
+                        }
                     }
                 }),
         )

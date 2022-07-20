@@ -47,6 +47,7 @@ pub struct Cpu {
     pub(crate) access_type: Access,
 
     block_ended: bool,
+    pipeline_valid: bool,
     #[serde(default)]
     #[serde(skip)]
     pub(crate) cache: Cache,
@@ -58,8 +59,8 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    /// Execute the next instruction and advance the scheduler.
-    pub fn exec_next_inst(gg: &mut GameGirlAdv) {
+    /// Advance emulation..
+    pub fn continue_running(gg: &mut GameGirlAdv) {
         if !gg.debugger.should_execute(gg.cpu.pc()) {
             gg.options.running = false; // Pause emulation, we hit a BP
             return;
@@ -74,8 +75,13 @@ impl Cpu {
                 return;
             }
         }
+        Self::execute_next_inst(gg);
+    }
 
+    /// Execute the next instruction and advance the scheduler.
+    fn execute_next_inst(gg: &mut GameGirlAdv) {
         gg.advance_clock();
+        Self::ensure_pipeline_valid(gg);
         if gg.cpu.flag(Thumb) {
             let (inst, _) = Self::fetch_next_inst::<2, true>(gg);
             gg.execute_inst_thumb(inst.u16());
@@ -87,6 +93,8 @@ impl Cpu {
 
     fn run_cache(gg: &mut GameGirlAdv, cache: CacheEntry) {
         gg.cpu.block_ended = false;
+        gg.cpu.pipeline_valid = false;
+
         match cache {
             CacheEntry::Arm(cache) => {
                 assert!(!gg.cpu.flag(Thumb));
@@ -121,21 +129,6 @@ impl Cpu {
                 }
             }
         }
-
-        if !gg.cpu.block_ended {
-            // The block ended on a branch instruction that wasn't taken
-            // and so the pipeline contents were not flushed.
-            // This means that we need to restore correct pipeline state
-            // to ensure the code after the block doesn't end up executing
-            // a stale/incorrect pipeline from before the cached block
-            if gg.cpu.flag(Thumb) {
-                gg.cpu.pipeline[0] = gg.get_hword(gg.cpu.pc() - 2).u32();
-                gg.cpu.pipeline[1] = gg.get_hword(gg.cpu.pc()).u32();
-            } else {
-                gg.cpu.pipeline[0] = gg.get_word(gg.cpu.pc() - 4);
-                gg.cpu.pipeline[1] = gg.get_word(gg.cpu.pc());
-            };
-        }
     }
 
     fn try_make_cache(gg: &mut GameGirlAdv) {
@@ -145,6 +138,7 @@ impl Cpu {
             let mut block = Vec::with_capacity(5);
             while !gg.cpu.block_ended {
                 gg.advance_clock();
+                Self::ensure_pipeline_valid(gg);
                 if gg.cpu.block_ended {
                     // CPU got interrupted by system, discard the block
                     return;
@@ -168,6 +162,7 @@ impl Cpu {
             let mut block = Vec::with_capacity(5);
             while !gg.cpu.block_ended {
                 gg.advance_clock();
+                Self::ensure_pipeline_valid(gg);
                 if gg.cpu.block_ended {
                     // CPU got interrupted by system, discard the block
                     return;
@@ -260,16 +255,35 @@ impl Cpu {
     pub fn pipeline_stall(gg: &mut GameGirlAdv) {
         gg.memory.prefetch_len = 0; // Discard prefetch
         if gg.cpu.flag(Thumb) {
-            gg.cpu.pipeline[0] = gg.read_hword(gg.cpu.pc(), Access::NonSeq);
+            let time = gg.wait_time::<2>(gg.cpu.pc(), Access::NonSeq);
+            gg.add_sn_cycles(time);
             gg.cpu.inc_pc_by(2);
-            gg.cpu.pipeline[1] = gg.read_hword(gg.cpu.pc(), Access::Seq);
+            let time = gg.wait_time::<2>(gg.cpu.pc(), Access::Seq);
+            gg.add_sn_cycles(time);
         } else {
-            gg.cpu.pipeline[0] = gg.read_word(gg.cpu.pc(), Access::NonSeq);
+            let time = gg.wait_time::<4>(gg.cpu.pc(), Access::NonSeq);
+            gg.add_sn_cycles(time);
             gg.cpu.inc_pc_by(4);
-            gg.cpu.pipeline[1] = gg.read_word(gg.cpu.pc(), Access::Seq);
+            let time = gg.wait_time::<4>(gg.cpu.pc(), Access::Seq);
+            gg.add_sn_cycles(time);
         };
         gg.cpu.access_type = Access::Seq;
         gg.cpu.block_ended = true;
+        gg.cpu.pipeline_valid = false;
+    }
+
+    fn ensure_pipeline_valid(gg: &mut GameGirlAdv) {
+        if gg.cpu.pipeline_valid {
+            return;
+        }
+        if gg.cpu.flag(Thumb) {
+            gg.cpu.pipeline[0] = gg.get_hword(gg.cpu.pc() - 2).u32();
+            gg.cpu.pipeline[1] = gg.get_hword(gg.cpu.pc()).u32();
+        } else {
+            gg.cpu.pipeline[0] = gg.get_word(gg.cpu.pc() - 4);
+            gg.cpu.pipeline[1] = gg.get_word(gg.cpu.pc());
+        }
+        gg.cpu.pipeline_valid = true;
     }
 
     #[inline]
@@ -310,6 +324,7 @@ impl Default for Cpu {
             pipeline: [0; 2],
             access_type: Access::NonSeq,
             block_ended: false,
+            pipeline_valid: false,
             cache: Cache::default(),
 
             #[cfg(feature = "instruction-tracing")]

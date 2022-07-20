@@ -13,11 +13,11 @@ impl Cpu {
     /// Logical/Arithmetic shift left
     pub fn lsl<const CPSR: bool>(&mut self, value: u32, by: u32) -> u32 {
         if by == 0 {
-            self.set_zn::<CPSR>(value);
+            self.set_nz::<CPSR>(value);
             value
         } else {
             let res = value.wshl(by);
-            self.set_znc::<CPSR>(res, value.wshr(32u32.wrapping_sub(by)).is_bit(0));
+            self.set_nzc::<CPSR>(res, value.wshr(32u32.wrapping_sub(by)).is_bit(0));
             res
         }
     }
@@ -26,14 +26,14 @@ impl Cpu {
     pub fn lsr<const CPSR: bool, const COERCE: bool>(&mut self, value: u32, by: u32) -> u32 {
         if by == 0 && COERCE {
             let res = value.wshr(32);
-            self.set_znc::<CPSR>(res, value.wshr(31).is_bit(0));
+            self.set_nzc::<CPSR>(res, value.wshr(31).is_bit(0));
             res
         } else if by == 0 {
-            self.set_zn::<CPSR>(value);
+            self.set_nz::<CPSR>(value);
             value
         } else {
             let res = value.wshr(by);
-            self.set_znc::<CPSR>(res, value.wshr(by.saturating_sub(1)).is_bit(0));
+            self.set_nzc::<CPSR>(res, value.wshr(by.saturating_sub(1)).is_bit(0));
             res
         }
     }
@@ -42,14 +42,14 @@ impl Cpu {
     pub fn asr<const CPSR: bool, const COERCE: bool>(&mut self, value: u32, by: u32) -> u32 {
         if by == 0 && COERCE {
             let res = (value as i32).checked_shr(32).unwrap_or(value as i32 >> 31) as u32;
-            self.set_znc::<CPSR>(res, (value as i32).checked_shr(31).unwrap_or(0) & 1 == 1);
+            self.set_nzc::<CPSR>(res, (value as i32).checked_shr(31).unwrap_or(0) & 1 == 1);
             res
         } else if by == 0 {
-            self.set_zn::<CPSR>(value);
+            self.set_nz::<CPSR>(value);
             value
         } else {
             let res = (value as i32).checked_shr(by).unwrap_or(value as i32 >> 31) as u32;
-            self.set_znc::<CPSR>(
+            self.set_nzc::<CPSR>(
                 res,
                 (value as i32)
                     .checked_shr(by.saturating_sub(1))
@@ -65,14 +65,14 @@ impl Cpu {
     pub fn ror<const CPSR: bool, const COERCE: bool>(&mut self, value: u32, by: u32) -> u32 {
         if by == 0 && COERCE {
             let res = Self::ror_s0(value, 1).set_bit(31, self.flag(Flag::Carry));
-            self.set_znc::<CPSR>(res, value.is_bit(0));
+            self.set_nzc::<CPSR>(res, value.is_bit(0));
             res
         } else {
             let res = Self::ror_s0(value, by & 31);
             if by == 0 {
-                self.set_zn::<CPSR>(res);
+                self.set_nz::<CPSR>(res);
             } else {
-                self.set_znc::<CPSR>(res, res.is_bit(31));
+                self.set_nzc::<CPSR>(res, res.is_bit(31));
             }
             res
         }
@@ -86,7 +86,7 @@ impl Cpu {
     /// Addition
     pub fn add<const CPSR: bool>(&mut self, rs: u32, rn: u32) -> u32 {
         let res = rs.wrapping_add(rn);
-        self.set_znc::<CPSR>(res, (rs as u64) + (rn as u64) > 0xFFFF_FFFF);
+        self.set_nzc::<CPSR>(res, (rs as u64) + (rn as u64) > 0xFFFF_FFFF);
         self.set_flag_cpsr::<CPSR>(Flag::Overflow, (rs as i32).overflowing_add(rn as i32).1);
         res
     }
@@ -94,7 +94,7 @@ impl Cpu {
     /// Subtraction
     pub fn sub<const CPSR: bool>(&mut self, rs: u32, rn: u32) -> u32 {
         let res = rs.wrapping_sub(rn);
-        self.set_znc::<CPSR>(res, rn <= rs);
+        self.set_nzc::<CPSR>(res, rn <= rs);
         self.set_flag_cpsr::<CPSR>(Flag::Overflow, (rs as i32).overflowing_sub(rn as i32).1);
         res
     }
@@ -102,7 +102,7 @@ impl Cpu {
     /// Addition (c -> Carry)
     pub fn adc<const CPSR: bool>(&mut self, rs: u32, rn: u32, c: u32) -> u32 {
         let res = (rs as u64) + (rn as u64) + (c as u64);
-        self.set_zn::<CPSR>(res as u32);
+        self.set_nz::<CPSR>(res as u32);
         self.set_flag_cpsr::<CPSR>(Flag::Carry, res > 0xFFFF_FFFF);
         self.set_flag_cpsr::<CPSR>(
             Flag::Overflow,
@@ -119,28 +119,28 @@ impl Cpu {
     /// Multiplication
     pub fn mul<const CPSR: bool>(&mut self, a: u32, b: u32) -> u32 {
         let res = a.wrapping_mul(b);
-        self.set_znc::<CPSR>(res, false);
+        self.set_nzc::<CPSR>(res, false);
         res
     }
 
     /// Logic AND
     pub fn and<const CPSR: bool>(&mut self, a: u32, b: u32) -> u32 {
         let res = a & b;
-        self.set_zn::<CPSR>(res);
+        self.set_nz::<CPSR>(res);
         res
     }
 
     /// Logic OR
     pub fn or<const CPSR: bool>(&mut self, a: u32, b: u32) -> u32 {
         let res = a | b;
-        self.set_zn::<CPSR>(res);
+        self.set_nz::<CPSR>(res);
         res
     }
 
     /// Logic XOR
     pub fn xor<const CPSR: bool>(&mut self, a: u32, b: u32) -> u32 {
         let res = a ^ b;
-        self.set_zn::<CPSR>(res);
+        self.set_nz::<CPSR>(res);
         res
     }
 
@@ -153,7 +153,7 @@ impl Cpu {
     /// Not
     pub fn not<const CPSR: bool>(&mut self, value: u32) -> u32 {
         let val = value ^ u32::MAX;
-        self.set_zn::<CPSR>(val);
+        self.set_nz::<CPSR>(val);
         val
     }
 
@@ -162,17 +162,20 @@ impl Cpu {
         self.sub::<CPSR>(0, value)
     }
 
-    pub fn set_zn<const CPSR: bool>(&mut self, value: u32) {
+    pub fn set_nz<const CPSR: bool>(&mut self, value: u32) {
         if CPSR {
-            self.set_flag_cpsr::<CPSR>(Flag::Zero, value == 0);
-            self.set_flag_cpsr::<CPSR>(Flag::Neg, value.is_bit(31));
+            let neg = value & (1 << 31);
+            let zero = ((value == 0) as u32) << 30;
+            self.cpsr = (self.cpsr & 0x3FFF_FFFF) | zero | neg;
         }
     }
 
-    fn set_znc<const CPSR: bool>(&mut self, value: u32, carry: bool) {
+    fn set_nzc<const CPSR: bool>(&mut self, value: u32, carry: bool) {
         if CPSR {
-            self.set_zn::<CPSR>(value);
-            self.set_flag_cpsr::<CPSR>(Flag::Carry, carry);
+            let neg = value & (1 << 31);
+            let zero = ((value == 0) as u32) << 30;
+            let carry = (carry as u32) << 29;
+            self.cpsr = (self.cpsr & 0x1FFF_FFFF) | zero | neg | carry;
         }
     }
 

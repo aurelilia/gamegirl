@@ -505,7 +505,7 @@ impl GameGirlAdv {
             }
             0xC => self.cpu.or::<CPSR>(reg_a, b),
             0xD => {
-                self.cpu.set_zn::<CPSR>(b);
+                self.cpu.set_nz::<CPSR>(b);
                 b
             } // MOV
             0xE => self.cpu.bit_clear::<CPSR>(reg_a, b),

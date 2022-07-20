@@ -145,7 +145,7 @@ impl GameGirlAdv {
 
     /// Step forward the emulated console including all subsystems.
     pub fn advance(&mut self) {
-        Cpu::exec_next_inst(self)
+        Cpu::continue_running(self)
     }
 
     /// Advance everything but the CPU by a clock cycle.

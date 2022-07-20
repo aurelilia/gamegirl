@@ -137,7 +137,7 @@ impl GameGirlAdv {
         let n = inst.0 & 0xFF;
         match KIND {
             "MOV" => {
-                self.cpu.set_zn::<true>(n.u32());
+                self.cpu.set_nz::<true>(n.u32());
                 self.cpu.registers[d.us()] = n.u32();
             }
             "CMP" => {

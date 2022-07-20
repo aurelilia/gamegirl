@@ -101,6 +101,12 @@ pub enum Flag {
     Thumb = 5,
 }
 
+impl Flag {
+    pub fn mask(self) -> u16 {
+        1 << self as u16
+    }
+}
+
 impl Cpu {
     #[inline]
     pub fn sp(&self) -> u32 {
