@@ -426,9 +426,18 @@ impl GameGirlAdv {
                 }
             }
             WAITCNT => {
+                let prev = self[a];
                 self[a] = value;
-                self.memory.prefetch_len = 0;
-                self.update_wait_times();
+                // Only update things as needed
+                if value.bits(0, 11) != prev.bits(0, 11) {
+                    self.update_wait_times();
+                }
+                if value.bit(14) != prev.bit(14) {
+                    self.memory.prefetch_len = 0;
+                    self.cpu.cache.invalidate_rom();
+                } else if value.bits(2, 9) != prev.bits(2, 9) {
+                    self.cpu.cache.invalidate_rom();
+                }
             }
 
             // DMA Audio

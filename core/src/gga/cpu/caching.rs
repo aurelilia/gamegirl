@@ -63,12 +63,23 @@ impl Cache {
     }
 
     pub fn write(&mut self, addr: u32) {
-        if (0x300_0000..=IWRAM_END).contains(&addr) {
+        if !self.iwram.is_empty() && (0x300_0000..=IWRAM_END).contains(&addr) {
             let location = (addr & 0x7FFF) >> 1;
             for entry in self.iwram_cache_indices[location.us() / IWRAM_PAGE_SIZE.us()].drain(..) {
                 self.iwram[entry.us()] = None;
             }
         }
+    }
+
+    pub fn invalidate_rom(&mut self) {
+        if self.bios.is_empty() {
+            // Caching is disabled
+            return;
+        }
+        let len = self.rom.len();
+        unsafe { self.rom.set_len(0) };
+        self.rom.resize(len, None);
+        log::trace!("ROM cache invalidated: WAITCNT changed.");
     }
 }
 
