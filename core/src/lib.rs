@@ -6,10 +6,6 @@
 
 #![allow(incomplete_features)]
 #![feature(const_mut_refs)]
-#![feature(drain_filter)]
-#![feature(duration_consts_float)]
-#![feature(exclusive_range_pattern)]
-#![feature(is_some_with)]
 #![feature(mixed_integer_ops)]
 #![feature(trait_alias)]
 #![feature(adt_const_params)]

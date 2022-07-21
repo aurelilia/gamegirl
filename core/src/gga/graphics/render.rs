@@ -14,6 +14,7 @@ use crate::{
 };
 
 impl Ppu {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn render_tile_4bpp<const OBJ: bool>(
         gg: &mut PpuType,
         prio: u16,

@@ -309,10 +309,10 @@ impl GameGirl {
         }
 
         match a {
-            0x0000..0x0100 if self.mem.bootrom.is_some() => {
+            0x0000..=0x00FF if self.mem.bootrom.is_some() => {
                 offs(self.mem.bootrom.as_ref().unwrap(), a)
             }
-            0x0200..0x0900 if self.mem.bootrom.is_some() && self.cgb => {
+            0x0200..=0x08FF if self.mem.bootrom.is_some() && self.cgb => {
                 offs(self.mem.bootrom.as_ref().unwrap(), a - 0x0100)
             }
             0x0000..=0x3FFF => offs(&self.cart.rom, a),

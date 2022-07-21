@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-pub use apu::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
+pub use base::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
 pub use channel::ApuChannel;
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ use crate::{
     scheduler::Scheduler,
 };
 
-mod apu;
+mod base;
 mod channel;
 mod envelope;
 mod noise_channel;

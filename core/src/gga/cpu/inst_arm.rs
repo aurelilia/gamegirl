@@ -609,6 +609,7 @@ impl GameGirlAdv {
     }
 
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     fn ldrstr<const ALIGN: bool>(
         &mut self,
         post: bool,

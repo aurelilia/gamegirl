@@ -121,7 +121,7 @@ mod inner {
 
         pub fn new(ppu: &Arc<Mutex<Ppu>>) -> Self {
             let (tx, rx) = mpsc::channel();
-            let ppu = Arc::clone(&ppu);
+            let ppu = Arc::clone(ppu);
             thread::spawn(move || loop {
                 let mmio = match rx.recv() {
                     Ok(mmio) => mmio,

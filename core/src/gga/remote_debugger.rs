@@ -246,12 +246,11 @@ impl SwBreakpoint for SyncSys {
     ) -> TargetResult<bool, Self> {
         let mut gg = self.lock();
         let gg = gg.gga_mut();
-        let count = gg
-            .debugger
+        let len = gg.debugger.breakpoints.len();
+        gg.debugger
             .breakpoints
-            .drain_filter(|bp| bp.pc && bp.value == Some(addr))
-            .count();
-        Ok(count != 0)
+            .retain(|bp| !(bp.pc && bp.value == Some(addr)));
+        Ok(len != gg.debugger.breakpoints.len())
     }
 }
 
@@ -289,12 +288,11 @@ impl HwWatchpoint for SyncSys {
 
         let mut gg = self.lock();
         let gg = gg.gga_mut();
-        let count = gg
-            .debugger
+        let len = gg.debugger.breakpoints.len();
+        gg.debugger
             .breakpoints
-            .drain_filter(|bp| bp.write && bp.value == Some(addr))
-            .count();
-        Ok(count != 0)
+            .retain(|bp| !(bp.write && bp.value == Some(addr)));
+        Ok(len != gg.debugger.breakpoints.len())
     }
 }
 

@@ -386,6 +386,7 @@ impl Ppu {
 
 /// The kind of PPU this is
 #[derive(Deserialize, Serialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum PpuKind {
     Dmg { used_x_obj_coords: [Option<u8>; 10] },
     Cgb(Cgb),

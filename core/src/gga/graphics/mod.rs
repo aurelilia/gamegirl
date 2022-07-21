@@ -9,6 +9,8 @@
 //! that helped me understand the PPU's more complex behavior.
 //! The code is under the MIT license at https://github.com/DenSinH/GBAC-.
 
+#![allow(clippy::significant_drop_in_scrutinee)]
+
 mod bitmap;
 mod objects;
 mod palette;
@@ -187,7 +189,7 @@ impl Ppu {
             3 => Self::render_mode3(gg, line),
             4 => Self::render_mode4(gg, line),
             5 => Self::render_mode5(gg, line),
-            _ => println!("Invalid mode {}", gg[DISPCNT] & 7),
+            inv => log::warn!("Invalid PPU mode {inv}"),
         }
 
         Self::finish_line(gg, line);
@@ -394,6 +396,7 @@ impl Ppu {
         gg.ppu.obj_layers = serde_layer_arr();
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn calc_pixel<const OBJ: bool>(
         pixel: &mut Colour,
         enabled: bool,

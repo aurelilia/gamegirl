@@ -52,14 +52,12 @@ const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
 /// Total count of windows in GUI.
 const WINDOW_COUNT: usize = DBG_WINDOW_COUNT + APP_WINDOW_COUNT;
 
+/// Function signature for a debug window
+type DbgFn<G> = fn(&mut G, &mut Ui);
 /// Count of debugger GUI windows that take a system as a parameter.
 const DBG_WINDOW_COUNT: usize = 4;
 /// Debugger GUI windows. Both GGC and GGA versions for each.
-const DBG_WINDOWS: [(
-    &str,
-    fn(&mut GameGirl, &mut Ui),
-    fn(&mut GameGirlAdv, &mut Ui),
-); DBG_WINDOW_COUNT] = [
+const DBG_WINDOWS: [(&str, DbgFn<GameGirl>, DbgFn<GameGirlAdv>); DBG_WINDOW_COUNT] = [
     ("Debugger", debugger_ggc::debugger, debugger_gga::debugger),
     (
         "Breakpoints",
@@ -74,10 +72,12 @@ const DBG_WINDOWS: [(
     ),
 ];
 
+/// Function signature for an app window
+type AppFn = fn(&mut App, &Context, &mut Ui);
 /// Count of GUI windows that take the App as a parameter.
 const APP_WINDOW_COUNT: usize = 5;
 /// GUI windows that take the App as a parameter.
-const APP_WINDOWS: [(&str, fn(&mut App, &Context, &mut Ui)); APP_WINDOW_COUNT] = [
+const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] = [
     ("Options", options::options),
     ("About", options::about),
     ("VRAM", debugger_ggc::vram_viewer),

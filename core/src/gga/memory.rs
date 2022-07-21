@@ -216,7 +216,7 @@ impl GameGirlAdv {
             // Write-only registers (PPU)
             BG0HOFS..=WIN1V | MOSAIC | BLDY => self.invalid_read::<false>(addr).u16(),
             // Write-only registers (DMA)
-            0xB0..0xB8 | 0xBC..0xC4 | 0xC8..0xD0 | 0xD4..0xDC => {
+            0xB0..=0xB7 | 0xBC..=0xC3 | 0xC8..=0xCF | 0xD4..=0xDB => {
                 self.invalid_read::<false>(addr).u16()
             }
             // Zero registers (DMA)

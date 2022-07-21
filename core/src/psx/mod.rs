@@ -28,7 +28,7 @@ mod scheduling;
 pub type PsxDebugger = Debugger<u32>;
 
 /// System state representing entire console.
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct PlayStation {
     cpu: Cpu,
     gpu: Gpu,
@@ -149,20 +149,5 @@ impl PlayStation {
 
     pub fn skip_bootrom(&mut self) {
         todo!()
-    }
-}
-
-impl Default for PlayStation {
-    fn default() -> Self {
-        Self {
-            cpu: Cpu::default(),
-            gpu: Gpu::default(),
-            apu: Apu::default(),
-            memory: Memory::default(),
-            debugger: Debugger::default(),
-            scheduler: Scheduler::default(),
-            options: EmulateOptions::default(),
-            config: SystemConfig::default(),
-        }
     }
 }

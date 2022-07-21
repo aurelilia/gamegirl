@@ -208,7 +208,7 @@ impl Cartridge {
         let mut cart = Self {
             rom,
             kind: match kind {
-                0x01..0x04 => MBC1 {
+                0x01..=0x03 => MBC1 {
                     ram_mode: false,
                     bank2: 0,
                 },

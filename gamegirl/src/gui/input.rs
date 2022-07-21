@@ -13,7 +13,8 @@ use InputAction::*;
 
 use crate::gui::{file_dialog, App};
 
-pub(super) const HOTKEYS: &[(&str, fn(&mut App, bool))] = &[
+type HotkeyFn = fn(&mut App, bool);
+pub(super) const HOTKEYS: &[(&str, HotkeyFn)] = &[
     ("Open ROM", |a, p| {
         pressed(a, p, |app| file_dialog::open(app.message_channel.0.clone()))
     }),
