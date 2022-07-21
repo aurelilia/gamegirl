@@ -92,7 +92,8 @@ impl Cartridge {
         }
     }
 
-    pub fn load_save(&mut self, save: GameSave) {
+    pub fn load_save(&mut self, mut save: GameSave) {
+        save.ram.resize(self.ram.len(), 0xFF);
         self.ram = save.ram;
     }
 
