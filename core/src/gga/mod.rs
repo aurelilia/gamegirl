@@ -33,7 +33,7 @@ mod audio;
 mod cartridge;
 pub mod cpu;
 mod dma;
-mod graphics;
+pub mod graphics;
 mod input;
 mod memory;
 mod scheduling;

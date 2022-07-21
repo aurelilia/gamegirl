@@ -18,6 +18,7 @@ use crate::{
         io::{cartridge::Cartridge, joypad::Joypad},
         GameGirl,
     },
+    nds::Nds,
     psx::PlayStation,
     Colour,
 };
@@ -33,6 +34,7 @@ macro_rules! forward_fn {
             match self {
                 System::GGC(gg) => gg.$name(arg),
                 System::GGA(gg) => gg.$name(arg),
+                System::NDS(_ds) => todo!(),
                 System::PSX(_ps) => todo!(),
             }
         }
@@ -42,6 +44,7 @@ macro_rules! forward_fn {
             match self {
                 System::GGC(gg) => gg.$name(),
                 System::GGA(gg) => gg.$name(),
+                System::NDS(_ds) => todo!(),
                 System::PSX(ps) => ps.$name(),
             }
         }
@@ -59,6 +62,7 @@ macro_rules! forward_member {
             match self {
                 System::GGC($sys) => $expr,
                 System::GGA($sys) => $expr,
+                System::NDS(_ds) => todo!(),
                 System::PSX($sys) => todo!(),
             }
         }
@@ -163,7 +167,7 @@ macro_rules! common_functions {
             );
             self.restore_from(old_self);
         }
-    }
+    };
 }
 
 /// Enum for the system currently loaded.
@@ -173,6 +177,8 @@ pub enum System {
     GGC(Box<GameGirl>),
     /// A GGA. Only used for GGA games.
     GGA(Box<GameGirlAdv>),
+    /// An NDS. Only used for NDS games.
+    NDS(Box<Nds>),
     /// A PSX. Only used for PSX games, obviously.
     PSX(Box<PlayStation>),
 }
@@ -188,17 +194,35 @@ impl System {
     forward_fn!(reset);
     forward_fn!(skip_bootrom);
 
-    forward_member!(&mut Self, last_frame, Option<Vec<Colour>>, _sys, _sys.ppu.last_frame.take());
-    forward_member!(&mut Self, options, &mut EmulateOptions, _sys, &mut _sys.options);
+    forward_member!(
+        &mut Self,
+        last_frame,
+        Option<Vec<Colour>>,
+        _sys,
+        _sys.ppu.last_frame.take()
+    );
+    forward_member!(
+        &mut Self,
+        options,
+        &mut EmulateOptions,
+        _sys,
+        &mut _sys.options
+    );
     forward_member!(&Self, config, &SystemConfig, _sys, &_sys.config);
-    forward_member!(&mut Self, config_mut, &mut SystemConfig, _sys, &mut _sys.config);
+    forward_member!(
+        &mut Self,
+        config_mut,
+        &mut SystemConfig,
+        _sys,
+        &mut _sys.config
+    );
 
     /// Set a button on the joypad.
     pub fn set_button(&mut self, btn: Button, pressed: bool) {
         match self {
             System::GGC(gg) => Joypad::set(gg, btn, pressed),
             System::GGA(gg) => gg.set_button(btn, pressed),
-            System::PSX(_ps) => todo!(),
+            _ => todo!(),
         }
     }
 
@@ -207,6 +231,7 @@ impl System {
         match self {
             System::GGC(_) => [160, 144],
             System::GGA(_) => [240, 160],
+            System::NDS(_) => [256, 192 * 2],
             System::PSX(_) => [640, 480],
         }
     }
@@ -216,7 +241,7 @@ impl System {
         let save = match self {
             System::GGC(gg) => gg.cart.make_save(),
             System::GGA(gg) => gg.cart.make_save(),
-            System::PSX(_ps) => todo!(),
+            _ => todo!(),
         };
         if let Some(save) = save {
             Storage::save(path, save);

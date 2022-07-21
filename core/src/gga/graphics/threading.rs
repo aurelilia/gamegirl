@@ -2,7 +2,10 @@ pub use inner::*;
 
 #[cfg(not(feature = "threaded-ppu"))]
 mod inner {
-    use crate::gga::{graphics::Ppu, GameGirlAdv};
+    use crate::{
+        gga::{graphics::Ppu, GameGirlAdv},
+        nds::Nds,
+    };
 
     pub type GgaPpu = Ppu;
     pub type PpuType = GameGirlAdv;
@@ -16,6 +19,18 @@ mod inner {
         #[inline]
         pub fn ppu_nomut(&self) -> &Ppu {
             &self.ppu
+        }
+    }
+
+    impl Nds {
+        #[inline]
+        pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
+            &self.ppus[E]
+        }
+
+        #[inline]
+        pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
+            &mut self.ppus[E]
         }
     }
 
@@ -36,6 +51,7 @@ mod inner {
 
     use crate::{
         gga::{graphics::Ppu, GameGirlAdv},
+        nds::Nds,
         numutil::NumExt,
         Colour,
     };
@@ -67,6 +83,18 @@ mod inner {
         #[inline]
         pub fn ppu_nomut(&self) -> MutexGuard<Ppu> {
             self.ppu.ppu.lock().unwrap()
+        }
+    }
+
+    impl Nds {
+        #[inline]
+        pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
+            self.ppus[E].ppu.lock().unwrap()
+        }
+
+        #[inline]
+        pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
+            self.ppus[E].ppu.lock().unwrap()
         }
     }
 

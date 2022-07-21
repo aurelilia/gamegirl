@@ -26,7 +26,7 @@ use crate::{
         },
     },
     numutil::NumExt,
-    Colour
+    Colour,
 };
 
 pub mod cpu;
