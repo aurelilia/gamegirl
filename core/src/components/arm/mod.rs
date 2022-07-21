@@ -248,7 +248,7 @@ impl<S: ArmSystem> Cpu<S> {
 
     /// An exception occurred, jump to the bootrom handler and deal with it.
     fn exception_occurred(gg: &mut SysWrapper<S>, kind: Exception) {
-        gg.exception_happend(kind);
+        gg.exception_happened(kind);
         if gg.cpu().flag(Thumb) {
             gg.cpu().inc_pc_by(2); // ??
         }

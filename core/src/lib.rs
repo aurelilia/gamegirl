@@ -39,7 +39,7 @@ pub mod common;
 pub mod components;
 pub mod gga;
 pub mod ggc;
-// pub mod nds;
+pub mod nds;
 pub mod numutil;
 pub mod psx;
 

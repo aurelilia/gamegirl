@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{components::scheduler::Kind, nds::Nds, psx::PlayStation};
+use crate::{components::scheduler::Kind, nds::Nds};
 
 #[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub enum NdsEvent {
@@ -14,7 +14,7 @@ pub enum NdsEvent {
 }
 
 impl NdsEvent {
-    pub fn dispatch(self, _ds: &mut Nds, _late_by: i32) {}
+    pub fn _dispatch(self, _ds: &mut Nds, _late_by: i32) {}
 }
 
 impl Kind for NdsEvent {}

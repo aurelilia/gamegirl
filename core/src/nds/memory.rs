@@ -11,17 +11,17 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use super::{Nds7, Nds9};
 use crate::{
     components::memory::{MemoryMappedSystem, MemoryMapper},
-    gga::{cpu::Cpu, Access},
     nds::Nds,
-    numutil::{hword, word, NumExt, U16Ext, U32Ext},
+    numutil::NumExt,
 };
 
 pub const KB: usize = 1024;
 pub const MB: usize = KB * KB;
 pub const BIOS7: &[u8] = include_bytes!("bios7.bin");
-pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
+pub const _BIOS9: &[u8] = include_bytes!("bios9.bin");
 
 /// Memory struct containing the NDS's memory regions along with page tables
 /// and other auxiliary cached information relating to memory.
@@ -32,7 +32,7 @@ pub struct Memory {
     #[serde(with = "serde_arrays")]
     wram: [u8; 32 * KB],
     #[serde(with = "serde_arrays")]
-    mmio: [u16; KB / 2],
+    pub mmio: [u16; KB / 2],
 
     #[serde(with = "serde_arrays")]
     wram7: [u8; 64 * KB],
@@ -53,11 +53,11 @@ pub struct Memory {
 impl Nds {
     /// Initialize page tables and wait times.
     pub fn init_memory(&mut self) {
-        MemoryMapper::init_pages(&mut Nds7(self));
-        MemoryMapper::init_pages(&mut Nds9(self));
+        MemoryMapper::init_pages(&mut self.nds7());
+        MemoryMapper::init_pages(&mut self.nds9());
         if self.config.cached_interpreter {
-            self.cpu7.cache.init(todo!());
-            self.cpu9.cache.init(todo!());
+            self.cpu7.cache.init(0);
+            self.cpu9.cache.init(0);
         }
     }
 }
@@ -103,12 +103,7 @@ impl IndexMut<u32> for Nds {
     }
 }
 
-#[repr(transparent)]
-struct Nds7<'n>(&'n mut Nds);
-#[repr(transparent)]
-struct Nds9<'n>(&'n mut Nds);
-
-impl MemoryMappedSystem<8192> for Nds7<'_> {
+impl MemoryMappedSystem<8192> for Nds7 {
     type Usize = u32;
     const ADDR_MASK: &'static [usize] = &[
         0x3FFF, // ARM7 BIOS
@@ -132,11 +127,11 @@ impl MemoryMappedSystem<8192> for Nds7<'_> {
     const MASK_POW: usize = 24;
 
     fn get_mapper(&self) -> &MemoryMapper<8192> {
-        &self.0.memory.mapper7
+        &self.memory.mapper7
     }
 
     fn get_mapper_mut(&mut self) -> &mut MemoryMapper<8192> {
-        &mut self.0.memory.mapper7
+        &mut self.memory.mapper7
     }
 
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
@@ -146,11 +141,11 @@ impl MemoryMappedSystem<8192> for Nds7<'_> {
         }
 
         match a {
-            0x0000_0000..=0x00FF_FFFF if R => offs(&BIOS7, a),
-            0x0200_0000..=0x02FF_FFFF => offs(&self.0.memory.psram, a - 0x200_0000),
+            0x0000_0000..=0x00FF_FFFF if R => offs(BIOS7, a),
+            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.psram, a - 0x200_0000),
             // TODO not quite right...
-            0x0300_0000..=0x037F_FFFF => offs(&self.0.memory.wram, a - 0x300_0000),
-            0x0380_0000..=0x03FF_FFFF => offs(&self.0.memory.wram7, a - 0x380_0000),
+            0x0300_0000..=0x037F_FFFF => offs(&self.memory.wram, a - 0x300_0000),
+            0x0380_0000..=0x03FF_FFFF => offs(&self.memory.wram7, a - 0x380_0000),
             0x0600_0000..=0x06FF_FFFF if false => todo!(),
 
             _ => ptr::null::<u8>() as *mut u8,
@@ -158,7 +153,7 @@ impl MemoryMappedSystem<8192> for Nds7<'_> {
     }
 }
 
-impl MemoryMappedSystem<8192> for Nds9<'_> {
+impl MemoryMappedSystem<8192> for Nds9 {
     type Usize = u32;
     const ADDR_MASK: &'static [usize] = &[
         0x7FFF, // Instruction TCM
@@ -182,11 +177,11 @@ impl MemoryMappedSystem<8192> for Nds9<'_> {
     const MASK_POW: usize = 24;
 
     fn get_mapper(&self) -> &MemoryMapper<8192> {
-        &self.0.memory.mapper9
+        &self.memory.mapper9
     }
 
     fn get_mapper_mut(&mut self) -> &mut MemoryMapper<8192> {
-        &mut self.0.memory.mapper9
+        &mut self.memory.mapper9
     }
 
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
@@ -196,23 +191,23 @@ impl MemoryMappedSystem<8192> for Nds9<'_> {
         }
 
         match a {
-            0x0000_0000..=0x01FF_FFFF if R => offs(&self.0.memory.inst_tcm, a),
-            0x0200_0000..=0x02FF_FFFF => offs(&self.0.memory.psram, a - 0x200_0000),
-            0x0300_0000..=0x03FF_FFFF => offs(&self.0.memory.wram, a - 0x300_0000),
+            0x0000_0000..=0x01FF_FFFF if R => offs(&self.memory.inst_tcm, a),
+            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.psram, a - 0x200_0000),
+            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.wram, a - 0x300_0000),
 
             0x0500_0000..=0x05FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-                offs(&self.0.ppu_nomut::<0>().palette, a - 0x500_0000)
+                offs(&self.ppu_nomut::<0>().palette, a - 0x500_0000)
             }
-            0x0500_0000..=0x05FF_FFFF => offs(&self.0.ppu_nomut::<1>().palette, a - 0x501_0000),
-            0x0600_0000..=0x061F_FFFF => offs(&self.0.ppu_nomut::<0>().vram, a - 0x600_0000),
-            0x0620_0000..=0x063F_FFFF => offs(&self.0.ppu_nomut::<1>().vram, a - 0x620_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_nomut::<1>().palette, a - 0x501_0000),
+            0x0600_0000..=0x061F_FFFF => offs(&self.ppu_nomut::<0>().vram, a - 0x600_0000),
+            0x0620_0000..=0x063F_FFFF => offs(&self.ppu_nomut::<1>().vram, a - 0x620_0000),
             // TODO not quite right...
-            0x0640_0000..=0x065F_FFFF => offs(&self.0.ppu_nomut::<0>().vram, a - 0x640_0000),
-            0x0660_0000..=0x067F_FFFF => offs(&self.0.ppu_nomut::<1>().vram, a - 0x660_0000),
+            0x0640_0000..=0x065F_FFFF => offs(&self.ppu_nomut::<0>().vram, a - 0x640_0000),
+            0x0660_0000..=0x067F_FFFF => offs(&self.ppu_nomut::<1>().vram, a - 0x660_0000),
             0x0700_0000..=0x07FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-                offs(&self.0.ppu_nomut::<0>().oam, a - 0x700_0000)
+                offs(&self.ppu_nomut::<0>().oam, a - 0x700_0000)
             }
-            0x0700_0000..=0x07FF_FFFF => offs(&self.0.ppu_nomut::<1>().oam, a - 0x701_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_nomut::<1>().oam, a - 0x701_0000),
 
             0x0600_0000..=0x06FF_FFFF if false => todo!(),
 

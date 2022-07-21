@@ -26,7 +26,7 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     fn add_sn_cycles(&mut self, cycles: u16);
     fn add_i_cycles(&mut self, cycles: u16);
 
-    fn exception_happend(&mut self, kind: Exception);
+    fn exception_happened(&mut self, kind: Exception);
     fn pipeline_stalled(&mut self);
 
     fn get<T: RwType>(&mut self, addr: u32) -> T;

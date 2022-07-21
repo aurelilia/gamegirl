@@ -1,6 +1,8 @@
 # GameGirl
 A Gameboy (Color/Advance) emulator and debugger written in Rust, whose GG/GGC core is a rewrite of 
 [gamelin](https://git.angm.xyz/ellie/gamelin).  
+NDS support is in the works!
+
 [Try it in your browser!](https://gamegirl.angm.xyz)
 
 

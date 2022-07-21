@@ -11,7 +11,8 @@ use crate::{
         interface::{ArmSystem, RwType, SysWrapper},
         Access, Cpu, Exception,
     },
-    gga::{addr, GameGirlAdv},
+    gga::{addr, addr::WAITCNT, GameGirlAdv},
+    numutil::NumExt,
 };
 
 pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
@@ -36,14 +37,21 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn add_sn_cycles(&mut self, cycles: u16) {
-        self.add_sn_cycles(cycles);
+        self.scheduler.advance(cycles.u32());
     }
 
     fn add_i_cycles(&mut self, cycles: u16) {
-        self.add_i_cycles(cycles);
+        self.scheduler.advance(cycles.u32());
+        if self.cpu.pc() > 0x800_0000 {
+            if self[WAITCNT].is_bit(14) {
+                self.memory.prefetch_len += 1;
+            } else {
+                self.cpu.access_type = Access::NonSeq;
+            }
+        }
     }
 
-    fn exception_happend(&mut self, kind: Exception) {
+    fn exception_happened(&mut self, kind: Exception) {
         match kind {
             Exception::Irq if self.cpu.pc() > 0x100_0000 => self.memory.bios_value = 0xE25E_F004,
             Exception::Swi => self.memory.bios_value = 0xE3A0_2004,
