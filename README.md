@@ -138,6 +138,9 @@ cargo build --release
 # Release binary now in target/release/gamegirl_bin.
 ```
 
+You will probably get an error about missing firmware files for PSX and NDS -
+if you do not plan on using those cores, simply supply empty files.
+
 
 ## Testing
 Test ROMs can be run automatically:
