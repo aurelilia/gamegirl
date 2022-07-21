@@ -30,11 +30,13 @@ pub struct Dmas {
     /// Internal destination registers
     dst: [u32; 4],
     /// Internal cache shared between DMAs
-    cache: u32,
+    pub(super) cache: u32,
     /// Currently running DMA, or 99
     pub(super) running: u16,
     /// DMAs waiting to run after current.
     queued: ArrayVec<(u16, Reason), 3>,
+    /// PC when the last DMA finished (for lingering bus behavior)
+    pub(super) pc_at_last_end: u32,
 }
 
 impl Dmas {
@@ -212,6 +214,7 @@ impl Dmas {
             }
         }
         gg.add_i_cycles(2);
+        gg.dma.pc_at_last_end = gg.cpu.pc();
     }
 
     /// Get the step with which to change SRC/DST registers after every write.

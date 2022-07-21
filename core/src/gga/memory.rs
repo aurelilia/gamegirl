@@ -237,41 +237,48 @@ impl GameGirlAdv {
     }
 
     fn invalid_read<const WORD: bool>(&self, addr: u32) -> u32 {
-        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
-            // Out of bounds ROM read
-            let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
-            let low = addr.u16();
-            word(low, low.wrapping_add(1))
-        } else {
-            // Open bus
-            if self.cpu.pc() > 0xFFF_FFFF || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
-            {
-                return 0;
+        match addr {
+            0x0800_0000..=0x0DFF_FFFF => {
+                // Out of bounds ROM read
+                let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
+                let low = addr.u16();
+                word(low, low.wrapping_add(1))
             }
 
-            if !self.cpu.flag(Flag::Thumb) {
-                // Simple case: just read PC in ARM mode
-                self.get_word(self.cpu.pc())
-            } else {
-                // Thumb mode... complicated.
-                // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
-                match self.cpu.pc() >> 24 {
-                    0x02 | 0x05 | 0x06 | 0x08..=0xD => {
-                        let hword = self.get_hword(self.cpu.pc());
-                        word(hword, hword)
+            _ if self.cpu.pc() == self.dma.pc_at_last_end => self.dma.cache,
+
+            _ => {
+                // Open bus
+                if self.cpu.pc() > 0xFFF_FFFF
+                    || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
+                {
+                    return 0;
+                }
+
+                if !self.cpu.flag(Flag::Thumb) {
+                    // Simple case: just read PC in ARM mode
+                    self.get_word(self.cpu.pc())
+                } else {
+                    // Thumb mode... complicated.
+                    // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
+                    match self.cpu.pc() >> 24 {
+                        0x02 | 0x05 | 0x06 | 0x08..=0xD => {
+                            let hword = self.get_hword(self.cpu.pc());
+                            word(hword, hword)
+                        }
+                        _ if self.cpu.pc().is_bit(1) => word(
+                            self.get_hword(self.cpu.pc() - 2),
+                            self.get_hword(self.cpu.pc()),
+                        ),
+                        0x00 | 0x07 => word(
+                            self.get_hword(self.cpu.pc()),
+                            self.get_hword(self.cpu.pc() + 2),
+                        ),
+                        _ => word(
+                            self.get_hword(self.cpu.pc()),
+                            self.get_hword(self.cpu.pc() - 2),
+                        ),
                     }
-                    _ if self.cpu.pc().is_bit(1) => word(
-                        self.get_hword(self.cpu.pc() - 2),
-                        self.get_hword(self.cpu.pc()),
-                    ),
-                    0x00 | 0x07 => word(
-                        self.get_hword(self.cpu.pc()),
-                        self.get_hword(self.cpu.pc() + 2),
-                    ),
-                    _ => word(
-                        self.get_hword(self.cpu.pc()),
-                        self.get_hword(self.cpu.pc() - 2),
-                    ),
                 }
             }
         }
