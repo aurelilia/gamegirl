@@ -328,7 +328,7 @@ impl Default for Cpu {
             lr: ModeReg::default(),
             cpsr: 0xD3,
             spsr: ModeReg::default(),
-            registers: [0; 16],
+            registers: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
             pipeline: [0; 2],
             access_type: Access::NonSeq,
             block_ended: false,

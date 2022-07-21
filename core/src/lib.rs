@@ -33,6 +33,7 @@
 #![allow(clippy::match_on_vec_items)]
 #![allow(clippy::invalid_upcast_comparisons)]
 
+#[macro_use]
 pub mod common;
 pub mod components;
 pub mod gga;

@@ -13,7 +13,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     components::storage::Storage,
-    gga::{cpu::Cpu, GameGirlAdv},
+    gga::GameGirlAdv,
     ggc::{
         io::{cartridge::Cartridge, joypad::Joypad},
         GameGirl,
@@ -27,7 +27,7 @@ pub const SAMPLE_RATE: u32 = 44100;
 
 /// Macro for forwarding functions on the main system enum to individual
 /// systems.
-macro_rules! forward {
+macro_rules! forward_fn {
     ($name:ident, $ret:ty, $arg:ty) => {
         pub fn $name(&mut self, arg: $arg) -> $ret {
             match self {
@@ -47,8 +47,123 @@ macro_rules! forward {
         }
     };
     ($name:ident) => {
-        forward!($name, ());
+        forward_fn!($name, ());
     };
+}
+
+/// Macro for forwarding properties on the main system enum to individual
+/// systems.
+macro_rules! forward_member {
+    ($self:ty, $name:ident, $ret:ty, $sys:ident, $expr:expr) => {
+        pub fn $name(self: $self) -> $ret {
+            match self {
+                System::GGC($sys) => $expr,
+                System::GGA($sys) => $expr,
+                System::PSX($sys) => todo!(),
+            }
+        }
+    };
+}
+
+macro_rules! common_functions {
+    ($clock:expr, $pause_event:expr) => {
+        /// Advance the system clock by the given delta in seconds.
+        /// Might advance a few clocks more.
+        pub fn advance_delta(&mut self, delta: f32) {
+            if !self.options.running {
+                return;
+            }
+
+            let target = ($clock as f32 * delta * self.options.speed_multiplier as f32) as i32;
+            self.scheduler.schedule($pause_event, target);
+
+            self.ticking = true;
+            while self.options.running && self.ticking {
+                self.advance();
+            }
+        }
+
+        /// Step until the PPU has finished producing the current frame.
+        /// Only used for rewinding since it causes audio desync very easily.
+        pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
+            while self.options.running && self.ppu.last_frame == None {
+                self.advance();
+            }
+            self.ppu.last_frame.take()
+        }
+
+        /// Produce the next audio samples and write them to the given buffer.
+        /// Writes zeroes if the system is not currently running
+        /// and no audio should be played.
+        pub fn produce_samples(&mut self, samples: &mut [f32]) {
+            if !self.options.running {
+                samples.fill(0.0);
+                return;
+            }
+
+            let target = samples.len() * self.options.speed_multiplier;
+            while self.apu.buffer.len() < target {
+                if !self.options.running {
+                    samples.fill(0.0);
+                    return;
+                }
+                self.advance();
+            }
+
+            let mut buffer = mem::take(&mut self.apu.buffer);
+            if self.options.invert_audio_samples {
+                // If rewinding, truncate and get rid of any excess samples to prevent
+                // audio samples getting backed up
+                for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
+                    *dst = src * self.config.volume;
+                }
+            } else {
+                // Otherwise, store any excess samples back in the buffer for next time
+                // while again not storing too many to avoid backing up.
+                // This way can cause clipping if the console produces audio too fast,
+                // however this is preferred to audio falling behind and eating
+                // a lot of memory.
+                for sample in buffer.drain(target..) {
+                    self.apu.buffer.push(sample);
+                }
+                self.apu.buffer.truncate(5_000);
+
+                for (src, dst) in buffer
+                    .into_iter()
+                    .step_by(self.options.speed_multiplier)
+                    .zip(samples.iter_mut())
+                {
+                    *dst = src * self.config.volume;
+                }
+            }
+        }
+
+        /// Reset the console, while keeping the current cartridge inserted.
+        pub fn reset(&mut self) {
+            let old_self = mem::take(self);
+            self.restore_from(old_self);
+        }
+
+        /// Create a save state that can be loaded with [load_state].
+        pub fn save_state(&self) -> Vec<u8> {
+            common::serialize(self, self.config.compress_savestates)
+        }
+
+        /// Load a state produced by [save_state].
+        /// Will restore the current cartridge and debugger.
+        pub fn load_state(&mut self, state: &[u8]) {
+            if cfg!(target_arch = "wasm32") {
+                // Currently crashes...
+                return;
+            }
+
+            let old_self = mem::replace(
+                self,
+                common::deserialize(state, self.config.compress_savestates),
+            );
+            self.restore_from(old_self);
+        }
+    }
 }
 
 /// Enum for the system currently loaded.
@@ -63,16 +178,20 @@ pub enum System {
 }
 
 impl System {
-    // TODO These 5 functions are heavily duplicated, not nice.
-    forward!(advance_delta, (), f32);
-    forward!(produce_frame, Option<Vec<Colour>>);
-    forward!(produce_samples, (), &mut [f32]);
-    forward!(save_state, Vec<u8>);
-    forward!(load_state, (), &[u8]);
+    forward_fn!(advance_delta, (), f32);
+    forward_fn!(produce_frame, Option<Vec<Colour>>);
+    forward_fn!(produce_samples, (), &mut [f32]);
+    forward_fn!(save_state, Vec<u8>);
+    forward_fn!(load_state, (), &[u8]);
 
-    forward!(advance);
-    forward!(reset);
-    forward!(skip_bootrom);
+    forward_fn!(advance);
+    forward_fn!(reset);
+    forward_fn!(skip_bootrom);
+
+    forward_member!(&mut Self, last_frame, Option<Vec<Colour>>, _sys, _sys.ppu.last_frame.take());
+    forward_member!(&mut Self, options, &mut EmulateOptions, _sys, &mut _sys.options);
+    forward_member!(&Self, config, &SystemConfig, _sys, &_sys.config);
+    forward_member!(&mut Self, config_mut, &mut SystemConfig, _sys, &mut _sys.config);
 
     /// Set a button on the joypad.
     pub fn set_button(&mut self, btn: Button, pressed: bool) {
@@ -80,42 +199,6 @@ impl System {
             System::GGC(gg) => Joypad::set(gg, btn, pressed),
             System::GGA(gg) => gg.set_button(btn, pressed),
             System::PSX(_ps) => todo!(),
-        }
-    }
-
-    /// Get the last frame produced by the PPU.
-    pub fn last_frame(&mut self) -> Option<Vec<Colour>> {
-        match self {
-            System::GGC(gg) => gg.ppu.last_frame.take(),
-            System::GGA(gg) => gg.ppu.last_frame.take(),
-            System::PSX(_ps) => todo!(),
-        }
-    }
-
-    /// Get emulation options.
-    pub fn options(&mut self) -> &mut EmulateOptions {
-        match self {
-            System::GGC(gg) => &mut gg.options,
-            System::GGA(gg) => &mut gg.options,
-            System::PSX(ps) => &mut ps.options,
-        }
-    }
-
-    /// Get emulation config.
-    pub fn config(&self) -> &SystemConfig {
-        match self {
-            System::GGC(gg) => &gg.config,
-            System::GGA(gg) => &gg.config,
-            System::PSX(ps) => &ps.config,
-        }
-    }
-
-    /// Get emulation config.
-    pub fn config_mut(&mut self) -> &mut SystemConfig {
-        match self {
-            System::GGC(gg) => &mut gg.config,
-            System::GGA(gg) => &mut gg.config,
-            System::PSX(ps) => &mut ps.config,
         }
     }
 
@@ -130,18 +213,13 @@ impl System {
 
     /// Save the game to disk.
     pub fn save_game(&self, path: Option<PathBuf>) {
-        match self {
-            System::GGC(gg) => {
-                if let Some(save) = gg.cart.make_save() {
-                    Storage::save(path, save);
-                }
-            }
-            System::GGA(gg) => {
-                if let Some(save) = gg.cart.make_save() {
-                    Storage::save(path, save);
-                }
-            }
+        let save = match self {
+            System::GGC(gg) => gg.cart.make_save(),
+            System::GGA(gg) => gg.cart.make_save(),
             System::PSX(_ps) => todo!(),
+        };
+        if let Some(save) = save {
+            Storage::save(path, save);
         }
     }
 
@@ -212,8 +290,6 @@ impl System {
                 gga.skip_bootrom();
             }
 
-            // Fill the prefetch
-            Cpu::pipeline_stall(&mut gga);
             *self = Self::GGA(gga);
         }
 
