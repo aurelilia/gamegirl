@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::GameGirl;
 use crate::{
     common::{CgbMode, SystemConfig},
+    components::memory::{MemoryMappedSystem, MemoryMapper},
     ggc::io::{
         addr::*,
         apu::Apu,
@@ -52,9 +53,7 @@ pub struct Memory {
     high: [u8; 256],
     dma_active: bool,
 
-    #[serde(skip)]
-    #[serde(default = "serde_pages")]
-    read_pages: [*mut u8; 256],
+    mapper: MemoryMapper<256>,
     #[serde(with = "serde_arrays")]
     page_offsets: [u32; 16],
 
@@ -197,7 +196,7 @@ impl GameGirl {
             BOOTROM_DISABLE => {
                 self.mem.bootrom = None;
                 // Refresh page tables
-                self.init_memory();
+                MemoryMapper::init_pages(self);
             }
 
             DIV | TIMA | TAC => Timer::write(self, addr, value),
@@ -240,7 +239,7 @@ impl GameGirl {
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
         self.apu = Apu::new(self.cgb);
         self.cart = cart;
-        self.init_memory();
+        MemoryMapper::init_pages(self);
         self.init_high();
         self.init_scheduler();
     }
@@ -280,49 +279,17 @@ impl GameGirl {
     /// falls back to given closure if no page table is mapped at that address.
     #[inline]
     fn get<T>(&self, a: u16, slow: fn(&Self, u16) -> T) -> T {
-        let addr = a.us();
         let ptr = unsafe {
-            let page = self.mem.read_pages.get_unchecked(addr >> 8);
-            page.add(addr & 0xFF)
-                .add(self.mem.page_offsets.get_unchecked(addr >> 12).us())
+            self.mem
+                .mapper
+                .page::<Self, false>(a)
+                .add(self.mem.page_offsets.get_unchecked(a.us() >> 12).us())
         };
 
         if ptr as usize > 0xFF_FFFF {
             unsafe { (ptr as *const T).read() }
         } else {
             slow(self, a)
-        }
-    }
-
-    /// Initialize page tables.
-    pub fn init_memory(&mut self) {
-        for i in 0..self.mem.read_pages.len() {
-            self.mem.read_pages[i] = unsafe { self.get_page(i * 0x100) };
-        }
-    }
-
-    unsafe fn get_page(&self, a: usize) -> *mut u8 {
-        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
-            let ptr = reg.as_ptr() as *mut u8;
-            ptr.add(offs)
-        }
-
-        match a {
-            0x0000..=0x00FF if self.mem.bootrom.is_some() => {
-                offs(self.mem.bootrom.as_ref().unwrap(), a)
-            }
-            0x0200..=0x08FF if self.mem.bootrom.is_some() && self.cgb => {
-                offs(self.mem.bootrom.as_ref().unwrap(), a - 0x0100)
-            }
-            0x0000..=0x3FFF => offs(&self.cart.rom, a),
-            0x4000..=0x7FFF => offs(&self.cart.rom, a - 0x4000),
-
-            0x8000..=0x9FFF => offs(&self.mem.vram, a - 0x8000),
-            0xC000..=0xCFFF => offs(&self.mem.wram, a - 0xC000),
-            0xD000..=0xDFFF => offs(&self.mem.wram, a - 0xD000),
-            0xE000..=0xFDFF => offs(&self.mem.wram, a - 0xE000),
-
-            _ => ptr::null::<u8>() as *mut u8,
         }
     }
 }
@@ -338,7 +305,7 @@ impl Memory {
             dma_active: false,
             high: [0xFF; 256],
 
-            read_pages: serde_pages(),
+            mapper: MemoryMapper::default(),
             page_offsets: [
                 0, 0, 0, 0, 0x4000, 0x4000, 0x4000, 0x4000, 0, 0, 0, 0, 0, 0x1000, 0, 0,
             ],
@@ -363,6 +330,46 @@ impl IndexMut<u16> for GameGirl {
 
 unsafe impl Send for Memory {}
 
-fn serde_pages() -> [*mut u8; 256] {
-    [ptr::null::<u8>() as *mut u8; 256]
+impl MemoryMappedSystem<256> for GameGirl {
+    type Usize = u16;
+    const ADDR_MASK: &'static [usize] = &[0xFF];
+    const PAGE_POW: usize = 8;
+    const MASK_POW: usize = 0;
+
+    fn get_mapper(&self) -> &MemoryMapper<256> {
+        &self.mem.mapper
+    }
+
+    fn get_mapper_mut(&mut self) -> &mut MemoryMapper<256> {
+        &mut self.mem.mapper
+    }
+
+    unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
+        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
+            let ptr = reg.as_ptr() as *mut u8;
+            ptr.add(offs)
+        }
+
+        if !R {
+            return ptr::null::<u8>() as *mut u8;
+        }
+
+        match a {
+            0x0000..=0x00FF if self.mem.bootrom.is_some() => {
+                offs(self.mem.bootrom.as_ref().unwrap(), a)
+            }
+            0x0200..=0x08FF if self.mem.bootrom.is_some() && self.cgb => {
+                offs(self.mem.bootrom.as_ref().unwrap(), a - 0x0100)
+            }
+            0x0000..=0x3FFF => offs(&self.cart.rom, a),
+            0x4000..=0x7FFF => offs(&self.cart.rom, a - 0x4000),
+
+            0x8000..=0x9FFF => offs(&self.mem.vram, a - 0x8000),
+            0xC000..=0xCFFF => offs(&self.mem.wram, a - 0xC000),
+            0xD000..=0xDFFF => offs(&self.mem.wram, a - 0xD000),
+            0xE000..=0xFDFF => offs(&self.mem.wram, a - 0xE000),
+
+            _ => ptr::null::<u8>() as *mut u8,
+        }
+    }
 }

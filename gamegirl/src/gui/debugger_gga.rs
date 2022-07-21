@@ -5,7 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use core::{
-    debugger::Breakpoint,
+    components::debugger::Breakpoint,
     gga::{addr::IME, GameGirlAdv},
     numutil::NumExt,
 };

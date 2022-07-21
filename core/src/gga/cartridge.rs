@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use FlashCmdStage::*;
 use SaveType::*;
 
-use crate::{gga::memory::KB, numutil::NumExt, storage::GameSave};
+use crate::{components::storage::GameSave, gga::memory::KB, numutil::NumExt};
 
 // Both Macronix.
 const FLASH64_ID: [u8; 2] = [0xC2, 0x1C];

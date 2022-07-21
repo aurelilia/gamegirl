@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{psx::PlayStation, scheduler::Kind};
+use crate::{components::scheduler::Kind, psx::PlayStation};
 
 #[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub enum PsxEvent {

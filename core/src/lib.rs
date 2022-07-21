@@ -9,6 +9,7 @@
 #![feature(mixed_integer_ops)]
 #![feature(trait_alias)]
 #![feature(adt_const_params)]
+#![feature(generic_const_exprs)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
@@ -33,13 +34,11 @@
 #![allow(clippy::invalid_upcast_comparisons)]
 
 pub mod common;
-pub mod debugger;
+pub mod components;
 pub mod gga;
 pub mod ggc;
 pub mod numutil;
 pub mod psx;
-mod scheduler;
-pub mod storage;
 
 pub use common::System;
 

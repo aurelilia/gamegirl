@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{self, EmulateOptions, SystemConfig},
-    debugger::Debugger,
+    components::{debugger::Debugger, memory::MemoryMapper, scheduler::Scheduler},
     ggc::{
         cpu::{Cpu, Interrupt},
         io::{
@@ -26,7 +26,6 @@ use crate::{
         },
     },
     numutil::NumExt,
-    scheduler::Scheduler,
     Colour,
 };
 
@@ -187,7 +186,7 @@ impl GameGirl {
         self.config = old_self.config;
         self.debugger = old_self.debugger;
         self.mem.bootrom = old_self.mem.bootrom;
-        self.init_memory();
+        MemoryMapper::init_pages(self);
     }
 
     /// Reset the console, while keeping the current cartridge inserted.

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{self, EmulateOptions, SystemConfig},
-    debugger::Debugger,
+    components::{debugger::Debugger, scheduler::Scheduler},
     gga::{
         addr::{KEYINPUT, SOUNDBIAS, WAITCNT},
         audio::SAMPLE_EVERY_N_CLOCKS,
@@ -25,7 +25,6 @@ use crate::{
         timer::Timers,
     },
     numutil::NumExt,
-    scheduler::Scheduler,
     Colour,
 };
 

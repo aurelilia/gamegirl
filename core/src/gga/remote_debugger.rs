@@ -41,7 +41,7 @@ use gdbstub::{
 use gdbstub_arch::arm::{reg::id::ArmCoreRegId, Armv4t};
 
 use crate::{
-    debugger::Breakpoint,
+    components::debugger::Breakpoint,
     gga::remote_debugger::DebuggerStatus::{Disconnected, Running, WaitingForConnection},
     numutil::NumExt,
     System,

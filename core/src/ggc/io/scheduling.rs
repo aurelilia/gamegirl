@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use GGEvent::*;
 
 use crate::{
+    components::scheduler::Kind,
     ggc::{
         cpu::Interrupt,
         io::{
@@ -20,7 +21,6 @@ use crate::{
         },
         GameGirl,
     },
-    scheduler::Kind,
 };
 
 /// All scheduler events on the GG.

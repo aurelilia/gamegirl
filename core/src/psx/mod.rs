@@ -14,9 +14,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common,
     common::{EmulateOptions, SystemConfig},
-    debugger::Debugger,
+    components::{debugger::Debugger, scheduler::Scheduler},
     psx::{apu::Apu, cpu::Cpu, gpu::Gpu, memory::Memory, scheduling::PsxEvent},
-    scheduler::Scheduler,
     Colour,
 };
 

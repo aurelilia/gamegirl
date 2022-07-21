@@ -11,7 +11,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ggc::io::cartridge::MBCKind::*, numutil::NumExt, storage::GameSave};
+use crate::{components::storage::GameSave, ggc::io::cartridge::MBCKind::*, numutil::NumExt};
 
 const CGB_FLAG: u16 = 0x0143;
 const CGB_ONLY: u8 = 0xC0;

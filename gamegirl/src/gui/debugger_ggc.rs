@@ -6,7 +6,7 @@
 
 use core::{
     common::System,
-    debugger::Breakpoint,
+    components::debugger::Breakpoint,
     ggc::{
         cpu::{inst, DReg},
         io::{ppu, ppu::Ppu},

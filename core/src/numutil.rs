@@ -4,17 +4,16 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-/// Trait for common number operations.
-pub trait NumExt {
-    /// Always the implementor itself.
-    type Output;
+use std::ops::BitAnd;
 
+/// Trait for common number operations.
+pub trait NumExt: BitAnd<Output = Self> + Copy {
     /// Get the state of the given bit. Returns 0/1.
-    fn bit(self, bit: u16) -> Self::Output;
+    fn bit(self, bit: u16) -> Self;
     /// Is the given bit set?
     fn is_bit(&self, bit: u16) -> bool;
     /// Set the given bit.
-    fn set_bit(self, bit: u16, state: bool) -> Self::Output;
+    fn set_bit(self, bit: u16, state: bool) -> Self;
     /// Convert to u8
     fn u8(self) -> u8;
     /// Convert to u16
@@ -25,19 +24,17 @@ pub trait NumExt {
     fn us(self) -> usize;
 
     /// Get bits in a certain range
-    fn bits(self, start: Self::Output, len: Self::Output) -> Self::Output;
+    fn bits(self, start: Self, len: Self) -> Self;
 
     /// Shift to the left, giving 0 if it does not fit.
-    fn wshl(self, by: u32) -> Self::Output;
+    fn wshl(self, by: u32) -> Self;
     /// Shift to the right, giving 0 if it does not fit.
-    fn wshr(self, by: u32) -> Self::Output;
+    fn wshr(self, by: u32) -> Self;
 }
 
 macro_rules! num_ext_impl {
     ($ty:ident) => {
         impl NumExt for $ty {
-            type Output = $ty;
-
             #[inline(always)]
             fn bit(self, bit: u16) -> $ty {
                 ((self >> bit) & 1)

@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::SAMPLE_RATE,
+    components::scheduler::Scheduler,
     ggc::{
         io::scheduling::{ApuEvent, GGEvent},
         GameGirl, T_CLOCK_HZ,
     },
-    scheduler::Scheduler,
 };
 
 mod base;

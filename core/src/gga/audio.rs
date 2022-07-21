@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::scheduling::AdvEvent;
 use crate::{
     common::SAMPLE_RATE,
+    components::scheduler::Scheduler,
     gga::{
         addr::{FIFO_A_L, SOUNDBIAS, SOUNDCNT_H},
         dma::Dmas,
@@ -19,7 +20,6 @@ use crate::{
     },
     ggc::io::apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
     numutil::{NumExt, U16Ext},
-    scheduler::Scheduler,
 };
 
 pub const SAMPLE_EVERY_N_CLOCKS: i32 = (CPU_CLOCK / SAMPLE_RATE as f32) as i32;

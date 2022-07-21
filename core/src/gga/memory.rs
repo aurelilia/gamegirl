@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use std::{
-    fmt::UpperHex,
     ops::{Index, IndexMut},
     ptr,
 };
@@ -14,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use super::audio;
 use crate::{
+    components::memory::{MemoryMappedSystem, MemoryMapper},
     gga::{
         addr::*,
         cpu::{registers::Flag, Cpu, Interrupt},
@@ -26,7 +26,6 @@ use crate::{
 };
 
 pub const KB: usize = 1024;
-pub const PAGE_SIZE: usize = 0x8000; // 32KiB
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
 
 /// Memory struct containing the GGA's memory regions along with page tables
@@ -45,13 +44,7 @@ pub struct Memory {
     /// Length of the prefetch buffer at the current PC.
     pub(crate) prefetch_len: u16,
 
-    #[serde(skip)]
-    #[serde(default = "serde_pages")]
-    read_pages: [*mut u8; 8192],
-    #[serde(skip)]
-    #[serde(default = "serde_pages")]
-    write_pages: [*mut u8; 8192],
-
+    mapper: MemoryMapper<8192>,
     wait_word: [u16; 32],
     wait_other: [u16; 32],
 }
@@ -119,7 +112,7 @@ impl GameGirlAdv {
     /// the value.
     #[inline]
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
-        self.get(addr, !0, |this, addr| match addr {
+        MemoryMapper::get(self, addr, !0, |this, addr| match addr {
             0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u8(),
 
@@ -140,7 +133,7 @@ impl GameGirlAdv {
     /// simply fetches the value.
     #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
-        self.get(addr, !1, |this, addr| match addr {
+        MemoryMapper::get(self, addr, !1, |this, addr| match addr {
             0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u16(),
 
@@ -166,7 +159,7 @@ impl GameGirlAdv {
     /// fetches the value. Also does not handle unaligned reads.
     #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
-        self.get(addr, !3, |this, addr| match addr {
+        MemoryMapper::get(self, addr, !3, |this, addr| match addr {
             0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value,
 
@@ -348,7 +341,7 @@ impl GameGirlAdv {
             }
             0x0601_0000..=0x07FF_FFFF => (), // Ignored
 
-            _ => self.set(addr, value, |_this, _addr, _value| ()),
+            _ => MemoryMapper::set(self, addr, value, |_this, _addr, _value| ()),
         }
         self.cpu.cache.write(addr);
     }
@@ -357,7 +350,7 @@ impl GameGirlAdv {
     /// simply sets the value.
     pub(super) fn set_hword(&mut self, addr_unaligned: u32, value: u16) {
         let addr = addr_unaligned & !1; // Forcibly align: All write instructions do this
-        self.set(addr, value, |this, addr, value| match addr {
+        MemoryMapper::set(self, addr, value, |this, addr, value| match addr {
             0x0400_0000..=0x0400_0300 => this.set_mmio(addr, value),
 
             // Maybe write EEPROM
@@ -385,7 +378,7 @@ impl GameGirlAdv {
     /// sets the value.
     pub(super) fn set_word(&mut self, addr_unaligned: u32, value: u32) {
         let addr = addr_unaligned & !3; // Forcibly align: All write instructions do this
-        self.set(addr, value, |this, addr, value| match addr {
+        MemoryMapper::set(self, addr, value, |this, addr, value| match addr {
             0x0400_0000..=0x0400_0300 => {
                 this.set_mmio(addr, value.low());
                 this.set_mmio(addr.wrapping_add(2), value.high());
@@ -498,72 +491,6 @@ impl GameGirlAdv {
         }
     }
 
-    // Unsafe corner!
-    /// Get a value in memory. Will try to do a fast read from page tables,
-    /// falls back to given closure if no page table is mapped at that address.
-    #[inline]
-    fn get<T>(&self, addr: u32, align: u32, slow: impl FnOnce(&GameGirlAdv, u32) -> T) -> T {
-        let aligned = addr & align;
-        let ptr = self.page::<false>(aligned);
-        if ptr as usize > 0x8000 {
-            unsafe { (ptr as *const T).read() }
-        } else {
-            slow(self, addr)
-        }
-    }
-
-    /// Sets a value in memory. Will try to do a fast write with page tables,
-    /// falls back to given closure if no page table is mapped at that address.
-    #[inline]
-    fn set<T: UpperHex>(
-        &mut self,
-        addr: u32,
-        value: T,
-        slow: impl FnOnce(&mut GameGirlAdv, u32, T),
-    ) {
-        let ptr = self.page::<true>(addr);
-        if ptr as usize > 0x8000 {
-            unsafe { ptr::write(ptr.cast(), value) }
-        } else {
-            slow(self, addr, value);
-        }
-    }
-
-    /// Get the page table at the given address. Can be a write or read table,
-    /// see const generic parameter. If there is no page mapped, returns a
-    /// pointer in range 0..0x7FFF (due to offsets to the (null) pointer)
-    fn page<const WRITE: bool>(&self, addr: u32) -> *mut u8 {
-        const MASK: [usize; 16] = [
-            0,      // Unmapped
-            0,      // Unmapped
-            0x7FFF, // EWRAM
-            0x7FFF, // IWRAM
-            0,      // MMIO
-            0x3FF,  // Palette
-            0x7FFF, // VRAM
-            0x3FF,  // OAM
-            0x7FFF, // ROM
-            0x7FFF, // ROM
-            0x7FFF, // ROM
-            0x7FFF, // ROM
-            0x7FFF, // ROM
-            0x7FFF, // ROM
-            0,      // Unmapped
-            0,      // Unmapped
-        ];
-        let addr = addr.us();
-        unsafe {
-            let mask = MASK.get_unchecked((addr >> 24) & 0xF);
-            let page_idx = (addr >> 15) & 8191;
-            let page = if WRITE {
-                self.memory.write_pages.get_unchecked(page_idx)
-            } else {
-                self.memory.read_pages.get_unchecked(page_idx)
-            };
-            page.add(addr & mask)
-        }
-    }
-
     fn bios_read<T>(addr: u32) -> T {
         unsafe {
             let ptr = BIOS.as_ptr().add(addr.us() & 0x3FFF);
@@ -590,10 +517,7 @@ impl GameGirlAdv {
 
     /// Initialize page tables and wait times.
     pub fn init_memory(&mut self) {
-        for i in 0..self.memory.read_pages.len() {
-            self.memory.read_pages[i] = unsafe { self.get_page::<true>(i * PAGE_SIZE) };
-            self.memory.write_pages[i] = unsafe { self.get_page::<false>(i * PAGE_SIZE) };
-        }
+        MemoryMapper::init_pages(self);
         self.update_wait_times();
         if self.config.cached_interpreter {
             self.cpu.cache.init(self.cart.rom.len());
@@ -607,36 +531,6 @@ impl GameGirlAdv {
             self.memory.wait_other[i] = self.calc_wait_time::<2>(addr, Seq);
             self.memory.wait_word[i + 16] = self.calc_wait_time::<4>(addr, NonSeq);
             self.memory.wait_other[i + 16] = self.calc_wait_time::<2>(addr, NonSeq);
-        }
-    }
-
-    unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
-        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
-            let ptr = reg.as_ptr() as *mut u8;
-            ptr.add(offs % reg.len())
-        }
-
-        match a {
-            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
-            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_nomut().palette, a - 0x500_0000),
-            0x0600_0000..=0x0601_7FFF => offs(&self.ppu_nomut().vram, a - 0x600_0000),
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_nomut().oam, a - 0x700_0000),
-            0x0800_0000..=0x09FF_FFFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
-                offs(&self.cart.rom, a - 0x800_0000)
-            }
-            0x0A00_0000..=0x0BFF_FFFF if R && self.cart.rom.len() >= (a - 0xA00_0000) => {
-                offs(&self.cart.rom, a - 0xA00_0000)
-            }
-            // Does not go all the way due to EEPROM
-            0x0C00_0000..=0x0DFF_7FFF if R && self.cart.rom.len() >= (a - 0xC00_0000) => {
-                offs(&self.cart.rom, a - 0xC00_0000)
-            }
-
-            // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => offs(&self.ppu_nomut().vram, 0x1_0000 + (a - 0x600_0000)),
-            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),
-            _ => ptr::null::<u8>() as *mut u8,
         }
     }
 
@@ -683,8 +577,7 @@ impl Default for Memory {
             mmio: [0; KB / 2],
             bios_value: 0xE129_F000,
             prefetch_len: 0,
-            read_pages: serde_pages(),
-            write_pages: serde_pages(),
+            mapper: MemoryMapper::default(),
             wait_word: [0; 32],
             wait_other: [0; 32],
         }
@@ -711,6 +604,64 @@ impl IndexMut<u32> for GameGirlAdv {
     }
 }
 
-fn serde_pages() -> [*mut u8; 8192] {
-    [ptr::null::<u8>() as *mut u8; 8192]
+impl MemoryMappedSystem<8192> for GameGirlAdv {
+    type Usize = u32;
+    const ADDR_MASK: &'static [usize] = &[
+        0,      // Unmapped
+        0,      // Unmapped
+        0x7FFF, // EWRAM
+        0x7FFF, // IWRAM
+        0,      // MMIO
+        0x3FF,  // Palette
+        0x7FFF, // VRAM
+        0x3FF,  // OAM
+        0x7FFF, // ROM
+        0x7FFF, // ROM
+        0x7FFF, // ROM
+        0x7FFF, // ROM
+        0x7FFF, // ROM
+        0x7FFF, // ROM
+        0,      // Unmapped
+        0,      // Unmapped
+    ];
+    const PAGE_POW: usize = 15;
+    const MASK_POW: usize = 24;
+
+    fn get_mapper(&self) -> &MemoryMapper<8192> {
+        &self.memory.mapper
+    }
+
+    fn get_mapper_mut(&mut self) -> &mut MemoryMapper<8192> {
+        &mut self.memory.mapper
+    }
+
+    unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
+        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
+            let ptr = reg.as_ptr() as *mut u8;
+            ptr.add(offs % reg.len())
+        }
+
+        match a {
+            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
+            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_nomut().palette, a - 0x500_0000),
+            0x0600_0000..=0x0601_7FFF => offs(&self.ppu_nomut().vram, a - 0x600_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_nomut().oam, a - 0x700_0000),
+            0x0800_0000..=0x09FF_FFFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
+                offs(&self.cart.rom, a - 0x800_0000)
+            }
+            0x0A00_0000..=0x0BFF_FFFF if R && self.cart.rom.len() >= (a - 0xA00_0000) => {
+                offs(&self.cart.rom, a - 0xA00_0000)
+            }
+            // Does not go all the way due to EEPROM
+            0x0C00_0000..=0x0DFF_7FFF if R && self.cart.rom.len() >= (a - 0xC00_0000) => {
+                offs(&self.cart.rom, a - 0xC00_0000)
+            }
+
+            // VRAM mirror weirdness
+            0x0601_8000..=0x0601_FFFF => offs(&self.ppu_nomut().vram, 0x1_0000 + (a - 0x600_0000)),
+            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),
+            _ => ptr::null::<u8>() as *mut u8,
+        }
+    }
 }

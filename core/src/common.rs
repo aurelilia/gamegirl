@@ -12,13 +12,13 @@ use elf_rs::{Elf, ElfFile};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
+    components::storage::Storage,
     gga::{cpu::Cpu, GameGirlAdv},
     ggc::{
         io::{cartridge::Cartridge, joypad::Joypad},
         GameGirl,
     },
     psx::PlayStation,
-    storage::Storage,
     Colour,
 };
 
