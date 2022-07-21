@@ -1,24 +1,25 @@
 use std::sync::Arc;
 
 use crate::{
-    gga::cpu::{inst_arm::ArmHandler, inst_thumb::ThumbHandler},
+    components::arm::{inst_arm::ArmHandler, inst_thumb::ThumbHandler, interface::ArmSystem},
     numutil::NumExt,
 };
 
 const IWRAM_PAGE_SIZE: u32 = 128;
 const IWRAM_END: u32 = 0x300_7FFF - 0x400;
 
-#[derive(Default)]
-pub struct Cache {
-    bios: Vec<Option<CacheEntry>>,
-    rom: Vec<Option<CacheEntry>>,
+pub struct Cache<S: ArmSystem> {
+    bios: Vec<Option<CacheEntry<S>>>,
+    rom: Vec<Option<CacheEntry<S>>>,
 
-    iwram: Vec<Option<CacheEntry>>,
+    iwram: Vec<Option<CacheEntry<S>>>,
     iwram_cache_indices: Vec<Vec<u32>>,
+
+    pub enabled: bool,
 }
 
-impl Cache {
-    pub fn get(&self, pc: u32) -> Option<CacheEntry> {
+impl<S: ArmSystem> Cache<S> {
+    pub fn get(&self, pc: u32) -> Option<CacheEntry<S>> {
         match pc {
             0..=0x3FFF => self.bios.get(pc.us() >> 1).cloned().flatten(),
             0x300_0000..=IWRAM_END => self.iwram.get((pc.us() & 0x7FFF) >> 1).cloned().flatten(),
@@ -27,7 +28,7 @@ impl Cache {
         }
     }
 
-    pub fn put(&mut self, pc: u32, entry: CacheEntry) {
+    pub fn put(&mut self, pc: u32, entry: CacheEntry<S>) {
         match pc {
             0..=0x3FFF => Self::insert(&mut self.bios, pc >> 1, entry),
             0x300_0000..=IWRAM_END => {
@@ -40,14 +41,8 @@ impl Cache {
         }
     }
 
-    fn insert(set: &mut [Option<CacheEntry>], location: u32, entry: CacheEntry) {
+    fn insert(set: &mut [Option<CacheEntry<S>>], location: u32, entry: CacheEntry<S>) {
         set[location.us()] = Some(entry);
-    }
-
-    pub fn can_make_cache(pc: u32) -> bool {
-        pc < 0x3FFF
-            || (0x300_0000..=IWRAM_END).contains(&pc)
-            || (0x800_0000..=0xDFF_FFFF).contains(&pc)
     }
 
     pub fn init(&mut self, cart_size: usize) {
@@ -56,6 +51,7 @@ impl Cache {
         self.iwram_cache_indices
             .resize(0x4000 / IWRAM_PAGE_SIZE.us(), Vec::new());
         self.rom.resize(cart_size >> 1, None);
+        self.enabled = true;
     }
 
     pub fn force_end_block(pc: u32) -> bool {
@@ -72,8 +68,7 @@ impl Cache {
     }
 
     pub fn invalidate_rom(&mut self) {
-        if self.bios.is_empty() {
-            // Caching is disabled
+        if !self.enabled {
             return;
         }
         let len = self.rom.len();
@@ -83,10 +78,30 @@ impl Cache {
     }
 }
 
-#[derive(Clone)]
-pub enum CacheEntry {
-    Arm(Arc<Vec<CachedInst<u32, ArmHandler>>>),
-    Thumb(Arc<Vec<CachedInst<u16, ThumbHandler>>>),
+impl<S: ArmSystem> Default for Cache<S> {
+    fn default() -> Self {
+        Self {
+            bios: Vec::default(),
+            rom: Vec::default(),
+            iwram: Vec::default(),
+            iwram_cache_indices: Vec::default(),
+            enabled: false,
+        }
+    }
+}
+
+pub enum CacheEntry<S: ArmSystem> {
+    Arm(Arc<Vec<CachedInst<u32, ArmHandler<S>>>>),
+    Thumb(Arc<Vec<CachedInst<u16, ThumbHandler<S>>>>),
+}
+
+impl<S: ArmSystem> Clone for CacheEntry<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Arm(arg0) => Self::Arm(arg0.clone()),
+            Self::Thumb(arg0) => Self::Thumb(arg0.clone()),
+        }
+    }
 }
 
 pub struct CachedInst<I, H> {

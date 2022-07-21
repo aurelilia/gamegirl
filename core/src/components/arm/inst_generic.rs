@@ -6,27 +6,22 @@
 
 use std::fmt::UpperHex;
 
+use super::interface::{ArmSystem, SysWrapper};
 use crate::{
-    gga::{
-        cpu::{Cpu, Exception},
-        Access,
-        Access::NonSeq,
-        GameGirlAdv,
-    },
+    components::arm::{Access, Access::NonSeq, Cpu, Exception},
     numutil::NumExt,
 };
 
-impl GameGirlAdv {
+impl<S: ArmSystem> SysWrapper<S> {
     pub fn swi(&mut self) {
         Cpu::exception_occurred(self, Exception::Swi);
-        self.memory.bios_value = 0xE3A0_2004;
     }
 
     /// Called by multiple load/store instructions when the Rlist was
     /// empty, which causes R15 to be loaded/stored and Rb to be
     /// incremented/decremented by 0x40.
     pub fn on_empty_rlist(&mut self, rb: u32, str: bool, up: bool, before: bool) {
-        let addr = self.cpu.reg(rb);
+        let addr = self.cpu().reg(rb);
         self.set_reg(rb, Self::mod_with_offs(addr, 0x40, up));
 
         if str {
@@ -36,9 +31,10 @@ impl GameGirlAdv {
                 (false, true) => addr - 0x40,
                 (false, false) => addr - 0x3C,
             };
-            self.write_word(addr, self.cpu.pc() + self.cpu.inst_size(), NonSeq);
+            let value = self.cpur().pc() + self.cpur().inst_size();
+            self.write::<u32>(addr, value, NonSeq);
         } else {
-            let val = self.read_word(addr, NonSeq);
+            let val = self.read::<u32>(addr, NonSeq);
             self.set_pc(val);
         }
     }
@@ -54,7 +50,7 @@ impl GameGirlAdv {
 
     pub fn idle_nonseq(&mut self) {
         self.add_i_cycles(1);
-        self.cpu.access_type = Access::NonSeq;
+        self.cpu().access_type = Access::NonSeq;
     }
 
     pub fn mul_wait_cycles(&mut self, mut value: u32, signed: bool) {
@@ -87,7 +83,7 @@ impl GameGirlAdv {
     }
 }
 
-impl Cpu {
+impl<S: ArmSystem> Cpu<S> {
     pub fn eval_condition(&self, cond: u16) -> bool {
         // This condition table is taken from mGBA sources, which are licensed under
         // MPL2 at https://github.com/mgba-emu/mgba

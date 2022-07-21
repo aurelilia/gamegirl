@@ -1,4 +1,4 @@
-use core::{common::SystemConfig, gga::GameGirlAdv, numutil::NumExt, System};
+use core::{common::SystemConfig, components::arm::Cpu, gga::GameGirlAdv, numutil::NumExt, System};
 use std::{sync::mpsc, thread};
 
 fn main() {
@@ -44,9 +44,9 @@ fn main() {
         }
 
         let mnem = if !cached_state.1.is_bit(5) {
-            GameGirlAdv::get_mnemonic_arm(uncached_state.2)
+            Cpu::<GameGirlAdv>::get_mnemonic_arm(uncached_state.2)
         } else {
-            GameGirlAdv::get_mnemonic_thumb(uncached_state.2.u16())
+            Cpu::<GameGirlAdv>::get_mnemonic_thumb(uncached_state.2.u16())
         };
         eprintln!("0x{:08X} {}", cached_state.0[15], mnem);
     });

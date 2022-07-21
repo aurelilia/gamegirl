@@ -12,6 +12,7 @@
 #![feature(generic_const_exprs)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::missing_panics_doc)]
+#![allow(clippy::missing_safety_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_truncation)]
@@ -38,7 +39,7 @@ pub mod common;
 pub mod components;
 pub mod gga;
 pub mod ggc;
-pub mod nds;
+// pub mod nds;
 pub mod numutil;
 pub mod psx;
 

@@ -10,12 +10,11 @@ use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    gga::{
-        addr::VCOUNT,
-        cartridge::SaveType,
-        cpu::{Cpu, Interrupt},
-        Access, GameGirlAdv,
+    components::arm::{
+        interface::{ArmSystem, RwType},
+        Access, Cpu, Interrupt,
     },
+    gga::{addr::VCOUNT, cartridge::SaveType, GameGirlAdv},
     numutil::{word, NumExt},
 };
 
@@ -128,15 +127,15 @@ impl Dmas {
 
         let word_transfer = ctrl.is_bit(10);
         if fifo || word_transfer {
-            Self::perform_transfer::<true>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
+            Self::perform_transfer::<u32>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
         } else if idx == 3 {
             // Maybe alert EEPROM, if the cart has one
             if let SaveType::Eeprom(eeprom) = &mut gg.cart.save_type {
                 eeprom.dma3_started(gg.dma.dst[3], count);
             }
-            Self::perform_transfer::<false>(gg, 3, count, src_mod, dst_mod);
+            Self::perform_transfer::<u16>(gg, 3, count, src_mod, dst_mod);
         } else {
-            Self::perform_transfer::<false>(gg, idx.us(), count, src_mod, dst_mod);
+            Self::perform_transfer::<u16>(gg, idx.us(), count, src_mod, dst_mod);
         }
 
         if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 || (vid_capture && gg[VCOUNT] == 161) {
@@ -157,7 +156,7 @@ impl Dmas {
     }
 
     /// Perform a transfer.
-    fn perform_transfer<const WORD: bool>(
+    fn perform_transfer<T: RwType>(
         gg: &mut GameGirlAdv,
         idx: usize,
         count: u32,
@@ -171,18 +170,14 @@ impl Dmas {
         let mut kind = Access::NonSeq;
         if gg.dma.src[idx] >= 0x200_0000 {
             // First, align SRC/DST
-            let align = if WORD { 3 } else { 1 };
+            let align = T::WIDTH - 1;
             gg.dma.src[idx] &= !align;
             gg.dma.dst[idx] &= !align;
 
             for _ in 0..count {
-                if WORD {
-                    let value = gg.read_word(gg.dma.src[idx], kind);
-                    gg.write_word(gg.dma.dst[idx], value, kind);
-                } else {
-                    let value = gg.read_hword(gg.dma.src[idx], kind).u16();
-                    gg.write_hword(gg.dma.dst[idx], value, kind);
-                }
+                let value = gg.read::<T>(gg.dma.src[idx], kind).u32();
+                gg.write::<T>(gg.dma.dst[idx], T::from_u32(value), kind);
+
                 gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
                 gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
@@ -191,20 +186,20 @@ impl Dmas {
             }
 
             // Put last value into cache
-            if WORD {
-                gg.dma.cache = gg.get_word(gg.dma.src[idx].wrapping_add_signed(-src_mod));
+            if T::WIDTH == 4 {
+                gg.dma.cache = gg.get::<u32>(gg.dma.src[idx].wrapping_add_signed(-src_mod));
             } else {
-                let value = gg.get_hword(gg.dma.src[idx].wrapping_add_signed(-src_mod));
+                let value = gg.get::<u16>(gg.dma.src[idx].wrapping_add_signed(-src_mod));
                 gg.dma.cache = word(value, value);
             }
         } else {
             for _ in 0..count {
-                if WORD {
-                    gg.write_word(gg.dma.dst[idx], gg.dma.cache, kind);
+                if T::WIDTH == 4 {
+                    gg.write::<u32>(gg.dma.dst[idx], gg.dma.cache, kind);
                 } else if gg.dma.dst[idx].is_bit(1) {
-                    gg.write_hword(gg.dma.dst[idx], (gg.dma.cache >> 16).u16(), kind);
+                    gg.write::<u16>(gg.dma.dst[idx], (gg.dma.cache >> 16).u16(), kind);
                 } else {
-                    gg.write_hword(gg.dma.dst[idx], gg.dma.cache.u16(), kind);
+                    gg.write::<u16>(gg.dma.dst[idx], gg.dma.cache.u16(), kind);
                 }
                 gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
                 gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);

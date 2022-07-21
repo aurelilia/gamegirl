@@ -169,7 +169,7 @@ cargo run -p tests --release -- --gg
 - [ ] mgba's suite
   - [x] Memory: 1552/1552
   - [x] I/O read: 123/123
-  - [ ] Timing: 1294/2020
+  - [ ] Timing: 1272/2020
   - [ ] Timer count-up: Freezes...
   - [ ] Timer IRQ: 65/90
   - [x] Shifter: 140/140
@@ -178,7 +178,7 @@ cargo run -p tests --release -- --gg
   - [x] BIOS math: 625/625
   - [ ] DMA tests: 1248/1256
     - "0 Imm H/W R+0x10" tests fail (DMA0 with ROM?)
-  - [ ] Misc. edge case tests: 6/10
+  - [ ] Misc. edge case tests: 7/10
   - [ ] Video Tests
     - [x] Basic Mode 3
     - [x] Basic Mode 4

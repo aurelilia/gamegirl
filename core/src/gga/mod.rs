@@ -8,17 +8,20 @@ use std::mem;
 
 use audio::Apu;
 use cartridge::Cartridge;
-use cpu::Cpu;
+use cpu::CPU_CLOCK;
 use memory::Memory;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{self, EmulateOptions, SystemConfig},
-    components::{debugger::Debugger, scheduler::Scheduler},
+    components::{
+        arm::{registers::Flag, Access, Cpu},
+        debugger::Debugger,
+        scheduler::Scheduler,
+    },
     gga::{
         addr::{KEYINPUT, SOUNDBIAS, WAITCNT},
         audio::SAMPLE_EVERY_N_CLOCKS,
-        cpu::registers::Flag,
         dma::Dmas,
         graphics::threading::{new_ppu, GgaPpu},
         scheduling::{AdvEvent, ApuEvent, PpuEvent},
@@ -31,7 +34,7 @@ use crate::{
 pub mod addr;
 mod audio;
 mod cartridge;
-pub mod cpu;
+mod cpu;
 mod dma;
 pub mod graphics;
 mod input;
@@ -42,15 +45,13 @@ mod timer;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod remote_debugger;
 
-pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
-
 pub type GGADebugger = Debugger<u32>;
 
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.
 #[derive(Deserialize, Serialize)]
 pub struct GameGirlAdv {
-    pub cpu: Cpu,
+    pub cpu: Cpu<Self>,
     pub memory: Memory,
     pub ppu: GgaPpu,
     pub apu: Apu,
@@ -106,21 +107,13 @@ impl GameGirlAdv {
         }
     }
 
-    fn reg(&self, idx: u32) -> u32 {
-        self.cpu.reg(idx)
-    }
-
-    fn low(&self, idx: u16) -> u32 {
-        self.cpu.low(idx)
-    }
-
     pub fn get_inst_mnemonic(&self, ptr: u32) -> String {
         if self.cpu.flag(Flag::Thumb) {
             let inst = self.get_hword(ptr);
-            Self::get_mnemonic_thumb(inst)
+            Cpu::<Self>::get_mnemonic_thumb(inst)
         } else {
             let inst = self.get_word(ptr);
-            Self::get_mnemonic_arm(inst)
+            Cpu::<Self>::get_mnemonic_arm(inst)
         }
     }
 
@@ -141,7 +134,7 @@ impl GameGirlAdv {
 
     pub fn skip_bootrom(&mut self) {
         self.cpu.set_cpsr(0x1F);
-        self.set_pc(0x0800_0000);
+        self.cpu.registers[15] = 0x0800_0000;
         self.cpu.sp[1] = 0x0300_7F00;
         self.cpu.sp[3] = 0x0300_7F00;
         self.cpu.sp[5] = 0x0300_7F00;
@@ -186,13 +179,4 @@ impl Default for GameGirlAdv {
 
         gg
     }
-}
-
-/// Enum for the types of memory accesses; either sequential
-/// or non-sequential. The numbers assigned to the variants are
-/// to speed up reading the wait times in `memory.rs`.
-#[derive(Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub enum Access {
-    Seq = 0,
-    NonSeq = 16,
 }

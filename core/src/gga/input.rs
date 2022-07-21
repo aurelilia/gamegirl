@@ -9,9 +9,9 @@
 
 use crate::{
     common::Button,
+    components::arm::{Cpu, Interrupt},
     gga::{
         addr::{KEYCNT, KEYINPUT},
-        cpu::{Cpu, Interrupt},
         GameGirlAdv,
     },
     numutil::NumExt,

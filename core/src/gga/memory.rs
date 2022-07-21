@@ -13,15 +13,15 @@ use serde::{Deserialize, Serialize};
 
 use super::audio;
 use crate::{
-    components::memory::{MemoryMappedSystem, MemoryMapper},
-    gga::{
-        addr::*,
-        cpu::{registers::Flag, Cpu, Interrupt},
-        dma::Dmas,
-        timer::Timers,
-        Access::{self, *},
-        GameGirlAdv,
+    components::{
+        arm::{
+            registers::Flag,
+            Access::{self, *},
+            Cpu, Interrupt,
+        },
+        memory::{MemoryMappedSystem, MemoryMapper},
     },
+    gga::{addr::*, dma::Dmas, timer::Timers, GameGirlAdv},
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
@@ -50,64 +50,6 @@ pub struct Memory {
 }
 
 impl GameGirlAdv {
-    /// Read a byte from the bus. Also enforces timing.
-    pub(super) fn read_byte(&mut self, addr: u32, kind: Access) -> u8 {
-        let time = self.wait_time::<1>(addr, kind);
-        self.add_sn_cycles(time);
-        self.get_byte(addr)
-    }
-
-    /// Read a half-word from the bus (LE). Also enforces timing.
-    /// Also handles unaligned reads, which is why ret is u32.
-    pub(super) fn read_hword(&mut self, addr: u32, kind: Access) -> u32 {
-        let time = self.wait_time::<2>(addr, kind);
-        self.add_sn_cycles(time);
-        if addr.is_bit(0) {
-            // Unaligned
-            let val = self.get_hword(addr);
-            Cpu::ror_s0(val.u32(), 8)
-        } else {
-            // Aligned
-            self.get_hword(addr).u32()
-        }
-    }
-
-    /// Read a half-word from the bus (LE). Also enforces timing.
-    /// If address is unaligned, do LDRSH behavior.
-    pub(super) fn read_hword_ldrsh(&mut self, addr: u32, kind: Access) -> u32 {
-        let time = self.wait_time::<2>(addr, kind);
-        self.add_sn_cycles(time);
-        if addr.is_bit(0) {
-            // Unaligned
-            let val = self.get_hword(addr) >> 8;
-            val as i8 as i16 as u32
-        } else {
-            // Aligned
-            self.get_hword(addr).u32()
-        }
-    }
-
-    /// Read a word from the bus (LE). Also enforces timing.
-    pub(super) fn read_word(&mut self, addr: u32, kind: Access) -> u32 {
-        let time = self.wait_time::<4>(addr, kind);
-        self.add_sn_cycles(time);
-        self.get_word(addr)
-    }
-
-    /// Read a word from the bus (LE). Also enforces timing.
-    /// If address is unaligned, do LDR/SWP behavior.
-    pub(super) fn read_word_ldrswp(&mut self, addr: u32, kind: Access) -> u32 {
-        let val = self.read_word(addr, kind);
-        if addr & 3 != 0 {
-            // Unaligned
-            let by = (addr & 3) << 3;
-            Cpu::ror_s0(val, by)
-        } else {
-            // Aligned
-            val
-        }
-    }
-
     /// Read a byte from the bus. Does no timing-related things; simply fetches
     /// the value.
     #[inline]
@@ -275,26 +217,6 @@ impl GameGirlAdv {
                 }
             }
         }
-    }
-    /// Write a byte to the bus. Handles timing.
-    pub(super) fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
-        let time = self.wait_time::<1>(addr, kind);
-        self.add_sn_cycles(time);
-        self.set_byte(addr, value);
-    }
-
-    /// Write a half-word from the bus (LE). Handles timing.
-    pub(super) fn write_hword(&mut self, addr: u32, value: u16, kind: Access) {
-        let time = self.wait_time::<2>(addr, kind);
-        self.add_sn_cycles(time);
-        self.set_hword(addr, value);
-    }
-
-    /// Write a word from the bus (LE). Handles timing.
-    pub(super) fn write_word(&mut self, addr: u32, value: u32, kind: Access) {
-        let time = self.wait_time::<4>(addr, kind);
-        self.add_sn_cycles(time);
-        self.set_word(addr, value);
     }
 
     /// Write a byte to the bus. Does no timing-related things; simply sets the
@@ -500,15 +422,15 @@ impl GameGirlAdv {
 
     /// Get wait time for a given address.
     #[inline]
-    pub fn wait_time<const W: u32>(&mut self, addr: u32, ty: Access) -> u16 {
-        let prefetch_size = if W == 4 { 2 } else { 1 };
+    pub fn wait_time<T: NumExt + 'static>(&mut self, addr: u32, ty: Access) -> u16 {
+        let prefetch_size = if T::WIDTH == 4 { 2 } else { 1 };
         if addr == self.cpu.pc() && self.memory.prefetch_len >= prefetch_size {
             self.memory.prefetch_len -= prefetch_size;
             return prefetch_size;
         }
 
         let idx = ((addr.us() >> 24) & 0xF) + ty as usize;
-        if W == 4 {
+        if T::WIDTH == 4 {
             self.memory.wait_word[idx]
         } else {
             self.memory.wait_other[idx]

@@ -99,12 +99,12 @@ impl SingleThreadBase for SyncSys {
         let mut gg = gg.gga_mut();
 
         for (i, reg) in regs.r.iter().enumerate() {
-            gg.set_reg(i.u32(), *reg);
+            gg.cpu.registers[i] = *reg;
         }
         gg.cpu.set_sp(regs.sp);
         gg.cpu.set_lr(regs.lr);
         if regs.pc != gg.cpu.pc() {
-            gg.set_pc(regs.pc);
+            // gg.set_pc(regs.pc); TODO
         }
         gg.cpu.cpsr = regs.cpsr;
 
@@ -157,7 +157,7 @@ impl SingleRegisterAccess<()> for SyncSys {
         let gg = gg.as_gga();
 
         let value = match reg_id {
-            ArmCoreRegId::Gpr(id) => gg.reg(id.u32()),
+            ArmCoreRegId::Gpr(id) => gg.cpu.reg(id.u32()),
             ArmCoreRegId::Sp => gg.cpu.sp(),
             ArmCoreRegId::Lr => gg.cpu.lr(),
             ArmCoreRegId::Pc => gg.cpu.pc(),
@@ -182,10 +182,10 @@ impl SingleRegisterAccess<()> for SyncSys {
         let gg = gg.gga_mut();
 
         match reg_id {
-            ArmCoreRegId::Gpr(id) => gg.set_reg(id.u32(), value),
+            ArmCoreRegId::Gpr(id) => gg.cpu.registers[id.us()] = value,
             ArmCoreRegId::Sp => gg.cpu.set_sp(value),
             ArmCoreRegId::Lr => gg.cpu.set_lr(value),
-            ArmCoreRegId::Pc => gg.set_pc(value),
+            ArmCoreRegId::Pc => panic!(), // gg.set_pc(value), TODO
             ArmCoreRegId::Cpsr => gg.cpu.cpsr = value,
             _ => (),
         };

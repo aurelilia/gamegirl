@@ -7,10 +7,8 @@
 use bitmatch::bitmatch;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    gga::{cpu::Cpu, GameGirlAdv},
-    numutil::NumExt,
-};
+use super::interface::{ArmSystem, SysWrapper};
+use crate::{components::arm::Cpu, numutil::NumExt};
 
 /// Macro for creating accessors for mode-dependent registers.
 macro_rules! mode_reg {
@@ -107,7 +105,7 @@ impl Flag {
     }
 }
 
-impl Cpu {
+impl<S: ArmSystem> Cpu<S> {
     #[inline]
     pub fn sp(&self) -> u32 {
         self.registers[13]
@@ -209,20 +207,32 @@ impl Cpu {
     }
 }
 
-impl GameGirlAdv {
+impl<S: ArmSystem> SysWrapper<S> {
     /// Set the PC. Needs special behavior to fake the pipeline.
     #[inline]
     pub fn set_pc(&mut self, val: u32) {
         // Align to 2/4 depending on mode
-        self.cpu.registers[15] = val & (!(self.cpu.inst_size() - 1));
-        Cpu::pipeline_stall(self);
+        self.cpu().registers[15] = val & (!(self.cpu().inst_size() - 1));
+        Cpu::pipeline_stall(&mut **self);
     }
 
     pub fn set_reg(&mut self, idx: u32, val: u32) {
         if idx == 15 {
             self.set_pc(val);
         } else {
-            self.cpu.registers[idx.us()] = val;
+            self.cpu().registers[idx.us()] = val;
         }
+    }
+
+    pub fn reg(&self, idx: u32) -> u32 {
+        self.cpur().reg(idx)
+    }
+
+    pub fn reg_pc4(&self, idx: u32) -> u32 {
+        self.cpur().reg_pc4(idx)
+    }
+
+    pub fn low(&self, idx: u16) -> u32 {
+        self.cpur().low(idx)
     }
 }

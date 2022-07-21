@@ -51,7 +51,6 @@ mod inner {
 
     use crate::{
         gga::{graphics::Ppu, GameGirlAdv},
-        nds::Nds,
         numutil::NumExt,
         Colour,
     };
@@ -86,17 +85,17 @@ mod inner {
         }
     }
 
-    impl Nds {
-        #[inline]
-        pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
-            self.ppus[E].ppu.lock().unwrap()
-        }
-
-        #[inline]
-        pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
-            self.ppus[E].ppu.lock().unwrap()
-        }
-    }
+    // impl Nds {
+    // #[inline]
+    // pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
+    // self.ppus[E].ppu.lock().unwrap()
+    // }
+    //
+    // #[inline]
+    // pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
+    // self.ppus[E].ppu.lock().unwrap()
+    // }
+    // }
 
     pub fn new_ppu() -> GgaPpu {
         let ppu = Arc::new(Mutex::new(Ppu::default()));

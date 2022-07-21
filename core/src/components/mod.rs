@@ -4,6 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+pub mod arm;
 pub mod debugger;
 pub mod memory;
 pub mod scheduler;

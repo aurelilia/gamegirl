@@ -24,12 +24,12 @@ use self::threading::PpuType;
 use super::memory::KB;
 use crate::{
     common::BorrowedSystem,
+    components::arm::{Cpu, Interrupt},
     gga::{
         addr::{
             BG0CNT, BG2PA, BG3PA, BLDALPHA, BLDCNT, BLDY, DISPCNT, DISPSTAT, VCOUNT, WIN0H, WIN0V,
             WININ, WINOUT,
         },
-        cpu::{Cpu, Interrupt},
         dma::{Dmas, Reason},
         scheduling::{AdvEvent, PpuEvent},
         GameGirlAdv,

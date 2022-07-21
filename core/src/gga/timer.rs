@@ -7,10 +7,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    components::arm::{Cpu, Interrupt},
     gga::{
         addr::{SOUNDCNT_H, TM0CNT_H},
         audio::Apu,
-        cpu::{Cpu, Interrupt},
         scheduling::AdvEvent,
         GameGirlAdv,
     },

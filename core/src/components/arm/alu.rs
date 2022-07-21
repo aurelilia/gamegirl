@@ -4,12 +4,13 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use super::interface::ArmSystem;
 use crate::{
-    gga::cpu::{registers::Flag, Cpu},
+    components::arm::{registers::Flag, Cpu},
     numutil::NumExt,
 };
 
-impl Cpu {
+impl<S: ArmSystem> Cpu<S> {
     /// Logical/Arithmetic shift left
     pub fn lsl<const CPSR: bool>(&mut self, value: u32, by: u32) -> u32 {
         if by == 0 {

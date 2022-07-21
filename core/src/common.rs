@@ -18,7 +18,6 @@ use crate::{
         io::{cartridge::Cartridge, joypad::Joypad},
         GameGirl,
     },
-    nds::Nds,
     psx::PlayStation,
     Colour,
 };
@@ -178,7 +177,7 @@ pub enum System {
     /// A GGA. Only used for GGA games.
     GGA(Box<GameGirlAdv>),
     /// An NDS. Only used for NDS games.
-    NDS(Box<Nds>),
+    NDS(Box<usize>),
     /// A PSX. Only used for PSX games, obviously.
     PSX(Box<PlayStation>),
 }

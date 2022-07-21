@@ -8,6 +8,8 @@ use std::ops::BitAnd;
 
 /// Trait for common number operations.
 pub trait NumExt: BitAnd<Output = Self> + Copy {
+    const WIDTH: u32;
+
     /// Get the state of the given bit. Returns 0/1.
     fn bit(self, bit: u16) -> Self;
     /// Is the given bit set?
@@ -23,6 +25,13 @@ pub trait NumExt: BitAnd<Output = Self> + Copy {
     /// Convert to usize
     fn us(self) -> usize;
 
+    /// Convert from u8
+    fn from_u8(from: u8) -> Self;
+    /// Convert from u16
+    fn from_u16(from: u16) -> Self;
+    /// Convert from u32
+    fn from_u32(from: u32) -> Self;
+
     /// Get bits in a certain range
     fn bits(self, start: Self, len: Self) -> Self;
 
@@ -33,8 +42,10 @@ pub trait NumExt: BitAnd<Output = Self> + Copy {
 }
 
 macro_rules! num_ext_impl {
-    ($ty:ident) => {
+    ($ty:ident, $w:expr) => {
         impl NumExt for $ty {
+            const WIDTH: u32 = $w;
+
             #[inline(always)]
             fn bit(self, bit: u16) -> $ty {
                 ((self >> bit) & 1)
@@ -70,6 +81,21 @@ macro_rules! num_ext_impl {
                 self as usize
             }
 
+            #[inline(always)]
+            fn from_u8(from: u8) -> Self {
+                from as $ty
+            }
+
+            #[inline(always)]
+            fn from_u16(from: u16) -> Self {
+                from as $ty
+            }
+
+            #[inline(always)]
+            fn from_u32(from: u32) -> Self {
+                from as $ty
+            }
+
             fn bits(self, start: $ty, len: $ty) -> $ty {
                 (self >> start) & ((1 << len) - 1)
             }
@@ -85,11 +111,11 @@ macro_rules! num_ext_impl {
     };
 }
 
-num_ext_impl!(u8);
-num_ext_impl!(u16);
-num_ext_impl!(u32);
-num_ext_impl!(u64);
-num_ext_impl!(usize);
+num_ext_impl!(u8, 1);
+num_ext_impl!(u16, 2);
+num_ext_impl!(u32, 4);
+num_ext_impl!(u64, 8);
+num_ext_impl!(usize, 8);
 
 // Traits and functions for some more common operations used mainly on GGA.
 pub fn hword(lo: u8, hi: u8) -> u16 {
