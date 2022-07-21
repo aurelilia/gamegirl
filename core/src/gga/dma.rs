@@ -34,12 +34,12 @@ pub struct Dmas {
     /// Currently running DMA, or 99
     pub(super) running: u16,
     /// DMAs waiting to run after current.
-    queued: ArrayVec<(u16, DmaReason), 3>,
+    queued: ArrayVec<(u16, Reason), 3>,
 }
 
 impl Dmas {
     /// Update all DMAs to see if they need ticking.
-    pub fn update_all(gg: &mut GameGirlAdv, reason: DmaReason) {
+    pub fn update_all(gg: &mut GameGirlAdv, reason: Reason) {
         for idx in 0..4 {
             let base = Self::base_addr(idx);
             Self::step_dma(gg, idx, base, gg[base + 0xA], reason);
@@ -59,14 +59,14 @@ impl Dmas {
         }
 
         gg[base + 0xA] = new_ctrl & if idx == 3 { 0xFFE0 } else { 0xF7E0 };
-        Self::step_dma(gg, idx, base, new_ctrl, DmaReason::CtrlWrite);
+        Self::step_dma(gg, idx, base, new_ctrl, Reason::CtrlWrite);
     }
 
     /// Try to perform a FIFO transfer, if the DMA is otherwise configured for
     /// it.
     pub fn try_fifo_transfer(gg: &mut GameGirlAdv, idx: u16) {
         let base = Self::base_addr(idx);
-        Self::step_dma(gg, idx, base, gg[base + 0xA], DmaReason::Fifo);
+        Self::step_dma(gg, idx, base, gg[base + 0xA], Reason::Fifo);
     }
 
     /// Get the destination register for a DMA; this is not the internal one.
@@ -76,17 +76,17 @@ impl Dmas {
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16, reason: DmaReason) {
-        let fifo = reason == DmaReason::Fifo;
+    fn step_dma(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16, reason: Reason) {
+        let fifo = reason == Reason::Fifo;
         let vid_capture = idx == 3
             && (2..162).contains(&gg[VCOUNT])
-            && reason == DmaReason::HBlank
+            && reason == Reason::HBlank
             && ctrl.bits(12, 2) == 3;
         let on = ctrl.is_bit(15)
             && match ctrl.bits(12, 2) {
-                0 => reason == DmaReason::CtrlWrite,
-                1 => reason == DmaReason::VBlank,
-                2 => reason == DmaReason::HBlank && gg[VCOUNT] < 160,
+                0 => reason == Reason::CtrlWrite,
+                1 => reason == Reason::VBlank,
+                2 => reason == Reason::HBlank && gg[VCOUNT] < 160,
                 _ => fifo || vid_capture,
             };
         if !on {
@@ -140,11 +140,11 @@ impl Dmas {
         if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 || (vid_capture && gg[VCOUNT] == 161) {
             // Disable if reload is not enabled, it's an immediate transfer, or end of video
             // capture
-            gg[base + 0xA] = ctrl.set_bit(15, false)
+            gg[base + 0xA] = ctrl.set_bit(15, false);
         }
         if ctrl.is_bit(14) {
             // Fire interrupt if configured
-            Cpu::request_interrupt_idx(gg, Interrupt::Dma0 as u16 + idx)
+            Cpu::request_interrupt_idx(gg, Interrupt::Dma0 as u16 + idx);
         }
 
         gg.dma.running = prev_dma;
@@ -233,7 +233,7 @@ impl Dmas {
 
 /// Reason for why a DMA transfer attempt was initiated.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
-pub enum DmaReason {
+pub enum Reason {
     /// The control register was written.
     CtrlWrite,
     /// The PPU entered HBlank.

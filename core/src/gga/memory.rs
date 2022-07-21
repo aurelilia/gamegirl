@@ -6,7 +6,6 @@
 
 use std::{
     fmt::UpperHex,
-    mem,
     ops::{Index, IndexMut},
     ptr,
 };
@@ -121,7 +120,7 @@ impl GameGirlAdv {
     #[inline]
     pub(super) fn get_byte(&self, addr: u32) -> u8 {
         self.get(addr, !0, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u8(),
 
             0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
@@ -142,7 +141,7 @@ impl GameGirlAdv {
     #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
         self.get(addr, !1, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u16(),
 
             0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
@@ -168,7 +167,7 @@ impl GameGirlAdv {
     #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
         self.get(addr, !3, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => this.bios_read(addr),
+            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
             0x0000_0000..=0x0000_3FFF => this.memory.bios_value,
 
             0x0400_0000..=0x04FF_FFFF => {
@@ -212,17 +211,17 @@ impl GameGirlAdv {
             }
             // Sound register with some write-only bits
             SOUNDCNT_H => self[a] & 0x770F,
-
-            // Write-only registers (PPU)
-            BG0HOFS..=WIN1V | MOSAIC | BLDY => self.invalid_read::<false>(addr).u16(),
-            // Write-only registers (DMA)
-            0xB0..=0xB7 | 0xBC..=0xC3 | 0xC8..=0xCF | 0xD4..=0xDB => {
-                self.invalid_read::<false>(addr).u16()
-            }
             // Zero registers (DMA)
             0xB8 | 0xC4 | 0xD0 | 0xDC => 0,
 
-            0x4E
+            BG0HOFS..=WIN1V
+            | MOSAIC
+            | BLDY
+            | 0xB0..=0xB7
+            | 0xBC..=0xC3
+            | 0xC8..=0xCF
+            | 0xD4..=0xDB
+            | 0x4E
             | 0x56..=0x5E
             | 0x8C..=0x8E
             | 0xA0..=0xAF
@@ -238,46 +237,41 @@ impl GameGirlAdv {
     }
 
     fn invalid_read<const WORD: bool>(&self, addr: u32) -> u32 {
-        match addr {
-            0x0800_0000..=0x0DFF_FFFF => {
-                // Out of bounds ROM read
-                let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
-                let low = addr.u16();
-                word(low, low.wrapping_add(1))
+        if (0x0800_0000..=0x0DFF_FFFF).contains(&addr) {
+            // Out of bounds ROM read
+            let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
+            let low = addr.u16();
+            word(low, low.wrapping_add(1))
+        } else {
+            // Open bus
+            if self.cpu.pc() > 0xFFF_FFFF || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
+            {
+                return 0;
             }
 
-            _ => {
-                // Open bus
-                if self.cpu.pc() > 0xFFF_FFFF
-                    || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
-                {
-                    return 0;
-                }
-
-                if !self.cpu.flag(Flag::Thumb) {
-                    // Simple case: just read PC in ARM mode
-                    self.get_word(self.cpu.pc())
-                } else {
-                    // Thumb mode... complicated.
-                    // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
-                    match self.cpu.pc() >> 24 {
-                        0x02 | 0x05 | 0x06 | 0x08..=0xD => {
-                            let hword = self.get_hword(self.cpu.pc());
-                            word(hword, hword)
-                        }
-                        _ if self.cpu.pc().is_bit(1) => word(
-                            self.get_hword(self.cpu.pc() - 2),
-                            self.get_hword(self.cpu.pc()),
-                        ),
-                        0x00 | 0x07 => word(
-                            self.get_hword(self.cpu.pc()),
-                            self.get_hword(self.cpu.pc() + 2),
-                        ),
-                        _ => word(
-                            self.get_hword(self.cpu.pc()),
-                            self.get_hword(self.cpu.pc() - 2),
-                        ),
+            if !self.cpu.flag(Flag::Thumb) {
+                // Simple case: just read PC in ARM mode
+                self.get_word(self.cpu.pc())
+            } else {
+                // Thumb mode... complicated.
+                // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
+                match self.cpu.pc() >> 24 {
+                    0x02 | 0x05 | 0x06 | 0x08..=0xD => {
+                        let hword = self.get_hword(self.cpu.pc());
+                        word(hword, hword)
                     }
+                    _ if self.cpu.pc().is_bit(1) => word(
+                        self.get_hword(self.cpu.pc() - 2),
+                        self.get_hword(self.cpu.pc()),
+                    ),
+                    0x00 | 0x07 => word(
+                        self.get_hword(self.cpu.pc()),
+                        self.get_hword(self.cpu.pc() + 2),
+                    ),
+                    _ => word(
+                        self.get_hword(self.cpu.pc()),
+                        self.get_hword(self.cpu.pc() - 2),
+                    ),
                 }
             }
         }
@@ -286,21 +280,21 @@ impl GameGirlAdv {
     pub(super) fn write_byte(&mut self, addr: u32, value: u8, kind: Access) {
         let time = self.wait_time::<1>(addr, kind);
         self.add_sn_cycles(time);
-        self.set_byte(addr, value)
+        self.set_byte(addr, value);
     }
 
     /// Write a half-word from the bus (LE). Handles timing.
     pub(super) fn write_hword(&mut self, addr: u32, value: u16, kind: Access) {
         let time = self.wait_time::<2>(addr, kind);
         self.add_sn_cycles(time);
-        self.set_hword(addr, value)
+        self.set_hword(addr, value);
     }
 
     /// Write a word from the bus (LE). Handles timing.
     pub(super) fn write_word(&mut self, addr: u32, value: u32, kind: Access) {
         let time = self.wait_time::<4>(addr, kind);
         self.add_sn_cycles(time);
-        self.set_word(addr, value)
+        self.set_word(addr, value);
     }
 
     /// Write a byte to the bus. Does no timing-related things; simply sets the
@@ -327,12 +321,12 @@ impl GameGirlAdv {
                     (addr & 0xFFF).u16(),
                     value,
                     &mut audio::shed(&mut self.scheduler),
-                )
+                );
             }
 
             // MMIO
             0x0400_0000..=0x0400_0301 if addr.is_bit(0) => {
-                self.set_hword(addr, self.get_hword(addr).set_high(value))
+                self.set_hword(addr, self.get_hword(addr).set_high(value));
             }
             0x0400_0000..=0x0400_0301 => self.set_hword(addr, self.get_hword(addr).set_low(value)),
 
@@ -361,7 +355,7 @@ impl GameGirlAdv {
 
             // Maybe write EEPROM
             0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
-                this.cart.write_ram_hword(value)
+                this.cart.write_ram_hword(value);
             }
 
             // Other saves
@@ -421,8 +415,8 @@ impl GameGirlAdv {
                 // We assume that acknowledging the interrupt is the last thing the handler
                 // does, and set the BIOS read value to the post-interrupt
                 // state. Not entirely accurate...
-                if self.memory.bios_value == 0xE25EF004 {
-                    self.memory.bios_value = 0xE55EC002;
+                if self.memory.bios_value == 0xE25E_F004 {
+                    self.memory.bios_value = 0xE55E_C002;
                 }
             }
             WAITCNT => {
@@ -445,7 +439,7 @@ impl GameGirlAdv {
             FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
 
             // PPU
-            DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b11000111),
+            DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b1100_0111),
             BG0CNT | BG1CNT => self[a] = value & 0xDFFF,
             BG0HOFS..=BG3VOFS => self[a] = value & 0x1FF,
             WININ | WINOUT => self[a] = value & 0x3F3F,
@@ -505,7 +499,7 @@ impl GameGirlAdv {
         let aligned = addr & align;
         let ptr = self.page::<false>(aligned);
         if ptr as usize > 0x8000 {
-            unsafe { mem::transmute::<_, *const T>(ptr).read() }
+            unsafe { (ptr as *const T).read() }
         } else {
             slow(self, addr)
         }
@@ -522,9 +516,9 @@ impl GameGirlAdv {
     ) {
         let ptr = self.page::<true>(addr);
         if ptr as usize > 0x8000 {
-            unsafe { ptr::write(mem::transmute::<_, *mut T>(ptr), value) }
+            unsafe { ptr::write(ptr.cast(), value) }
         } else {
-            slow(self, addr, value)
+            slow(self, addr, value);
         }
     }
 
@@ -563,10 +557,10 @@ impl GameGirlAdv {
         }
     }
 
-    fn bios_read<T>(&self, addr: u32) -> T {
+    fn bios_read<T>(addr: u32) -> T {
         unsafe {
             let ptr = BIOS.as_ptr().add(addr.us() & 0x3FFF);
-            mem::transmute::<_, *const T>(ptr).read()
+            ptr.cast::<T>().read()
         }
     }
 
@@ -680,7 +674,7 @@ impl Default for Memory {
             ewram: [0; 256 * KB],
             iwram: [0; 32 * KB],
             mmio: [0; KB / 2],
-            bios_value: 0xE129F000,
+            bios_value: 0xE129_F000,
             prefetch_len: 0,
             read_pages: serde_pages(),
             write_pages: serde_pages(),

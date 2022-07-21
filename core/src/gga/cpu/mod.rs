@@ -146,7 +146,7 @@ impl Cpu {
 
                 let (inst, sn_cycles) = Self::fetch_next_inst::<2, true>(gg);
                 let inst = inst.u16();
-                let handler = gg.get_handler_thumb(inst);
+                let handler = GameGirlAdv::get_handler_thumb(inst);
 
                 handler(gg, ThumbInst(inst));
                 block.push(CachedInst {
@@ -173,7 +173,7 @@ impl Cpu {
                 }
 
                 let (inst, sn_cycles) = Self::fetch_next_inst::<4, false>(gg);
-                let handler = gg.get_handler_arm(inst);
+                let handler = GameGirlAdv::get_handler_arm(inst);
 
                 if gg.check_arm_cond(inst) {
                     handler(gg, ArmInst(inst));
@@ -212,10 +212,10 @@ impl Cpu {
 
     fn trace_inst<const THUMB: bool>(gg: &mut GameGirlAdv, inst: u32) {
         if crate::TRACING {
-            let mnem = if !THUMB {
-                GameGirlAdv::get_mnemonic_arm(inst)
-            } else {
+            let mnem = if THUMB {
                 GameGirlAdv::get_mnemonic_thumb(inst.u16())
+            } else {
+                GameGirlAdv::get_mnemonic_arm(inst)
             };
             eprintln!("0x{:08X} {}", gg.cpu.pc(), mnem);
         }
@@ -239,7 +239,7 @@ impl Cpu {
     /// An exception occurred, jump to the bootrom handler and deal with it.
     fn exception_occurred(gg: &mut GameGirlAdv, kind: Exception) {
         if gg.cpu.pc() > 0x100_0000 {
-            gg.memory.bios_value = 0xE25EF004;
+            gg.memory.bios_value = 0xE25E_F004;
         }
         if gg.cpu.flag(Thumb) {
             gg.cpu.inc_pc_by(2); // ??

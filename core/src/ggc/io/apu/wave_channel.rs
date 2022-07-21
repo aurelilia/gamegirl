@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{ApuChannel, ScheduleFn};
+use super::{Channel, ScheduleFn};
 use crate::{ggc::io::apu::GenApuEvent, numutil::NumExt};
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
@@ -52,17 +52,11 @@ impl WaveChannel {
     }
 
     pub fn write_buffer(&mut self, offset: u8, data: u8) {
-        if let Some(index) = self.wave_buffer_index(offset) {
-            self.buffer[index] = data;
-        }
+        self.buffer[self.wave_buffer_index(offset)] = data;
     }
 
     pub fn read_buffer(&self, offset: u8) -> u8 {
-        if let Some(index) = self.wave_buffer_index(offset) {
-            self.buffer[index]
-        } else {
-            0xFF
-        }
+        self.buffer[self.wave_buffer_index(offset)]
     }
 
     pub fn clock(&mut self) -> u32 {
@@ -81,19 +75,17 @@ impl WaveChannel {
     }
 
     /// returns `Some` if the wave is accessable, `None` otherwise (for DMG)
-    fn wave_buffer_index(&self, offset: u8) -> Option<usize> {
-        let index = if self.dac_enable && self.channel_enable {
+    fn wave_buffer_index(&self, offset: u8) -> usize {
+        (if self.dac_enable && self.channel_enable {
             self.buffer_position / 2
         } else {
             offset
-        } as usize
-            & 0xF;
-
-        Some(index)
+        }) as usize
+            & 0xF
     }
 }
 
-impl ApuChannel for WaveChannel {
+impl Channel for WaveChannel {
     fn output(&self) -> u8 {
         let byte = self.buffer[self.buffer_position as usize / 2];
         // the shift will be 4 if buffer_position is even, and 0 if its odd

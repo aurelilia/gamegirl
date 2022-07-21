@@ -33,7 +33,7 @@ use crate::{
 pub mod cpu;
 pub mod io;
 
-const T_CLOCK_HZ: u32 = 4194304;
+const T_CLOCK_HZ: u32 = 4_194_304;
 
 pub type GGDebugger = Debugger<u16>;
 
@@ -147,7 +147,7 @@ impl GameGirl {
 
     /// Advance the system by a single CPU instruction.
     pub fn advance(&mut self) {
-        Cpu::exec_next_inst(self)
+        Cpu::exec_next_inst(self);
     }
 
     /// Advance the scheduler, which controls everything except the CPU.

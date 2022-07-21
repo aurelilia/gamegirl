@@ -158,7 +158,7 @@ impl Ppu {
                         Self::render_window(gg);
                     }
                 } else {
-                    Self::clear_line(gg)
+                    Self::clear_line(gg);
                 }
             }
         }
@@ -196,7 +196,7 @@ impl Ppu {
             gg.map_addr(BG_MAP),
             gg[SCY].wrapping_add(gg.ppu.line),
             true,
-        )
+        );
     }
 
     fn render_window(gg: &mut GameGirl) {
@@ -393,7 +393,7 @@ pub enum PpuKind {
 }
 
 /// Data for a single sprite in OAM.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 struct Sprite {
     x: i16,
     y: i16,

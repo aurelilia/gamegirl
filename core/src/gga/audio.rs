@@ -17,7 +17,7 @@ use crate::{
         scheduling::ApuEvent,
         GameGirlAdv, CPU_CLOCK,
     },
-    ggc::io::apu::{ApuChannel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
+    ggc::io::apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
     numutil::{NumExt, U16Ext},
     scheduler::Scheduler,
 };
@@ -59,9 +59,7 @@ impl Apu {
     }
 
     pub fn init_scheduler(gg: &mut GameGirlAdv) {
-        gg.apu
-            .cgb_chans
-            .init_scheduler(&mut shed(&mut gg.scheduler));
+        GenericApu::init_scheduler(&mut shed(&mut gg.scheduler));
     }
 
     fn push_output(gg: &mut GameGirlAdv) {
@@ -133,7 +131,7 @@ impl Apu {
             let dest = 0x400_0000 | (FIFO_A_L + CH.u32() * 4);
             for dma in 1..=2 {
                 if Dmas::get_dest(gg, dma) == dest {
-                    Dmas::try_fifo_transfer(gg, dma)
+                    Dmas::try_fifo_transfer(gg, dma);
                 }
             }
         }
@@ -340,6 +338,6 @@ pub fn shed(sched: &mut Scheduler<AdvEvent>) -> impl ScheduleFn + '_ {
     |e, t| {
         let evt = AdvEvent::ApuEvent(ApuEvent::Gen(e));
         sched.cancel(evt);
-        sched.schedule(evt, t * GG_OFFS)
+        sched.schedule(evt, t * GG_OFFS);
     }
 }

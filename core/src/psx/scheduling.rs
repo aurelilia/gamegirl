@@ -14,7 +14,7 @@ pub enum PsxEvent {
 }
 
 impl PsxEvent {
-    pub fn dispatch(&self, _ps: &mut PlayStation, _late_by: i32) {}
+    pub fn dispatch(self, _ps: &mut PlayStation, _late_by: i32) {}
 }
 
 impl Kind for PsxEvent {}

@@ -5,6 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 #![allow(unused)]
+#![allow(clippy::unused_self)]
 
 use std::mem;
 
@@ -102,7 +103,7 @@ impl PlayStation {
 
     /// Advance the system by a single CPU instruction.
     pub fn advance(&mut self) {
-        Cpu::execute_next(self)
+        Cpu::execute_next(self);
     }
 
     /// Advance the scheduler, which controls everything except the CPU.

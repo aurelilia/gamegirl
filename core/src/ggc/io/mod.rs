@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use std::{
-    mem,
     ops::{Index, IndexMut},
     ptr,
 };
@@ -111,7 +110,7 @@ impl GameGirl {
     /// Push the given value to the current SP.
     pub fn push_stack(&mut self, value: u16) {
         self.cpu.sp = self.cpu.sp.wrapping_sub(2);
-        self.write16(self.cpu.sp, value)
+        self.write16(self.cpu.sp, value);
     }
 
     pub fn get8(&self, addr: u16) -> u8 {
@@ -163,11 +162,11 @@ impl GameGirl {
             }
             0xA000..=0xBFFF => self.cart.write(addr, value),
             0x8000..=0x9FFF => {
-                self.mem.vram[(a & 0x1FFF) + (self.mem.vram_bank.us() * 0x2000)] = value
+                self.mem.vram[(a & 0x1FFF) + (self.mem.vram_bank.us() * 0x2000)] = value;
             }
             0xC000..=0xCFFF => self.mem.wram[(a & 0x0FFF)] = value,
             0xD000..=0xDFFF => {
-                self.mem.wram[(a & 0x0FFF) + (self.mem.wram_bank.us() * 0x1000)] = value
+                self.mem.wram[(a & 0x0FFF) + (self.mem.wram_bank.us() * 0x1000)] = value;
             }
             0xE000..=0xFDFF => self.mem.wram[a & 0x1FFF] = value,
             0xFE00..=0xFE9F => self.mem.oam[a & 0xFF] = value,
@@ -289,7 +288,7 @@ impl GameGirl {
         };
 
         if ptr as usize > 0xFF_FFFF {
-            unsafe { mem::transmute::<_, *const T>(ptr).read() }
+            unsafe { (ptr as *const T).read() }
         } else {
             slow(self, a)
         }

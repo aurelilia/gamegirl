@@ -19,7 +19,7 @@ use crate::{
 impl GameGirlAdv {
     pub fn swi(&mut self) {
         Cpu::exception_occurred(self, Exception::Swi);
-        self.memory.bios_value = 0xE3A02004;
+        self.memory.bios_value = 0xE3A0_2004;
     }
 
     /// Called by multiple load/store instructions when the Rlist was

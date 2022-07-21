@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ScheduleFn;
 
-pub trait ApuChannel {
+pub trait Channel {
     fn output(&self) -> u8;
     fn muted(&self) -> bool;
     fn set_enable(&mut self, enabled: bool);
@@ -19,7 +19,7 @@ pub trait ApuChannel {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct LengthCountedChannel<C: ApuChannel> {
+pub struct LengthCountedChannel<C: Channel> {
     // FIXME: re-order the organization of apu channels,
     //  `dac_enable`, should not be here like this
     // dac_enable: bool,
@@ -30,7 +30,7 @@ pub struct LengthCountedChannel<C: ApuChannel> {
     channel: C,
 }
 
-impl<C: ApuChannel> LengthCountedChannel<C> {
+impl<C: Channel> LengthCountedChannel<C> {
     pub fn new(channel: C, max_length: u16) -> Self {
         Self {
             // dac_enable: true,
@@ -93,7 +93,7 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
     }
 }
 
-impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
+impl<C: Channel> Channel for LengthCountedChannel<C> {
     fn output(&self) -> u8 {
         if !self.channel.enabled() {
             0
@@ -136,12 +136,12 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct Dac<C: ApuChannel> {
+pub struct Dac<C: Channel> {
     capacitor: f32,
     channel: C,
 }
 
-impl<C: ApuChannel> Dac<C> {
+impl<C: Channel> Dac<C> {
     pub fn new(channel: C) -> Self {
         Self {
             capacitor: 0.,
@@ -163,7 +163,7 @@ impl<C: ApuChannel> Dac<C> {
     }
 }
 
-impl<C: ApuChannel> std::ops::Deref for Dac<C> {
+impl<C: Channel> std::ops::Deref for Dac<C> {
     type Target = C;
 
     fn deref(&self) -> &Self::Target {
@@ -171,7 +171,7 @@ impl<C: ApuChannel> std::ops::Deref for Dac<C> {
     }
 }
 
-impl<C: ApuChannel> std::ops::DerefMut for Dac<C> {
+impl<C: Channel> std::ops::DerefMut for Dac<C> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.channel
     }

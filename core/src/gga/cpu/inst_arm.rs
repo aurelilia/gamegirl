@@ -204,15 +204,15 @@ impl GameGirlAdv {
             return;
         }
 
-        let handler = self.get_handler_arm(inst);
-        handler(self, ArmInst(inst))
+        let handler = Self::get_handler_arm(inst);
+        handler(self, ArmInst(inst));
     }
 
     pub fn check_arm_cond(&mut self, inst: u32) -> bool {
         self.cpu.eval_condition(inst.bits(28, 4).u16())
     }
 
-    pub fn get_handler_arm(&self, inst: u32) -> ArmHandler {
+    pub fn get_handler_arm(inst: u32) -> ArmHandler {
         ARM_LUT[(inst.us() >> 20) & 0xFF]
     }
 
@@ -247,20 +247,15 @@ impl GameGirlAdv {
         } else if !CPSR && (0x8..=0xB).contains(&OP) {
             // MRS/MSR/SWP/LDRSTR
             let bit_1 = OP.is_bit(1);
-            let msr = OP.is_bit(0);
+            let is_msr = OP.is_bit(0);
 
-            if !msr {
+            if is_msr {
+                let m = inst.reg(0);
+                self.msr(self.cpu.reg(m), inst.0.is_bit(19), inst.0.is_bit(16), bit_1);
+            } else {
                 let n = inst.reg(16);
                 let d = inst.reg(12);
-                if n != 15 {
-                    if inst.0.bits(4, 8) == 0b00001001 {
-                        // SWP
-                        self.arm_swp(inst, n, d, bit_1);
-                    } else {
-                        // STRH/LDRH
-                        self.arm_strh_ldr::<OP, CPSR>(inst);
-                    }
-                } else {
+                if n == 15 {
                     // MRS
                     let psr = if bit_1 {
                         self.cpu.spsr()
@@ -268,11 +263,13 @@ impl GameGirlAdv {
                         self.cpu.cpsr
                     };
                     self.set_reg(d, psr.set_bit(4, true));
+                } else if inst.0.bits(4, 8) == 0b0000_1001 {
+                    // SWP
+                    self.arm_swp(inst, n, d, bit_1);
+                } else {
+                    // STRH/LDRH
+                    self.arm_strh_ldr::<OP, CPSR>(inst);
                 }
-            } else {
-                // MSR
-                let m = inst.reg(0);
-                self.msr(self.cpu.reg(m), inst.0.is_bit(19), inst.0.is_bit(16), bit_1)
             }
         } else if inst.0.bits(4, 4) == 0b1001 {
             // MUL
@@ -287,18 +284,18 @@ impl GameGirlAdv {
             let t = inst.0.bits(5, 2);
             let carry = self.cpu.flag(Carry);
 
-            if !inst.0.is_bit(4) {
-                // Shift by imm
-                let a = inst.0.bits(7, 5);
-                let rm = self.cpu.reg(m);
-                let second_op = self.shifted_op::<CPSR, true>(rm, t, a);
-                self.alu::<OP, CPSR, false>(n, second_op, d, carry);
-            } else {
+            if inst.0.is_bit(4) {
                 // Shift by reg
                 let a = inst.0.bits(8, 4);
                 let rm = self.cpu.reg_pc4(m);
                 let second_op = self.shifted_op::<CPSR, false>(rm, t, self.cpu.reg(a) & 0xFF);
                 self.alu::<OP, CPSR, true>(n, second_op, d, carry);
+            } else {
+                // Shift by imm
+                let a = inst.0.bits(7, 5);
+                let rm = self.cpu.reg(m);
+                let second_op = self.shifted_op::<CPSR, true>(rm, t, a);
+                self.alu::<OP, CPSR, false>(n, second_op, d, carry);
             }
         }
     }
@@ -333,9 +330,9 @@ impl GameGirlAdv {
         };
         let reg = self.reg(m);
         if byte {
-            self.write_byte(addr, reg.u8(), NonSeq)
+            self.write_byte(addr, reg.u8(), NonSeq);
         } else {
-            self.write_word(addr, reg, NonSeq)
+            self.write_word(addr, reg, NonSeq);
         }
         self.set_reg(d, mem_value);
         self.idle_nonseq();
@@ -409,11 +406,11 @@ impl GameGirlAdv {
                 self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
             }
 
-            if !ldr {
-                self.write_word(addr, self.cpu.reg_pc4(reg.u32()), kind);
-            } else {
+            if ldr {
                 let val = self.read_word(addr, kind);
                 self.set_reg(reg.u32(), val);
+            } else {
+                self.write_word(addr, self.cpu.reg_pc4(reg.u32()), kind);
             }
 
             kind = Seq;
@@ -530,10 +527,10 @@ impl GameGirlAdv {
         let mut dest = if spsr { self.cpu.spsr() } else { self.cpu.cpsr };
 
         if flags {
-            dest = (dest & 0x00FFFFFF) | (src & 0xFF000000)
+            dest = (dest & 0x00FF_FFFF) | (src & 0xFF00_0000);
         };
         if ctrl && self.cpu.mode() != Mode::User {
-            dest = (dest & 0xFFFFFF00) | (src & 0xFF)
+            dest = (dest & 0xFFFF_FF00) | (src & 0xFF);
         };
 
         if spsr {
@@ -686,7 +683,7 @@ impl GameGirlAdv {
         }
     }
 
-    fn arm_unknown_opcode(&mut self, inst: ArmInst) {
+    fn arm_unknown_opcode(_self: &mut Self, inst: ArmInst) {
         Self::log_unknown_opcode(inst.0);
     }
 
@@ -860,7 +857,7 @@ impl GameGirlAdv {
 pub struct ArmInst(pub u32);
 
 impl ArmInst {
-    fn reg(&self, idx: u32) -> u32 {
+    fn reg(self, idx: u32) -> u32 {
         self.0.bits(idx, 4)
     }
 }

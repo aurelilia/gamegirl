@@ -395,7 +395,7 @@ impl PlayStation {
 
     fn jalr(&mut self, inst: Inst) {
         self.cpu.set_reg(inst.rd(), self.cpu.pc);
-        self.cpu.pc = self.cpu.reg(inst.rs())
+        self.cpu.pc = self.cpu.reg(inst.rs());
     }
 
     fn lohi_mov<const TO_REG: bool, const HI: bool>(&mut self, inst: Inst) {
@@ -446,31 +446,31 @@ impl PlayStation {
 pub struct Inst(pub(crate) u32);
 
 impl Inst {
-    pub fn rs(&self) -> u32 {
+    pub fn rs(self) -> u32 {
         self.0.bits(21, 5)
     }
 
-    pub fn rt(&self) -> u32 {
+    pub fn rt(self) -> u32 {
         self.0.bits(16, 5)
     }
 
-    pub fn rd(&self) -> u32 {
+    pub fn rd(self) -> u32 {
         self.0.bits(11, 5)
     }
 
-    pub fn imm5(&self) -> u32 {
+    pub fn imm5(self) -> u32 {
         self.0.bits(6, 5)
     }
 
-    pub fn imm16(&self) -> u32 {
+    pub fn imm16(self) -> u32 {
         self.0.low().u32()
     }
 
-    pub fn imm16s(&self) -> i32 {
+    pub fn imm16s(self) -> i32 {
         self.0.low() as i16 as i32
     }
 
-    pub fn imm26(&self) -> u32 {
+    pub fn imm26(self) -> u32 {
         self.0.bits(0, 26)
     }
 }

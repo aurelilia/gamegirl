@@ -30,15 +30,15 @@ pub enum AdvEvent {
 
 impl AdvEvent {
     /// Handle the event by delegating to the appropriate handler.
-    pub fn dispatch(&self, gg: &mut GameGirlAdv, late_by: i32) {
+    pub fn dispatch(self, gg: &mut GameGirlAdv, late_by: i32) {
         match self {
             PauseEmulation => gg.ticking = false,
-            PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
+            PpuEvent(evt) => Ppu::handle_event(gg, evt, late_by),
             ApuEvent(evt) => {
-                let time = Apu::handle_event(gg, *evt, late_by);
-                gg.scheduler.schedule(*self, time);
+                let time = Apu::handle_event(gg, evt, late_by);
+                gg.scheduler.schedule(self, time);
             }
-            TimerOverflow(idx) => Timers::handle_overflow_event(gg, *idx, late_by),
+            TimerOverflow(idx) => Timers::handle_overflow_event(gg, idx, late_by),
         }
     }
 }

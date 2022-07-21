@@ -155,11 +155,11 @@ impl U32Ext for u32 {
     }
 
     fn set_low(self, low: u16) -> u32 {
-        (self & 0xFFFF0000) | low.u32()
+        (self & 0xFFFF_0000) | low.u32()
     }
 
     fn set_high(self, high: u16) -> u32 {
-        (self & 0x0000FFFF) | (high.u32() << 16)
+        (self & 0x0000_FFFF) | (high.u32() << 16)
     }
 
     fn i24(self) -> i32 {

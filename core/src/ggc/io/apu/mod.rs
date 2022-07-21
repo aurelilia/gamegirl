@@ -5,7 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 pub use base::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
-pub use channel::ApuChannel;
+pub use channel::Channel;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -65,7 +65,7 @@ impl Apu {
     }
 
     pub fn init_scheduler(gg: &mut GameGirl) {
-        gg.apu.inner.init_scheduler(&mut shed(&mut gg.scheduler));
+        GenericApu::init_scheduler(&mut shed(&mut gg.scheduler));
         gg.scheduler.schedule(
             GGEvent::ApuEvent(ApuEvent::PushSample),
             SAMPLE_EVERY_N_CLOCKS,
@@ -88,23 +88,16 @@ impl GenericApu {
             0xFF10 => 0x80 | self.pulse1.channel().read_sweep_register(),
             0xFF11 => 0x3F | (self.pulse1.channel().read_pattern_duty() << 6),
             0xFF12 => self.pulse1.channel().envelope().read_envelope_register(),
-            0xFF13 => 0xFF,
             0xFF14 => 0xBF | ((self.pulse1.read_length_enable() as u8) << 6),
 
-            0xFF15 => 0xFF,
             0xFF16 => 0x3F | (self.pulse2.channel().read_pattern_duty() << 6),
             0xFF17 => self.pulse2.channel().envelope().read_envelope_register(),
-            0xFF18 => 0xFF,
             0xFF19 => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
 
             0xFF1A => 0x7F | ((self.wave.dac_enabled() as u8) << 7),
-            0xFF1B => 0xFF,
             0xFF1C => 0x9F | ((self.wave.channel().read_volume()) << 5),
-            0xFF1D => 0xFF,
             0xFF1E => 0xBF | ((self.wave.read_length_enable() as u8) << 6),
 
-            0xFF1F => 0xFF,
-            0xFF20 => 0xFF,
             0xFF21 => self.noise.channel().envelope().read_envelope_register(),
             0xFF22 => self.noise.channel().read_noise_register(),
             0xFF23 => 0xBF | ((self.noise.read_length_enable() as u8) << 6),
@@ -119,10 +112,8 @@ impl GenericApu {
                     | self.pulse1.enabled() as u8
             }
 
-            0xFF27..=0xFF2F => 0xFF,
-
             0xFF30..=0xFF3F => self.wave.channel().read_buffer((addr & 0xF) as u8),
-            _ => unreachable!(),
+            _ => 0xFF,
         }
     }
 
@@ -170,7 +161,6 @@ impl GenericApu {
                 );
             }
 
-            0xFF15 => {}
             0xFF16 => {
                 if self.power {
                     self.pulse2.channel_mut().write_pattern_duty(data >> 6);
@@ -226,7 +216,6 @@ impl GenericApu {
                 );
             }
 
-            0xFF1F => {}
             0xFF20 => self.noise.write_sound_length(data & 0x3F),
             0xFF21 => {
                 self.noise
@@ -269,16 +258,12 @@ impl GenericApu {
                 self.power = new_power;
             }
 
-            0xFF27..=0xFF2F => {
-                // unused
-            }
-
             0xFF30..=0xFF3F => {
                 self.wave
                     .channel_mut()
                     .write_buffer((addr & 0xF) as u8, data);
             }
-            _ => unreachable!(),
+            _ => (),
         }
     }
 
@@ -301,6 +286,6 @@ fn shed(sched: &mut Scheduler<GGEvent>) -> impl ScheduleFn + '_ {
     |e, t| {
         let evt = GGEvent::ApuEvent(ApuEvent::Gen(e));
         sched.cancel(evt);
-        sched.schedule(evt, t)
+        sched.schedule(evt, t);
     }
 }

@@ -20,16 +20,17 @@ type ThumbLut = [ThumbHandler; 256];
 const THUMB_LUT: ThumbLut = GameGirlAdv::make_thumb_lut();
 
 impl GameGirlAdv {
+    #[allow(clippy::unreadable_literal)]
     const fn make_thumb_lut() -> ThumbLut {
         let mut lut: ThumbLut = [Self::thumb_unknown_opcode; 256];
 
-        lut[0b11011111] = Self::thumb_swi;
-        lut[0b10110000] = Self::thumb_sp_offs;
+        lut[0b1101_1111] = Self::thumb_swi;
+        lut[0b1011_0000] = Self::thumb_sp_offs;
 
-        lut[0b01000100] = Self::thumb_hi_add;
-        lut[0b01000101] = Self::thumb_hi_cmp;
-        lut[0b01000110] = Self::thumb_hi_mov;
-        lut[0b01000111] = Self::thumb_hi_bx;
+        lut[0b0100_0100] = Self::thumb_hi_add;
+        lut[0b0100_0101] = Self::thumb_hi_cmp;
+        lut[0b0100_0110] = Self::thumb_hi_mov;
+        lut[0b0100_0111] = Self::thumb_hi_bx;
 
         Self::lut_span(&mut lut, 0b00000, 5, Self::thumb_arithmetic::<"LSL">);
         Self::lut_span(&mut lut, 0b00001, 5, Self::thumb_arithmetic::<"LSR">);
@@ -68,10 +69,10 @@ impl GameGirlAdv {
         Self::lut_span(&mut lut, 0b10100, 5, Self::thumb_rel_addr::<false>);
         Self::lut_span(&mut lut, 0b10101, 5, Self::thumb_rel_addr::<true>);
 
-        lut[0b10110100] = Self::thumb_push::<false>;
-        lut[0b10110101] = Self::thumb_push::<true>;
-        lut[0b10111100] = Self::thumb_pop::<false>;
-        lut[0b10111101] = Self::thumb_pop::<true>;
+        lut[0b1011_0100] = Self::thumb_push::<false>;
+        lut[0b1011_0101] = Self::thumb_push::<true>;
+        lut[0b1011_1100] = Self::thumb_pop::<false>;
+        lut[0b1011_1101] = Self::thumb_pop::<true>;
         Self::lut_span(&mut lut, 0b11000, 5, Self::thumb_stmia);
         Self::lut_span(&mut lut, 0b11001, 5, Self::thumb_ldmia);
 
@@ -101,15 +102,15 @@ impl GameGirlAdv {
     }
 
     pub fn execute_inst_thumb(&mut self, inst: u16) {
-        let handler = self.get_handler_thumb(inst);
-        handler(self, ThumbInst(inst))
+        let handler = Self::get_handler_thumb(inst);
+        handler(self, ThumbInst(inst));
     }
 
-    pub fn get_handler_thumb(&self, inst: u16) -> ThumbHandler {
+    pub fn get_handler_thumb(inst: u16) -> ThumbHandler {
         THUMB_LUT[inst.us() >> 8]
     }
 
-    fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
+    fn thumb_unknown_opcode(_self: &mut Self, inst: ThumbInst) {
         Self::log_unknown_opcode(inst.0);
     }
 
@@ -237,11 +238,11 @@ impl GameGirlAdv {
             self.set_pc(self.cpu.pc()); // Align
         } else {
             // BX
-            if !self.reg(s.u32()).is_bit(0) {
+            if self.reg(s.u32()).is_bit(0) {
+                self.set_pc(self.reg(s.u32()) & !1);
+            } else {
                 self.cpu.set_flag(Thumb, false);
                 self.set_pc(self.reg(s.u32()) & !3);
-            } else {
-                self.set_pc(self.reg(s.u32()) & !1);
             }
         }
     }
@@ -254,7 +255,7 @@ impl GameGirlAdv {
         // LDR has +1I
         self.idle_nonseq();
         self.cpu.registers[d.us()] =
-            self.read_word_ldrswp(self.cpu.adj_pc() + (n.u32() << 2), NonSeq)
+            self.read_word_ldrswp(self.cpu.adj_pc() + (n.u32() << 2), NonSeq);
     }
 
     // THUMB.7/8
@@ -277,7 +278,7 @@ impl GameGirlAdv {
             // LDSH, needs special handling for unaligned reads which makes it behave as
             // LBSB
             _ if addr.is_bit(0) => {
-                self.cpu.registers[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32
+                self.cpu.registers[d.us()] = self.read_byte(addr, NonSeq) as i8 as i32 as u32;
             }
             _ => self.cpu.registers[d.us()] = self.read_hword(addr, NonSeq) as i16 as i32 as u32,
         }
@@ -332,7 +333,7 @@ impl GameGirlAdv {
         let n = inst.0 & 0xFF;
         let d = inst.low(8);
         self.cpu.access_type = NonSeq;
-        self.write_word(self.cpu.sp() + (n.u32() << 2), self.cpu.low(d), NonSeq)
+        self.write_word(self.cpu.sp() + (n.u32() << 2), self.cpu.low(d), NonSeq);
     }
 
     fn thumb_ldr_sp(&mut self, inst: ThumbInst) {
@@ -417,7 +418,7 @@ impl GameGirlAdv {
         for reg in 0..8 {
             if inst.0.is_bit(reg) {
                 if reg == b && kind != NonSeq {
-                    base_rlist_addr = Some(self.cpu.low(b))
+                    base_rlist_addr = Some(self.cpu.low(b));
                 }
                 self.write_word(self.cpu.low(b), self.cpu.registers[reg.us()], kind);
                 self.cpu.registers[b.us()] = self.low(b).wrapping_add(4);
@@ -600,7 +601,7 @@ impl GameGirlAdv {
 pub struct ThumbInst(pub u16);
 
 impl ThumbInst {
-    fn low(&self, idx: u16) -> u16 {
+    fn low(self, idx: u16) -> u16 {
         self.0.bits(idx, 3)
     }
 }

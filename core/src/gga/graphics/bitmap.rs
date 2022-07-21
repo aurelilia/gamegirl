@@ -60,10 +60,10 @@ impl Ppu {
     }
 
     fn bitmap_start_addr(gg: &PpuType) -> usize {
-        if !gg[DISPCNT].is_bit(FRAME_SELECT) {
-            0x0
-        } else {
+        if gg[DISPCNT].is_bit(FRAME_SELECT) {
             0xA000
+        } else {
+            0x0
         }
     }
 }

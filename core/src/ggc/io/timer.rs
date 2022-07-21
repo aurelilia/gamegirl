@@ -171,7 +171,7 @@ mod tests {
             gg.scheduler.advance(255);
             assert_eq!(0, Timer::read(gg, DIV));
             gg.scheduler.advance(1);
-            assert_eq!(1, Timer::read(gg, DIV))
+            assert_eq!(1, Timer::read(gg, DIV));
         });
     }
 
@@ -254,7 +254,7 @@ mod tests {
     fn for_all_speeds(mut inner: impl FnMut(&mut GameGirl, u8)) {
         for speed in 0..4 {
             let mut gg = setup(true, speed);
-            inner(&mut gg, speed)
+            inner(&mut gg, speed);
         }
     }
 }

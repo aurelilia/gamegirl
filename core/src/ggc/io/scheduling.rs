@@ -95,7 +95,7 @@ impl PpuEvent {
             PpuEvent::VblankEnd => 1,
             PpuEvent::OamScanEnd => 2,
             PpuEvent::UploadEnd => 3,
-            _ => panic!("Not applicable!"),
+            PpuEvent::LYIncrement => panic!("Not applicable!"),
         }
     }
 }

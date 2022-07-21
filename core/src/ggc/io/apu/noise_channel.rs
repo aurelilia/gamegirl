@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{envelope::EnvelopGenerator, ApuChannel, ScheduleFn};
+use super::{envelope::EnvelopGenerator, Channel, ScheduleFn};
 use crate::numutil::NumExt;
 
 #[derive(Default, Deserialize, Serialize)]
@@ -76,7 +76,7 @@ impl NoiseChannel {
     }
 }
 
-impl ApuChannel for NoiseChannel {
+impl Channel for NoiseChannel {
     fn output(&self) -> u8 {
         ((self.feedback_shift_register & 1) ^ 1) as u8 * self.envelope.current_volume()
     }

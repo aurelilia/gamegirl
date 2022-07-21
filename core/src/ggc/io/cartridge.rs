@@ -64,11 +64,10 @@ impl Cartridge {
         match (&mut self.kind, addr) {
             // MBC2
             (MBC2, 0x0000..=0x3FFF) if addr.is_bit(8) => {
-                self.rom1_bank = (value.u16() & 0x0F).max(1) % self.rom_bank_count()
+                self.rom1_bank = (value.u16() & 0x0F).max(1) % self.rom_bank_count();
             }
-            (MBC2, 0x0000..=0x3FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
             (MBC2, 0xA000..=0xBFFF) if self.ram_enable => {
-                self.ram[addr.us() & 0x1FF] = value | 0xF0
+                self.ram[addr.us() & 0x1FF] = value | 0xF0;
             }
 
             // MBC3 with RTC
@@ -103,14 +102,16 @@ impl Cartridge {
             }
 
             // Shared between all (except MBC2 and RTCs...)
-            (_, 0x0000..=0x1FFF) => self.ram_enable = (value & 0x0F) == 0x0A,
+            (_, 0x0000..=0x1FFF) | (MBC2, 0x0000..=0x3FFF) => {
+                self.ram_enable = (value & 0x0F) == 0x0A;
+            }
             (_, 0xA000..=0xBFFF) if !self.ram.is_empty() && self.ram_enable => {
-                self.ram[(addr & 0x1FFF).us() + (0x2000 * self.ram_bank.us())] = value
+                self.ram[(addr & 0x1FFF).us() + (0x2000 * self.ram_bank.us())] = value;
             }
 
             // Shared between some
             (MBC3 | MBC5, 0x4000..=0x5FFF) => {
-                self.ram_bank = (value & 0x03) % self.ram_bank_count()
+                self.ram_bank = (value & 0x03) % self.ram_bank_count();
             }
 
             // MBC1
@@ -137,10 +138,10 @@ impl Cartridge {
 
             // MBC5
             (MBC5, 0x2000..=0x2FFF) => {
-                self.rom1_bank = (self.rom1_bank & 0x100) | (value.u16() % self.rom_bank_count())
+                self.rom1_bank = (self.rom1_bank & 0x100) | (value.u16() % self.rom_bank_count());
             }
             (MBC5, 0x3000..=0x3FFF) => {
-                self.rom1_bank = self.rom1_bank.set_bit(8, value.is_bit(0)) % self.rom_bank_count()
+                self.rom1_bank = self.rom1_bank.set_bit(8, value.is_bit(0)) % self.rom_bank_count();
             }
 
             _ => (),
@@ -213,7 +214,14 @@ impl Cartridge {
                     bank2: 0,
                 },
                 0x05..=0x06 => MBC2,
-                0x0F..=0x10 => MBC3, // TODO RTC variant
+                0x0F..=0x10 => MBC3RTC {
+                    rtc: Rtc {
+                        start: 0,
+                        latched_at: None,
+                    },
+                    rtc_reg: None,
+                    latch_prepare: false,
+                },
                 0x11..=0x13 => MBC3,
                 0x19..=0x1E => MBC5,
                 _ => NoMBC,
@@ -228,7 +236,7 @@ impl Cartridge {
     pub fn make_save(&self) -> Option<GameSave> {
         if !self.rom.is_empty() && self.ram_bank_count() > 0 {
             Some(GameSave {
-                ram: self.ram.to_vec(),
+                ram: self.ram.clone(),
                 rtc: if let MBC3RTC { rtc, .. } = &self.kind {
                     Some(rtc.start)
                 } else {

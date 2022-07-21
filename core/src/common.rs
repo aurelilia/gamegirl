@@ -186,7 +186,7 @@ impl System {
             );
             *self = Self::GGC(ggc);
         } else {
-            let (mut cart, elf) = if let Some(elf_read) = Self::decode_elf(&cart) {
+            let (mut cart, is_elf) = if let Some(elf_read) = Self::decode_elf(&cart) {
                 (elf_read, true)
             } else {
                 (cart, false)
@@ -208,7 +208,7 @@ impl System {
                 EmulateOptions::serde_frame_finished(),
             );
 
-            if elf {
+            if is_elf {
                 gga.skip_bootrom();
             }
 

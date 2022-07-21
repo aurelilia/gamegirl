@@ -62,9 +62,8 @@ impl Cpu {
             if bits.is_bit(bit) {
                 if Self::dispatch_intr(gg, bit) {
                     return;
-                } else {
-                    bits = gg[IE] & gg[IF] & 0x1F;
                 }
+                bits = gg[IE] & gg[IF] & 0x1F;
             }
         }
     }
@@ -92,15 +91,15 @@ impl Cpu {
     }
 
     pub fn set_fli(&mut self, flag: Flag, val: u8) {
-        self.set_fl(flag, val != 0)
+        self.set_fl(flag, val != 0);
     }
 
     pub fn set_fli16(&mut self, flag: Flag, val: u16) {
-        self.set_fl(flag, val != 0)
+        self.set_fl(flag, val != 0);
     }
 
     pub fn set_fl(&mut self, flag: Flag, val: bool) {
-        self.regs[Reg::F.i()] = self.reg(Reg::F).set_bit(flag.bit(), val).u8()
+        self.regs[Reg::F.i()] = self.reg(Reg::F).set_bit(flag.bit(), val).u8();
     }
 
     pub fn reg(&self, reg: Reg) -> u8 {
@@ -110,7 +109,7 @@ impl Cpu {
     pub fn set_reg(&mut self, reg: Reg, value: u8) {
         // Register F only allows writing the 4 high/flag bits
         let value = if reg == Reg::F { value & 0xF0 } else { value };
-        self.regs[reg.i()] = value
+        self.regs[reg.i()] = value;
     }
 
     pub fn dreg(&self, reg: DReg) -> u16 {

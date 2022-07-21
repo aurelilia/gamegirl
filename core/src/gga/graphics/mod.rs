@@ -30,7 +30,7 @@ use crate::{
             WININ, WINOUT,
         },
         cpu::{Cpu, Interrupt},
-        dma::{DmaReason, Dmas},
+        dma::{Dmas, Reason},
         scheduling::{AdvEvent, PpuEvent},
         GameGirlAdv,
     },
@@ -105,7 +105,7 @@ impl Ppu {
             PpuEvent::HblankStart => {
                 Self::render_line_maybe_threaded(gg);
                 Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
-                Dmas::update_all(gg, DmaReason::HBlank);
+                Dmas::update_all(gg, Reason::HBlank);
 
                 (PpuEvent::SetHblank, 46i32)
             }
@@ -129,7 +129,7 @@ impl Ppu {
                     160 => {
                         gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
                         Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
-                        Dmas::update_all(gg, DmaReason::VBlank);
+                        Dmas::update_all(gg, Reason::VBlank);
                     }
                     // VBlank flag gets set one scanline early
                     227 => gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false),
@@ -416,14 +416,14 @@ impl Ppu {
 
             _ if (was_obj && second) || blend_mode == 1 => {
                 // Regular alphablend.
-                if pixel[3] != EMPTY_A {
+                if pixel[3] == EMPTY_A {
+                    *pixel = colour;
+                    !first
+                } else {
                     if second {
                         *pixel = Self::blend_pixel(*pixel, colour, bld.bits(0, 5), bld.bits(8, 5));
                     }
                     second
-                } else {
-                    *pixel = colour;
-                    !first
                 }
             }
 

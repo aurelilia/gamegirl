@@ -314,7 +314,7 @@ impl ExecFile for SyncSys {
             .take(length)
         {
             *dst = *src;
-            count += 1
+            count += 1;
         }
         Ok(count)
     }
@@ -366,6 +366,7 @@ pub enum DebuggerStatus {
     Disconnected,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn init(sys: Arc<Mutex<System>>, rom_path: PathBuf, status: Arc<RwLock<DebuggerStatus>>) {
     {
         *status.write().unwrap() = WaitingForConnection;
@@ -383,7 +384,7 @@ pub fn init(sys: Arc<Mutex<System>>, rom_path: PathBuf, status: Arc<RwLock<Debug
             *status.write().unwrap() = Disconnected;
         }
         Err(e) => {
-            eprintln!("gdbstub encountered an error: {}", e)
+            log::error!("gdbstub encountered an error: {}", e);
         }
     }
 }

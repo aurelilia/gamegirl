@@ -191,9 +191,9 @@ impl GameGirl {
 
     pub(super) fn z_flag_only(&mut self, value: u8) -> u8 {
         if value == 0 {
-            self.cpu.set_reg(Reg::F, Flag::Zero.mask())
+            self.cpu.set_reg(Reg::F, Flag::Zero.mask());
         } else {
-            self.cpu.set_reg(Reg::F, 0)
+            self.cpu.set_reg(Reg::F, 0);
         }
         value
     }

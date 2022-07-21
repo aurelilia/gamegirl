@@ -294,7 +294,7 @@ impl FlashState {
 
             (_, _, _) if self.mode == FlashMode::Write => {
                 self.mode = FlashMode::Regular;
-                if bank.cloned() == Some(1) {
+                if bank.copied() == Some(1) {
                     ram[addr | 0x10000] = value;
                 } else {
                     ram[addr] = value;
@@ -307,7 +307,7 @@ impl FlashState {
             // Erase 4K sector
             (_, 0x30, Some(SecondWritten)) => {
                 if self.mode == FlashMode::Erase {
-                    let addr = if bank.cloned() == Some(1) {
+                    let addr = if bank.copied() == Some(1) {
                         (addr & 0xF000) | 0x10000
                     } else {
                         addr & 0xF000

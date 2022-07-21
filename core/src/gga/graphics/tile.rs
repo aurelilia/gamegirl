@@ -123,10 +123,9 @@ impl Ppu {
             if !range.contains(&x) || !range.contains(&y) {
                 if !overflow {
                     continue;
-                } else {
-                    x &= size - 1;
-                    y &= size - 1;
                 }
+                x &= size - 1;
+                y &= size - 1;
             }
 
             let map_addr = map_base + (((y >> 3) * (size >> 3)) + (x >> 3)) as usize;

@@ -12,7 +12,7 @@ use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    channel::{ApuChannel, Dac, LengthCountedChannel},
+    channel::{Channel, Dac, LengthCountedChannel},
     noise_channel::NoiseChannel,
     pulse_channel::PulseChannel,
     wave_channel::WaveChannel,
@@ -29,11 +29,11 @@ bitflags! {
 }
 
 impl ChannelsControl {
-    fn vol_left(&self) -> u8 {
+    fn vol_left(self) -> u8 {
         (self.bits() >> 4) & 7
     }
 
-    fn vol_right(&self) -> u8 {
+    fn vol_right(self) -> u8 {
         self.bits() & 7
     }
 }
@@ -240,7 +240,7 @@ impl GenericApu {
 
     /// write the top 2 bits of NRx4 registers and runs the obsecure
     /// behaviour of clocking the length counter
-    pub(crate) fn write_channel_length_enable_and_trigger<C: ApuChannel>(
+    pub(crate) fn write_channel_length_enable_and_trigger<C: Channel>(
         channel: &mut LengthCountedChannel<C>,
         is_length_clock_next: bool,
         data: u8,
@@ -262,7 +262,7 @@ impl GenericApu {
         }
     }
 
-    pub fn init_scheduler(&mut self, sched: &mut impl ScheduleFn) {
+    pub fn init_scheduler(sched: &mut impl ScheduleFn) {
         sched(GenApuEvent::NoiseReload, 4);
     }
 }

@@ -138,7 +138,7 @@ impl Ppu {
                 value,
             ),
             (PpuKind::Cgb(cgb), OPRI) if value.is_bit(0) => {
-                cgb.dmg_used_x_obj_cords = Some([None; 10])
+                cgb.dmg_used_x_obj_cords = Some([None; 10]);
             }
             (PpuKind::Cgb(cgb), OPRI) => cgb.dmg_used_x_obj_cords = None,
             _ => (),

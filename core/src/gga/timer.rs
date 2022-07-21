@@ -100,7 +100,7 @@ impl Timers {
         gg.timers.counters[idx.us()] = reload;
         // Fire IRQ if enabled
         if ctrl.is_bit(6) {
-            Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16())
+            Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16());
         }
 
         if idx < 2 {

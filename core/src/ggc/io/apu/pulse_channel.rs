@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{envelope::EnvelopGenerator, ApuChannel, ScheduleFn};
+use super::{envelope::EnvelopGenerator, Channel, ScheduleFn};
 use crate::{ggc::io::apu::GenApuEvent, numutil::NumExt};
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
@@ -177,7 +177,7 @@ impl<const T: bool> PulseChannel<T> {
     }
 }
 
-impl<const T: bool> ApuChannel for PulseChannel<T> {
+impl<const T: bool> Channel for PulseChannel<T> {
     fn output(&self) -> u8 {
         self.sequencer_data[self.sequencer_position] * self.envelope.current_volume()
     }

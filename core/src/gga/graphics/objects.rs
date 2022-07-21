@@ -241,6 +241,7 @@ impl Ppu {
     }
 }
 
+#[derive(Copy, Clone)]
 struct Object {
     x: u16,
     y: u8,
@@ -250,21 +251,21 @@ struct Object {
 }
 
 impl Object {
-    fn size(&self) -> (u16, u16) {
+    fn size(self) -> (u16, u16) {
         let addr = (self.attr1.bits(6, 2) | (self.attr0.bits(6, 2) << 2)).us();
         (OBJ_X_SIZE[addr], OBJ_Y_SIZE[addr])
     }
 
-    fn draw_on(&self, line: u16, size_y: u8) -> bool {
+    fn draw_on(self, line: u16, size_y: u8) -> bool {
         let pos = line.u8().wrapping_sub(self.y);
         self.valid() && pos < size_y
     }
 
-    fn valid(&self) -> bool {
+    fn valid(self) -> bool {
         self.attr0.bits(3, 2) != 3 && self.attr0.bits(6, 2) != 3
     }
 
-    fn y_on(&self, line: u16, mosaic: u16) -> u8 {
+    fn y_on(self, line: u16, mosaic: u16) -> u8 {
         let mut pos = line.u8().wrapping_sub(self.y);
         // Consider VFlip and Mosaic
         if self.attr0.is_bit(4) {
@@ -276,7 +277,7 @@ impl Object {
         pos
     }
 
-    fn signed_x<const FLIP: bool>(&self) -> (i16, i16) {
+    fn signed_x<const FLIP: bool>(self) -> (i16, i16) {
         let x = if self.x.is_bit(8) {
             // i didn't pay attention in math class
             self.x as i16 | 0xFF00u16 as i16

@@ -75,14 +75,14 @@ impl Inst {
         self.get_(&data::INC_PC, data::INC_PC_EXT)
     }
 
-    fn get<T: Copy>(&self, reg: &[T], ext: &[T]) -> T {
+    fn get<T: Copy>(self, reg: &[T], ext: &[T]) -> T {
         match self.0 {
             EXT => ext[self.1 as usize],
             _ => reg[self.0 as usize],
         }
     }
 
-    fn get_<T: Copy>(&self, reg: &[T], ext: T) -> T {
+    fn get_<T: Copy>(self, reg: &[T], ext: T) -> T {
         match self.0 {
             EXT => ext,
             _ => reg[self.0 as usize],
@@ -145,11 +145,11 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         0x12 => gg.write8(gg.cpu.dreg(DE), gg.cpu.reg(A)),
         0x22 => {
             let addr = gg.mod_ret_hl(1);
-            gg.write8(addr, gg.cpu.reg(A))
+            gg.write8(addr, gg.cpu.reg(A));
         }
         0x32 => {
             let addr = gg.mod_ret_hl(-1);
-            gg.write8(addr, gg.cpu.reg(A))
+            gg.write8(addr, gg.cpu.reg(A));
         }
 
         0x03 | 0x13 | 0x23 => {
@@ -164,7 +164,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
 
         0x04 | 0x14 | 0x24 => {
             let val = gg.add(gg.cpu.reg(BDH[reg]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(BDH[reg], val)
+            gg.cpu.set_reg(BDH[reg], val);
         }
         0x34 => {
             let addr = gg.cpu.dreg(HL);
@@ -175,7 +175,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
 
         0x05 | 0x15 | 0x25 => {
             let val = gg.sub(gg.cpu.reg(BDH[reg]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(BDH[reg], val)
+            gg.cpu.set_reg(BDH[reg], val);
         }
         0x35 => {
             let addr = gg.cpu.dreg(HL);
@@ -217,7 +217,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
                     a = a.wrapping_sub(0x60);
                 }
                 if gg.cpu.flag(HalfCarry) {
-                    a = a.wrapping_sub(0x06) & 0xFF
+                    a = a.wrapping_sub(0x06) & 0xFF;
                 }
             }
 
@@ -227,11 +227,11 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         }
         0x37 => gg
             .cpu
-            .set_reg(F, (gg.cpu.reg(F) & Zero.mask()) + 0b00010000),
+            .set_reg(F, (gg.cpu.reg(F) & Zero.mask()) + 0b0001_0000),
 
         0x08 => {
             let addr = gg.arg16();
-            gg.write16(addr, gg.cpu.sp)
+            gg.write16(addr, gg.cpu.sp);
         }
         0x18 => return jr(gg),
         0x28 if gg.cpu.flag(Zero) => return jr(gg),
@@ -251,12 +251,12 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         0x2A => {
             let addr = gg.mod_ret_hl(1);
             let value = gg.read8(addr);
-            gg.cpu.set_reg(A, value)
+            gg.cpu.set_reg(A, value);
         }
         0x3A => {
             let addr = gg.mod_ret_hl(-1);
             let value = gg.read8(addr);
-            gg.cpu.set_reg(A, value)
+            gg.cpu.set_reg(A, value);
         }
 
         0x0B | 0x1B | 0x2B => {
@@ -266,16 +266,16 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         }
         0x3B => {
             gg.advance_clock(1);
-            gg.cpu.sp = gg.cpu.sp.wrapping_sub(1)
+            gg.cpu.sp = gg.cpu.sp.wrapping_sub(1);
         }
 
         0x0C | 0x1C | 0x2C | 0x3C => {
             let val = gg.add(gg.cpu.reg(CELA[reg]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(CELA[reg], val)
+            gg.cpu.set_reg(CELA[reg], val);
         }
         0x0D | 0x1D | 0x2D | 0x3D => {
             let val = gg.sub(gg.cpu.reg(CELA[reg]).u16(), 1, 0, false).u8();
-            gg.cpu.set_reg(CELA[reg], val)
+            gg.cpu.set_reg(CELA[reg], val);
         }
         0x0E | 0x1E | 0x2E | 0x3E => {
             let value = gg.arg8();
@@ -293,7 +293,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         0x2F => {
             gg.cpu.set_fl(Negative, true);
             gg.cpu.set_fl(HalfCarry, true);
-            gg.cpu.set_reg(A, gg.cpu.reg(A) ^ 0xFF)
+            gg.cpu.set_reg(A, gg.cpu.reg(A) ^ 0xFF);
         }
         0x3F => {
             gg.cpu.set_fl(Negative, false);
@@ -320,7 +320,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
                 }
 
                 _ => reg_set(gg, inst.0, |gg, v| {
-                    gg.cpu.set_reg(MATH_REGS[reg as usize], v)
+                    gg.cpu.set_reg(MATH_REGS[reg as usize], v);
                 }),
             }
         }
@@ -427,7 +427,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         0xDA if gg.cpu.flag(Carry) => return jp(gg),
         0xEA => {
             let addr = gg.arg16();
-            gg.write8(addr, gg.cpu.reg(A))
+            gg.write8(addr, gg.cpu.reg(A));
         }
         0xFA => {
             let addr = gg.arg16();
@@ -493,10 +493,10 @@ fn execute_ext(gg: &mut GameGirl, ext: u8) {
         0x08 => reg_ext::<true, _>(gg, ext, |gg, v| gg.rrc(v, true)),
         0x10 => reg_ext::<true, _>(gg, ext, |gg, v| gg.rl(v, true)),
         0x18 => reg_ext::<true, _>(gg, ext, |gg, v| gg.rr(v, true)),
-        0x20 => reg_ext::<true, _>(gg, ext, |gg, v| gg.sla(v)),
-        0x28 => reg_ext::<true, _>(gg, ext, |gg, v| gg.sra(v)),
-        0x30 => reg_ext::<true, _>(gg, ext, |gg, v| gg.swap(v)),
-        0x38 => reg_ext::<true, _>(gg, ext, |gg, v| gg.srl(v)),
+        0x20 => reg_ext::<true, _>(gg, ext, GameGirl::sla),
+        0x28 => reg_ext::<true, _>(gg, ext, GameGirl::sra),
+        0x30 => reg_ext::<true, _>(gg, ext, GameGirl::swap),
+        0x38 => reg_ext::<true, _>(gg, ext, GameGirl::srl),
         _ => {
             let bit = ((ext & 0b0011_1000) >> 3).u16();
             match ext & 0b1100_0000 {
@@ -515,39 +515,31 @@ fn reg_ext<const ADV: bool, T: FnOnce(&mut GameGirl, u8) -> u8>(
     func: T,
 ) {
     let reg = op & 0x07;
-    match reg {
-        6 => {
-            let addr = gg.cpu.dreg(HL);
-            let value = gg.read8(addr);
-            let value = func(gg, value);
-            if ADV {
-                gg.advance_clock(1);
-            }
-            gg.set8(addr, value);
+    if reg == 6 {
+        let addr = gg.cpu.dreg(HL);
+        let value = gg.read8(addr);
+        let value = func(gg, value);
+        if ADV {
+            gg.advance_clock(1);
         }
-
-        _ => {
-            let reg = MATH_REGS[reg as usize];
-            let value = gg.cpu.reg(reg);
-            let value = func(gg, value);
-            gg.cpu.set_reg(reg, value)
-        }
+        gg.set8(addr, value);
+    } else {
+        let reg = MATH_REGS[reg as usize];
+        let value = gg.cpu.reg(reg);
+        let value = func(gg, value);
+        gg.cpu.set_reg(reg, value);
     }
 }
 
 fn reg_set<T: FnOnce(&mut GameGirl, u8)>(gg: &mut GameGirl, op: u8, func: T) {
     let reg = op & 0x07;
-    match reg {
-        6 => {
-            let addr = gg.cpu.dreg(HL);
-            let value = gg.read8(addr);
-            func(gg, value)
-        }
-
-        _ => {
-            let reg = MATH_REGS[reg as usize];
-            let value = gg.cpu.reg(reg);
-            func(gg, value)
-        }
+    if reg == 6 {
+        let addr = gg.cpu.dreg(HL);
+        let value = gg.read8(addr);
+        func(gg, value);
+    } else {
+        let reg = MATH_REGS[reg as usize];
+        let value = gg.cpu.reg(reg);
+        func(gg, value);
     }
 }
