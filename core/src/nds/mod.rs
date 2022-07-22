@@ -4,33 +4,38 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+mod audio;
+mod cartridge;
+mod cpu;
+mod graphics;
 mod memory;
 mod scheduling;
 
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::{
+    mem,
+    ops::{Deref, DerefMut, Index, IndexMut},
+};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    common,
     common::{EmulateOptions, SystemConfig},
-    components::{
-        arm::{
-            inst_arm::ArmLut,
-            inst_thumb::ThumbLut,
-            interface::{ArmSystem, RwType, SysWrapper},
-            Access, Cpu, Exception,
-        },
-        debugger::Debugger,
-        memory::MemoryMapper,
-        scheduler::Scheduler,
+    components::{arm::Cpu, debugger::Debugger, scheduler::Scheduler},
+    nds::{
+        audio::Apu,
+        cartridge::Cartridge,
+        cpu::NDS9_CLOCK,
+        graphics::NdsEngines,
+        memory::Memory,
+        scheduling::{ApuEvent, NdsEvent},
     },
-    gga::graphics::threading::GgaPpu,
-    nds::{memory::Memory, scheduling::NdsEvent},
     numutil::NumExt,
+    Colour,
 };
 
 macro_rules! deref {
-    ($name:ident) => {
+    ($name:ident, $mmio:ident) => {
         impl Deref for $name {
             type Target = Nds;
 
@@ -51,17 +56,15 @@ macro_rules! deref {
             type Output = u16;
 
             fn index(&self, addr: u32) -> &Self::Output {
-                assert!(addr < 0x3FF);
                 assert_eq!(addr & 1, 0);
-                &self.memory.mmio[(addr >> 1).us()]
+                &self.memory.$mmio[(addr >> 1).us()]
             }
         }
 
         impl IndexMut<u32> for $name {
             fn index_mut(&mut self, addr: u32) -> &mut Self::Output {
-                assert!(addr < 0x3FF);
                 assert_eq!(addr & 1, 0);
-                &mut self.memory.mmio[(addr >> 1).us()]
+                &mut self.memory.$mmio[(addr >> 1).us()]
             }
         }
 
@@ -74,16 +77,20 @@ macro_rules! deref {
     };
 }
 
-deref!(Nds7);
-deref!(Nds9);
+deref!(Nds7, mmio7);
+deref!(Nds9, mmio9);
 
 #[derive(Deserialize, Serialize)]
 pub struct Nds {
     cpu7: Cpu<Nds7>,
     cpu9: Cpu<Nds9>,
-    pub ppus: [GgaPpu; 2],
+    pub ppu: NdsEngines,
+    apu: Apu,
     memory: Memory,
+    pub(crate) cart: Cartridge,
+
     scheduler: Scheduler<NdsEvent>,
+    time_7: u32,
 
     #[serde(skip)]
     #[serde(default)]
@@ -94,18 +101,25 @@ pub struct Nds {
 }
 
 impl Nds {
-    fn advance_clock(&mut self) {}
+    common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation);
 
-    /// Add S/N cycles, which advance the system besides the CPU.
-    #[inline]
-    fn add_sn_cycles(&mut self, count: u16) {
-        self.scheduler.advance(count.u32());
+    /// Step forward the emulated console including all subsystems.
+    pub fn advance(&mut self) {
+        // Run an instruction on the ARM9, then keep running the ARM7
+        // until it has caught up
+        Cpu::continue_running(&mut self.nds9());
+        let mut nds7 = self.nds7();
+        while self.time_7 < self.scheduler.now() {
+            Cpu::continue_running(&mut nds7);
+        }
     }
 
-    /// Add I cycles, which advance the system besides the CPU.
-    #[inline]
-    fn add_i_cycles(&mut self, count: u16) {
-        self.scheduler.advance(count.u32());
+    fn advance_clock(&mut self) {
+        if self.scheduler.has_events() {
+            while let Some(event) = self.scheduler.get_next_pending() {
+                event.kind.dispatch(self, event.late_by);
+            }
+        }
     }
 
     #[inline]
@@ -117,6 +131,49 @@ impl Nds {
     fn nds9(&mut self) -> Nds9 {
         Nds9(self as *mut Nds)
     }
+
+    /// Restore state after a savestate load. `old_self` should be the
+    /// system state before the state was loaded.
+    pub fn restore_from(&mut self, old_self: Self) {
+        self.options = old_self.options;
+        self.config = old_self.config;
+        self.debugger = old_self.debugger;
+        self.init_memory();
+    }
+
+    pub fn skip_bootrom(&mut self) {
+        todo!();
+    }
+}
+
+impl Default for Nds {
+    fn default() -> Self {
+        let mut nds = Self {
+            cpu7: Cpu::default(),
+            cpu9: Cpu::default(),
+            ppu: NdsEngines::default(),
+            apu: Apu::default(),
+            memory: Memory::default(),
+            cart: Cartridge::default(),
+            scheduler: Scheduler::default(),
+            time_7: 0,
+            debugger: Debugger::default(),
+            options: EmulateOptions::default(),
+            config: SystemConfig::default(),
+            ticking: false,
+        };
+
+        // ARM9 has a different entry point compared to ARM7.
+        nds.cpu9.registers[15] = 0xFFFF_0000;
+
+        // Initialize scheduler
+        nds.scheduler.schedule(
+            NdsEvent::ApuEvent(ApuEvent::PushSample),
+            audio::SAMPLE_EVERY_N_CLOCKS,
+        );
+
+        nds
+    }
 }
 
 #[repr(transparent)]
@@ -124,106 +181,5 @@ struct Nds7(*mut Nds);
 #[repr(transparent)]
 struct Nds9(*mut Nds);
 
-impl ArmSystem for Nds7 {
-    const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_armv4_lut();
-    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumbv4_lut();
-    const IE_ADDR: u32 = 0;
-    const IF_ADDR: u32 = 0;
-    const IME_ADDR: u32 = 0;
-
-    fn cpur(&self) -> &Cpu<Self> {
-        &self.cpu7
-    }
-
-    fn cpu(&mut self) -> &mut Cpu<Self> {
-        &mut self.cpu7
-    }
-
-    fn advance_clock(&mut self) {
-        Nds::advance_clock(self);
-    }
-
-    fn add_sn_cycles(&mut self, cycles: u16) {
-        Nds::add_sn_cycles(self, cycles);
-    }
-
-    fn add_i_cycles(&mut self, cycles: u16) {
-        Nds::add_sn_cycles(self, cycles);
-    }
-
-    fn exception_happened(&mut self, _kind: Exception) {}
-
-    fn pipeline_stalled(&mut self) {}
-
-    fn get<T: RwType>(&mut self, addr: u32) -> T {
-        MemoryMapper::get(self, addr, T::WIDTH - 1, |_, _| T::from_u8(0))
-    }
-
-    fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        MemoryMapper::set(self, addr, value, |_, _, _| ());
-    }
-
-    fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {
-        1
-    }
-
-    fn check_debugger(&mut self) -> bool {
-        true
-    }
-
-    fn can_cache_at(_addr: u32) -> bool {
-        false
-    }
-}
-
-impl ArmSystem for Nds9 {
-    const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_armv4_lut();
-    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumbv4_lut();
-    const IE_ADDR: u32 = 0;
-    const IF_ADDR: u32 = 0;
-    const IME_ADDR: u32 = 0;
-
-    fn cpur(&self) -> &Cpu<Self> {
-        &self.cpu9
-    }
-
-    fn cpu(&mut self) -> &mut Cpu<Self> {
-        &mut self.cpu9
-    }
-
-    fn advance_clock(&mut self) {
-        Nds::advance_clock(self);
-    }
-
-    fn add_sn_cycles(&mut self, cycles: u16) {
-        Nds::add_sn_cycles(self, cycles);
-    }
-
-    fn add_i_cycles(&mut self, cycles: u16) {
-        Nds::add_i_cycles(self, cycles);
-    }
-
-    fn exception_happened(&mut self, _kind: Exception) {}
-
-    fn pipeline_stalled(&mut self) {}
-
-    fn get<T: RwType>(&mut self, addr: u32) -> T {
-        MemoryMapper::get(self, addr, T::WIDTH - 1, |_, _| T::from_u8(0))
-    }
-
-    fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        MemoryMapper::set(self, addr, value, |_, _, _| ());
-    }
-
-    fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {
-        1
-    }
-
-    fn check_debugger(&mut self) -> bool {
-        true
-    }
-
-    fn can_cache_at(_addr: u32) -> bool {
-        false
-    }
-}
+unsafe impl Send for Nds7 {}
+unsafe impl Send for Nds9 {}

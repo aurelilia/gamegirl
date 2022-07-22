@@ -3,3 +3,11 @@
 /gamegirl/web/gamegirl*
 *.sav
 bench.gb
+
+bios7.bin
+bios9.bin
+bios.bin
+
+perf.data
+perf.data.old
+flamegraph.svg

@@ -18,6 +18,7 @@ use crate::{
         io::{cartridge::Cartridge, joypad::Joypad},
         GameGirl,
     },
+    nds::Nds,
     psx::PlayStation,
     Colour,
 };
@@ -33,7 +34,7 @@ macro_rules! forward_fn {
             match self {
                 System::GGC(gg) => gg.$name(arg),
                 System::GGA(gg) => gg.$name(arg),
-                System::NDS(_ds) => todo!(),
+                System::NDS(ds) => ds.$name(arg),
                 System::PSX(_ps) => todo!(),
             }
         }
@@ -43,7 +44,7 @@ macro_rules! forward_fn {
             match self {
                 System::GGC(gg) => gg.$name(),
                 System::GGA(gg) => gg.$name(),
-                System::NDS(_ds) => todo!(),
+                System::NDS(ds) => ds.$name(),
                 System::PSX(ps) => ps.$name(),
             }
         }
@@ -61,7 +62,7 @@ macro_rules! forward_member {
             match self {
                 System::GGC($sys) => $expr,
                 System::GGA($sys) => $expr,
-                System::NDS(_ds) => todo!(),
+                System::NDS($sys) => $expr,
                 System::PSX($sys) => todo!(),
             }
         }
@@ -177,7 +178,7 @@ pub enum System {
     /// A GGA. Only used for GGA games.
     GGA(Box<GameGirlAdv>),
     /// An NDS. Only used for NDS games.
-    NDS(Box<usize>),
+    NDS(Box<Nds>),
     /// A PSX. Only used for PSX games, obviously.
     PSX(Box<PlayStation>),
 }
@@ -273,48 +274,19 @@ impl System {
         // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
         // that is present on every cartridge.
         let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
+        // We detect GGA carts by a zero-filled header region
+        let is_gga = cart.iter().skip(0xB5).take(6).all(|b| *b == 0);
+        // We detect NDS carts by a zero-filled header region
+        let is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
 
-        if is_ggc {
-            let mut cart = Cartridge::from_rom(cart);
-            if let Some(save) = Storage::load(path, cart.title(true)) {
-                cart.load_save(save);
+        match () {
+            _ if is_ggc => self.load_ggc(cart, path, config),
+            _ if is_gga => self.load_gga(cart, path, config),
+            _ if is_nds => self.load_nds(cart, path, config),
+            _ => {
+                log::error!("Failed to detect cart! Guessing GGA.");
+                self.load_gga(cart, path, config)
             }
-
-            let mut ggc = Box::new(GameGirl::default());
-            ggc.load_cart(cart, config, false);
-            ggc.options.frame_finished = mem::replace(
-                &mut self.options().frame_finished,
-                EmulateOptions::serde_frame_finished(),
-            );
-            *self = Self::GGC(ggc);
-        } else {
-            let (mut cart, is_elf) = if let Some(elf_read) = Self::decode_elf(&cart) {
-                (elf_read, true)
-            } else {
-                (cart, false)
-            };
-
-            // Paging implementation requires this to prevent reading unallocated memory
-            let until_full_page = 0x7FFF - (cart.len() & 0x7FFF);
-            cart.extend(iter::repeat(0).take(until_full_page));
-
-            let mut gga = Box::new(GameGirlAdv::default());
-            gga.config = config.clone();
-            gga.cart.load_rom(cart);
-            if let Some(save) = Storage::load(path, gga.cart.title()) {
-                gga.cart.load_save(save);
-            }
-            gga.init_memory();
-            gga.options.frame_finished = mem::replace(
-                &mut self.options().frame_finished,
-                EmulateOptions::serde_frame_finished(),
-            );
-
-            if is_elf {
-                gga.skip_bootrom();
-            }
-
-            *self = Self::GGA(gga);
         }
 
         self.options().running = true;
@@ -323,6 +295,51 @@ impl System {
             self.options().running = false;
             self.skip_bootrom();
         }
+    }
+
+    fn load_ggc(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+        let mut cart = Cartridge::from_rom(cart);
+        if let Some(save) = Storage::load(path, cart.title(true)) {
+            cart.load_save(save);
+        }
+
+        let mut ggc = Box::new(GameGirl::default());
+        ggc.load_cart(cart, config, false);
+        ggc.options.frame_finished = mem::replace(
+            &mut self.options().frame_finished,
+            EmulateOptions::serde_frame_finished(),
+        );
+        *self = Self::GGC(ggc);
+    }
+
+    fn load_gga(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+        let (mut cart, is_elf) = if let Some(elf_read) = Self::decode_elf(&cart) {
+            (elf_read, true)
+        } else {
+            (cart, false)
+        };
+
+        // Paging implementation requires this to prevent reading unallocated memory
+        let until_full_page = 0x7FFF - (cart.len() & 0x7FFF);
+        cart.extend(iter::repeat(0).take(until_full_page));
+
+        let mut gga = Box::new(GameGirlAdv::default());
+        gga.config = config.clone();
+        gga.cart.load_rom(cart);
+        if let Some(save) = Storage::load(path, gga.cart.title()) {
+            gga.cart.load_save(save);
+        }
+        gga.init_memory();
+        gga.options.frame_finished = mem::replace(
+            &mut self.options().frame_finished,
+            EmulateOptions::serde_frame_finished(),
+        );
+
+        if is_elf {
+            gga.skip_bootrom();
+        }
+
+        *self = Self::GGA(gga);
     }
 
     fn decode_elf(cart: &[u8]) -> Option<Vec<u8>> {
@@ -344,6 +361,19 @@ impl System {
         }
 
         Some(buf)
+    }
+
+    fn load_nds(&mut self, cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) {
+        let mut nds = Box::new(Nds::default());
+        nds.config = config.clone();
+        nds.cart.load_rom(cart);
+        nds.init_memory();
+        nds.options.frame_finished = mem::replace(
+            &mut self.options().frame_finished,
+            EmulateOptions::serde_frame_finished(),
+        );
+
+        *self = Self::NDS(nds);
     }
 }
 

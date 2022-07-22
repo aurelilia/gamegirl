@@ -4,24 +4,24 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{
-    ops::{Index, IndexMut},
-    ptr,
-};
+use std::ptr;
 
 use serde::{Deserialize, Serialize};
 
 use super::{Nds7, Nds9};
 use crate::{
-    components::memory::{MemoryMappedSystem, MemoryMapper},
+    components::{
+        arm::interface::RwType,
+        memory::{MemoryMappedSystem, MemoryMapper},
+    },
     nds::Nds,
-    numutil::NumExt,
+    numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
 pub const KB: usize = 1024;
 pub const MB: usize = KB * KB;
 pub const BIOS7: &[u8] = include_bytes!("bios7.bin");
-pub const _BIOS9: &[u8] = include_bytes!("bios9.bin");
+pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
 
 /// Memory struct containing the NDS's memory regions along with page tables
 /// and other auxiliary cached information relating to memory.
@@ -32,7 +32,9 @@ pub struct Memory {
     #[serde(with = "serde_arrays")]
     wram: [u8; 32 * KB],
     #[serde(with = "serde_arrays")]
-    pub mmio: [u16; KB / 2],
+    pub mmio7: [u16; 0x1010 / 2],
+    #[serde(with = "serde_arrays")]
+    pub mmio9: [u16; 0x520 / 2],
 
     #[serde(with = "serde_arrays")]
     wram7: [u8; 64 * KB],
@@ -55,10 +57,101 @@ impl Nds {
     pub fn init_memory(&mut self) {
         MemoryMapper::init_pages(&mut self.nds7());
         MemoryMapper::init_pages(&mut self.nds9());
-        if self.config.cached_interpreter {
-            self.cpu7.cache.init(0);
-            self.cpu9.cache.init(0);
+    }
+}
+
+impl Nds7 {
+    pub fn get_slow<T: RwType>(&self, addr: u32) -> T {
+        match addr {
+            0x400_0000..=0x400_1010 if T::WIDTH == 1 && addr.is_bit(0) => {
+                T::from_u8(self.get_mmio(addr).high())
+            }
+            0x400_0000..=0x400_1010 if T::WIDTH == 1 => T::from_u8(self.get_mmio(addr).low()),
+            0x400_0000..=0x400_1010 if T::WIDTH == 2 => T::from_u16(self.get_mmio(addr)),
+            0x400_0000..=0x400_1010 if T::WIDTH == 4 => {
+                T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2)))
+            }
+
+            _ => T::from_u8(0),
         }
+    }
+
+    pub fn set_slow<T: RwType>(&mut self, addr: u32, value: T) {
+        match addr {
+            0x400_0000..=0x400_1010 if T::WIDTH == 1 && addr.is_bit(0) => {
+                self.set_mmio(addr, hword(self.get_mmio(addr).low(), value.u8()))
+            }
+            0x400_0000..=0x400_1010 if T::WIDTH == 1 => {
+                self.set_mmio(addr, hword(value.u8(), self.get_mmio(addr).high()))
+            }
+            0x400_0000..=0x400_1010 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
+            0x400_0000..=0x400_1010 if T::WIDTH == 4 => {
+                self.set_mmio(addr, value.u16());
+                self.set_mmio(addr, value.u32().high());
+            }
+
+            _ => (),
+        }
+    }
+
+    fn get_mmio(&self, addr: u32) -> u16 {
+        let addr = addr & !1;
+        self[addr]
+    }
+
+    fn set_mmio(&mut self, addr: u32, value: u16) {
+        let addr = addr & !1;
+        self[addr] = value;
+    }
+}
+
+impl Nds9 {
+    pub fn get_slow<T: RwType>(&self, addr: u32) -> T {
+        match addr {
+            0x400_0000..=0x400_0520 if T::WIDTH == 1 && addr.is_bit(0) => {
+                T::from_u8(self.get_mmio(addr).high())
+            }
+            0x400_0000..=0x400_0520 if T::WIDTH == 1 => T::from_u8(self.get_mmio(addr).low()),
+            0x400_0000..=0x400_0520 if T::WIDTH == 2 => T::from_u16(self.get_mmio(addr)),
+            0x400_0000..=0x400_0520 if T::WIDTH == 4 => {
+                T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2)))
+            }
+
+            0xFFFF_0000..=0xFFFF_FFFF => unsafe {
+                let ptr = BIOS9.as_ptr().add(addr.us() % BIOS9.len());
+                ptr.cast::<T>().read()
+            },
+
+            _ => T::from_u8(0),
+        }
+    }
+
+    pub fn set_slow<T: RwType>(&mut self, addr: u32, value: T) {
+        match addr {
+            0x400_0000..=0x400_0520 if T::WIDTH == 1 && addr.is_bit(0) => {
+                self.set_mmio(addr, hword(self.get_mmio(addr).low(), value.u8()))
+            }
+            0x400_0000..=0x400_0520 if T::WIDTH == 1 => {
+                self.set_mmio(addr, hword(value.u8(), self.get_mmio(addr).high()))
+            }
+            0x400_0000..=0x400_0520 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
+            0x400_0000..=0x400_0520 if T::WIDTH == 4 => {
+                self.set_mmio(addr, value.u16());
+                self.set_mmio(addr, value.u32().high());
+            }
+
+            _ => (),
+        }
+    }
+
+    fn get_mmio(&self, addr: u32) -> u16 {
+        let addr = addr & !1;
+        self[addr]
+    }
+
+    fn set_mmio(&mut self, addr: u32, value: u16) {
+        let addr = addr & !1;
+        self[addr] = value;
     }
 }
 
@@ -67,7 +160,8 @@ impl Default for Memory {
         Self {
             psram: [0; 4 * MB],
             wram: [0; 32 * KB],
-            mmio: [0; KB / 2],
+            mmio7: [0; 0x1010 / 2],
+            mmio9: [0; 0x520 / 2],
 
             wram7: [0; 64 * KB],
             inst_tcm: [0; 32 * KB],
@@ -84,24 +178,6 @@ impl Default for Memory {
 }
 
 unsafe impl Send for Memory {}
-
-impl Index<u32> for Nds {
-    type Output = u16;
-
-    fn index(&self, addr: u32) -> &Self::Output {
-        assert!(addr < 0x3FF);
-        assert_eq!(addr & 1, 0);
-        &self.memory.mmio[(addr >> 1).us()]
-    }
-}
-
-impl IndexMut<u32> for Nds {
-    fn index_mut(&mut self, addr: u32) -> &mut Self::Output {
-        assert!(addr < 0x3FF);
-        assert_eq!(addr & 1, 0);
-        &mut self.memory.mmio[(addr >> 1).us()]
-    }
-}
 
 impl MemoryMappedSystem<8192> for Nds7 {
     type Usize = u32;

@@ -89,12 +89,12 @@ mod inner {
     impl Nds {
         #[inline]
         pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
-            self.ppus[E].ppu.lock().unwrap()
+            self.ppu.ppus[E].ppu.lock().unwrap()
         }
 
         #[inline]
         pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
-            self.ppus[E].ppu.lock().unwrap()
+            self.ppu.ppus[E].ppu.lock().unwrap()
         }
     }
 
