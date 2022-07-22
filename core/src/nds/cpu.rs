@@ -7,9 +7,7 @@
 use crate::{
     components::{
         arm::{
-            inst_arm::ArmLut,
-            inst_thumb::ThumbLut,
-            interface::{ArmSystem, RwType, SysWrapper},
+            interface::{ArmSystem, RwType},
             Access, Cpu, Exception,
         },
         memory::MemoryMapper,
@@ -21,8 +19,7 @@ use crate::{
 pub const NDS9_CLOCK: u32 = 67_027_964;
 
 impl ArmSystem for Nds7 {
-    const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_armv4_lut();
-    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumbv4_lut();
+    const IS_V5: bool = false;
     const IE_ADDR: u32 = 0;
     const IF_ADDR: u32 = 0;
     const IME_ADDR: u32 = 0;
@@ -71,8 +68,7 @@ impl ArmSystem for Nds7 {
 }
 
 impl ArmSystem for Nds9 {
-    const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_armv4_lut();
-    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumbv4_lut();
+    const IS_V5: bool = true;
     const IE_ADDR: u32 = 0;
     const IF_ADDR: u32 = 0;
     const IME_ADDR: u32 = 0;

@@ -30,20 +30,44 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     pub fn check_arm_cond(&mut self, inst: u32) -> bool {
-        self.cpu().eval_condition(inst.bits(28, 4).u16())
+        // BLX/CP15 on ARMv5 is a special case: it is encoded with NV.
+        let armv5_uncond =
+            S::IS_V5 && (inst.bits(25, 7) == 0b1111_101) || (inst.bits(24, 9) == 0b1111_1110);
+        self.cpu().eval_condition(inst.bits(28, 4).u16()) || armv5_uncond
     }
 
     pub fn get_handler_arm(inst: u32) -> ArmHandler<S> {
         S::ARM_LUT[(inst.us() >> 20) & 0xFF]
     }
 
+    pub(crate) fn arm_unknown_opcode(self: &mut Self, inst: ArmInst) {
+        self.und_inst(inst.0);
+    }
+
     pub(crate) fn arm_b<const BL: bool>(&mut self, inst: ArmInst) {
-        let nn = inst.0.i24() * 4; // Step 4
-        if BL {
-            let lr = self.cpur().pc() - 4;
-            self.cpu().set_lr(lr);
+        if S::IS_V5 && inst.0.bits(25, 7) == 0b1111_101 {
+            self.armv5_blx::<BL>(inst);
+        } else {
+            let nn = inst.0.i24() * 4; // Step 4
+            if BL {
+                let lr = self.cpur().pc() - 4;
+                self.cpu().set_lr(lr);
+            }
+            self.set_pc(self.cpur().pc().wrapping_add_signed(nn));
         }
-        self.set_pc(self.cpur().pc().wrapping_add_signed(nn));
+    }
+
+    fn armv5_blx<const HALF: bool>(&mut self, inst: ArmInst) {
+        let nn = inst.0.i24() * 4; // Step 4
+        let lr = self.cpur().pc() - 4;
+        self.cpu().set_lr(lr);
+        self.cpu().set_flag(Thumb, true);
+        self.set_pc(
+            self.cpur()
+                .pc()
+                .wrapping_add_signed(nn)
+                .wrapping_add((HALF as u32) * 2),
+        );
     }
 
     pub(crate) fn arm_bx(&mut self, inst: ArmInst) {
@@ -63,7 +87,16 @@ impl<S: ArmSystem> SysWrapper<S> {
     pub(crate) fn arm_alu_mul_psr_reg<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
         // ALU with register OR mul OR psr OR SWP OR BX OR LDR/STR
         // ARM please... what is this instruction encoding
-        if OP == 0b1001 && inst.0.bits(8, 13) == 0xFFF {
+        if S::IS_V5 && (inst.0 & 0x0FFF_0FF0) == 0x016F_0F10 {
+            // ARMv5: CLZ
+            let d = inst.reg(12);
+            let m = inst.reg(0);
+            let rm = self.reg(m);
+            self.set_reg(d, rm.leading_zeros());
+        } else if S::IS_V5 && !CPSR && (0x8..=0xB).contains(&OP) && inst.0.bits(4, 8) == 0x05 {
+            // ARMv5: QADD/QSUB
+            self.armv5_alu_q::<OP, CPSR>(inst);
+        } else if OP == 0b1001 && inst.0.bits(8, 13) == 0xFFF {
             // BX
             self.arm_bx(inst);
         } else if !CPSR && (0x8..=0xB).contains(&OP) {
@@ -122,8 +155,28 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
     }
 
+    fn armv5_alu_q<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+        let rm = self.reg(inst.reg(0)) as i32;
+        let rn = self.reg(inst.reg(16)) as i32;
+        let d = inst.reg(12);
+        let value = match OP {
+            9 => rm.saturating_add(rn),
+            10 => rm.saturating_sub(rn),
+            11 => rm.saturating_add(rn.saturating_mul(2)),
+            _ => rm.saturating_sub(rn.saturating_mul(2)),
+        };
+        let checked = match OP {
+            9 => rm.checked_add(rn),
+            10 => rm.checked_sub(rn),
+            11 => rm.checked_add(rn.saturating_mul(2)),
+            _ => rm.checked_sub(rn.saturating_mul(2)),
+        };
+        self.cpu().set_flag(QClamped, checked.is_none());
+        self.set_reg(d, value as u32);
+    }
+
     pub(crate) fn arm_alu_imm<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
-        // ALU with register OR MSR
+        // ALU with register OR MSR OR (ARMv5) CLZ OR (ARMv5) Q*
         if !CPSR && (0x8..=0xB).contains(&OP) {
             // MSR
             let spsr = OP.is_bit(1);
@@ -280,7 +333,33 @@ impl<S: ArmSystem> SysWrapper<S> {
         self.ldrstr::<false>(!pre, up, width, !pre || writeback, !ldr, n, d, offs);
     }
 
-    pub(crate) fn alu<const OP: u16, const CPSR: bool, const SHIFT_REG: bool>(
+    pub(crate) fn armv5_cp15_trans(&mut self, inst: ArmInst) {
+        let mrc = inst.0.is_bit(20);
+        let cn = inst.reg(16);
+        let rd = inst.reg(12);
+        let pn = inst.reg(8);
+        let cp = inst.0.bits(5, 3);
+        let cm = inst.reg(0);
+
+        if inst.0.is_bit(4) && pn == 15 {
+            if mrc {
+                let value = self.get_cp15(cm, cp, cn);
+                if rd == 15 {
+                    let cpsr = self.cpur().cpsr & 0x0FFF_FFFF;
+                    self.cpu().cpsr = cpsr | (value & 0xF000_0000);
+                } else {
+                    self.set_reg(rd, value);
+                }
+            } else {
+                let rd = self.reg_pc4(rd);
+                self.set_cp15(cm, cp, cn, rd);
+            }
+        } else {
+            self.arm_unknown_opcode(inst);
+        }
+    }
+
+    fn alu<const OP: u16, const CPSR: bool, const SHIFT_REG: bool>(
         &mut self,
         reg_a: u32,
         b: u32,
@@ -351,7 +430,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     #[inline]
-    pub(crate) fn msr(&mut self, src: u32, flags: bool, ctrl: bool, spsr: bool) {
+    fn msr(&mut self, src: u32, flags: bool, ctrl: bool, spsr: bool) {
         let mut dest = if spsr {
             self.cpu().spsr()
         } else {
@@ -376,7 +455,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     #[inline]
-    pub(crate) fn arm_mul<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+    fn arm_mul<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
         let rm = self.cpu().reg(inst.reg(0));
         let rs = self.cpu().reg(inst.reg(8));
         let rn = self.cpu().reg(inst.reg(12));
@@ -439,7 +518,7 @@ impl<S: ArmSystem> SysWrapper<S> {
 
     #[inline]
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn ldrstr<const ALIGN: bool>(
+    fn ldrstr<const ALIGN: bool>(
         &mut self,
         post: bool,
         up: bool,
@@ -505,7 +584,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
     }
 
-    pub(crate) fn shifted_op<const CPSR: bool, const IMM: bool>(
+    fn shifted_op<const CPSR: bool, const IMM: bool>(
         &mut self,
         nn: u32,
         op: u32,
@@ -522,10 +601,6 @@ impl<S: ArmSystem> SysWrapper<S> {
                 _ => self.cpu().ror::<CPSR, IMM>(nn, shift_amount),
             }
         }
-    }
-
-    pub(crate) fn arm_unknown_opcode(_self: &mut Self, inst: ArmInst) {
-        Self::log_unknown_opcode(inst.0);
     }
 }
 

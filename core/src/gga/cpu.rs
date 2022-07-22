@@ -6,9 +6,7 @@
 
 use crate::{
     components::arm::{
-        inst_arm::ArmLut,
-        inst_thumb::ThumbLut,
-        interface::{ArmSystem, RwType, SysWrapper},
+        interface::{ArmSystem, RwType},
         Access, Cpu, Exception,
     },
     gga::{addr, addr::WAITCNT, GameGirlAdv},
@@ -18,8 +16,7 @@ use crate::{
 pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 
 impl ArmSystem for GameGirlAdv {
-    const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_armv4_lut();
-    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumbv4_lut();
+    const IS_V5: bool = false;
     const IE_ADDR: u32 = addr::IE;
     const IF_ADDR: u32 = addr::IF;
     const IME_ADDR: u32 = addr::IME;

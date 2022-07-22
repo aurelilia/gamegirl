@@ -12,12 +12,11 @@ use crate::components::arm::inst_arm::ArmLut;
 
 impl<S: ArmSystem> SysWrapper<S> {
     #[allow(clippy::unusual_byte_groupings)]
-    pub const fn make_armv4_lut() -> ArmLut<S> {
+    pub const fn make_arm_lut() -> ArmLut<S> {
         let mut lut: ArmLut<S> = [Self::arm_unknown_opcode; 256];
 
         Self::lut_span(&mut lut, 0b1010, 4, Self::arm_b::<false>);
         Self::lut_span(&mut lut, 0b1011, 4, Self::arm_b::<true>);
-
         Self::lut_span(&mut lut, 0b1111, 4, Self::arm_swi);
 
         // Ew.
@@ -184,11 +183,15 @@ impl<S: ArmSystem> SysWrapper<S> {
         lut[0b011_11110] = Self::arm_ldrstr::<0b11110, false>;
         lut[0b011_11111] = Self::arm_ldrstr::<0b11111, false>;
 
+        if S::IS_V5 {
+            Self::lut_span(&mut lut, 0b1110, 4, Self::armv5_cp15_trans);
+        }
+
         lut
     }
 
     #[allow(clippy::unreadable_literal)]
-    pub const fn make_thumbv4_lut() -> ThumbLut<S> {
+    pub const fn make_thumb_lut() -> ThumbLut<S> {
         let mut lut: ThumbLut<S> = [Self::thumb_unknown_opcode; 256];
 
         lut[0b1101_1111] = Self::thumb_swi;

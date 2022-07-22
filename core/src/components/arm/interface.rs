@@ -13,8 +13,9 @@ use crate::{
 };
 
 pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
-    const ARM_LUT: ArmLut<Self>;
-    const THUMB_LUT: ThumbLut<Self>;
+    const IS_V5: bool;
+    const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_arm_lut();
+    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumb_lut();
     const IE_ADDR: u32;
     const IF_ADDR: u32;
     const IME_ADDR: u32;
@@ -37,8 +38,8 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
         let time = self.wait_time::<T>(addr, access);
         self.add_sn_cycles(time);
         let value = self.get::<T>(addr).u32();
-        T::ReadOutput::from_u32(if T::WIDTH == 2 {
-            // Special handling for halfwords
+        T::ReadOutput::from_u32(if !Self::IS_V5 && T::WIDTH == 2 {
+            // Special handling for halfwords on ARMv4
             if addr.is_bit(0) {
                 // Unaligned
                 Cpu::<Self>::ror_s0(value.u32(), 8)
@@ -53,6 +54,13 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
         let time = self.wait_time::<T>(addr, access);
         self.add_sn_cycles(time);
         self.set(addr, value);
+    }
+
+    fn get_cp15(&self, _cm: u32, _cp: u32, _cn: u32) -> u32 {
+        panic!("CP15 unsupported!")
+    }
+    fn set_cp15(&self, _cm: u32, _cp: u32, _cn: u32, _rd: u32) {
+        panic!("CP15 unsupported!");
     }
 
     fn check_debugger(&mut self) -> bool;
@@ -71,8 +79,8 @@ impl<S: ArmSystem> SysWrapper<S> {
         let time = self.wait_time::<u16>(addr, kind);
         self.add_sn_cycles(time);
         let val = self.get::<u16>(addr).u32();
-        if addr.is_bit(0) {
-            // Unaligned
+        if !S::IS_V5 && addr.is_bit(0) {
+            // Unaligned on ARMv4
             (val >> 8) as i8 as i16 as u32
         } else {
             // Aligned

@@ -25,8 +25,8 @@ impl<S: ArmSystem> SysWrapper<S> {
         S::THUMB_LUT[inst.us() >> 8]
     }
 
-    pub(crate) fn thumb_unknown_opcode(_self: &mut Self, inst: ThumbInst) {
-        Self::log_unknown_opcode(inst.0);
+    pub(crate) fn thumb_unknown_opcode(self: &mut Self, inst: ThumbInst) {
+        self.und_inst(inst.0);
     }
 
     // THUMB.1/2
@@ -161,7 +161,16 @@ impl<S: ArmSystem> SysWrapper<S> {
         let s = inst.0.bits(3, 4);
         if inst.0.is_bit(7) {
             // BLX
-            self.set_pc(self.reg(s.u32()));
+            let rn = self.reg(s.u32());
+            // Is this v5 behavior correct?
+            if S::IS_V5 {
+                let pc = self.cpur().pc() - 1;
+                self.cpu().set_lr(pc);
+                if !rn.is_bit(0) {
+                    self.cpu().set_flag(Thumb, false);
+                }
+            }
+            self.set_pc(rn);
         } else if s == 15 {
             // BX ARM switch
             self.cpu().set_flag(Thumb, false);
@@ -337,6 +346,9 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
         if PC {
             let pc = self.read::<u32>(sp, kind);
+            if S::IS_V5 && !pc.is_bit(0) {
+                self.cpu().set_flag(Thumb, false);
+            }
             self.set_pc(pc);
             sp += 4;
             kind = Seq;

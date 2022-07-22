@@ -24,13 +24,13 @@ mod inner {
 
     impl Nds {
         #[inline]
-        pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
-            &self.ppus[E]
+        pub fn ppu<const E: usize>(&mut self) -> &mut Ppu {
+            &mut self.ppu.ppus[E]
         }
 
         #[inline]
-        pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
-            &mut self.ppus[E]
+        pub fn ppu_nomut<const E: usize>(&self) -> &Ppu {
+            &self.ppu.ppus[E]
         }
     }
 

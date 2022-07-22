@@ -5,12 +5,12 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 mod alu;
-mod armv4;
 mod caching;
 pub mod inst_arm;
 mod inst_generic;
 pub mod inst_thumb;
 pub mod interface;
+mod lut;
 pub mod registers;
 
 use std::{marker::PhantomData, sync::Arc};

@@ -94,6 +94,7 @@ pub enum Flag {
     Zero = 30,
     Carry = 29,
     Overflow = 28,
+    QClamped = 27,
     IrqDisable = 7,
     FiqDisable = 6,
     Thumb = 5,

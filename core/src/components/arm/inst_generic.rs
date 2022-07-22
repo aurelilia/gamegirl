@@ -17,6 +17,11 @@ impl<S: ArmSystem> SysWrapper<S> {
         Cpu::exception_occurred(self, Exception::Swi);
     }
 
+    pub fn und_inst<T: UpperHex>(&mut self, code: T) {
+        log::error!("Unknown opcode '{:08X}'", code);
+        Cpu::exception_occurred(self, Exception::Undefined);
+    }
+
     /// Called by multiple load/store instructions when the Rlist was
     /// empty, which causes R15 to be loaded/stored and Rb to be
     /// incremented/decremented by 0x40.
@@ -24,7 +29,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         let addr = self.cpu().reg(rb);
         self.set_reg(rb, Self::mod_with_offs(addr, 0x40, up));
 
-        if str {
+        if !S::IS_V5 && str {
             let addr = match (up, before) {
                 (true, true) => addr + 4,
                 (true, false) => addr,
@@ -33,7 +38,7 @@ impl<S: ArmSystem> SysWrapper<S> {
             };
             let value = self.cpur().pc() + self.cpur().inst_size();
             self.write::<u32>(addr, value, NonSeq);
-        } else {
+        } else if !S::IS_V5 {
             let val = self.read::<u32>(addr, NonSeq);
             self.set_pc(val);
         }
@@ -76,10 +81,6 @@ impl<S: ArmSystem> SysWrapper<S> {
             lut[start | idx] = handler;
             idx += 1;
         }
-    }
-
-    pub fn log_unknown_opcode<T: UpperHex>(code: T) {
-        eprintln!("Unknown opcode '{:08X}'", code);
     }
 }
 
