@@ -267,7 +267,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         let end_offs = regs.len().u32() * 4;
         if !up {
             addr = Self::mod_with_offs(addr, 4, !pre);
-            addr -= end_offs;
+            addr = addr.wrapping_sub(end_offs);
         }
         let mut kind = NonSeq;
         let mut set_n = false;
@@ -275,7 +275,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         for reg in regs {
             set_n |= reg == n.u16();
             if pre {
-                addr += 4;
+                addr = addr.wrapping_add(4);
             }
             if !ldr && reg == n.u16() && reg != first_reg {
                 self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
@@ -291,7 +291,7 @@ impl<S: ArmSystem> SysWrapper<S> {
 
             kind = Seq;
             if !pre {
-                addr += 4;
+                addr = addr.wrapping_add(4);
             }
         }
 

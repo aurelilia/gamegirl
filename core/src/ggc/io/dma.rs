@@ -86,8 +86,8 @@ impl Hdma {
     fn advance_transfer(gg: &mut GameGirl) {
         for _ in 0..0x10 {
             gg.set8(gg.hdma.dest, gg.get8(gg.hdma.source));
-            gg.hdma.source += 1;
-            gg.hdma.dest += 1;
+            gg.hdma.source = gg.hdma.source.wrapping_add(1);
+            gg.hdma.dest = gg.hdma.dest.wrapping_add(1);
         }
         // 8 at once is 1 too much, split it
         gg.advance_clock(4);

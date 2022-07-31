@@ -39,13 +39,13 @@ impl Cpu {
 
         let inst = inst::get_next(gg);
         if gg.cpu.halt_bug {
-            gg.cpu.pc -= 1;
+            gg.cpu.pc = gg.cpu.pc.wrapping_sub(1);
             gg.cpu.halt_bug = false;
         }
 
         let inc = inst::execute(gg, inst);
         if inc {
-            gg.cpu.pc += inst.size().u16();
+            gg.cpu.pc = gg.cpu.pc.wrapping_add(inst.size().u16());
         }
 
         Self::check_interrupts(gg, ime && gg.cpu.ime);

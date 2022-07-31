@@ -31,10 +31,10 @@ impl<S: ArmSystem> SysWrapper<S> {
 
         if !S::IS_V5 && str {
             let addr = match (up, before) {
-                (true, true) => addr + 4,
+                (true, true) => addr.wrapping_add(4),
                 (true, false) => addr,
-                (false, true) => addr - 0x40,
-                (false, false) => addr - 0x3C,
+                (false, true) => addr.wrapping_sub(0x40),
+                (false, false) => addr.wrapping_sub(0x3C),
             };
             let value = self.cpur().pc() + self.cpur().inst_size();
             self.write::<u32>(addr, value, NonSeq);
