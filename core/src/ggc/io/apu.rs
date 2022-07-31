@@ -4,25 +4,19 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-pub use base::{ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu, ScheduleFn};
-pub use channel::Channel;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::SAMPLE_RATE,
-    components::scheduler::Scheduler,
+    components::{
+        apu_psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
+        scheduler::Scheduler,
+    },
     ggc::{
         io::scheduling::{ApuEvent, GGEvent},
         GameGirl, T_CLOCK_HZ,
     },
 };
-
-mod base;
-mod channel;
-mod envelope;
-mod noise_channel;
-mod pulse_channel;
-mod wave_channel;
 
 pub const SAMPLE_EVERY_N_CLOCKS: i32 = (T_CLOCK_HZ / SAMPLE_RATE) as i32;
 

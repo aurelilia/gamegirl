@@ -9,14 +9,18 @@
 //! Thank you to Amjad50 for mizu!
 
 use bitflags::bitflags;
+pub use channel::Channel;
+use channel::{Dac, LengthCountedChannel};
+use noise_channel::NoiseChannel;
+use pulse_channel::PulseChannel;
 use serde::{Deserialize, Serialize};
+use wave_channel::WaveChannel;
 
-use super::{
-    channel::{Channel, Dac, LengthCountedChannel},
-    noise_channel::NoiseChannel,
-    pulse_channel::PulseChannel,
-    wave_channel::WaveChannel,
-};
+mod channel;
+mod envelope;
+mod noise_channel;
+mod pulse_channel;
+mod wave_channel;
 
 bitflags! {
     #[derive(Deserialize, Serialize)]
@@ -92,6 +96,7 @@ impl GenericApu {
         }
     }
 
+    #[inline]
     pub fn tick_sequencer(&mut self) {
         self.sequencer_position += 1;
         match self.sequencer_position {
@@ -121,6 +126,7 @@ impl GenericApu {
 }
 
 impl GenericApu {
+    #[inline]
     pub(crate) fn make_sample(&mut self) -> [f32; 2] {
         let right_vol = self.channels_control.vol_right() as f32 + 1.;
         let left_vol = self.channels_control.vol_left() as f32 + 1.;
@@ -284,6 +290,7 @@ pub enum GenApuEvent {
 }
 
 impl GenApuEvent {
+    #[inline]
     pub fn dispatch(&self, apu: &mut GenericApu) -> i32 {
         if !apu.power {
             // Just wait a while.

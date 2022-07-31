@@ -27,6 +27,7 @@ impl<E: Kind> Scheduler<E> {
     /// Number can be negative; this is mainly used for events where
     /// they were quite a bit late and the followup event also needed to happen
     /// already.
+    #[inline]
     pub fn schedule(&mut self, kind: E, after: i32) {
         let time = self.time.saturating_add_signed(after);
         let event = ScheduledEvent {
@@ -67,6 +68,7 @@ impl<E: Kind> Scheduler<E> {
     /// Execute all pending events in order with the given closure.
     /// Note that this implementation assumes there is always at least one event
     /// scheduled.
+    #[inline]
     pub fn get_next_pending(&mut self) -> Option<Event<E>> {
         if self.next <= self.time {
             let idx = self.events.len() - 1;
@@ -82,6 +84,7 @@ impl<E: Kind> Scheduler<E> {
         }
     }
 
+    #[inline]
     pub fn has_events(&self) -> bool {
         self.next <= self.time
     }
@@ -106,6 +109,7 @@ impl<E: Kind> Scheduler<E> {
         self.next = self.events.last().unwrap().execute_at;
     }
 
+    #[inline]
     pub fn now(&self) -> u32 {
         self.time
     }

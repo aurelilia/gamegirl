@@ -8,9 +8,8 @@ use serde::{Deserialize, Serialize};
 use AdvEvent::*;
 
 use crate::{
-    components::scheduler::Kind,
+    components::{apu_psg::GenApuEvent, scheduler::Kind},
     gga::{audio::Apu, graphics::Ppu, timer::Timers, GameGirlAdv},
-    ggc::io::apu::GenApuEvent,
 };
 
 /// All scheduler events on the GGA.

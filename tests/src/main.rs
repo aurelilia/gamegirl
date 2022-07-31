@@ -60,7 +60,7 @@ fn main() {
                 .action(|c| {
                     let mut gg = System::default();
                     gg.load_cart(
-                        include_bytes!("../../bench.gb").to_vec(),
+                        fs::read("bench.gb").unwrap(),
                         None,
                         &SystemConfig::default(),
                     );

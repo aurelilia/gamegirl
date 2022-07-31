@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 use GGEvent::*;
 
 use crate::{
-    components::scheduler::Kind,
+    components::{apu_psg::GenApuEvent, scheduler::Kind},
     ggc::{
         cpu::Interrupt,
         io::{
             addr::{TIMA, TMA},
-            apu::{Apu, GenApuEvent},
+            apu::Apu,
             dma,
             dma::Hdma,
             ppu::Ppu,

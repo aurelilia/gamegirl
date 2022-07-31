@@ -6,8 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{envelope::EnvelopGenerator, Channel, ScheduleFn};
-use crate::{ggc::io::apu::GenApuEvent, numutil::NumExt};
+use super::{envelope::EnvelopGenerator, Channel, GenApuEvent, ScheduleFn};
+use crate::numutil::NumExt;
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],

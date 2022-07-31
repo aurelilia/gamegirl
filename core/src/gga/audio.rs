@@ -11,14 +11,16 @@ use serde::{Deserialize, Serialize};
 use super::scheduling::AdvEvent;
 use crate::{
     common::SAMPLE_RATE,
-    components::scheduler::Scheduler,
+    components::{
+        apu_psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
+        scheduler::Scheduler,
+    },
     gga::{
         addr::{FIFO_A_L, SOUNDBIAS, SOUNDCNT_H},
         dma::Dmas,
         scheduling::ApuEvent,
         GameGirlAdv, CPU_CLOCK,
     },
-    ggc::io::apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
     numutil::{NumExt, U16Ext},
 };
 

@@ -64,6 +64,7 @@ pub struct Cpu<S: ArmSystem + 'static> {
 
 impl<S: ArmSystem> Cpu<S> {
     /// Advance emulation.
+    #[inline]
     pub fn continue_running(gg: &mut S) {
         if !gg.check_debugger() {
             return;
