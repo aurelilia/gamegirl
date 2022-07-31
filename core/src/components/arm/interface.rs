@@ -16,9 +16,7 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     const IS_V5: bool;
     const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_arm_lut();
     const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumb_lut();
-    const IE_ADDR: u32;
     const IF_ADDR: u32;
-    const IME_ADDR: u32;
 
     fn cpur(&self) -> &Cpu<Self>;
     fn cpu(&mut self) -> &mut Cpu<Self>;
@@ -27,6 +25,7 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     fn add_sn_cycles(&mut self, cycles: u16);
     fn add_i_cycles(&mut self, cycles: u16);
 
+    fn is_irq_pending(&self) -> bool;
     fn exception_happened(&mut self, kind: Exception);
     fn pipeline_stalled(&mut self);
 

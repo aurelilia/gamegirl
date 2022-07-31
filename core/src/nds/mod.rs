@@ -4,12 +4,15 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+mod addr;
 mod audio;
 mod cartridge;
 mod cpu;
+mod dma;
 mod graphics;
 mod memory;
 mod scheduling;
+mod timer;
 
 use std::{
     mem,
@@ -21,21 +24,27 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common,
     common::{EmulateOptions, SystemConfig},
-    components::{arm::Cpu, debugger::Debugger, scheduler::Scheduler},
+    components::{
+        arm::{interface::ArmSystem, Cpu},
+        debugger::Debugger,
+        scheduler::Scheduler,
+    },
     nds::{
         audio::Apu,
         cartridge::Cartridge,
         cpu::NDS9_CLOCK,
+        dma::Dmas,
         graphics::NdsEngines,
         memory::Memory,
         scheduling::{ApuEvent, NdsEvent},
+        timer::Timers,
     },
     numutil::NumExt,
     Colour,
 };
 
 macro_rules! deref {
-    ($name:ident, $mmio:ident) => {
+    ($name:ident, $mmio:ident, $idx:expr) => {
         impl Deref for $name {
             type Target = Nds;
 
@@ -68,6 +77,10 @@ macro_rules! deref {
             }
         }
 
+        impl NdsCpu for $name {
+            const I: usize = $idx;
+        }
+
         // Satisfy serde...
         impl Default for $name {
             fn default() -> $name {
@@ -77,8 +90,8 @@ macro_rules! deref {
     };
 }
 
-deref!(Nds7, mmio7);
-deref!(Nds9, mmio9);
+deref!(Nds7, mmio7, 0);
+deref!(Nds9, mmio9, 1);
 
 #[derive(Deserialize, Serialize)]
 pub struct Nds {
@@ -88,6 +101,8 @@ pub struct Nds {
     apu: Apu,
     memory: Memory,
     pub(crate) cart: Cartridge,
+    dmas: CpuDevice<Dmas>,
+    timers: CpuDevice<Timers>,
 
     scheduler: Scheduler<NdsEvent>,
     time_7: u32,
@@ -155,6 +170,8 @@ impl Default for Nds {
             apu: Apu::default(),
             memory: Memory::default(),
             cart: Cartridge::default(),
+            dmas: [Dmas::default(), Dmas::default()],
+            timers: [Timers::default(), Timers::default()],
             scheduler: Scheduler::default(),
             time_7: 0,
             debugger: Debugger::default(),
@@ -175,6 +192,12 @@ impl Default for Nds {
         nds
     }
 }
+
+pub trait NdsCpu: ArmSystem + DerefMut<Target = Nds> {
+    const I: usize;
+}
+
+type CpuDevice<T> = [T; 2];
 
 #[repr(transparent)]
 struct Nds7(*mut Nds);

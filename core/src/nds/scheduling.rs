@@ -9,7 +9,7 @@ use NdsEvent::*;
 
 use crate::{
     components::scheduler::Kind,
-    nds::{audio::Apu, Nds},
+    nds::{audio::Apu, timer::Timers, Nds},
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
@@ -17,6 +17,11 @@ pub enum NdsEvent {
     PauseEmulation,
     /// An event handled by the APU.
     ApuEvent(ApuEvent),
+    /// A timer overflow.
+    TimerOverflow {
+        timer: u8,
+        is_arm9: bool,
+    },
 }
 
 impl NdsEvent {
@@ -26,6 +31,12 @@ impl NdsEvent {
             ApuEvent(evt) => {
                 let time = Apu::handle_event(ds, evt, late_by);
                 ds.scheduler.schedule(self, time);
+            }
+            TimerOverflow { timer, is_arm9 } if is_arm9 => {
+                Timers::handle_overflow_event(&mut ds.nds9(), timer, late_by)
+            }
+            TimerOverflow { timer, .. } => {
+                Timers::handle_overflow_event(&mut ds.nds7(), timer, late_by)
             }
         }
     }

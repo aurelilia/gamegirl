@@ -8,11 +8,15 @@ use crate::{
     components::{
         arm::{
             interface::{ArmSystem, RwType},
+            registers::Flag::IrqDisable,
             Access, Cpu, Exception,
         },
         memory::MemoryMapper,
     },
-    nds::{Nds, Nds7, Nds9},
+    nds::{
+        addr::{IE_H, IE_L, IF_H, IF_L, IME},
+        Nds, Nds7, Nds9, NdsCpu,
+    },
     numutil::NumExt,
 };
 
@@ -20,9 +24,7 @@ pub const NDS9_CLOCK: u32 = 67_027_964;
 
 impl ArmSystem for Nds7 {
     const IS_V5: bool = false;
-    const IE_ADDR: u32 = 0;
-    const IF_ADDR: u32 = 0;
-    const IME_ADDR: u32 = 0;
+    const IF_ADDR: u32 = IF_L;
 
     fn cpur(&self) -> &Cpu<Self> {
         &self.cpu7
@@ -40,6 +42,10 @@ impl ArmSystem for Nds7 {
 
     fn add_i_cycles(&mut self, cycles: u16) {
         self.time_7 += cycles.u32() << 1;
+    }
+
+    fn is_irq_pending(&self) -> bool {
+        is_irq_pending(self)
     }
 
     fn exception_happened(&mut self, _kind: Exception) {}
@@ -69,9 +75,7 @@ impl ArmSystem for Nds7 {
 
 impl ArmSystem for Nds9 {
     const IS_V5: bool = true;
-    const IE_ADDR: u32 = 0;
-    const IF_ADDR: u32 = 0;
-    const IME_ADDR: u32 = 0;
+    const IF_ADDR: u32 = IF_L;
 
     fn cpur(&self) -> &Cpu<Self> {
         &self.cpu9
@@ -91,6 +95,10 @@ impl ArmSystem for Nds9 {
 
     fn add_i_cycles(&mut self, cycles: u16) {
         self.scheduler.advance(cycles.u32());
+    }
+
+    fn is_irq_pending(&self) -> bool {
+        is_irq_pending(self)
     }
 
     fn exception_happened(&mut self, _kind: Exception) {}
@@ -116,4 +124,10 @@ impl ArmSystem for Nds9 {
     fn can_cache_at(_addr: u32) -> bool {
         false
     }
+}
+
+fn is_irq_pending<DS: NdsCpu>(ds: &DS) -> bool {
+    (ds[IME] == 1)
+        && !ds.cpur().flag(IrqDisable)
+        && (((ds[IE_L] & ds[IF_L]) != 0) || ((ds[IE_H] & ds[IF_H]) != 0))
 }

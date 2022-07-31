@@ -163,6 +163,7 @@ impl Dmas {
         src_mod: i32,
         dst_mod: i32,
     ) {
+        gg.add_i_cycles(2);
         if gg.dma.dst[idx] < 0x200_0000 {
             return;
         }
@@ -208,7 +209,6 @@ impl Dmas {
                 gg.advance_clock();
             }
         }
-        gg.add_i_cycles(2);
         gg.dma.pc_at_last_end = gg.cpu.pc();
     }
 

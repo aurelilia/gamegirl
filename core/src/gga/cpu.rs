@@ -7,9 +7,14 @@
 use crate::{
     components::arm::{
         interface::{ArmSystem, RwType},
+        registers::Flag::IrqDisable,
         Access, Cpu, Exception,
     },
-    gga::{addr, addr::WAITCNT, GameGirlAdv},
+    gga::{
+        addr,
+        addr::{IE, IF, IME, WAITCNT},
+        GameGirlAdv,
+    },
     numutil::NumExt,
 };
 
@@ -17,9 +22,7 @@ pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 
 impl ArmSystem for GameGirlAdv {
     const IS_V5: bool = false;
-    const IE_ADDR: u32 = addr::IE;
     const IF_ADDR: u32 = addr::IF;
-    const IME_ADDR: u32 = addr::IME;
 
     fn cpur(&self) -> &Cpu<Self> {
         &self.cpu
@@ -46,6 +49,10 @@ impl ArmSystem for GameGirlAdv {
                 self.cpu.access_type = Access::NonSeq;
             }
         }
+    }
+
+    fn is_irq_pending(&self) -> bool {
+        (self[IME] == 1) && !self.cpu.flag(IrqDisable) && (self[IE] & self[IF]) != 0
     }
 
     fn exception_happened(&mut self, kind: Exception) {

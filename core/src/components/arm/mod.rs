@@ -234,10 +234,7 @@ impl<S: ArmSystem> Cpu<S> {
     /// Check if an interrupt needs to be handled and jump to the handler if so.
     /// Called on any events that might cause an interrupt to be triggered..
     pub fn check_if_interrupt(gg: &mut S) {
-        let int = (gg[S::IME_ADDR] == 1)
-            && !gg.cpu().flag(IrqDisable)
-            && (gg[S::IE_ADDR] & gg[S::IF_ADDR]) != 0;
-        if int {
+        if gg.is_irq_pending() {
             gg.cpu().inc_pc_by(4);
             let mut wrapper = SysWrapper {
                 inner: gg as *mut S,
@@ -325,7 +322,11 @@ impl<S: ArmSystem> Cpu<S> {
     /// right away.
     #[inline]
     pub fn request_interrupt_idx(gg: &mut S, idx: u16) {
-        gg[S::IF_ADDR] = gg[S::IF_ADDR].set_bit(idx, true);
+        if idx >= 16 {
+            gg[S::IF_ADDR + 2] = gg[S::IF_ADDR + 2].set_bit(idx - 16, true);
+        } else {
+            gg[S::IF_ADDR] = gg[S::IF_ADDR].set_bit(idx, true);
+        }
         Self::check_if_interrupt(gg);
     }
 }

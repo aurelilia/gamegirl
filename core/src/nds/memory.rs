@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 use super::{Nds7, Nds9};
 use crate::{
     components::{
-        arm::interface::RwType,
+        arm::{interface::RwType, Cpu},
         memory::{MemoryMappedSystem, MemoryMapper},
     },
-    nds::Nds,
+    nds::{addr::*, dma::Dmas, timer::Timers, Nds, NdsCpu},
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
@@ -57,6 +57,35 @@ impl Nds {
     pub fn init_memory(&mut self) {
         MemoryMapper::init_pages(&mut self.nds7());
         MemoryMapper::init_pages(&mut self.nds9());
+    }
+
+    pub fn try_set_mmio_shared<DS: NdsCpu>(ds: &mut DS, addr: u32, value: u16) {
+        match addr {
+            // Interrupts
+            IME => {
+                ds[IME] = value & 1;
+                Cpu::check_if_interrupt(ds);
+            }
+            IE_L | IE_H => {
+                ds[addr] = value;
+                Cpu::check_if_interrupt(ds);
+            }
+            IF_L | IF_H => ds[addr] &= !value,
+
+            // Timers
+            TM0CNT_H => Timers::hi_write::<DS, 0>(ds, addr, value),
+            TM1CNT_H => Timers::hi_write::<DS, 1>(ds, addr, value),
+            TM2CNT_H => Timers::hi_write::<DS, 2>(ds, addr, value),
+            TM3CNT_H => Timers::hi_write::<DS, 3>(ds, addr, value),
+
+            // DMAs
+            0xBA => Dmas::ctrl_write(ds, 0, value),
+            0xC6 => Dmas::ctrl_write(ds, 1, value),
+            0xD2 => Dmas::ctrl_write(ds, 2, value),
+            0xDE => Dmas::ctrl_write(ds, 3, value),
+
+            _ => ds[addr] = value,
+        }
     }
 }
 
@@ -101,7 +130,12 @@ impl Nds7 {
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
         let addr = addr & !1;
+        Nds::try_set_mmio_shared(self, addr, value);
+    }
+
+    fn mmio_mirror_nds9(&mut self, addr: u32, value: u16) {
         self[addr] = value;
+        self.memory.mmio9[addr.us() >> 1] = value
     }
 }
 
@@ -145,13 +179,21 @@ impl Nds9 {
     }
 
     fn get_mmio(&self, addr: u32) -> u16 {
-        let addr = addr & !1;
+        let addr = addr & 0x1FFE;
         self[addr]
     }
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
-        let addr = addr & !1;
+        let addr = addr & 0x1FFE;
+        match addr {
+            EXMEM => self.mmio_mirror_nds7(addr, value),
+            _ => Nds::try_set_mmio_shared(self, addr, value),
+        }
+    }
+
+    fn mmio_mirror_nds7(&mut self, addr: u32, value: u16) {
         self[addr] = value;
+        self.memory.mmio7[addr.us() >> 1] = value
     }
 }
 
