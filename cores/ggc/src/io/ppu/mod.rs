@@ -98,8 +98,11 @@ impl Ppu {
                     gg.ppu.line = 0;
                     gg[LY] = 0;
                     gg.ppu.window_line = 0;
-                    (gg.options.frame_finished)();
                     Self::stat_interrupt(gg, 5);
+
+                    #[cfg(feature = "serde")]
+                    (gg.options.frame_finished)(gg.save_state());
+
                     (PpuEvent::OamScanEnd, 80)
                 } else {
                     (PpuEvent::VblankEnd, 456)

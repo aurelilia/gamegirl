@@ -177,20 +177,9 @@ impl App {
             .set_rw_buf_size(self.state.options.rewind_buffer_size);
         let buffer = self.rewinder.rewind_buffer.clone();
 
-        let sys = self.gg.clone();
         if self.state.options.enable_rewind {
-            self.gg.lock().unwrap().options().frame_finished = Box::new(move || {
-                // Kinda ugly duplication but it works ig?
-                let sys = sys.lock().unwrap();
-                match &*sys {
-                    System::GGC(gg) if !gg.options.invert_audio_samples => {
-                        buffer.lock().unwrap().push(gg.save_state())
-                    }
-                    System::GGA(gg) if !gg.options.invert_audio_samples => {
-                        buffer.lock().unwrap().push(gg.save_state())
-                    }
-                    _ => (),
-                }
+            self.gg.lock().unwrap().options().frame_finished = Box::new(move |state| {
+                buffer.lock().unwrap().push(state);
             });
         }
     }

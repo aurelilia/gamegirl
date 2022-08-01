@@ -135,7 +135,9 @@ impl Ppu {
                         gg[VCOUNT] = 0;
                         let frame = Self::end_frame(gg);
                         gg.ppu.last_frame = Some(frame);
-                        (gg.options.frame_finished)();
+
+                        #[cfg(feature = "serde")]
+                        (gg.options.frame_finished)(gg.save_state());
                     }
                     _ => (),
                 }

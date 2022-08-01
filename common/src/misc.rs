@@ -15,17 +15,18 @@ pub struct EmulateOptions {
     /// Affects [advance_delta] and sound sample output.
     pub speed_multiplier: usize,
     /// Called when a frame is finished rendering. (End of VBlank)
+    /// Gives a saved state of the system.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(
         feature = "serde",
         serde(default = "EmulateOptions::serde_frame_finished")
     )]
-    pub frame_finished: Box<dyn Fn() + Send>,
+    pub frame_finished: Box<dyn Fn(Vec<u8>) + Send>,
 }
 
 impl EmulateOptions {
-    pub fn serde_frame_finished() -> Box<dyn Fn() + Send> {
-        Box::new(|| ())
+    pub fn serde_frame_finished() -> Box<dyn Fn(Vec<u8>) + Send> {
+        Box::new(|_| ())
     }
 }
 
@@ -36,7 +37,7 @@ impl Default for EmulateOptions {
             rom_loaded: false,
             invert_audio_samples: false,
             speed_multiplier: 1,
-            frame_finished: Box::new(|| ()),
+            frame_finished: Box::new(|_| ()),
         }
     }
 }
