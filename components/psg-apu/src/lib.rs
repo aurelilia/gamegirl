@@ -6,10 +6,6 @@
 
 #![feature(trait_alias)]
 
-//! This implementation is abridged from mizu: https://github.com/Amjad50/mizu
-//! It is under the MIT license. See the linked repository for more info.
-//! Thank you to Amjad50 for mizu!
-
 use bitflags::bitflags;
 pub use channel::Channel;
 use channel::{Dac, LengthCountedChannel};
@@ -57,6 +53,9 @@ bitflags! {
     }
 }
 
+/// Generic PSG APU used by GG and GGA.
+/// Fully implemented except reading/writing IO registers,
+/// which is up to the system to implement.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct GenericApu {
     pub pulse1: Dac<LengthCountedChannel<PulseChannel<false>>>,

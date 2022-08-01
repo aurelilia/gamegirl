@@ -19,7 +19,8 @@ impl<S: PpuSystem> Ppu<S>
 where
     [(); S::W * S::H]:,
 {
-    pub fn render_objs<const _START: u16>(gg: &mut PpuType<S>, line: u16) {
+    /// Render all objects in the current scanline.
+    pub fn render_objs(gg: &mut PpuType<S>, line: u16) {
         if !gg[DISPCNT].is_bit(OBJ_EN) {
             return;
         }
@@ -220,6 +221,7 @@ where
         }
     }
 
+    /// Get the Rot/Scal parameters at the given OAM index.
     fn get_rotscal(&self, idx: u8) -> [i32; 4] {
         let mut offs = 32 * idx.us() + 6;
         let mut out = [0; 4];

@@ -23,7 +23,7 @@ where
             gg.ppu.bg_layers[0][offs] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
 
-        Self::render_objs::<512>(gg, line);
+        Self::render_objs(gg, line);
     }
 
     pub fn render_mode4(gg: &mut PpuType<S>, line: u16) {
@@ -40,7 +40,7 @@ where
             }
         }
 
-        Self::render_objs::<512>(gg, line);
+        Self::render_objs(gg, line);
     }
 
     pub fn render_mode5(gg: &mut PpuType<S>, line: u16) {
@@ -55,7 +55,7 @@ where
             gg.ppu.bg_layers[0][offs] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
 
-        Self::render_objs::<512>(gg, line);
+        Self::render_objs(gg, line);
     }
 
     fn bitmap_start_addr(gg: &PpuType<S>) -> usize {

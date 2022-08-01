@@ -4,6 +4,13 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+//! CPU implementations.
+//! Note that when it comes to timing, the ARM9 runs on the scheduler until
+//! the ARM7 is behind, which then runs outside the scheduler until the ARM9 is
+//! behind. This is repeated in a loop.
+//! Effectively, the ARM9 is the one handling the scheduling, with the ARM7
+//! being dragged along.
+
 use arm_cpu::{
     interface::{ArmSystem, RwType},
     registers::Flag::IrqDisable,

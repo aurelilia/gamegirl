@@ -35,6 +35,7 @@ use crate::{
 };
 
 /// Represents the CPU of the console - an ARM7TDMI.
+/// It is generic over the system used; see `interface.rs`.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cpu<S: ArmSystem + 'static> {
     pub fiqs: [FiqReg; 5],
@@ -98,6 +99,7 @@ impl<S: ArmSystem> Cpu<S> {
         }
     }
 
+    /// Run the given cache block for as long as possible.
     fn run_cache(gg: &mut SysWrapper<S>, cache: CacheEntry<S>) {
         gg.cpu().block_ended = false;
         gg.cpu().pipeline_valid = false;
@@ -138,6 +140,9 @@ impl<S: ArmSystem> Cpu<S> {
         }
     }
 
+    /// Try to make a cache block at the current location.
+    /// If we get interrrupted by an IRQ, will abort to ensure
+    /// cache blocks are as long as possible.
     fn try_make_cache(gg: &mut SysWrapper<S>) {
         let start_pc = gg.cpu().pc();
         gg.cpu().block_ended = false;
@@ -201,6 +206,7 @@ impl<S: ArmSystem> Cpu<S> {
         }
     }
 
+    /// Fetch the next instruction of the CPU.
     fn fetch_next_inst<TY: RwType>(gg: &mut S) -> (u32, u16) {
         gg.cpu().inc_pc_by(TY::WIDTH);
         let sn_cycles = gg.wait_time::<TY>(gg.cpur().pc(), gg.cpur().access_type);
@@ -287,6 +293,8 @@ impl<S: ArmSystem> Cpu<S> {
         gg.cpu().pipeline_valid = false;
     }
 
+    /// Ensure the pipeline is valid, which it might not be after
+    /// a cache block was executed.
     fn ensure_pipeline_valid(gg: &mut S) {
         if gg.cpu().pipeline_valid {
             return;
@@ -353,6 +361,8 @@ impl<S: ArmSystem> Default for Cpu<S> {
 }
 
 /// Possible interrupts.
+/// These are the same between GGA and NDS, so
+/// putting them here is OK.
 #[repr(C)]
 pub enum Interrupt {
     VBlank,
@@ -372,9 +382,8 @@ pub enum Interrupt {
 }
 
 /// Possible exceptions.
-/// Most are only listed to preserve bit order in IE/IF, only SWI
-/// and IRQ ever get raised on the GGA. (UND does as well, but this
-/// emulator doesn't implement that.)
+/// Most are only listed to preserve bit order in IE/IF, only SWI, UND
+/// and IRQ ever get raised on the GGA.
 #[derive(Copy, Clone)]
 pub enum Exception {
     Reset,

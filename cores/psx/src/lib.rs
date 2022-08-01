@@ -50,6 +50,7 @@ pub struct PlayStation {
 }
 
 impl PlayStation {
+    #![allow(clippy::diverging_sub_expression)]
     common_functions!(todo!(), todo!());
 
     /// Advance the system by a single CPU instruction.

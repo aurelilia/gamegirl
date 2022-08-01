@@ -4,6 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+/// A macro that can be used by systems to implement common functions
+/// in a generic manner.
+/// This macro simply grew as it became clear that some functionality
+/// is easily shared between systems.
 #[macro_export]
 macro_rules! common_functions {
     ($clock:expr, $pause_event:expr) => {

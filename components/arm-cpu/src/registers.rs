@@ -163,21 +163,26 @@ impl<S: ArmSystem> Cpu<S> {
     mode_reg!(lr, cpsr_lr, set_cpsr_lr);
     mode_reg!(spsr, spsr, set_spsr);
 
+    /// Get a "low" register (R0-R7)
     #[inline]
     pub fn low(&self, idx: u16) -> u32 {
         self.registers[idx.us()]
     }
 
+    /// Get a register
     pub fn reg(&self, idx: u32) -> u32 {
         self.registers[idx.us()]
     }
 
+    /// Get a register's value for the next instruction (PC will be +4)
     pub fn reg_pc4(&self, idx: u32) -> u32 {
         let mut regs = self.registers;
         regs[15] += 4;
         regs[idx.us()]
     }
 
+    /// Get a register based on current CPSR. Slower than regular access;
+    /// only done on mode change.
     fn get_cpsr_reg(&self, idx: u32) -> u32 {
         match idx {
             8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq,
@@ -188,6 +193,8 @@ impl<S: ArmSystem> Cpu<S> {
         }
     }
 
+    /// Set a register based on current CPSR. Slower than regular access;
+    /// only done on mode change.
     fn set_cpsr_reg(&mut self, idx: u32, val: u32) {
         match idx {
             8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq = val,
@@ -198,6 +205,8 @@ impl<S: ArmSystem> Cpu<S> {
         }
     }
 
+    /// Set the CPSR. Needs to consider mode switches, in which case
+    /// the current registers need to be copied.
     pub fn set_cpsr(&mut self, value: u32) {
         for reg in 8..15 {
             self.set_cpsr_reg(reg, self.registers[reg.us()]);
@@ -218,6 +227,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         Cpu::pipeline_stall(&mut **self);
     }
 
+    /// Set a register. Needs special behavior due to PC.
     pub fn set_reg(&mut self, idx: u32, val: u32) {
         if idx == 15 {
             self.set_pc(val);
@@ -226,14 +236,17 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
     }
 
+    /// Get a register
     pub fn reg(&self, idx: u32) -> u32 {
         self.cpur().reg(idx)
     }
 
+    /// Get a register's value for the next instruction (PC will be +4)
     pub fn reg_pc4(&self, idx: u32) -> u32 {
         self.cpur().reg_pc4(idx)
     }
 
+    /// Get a "low" register (R0-R7)
     pub fn low(&self, idx: u16) -> u32 {
         self.cpur().low(idx)
     }

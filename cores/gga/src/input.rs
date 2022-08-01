@@ -21,6 +21,7 @@ impl GameGirlAdv {
         self.check_keycnt();
     }
 
+    /// Check if KEYCNT should cause a joypad IRQ.
     pub fn check_keycnt(&mut self) {
         let input = self[KEYINPUT];
         let cnt = self[KEYCNT];

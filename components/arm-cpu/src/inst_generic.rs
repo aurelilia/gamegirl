@@ -9,7 +9,7 @@ use std::fmt::UpperHex;
 use common::numutil::NumExt;
 
 use super::interface::{ArmSystem, SysWrapper};
-use crate::{Access, Access::NonSeq, Cpu, Exception};
+use crate::{Access::NonSeq, Cpu, Exception};
 
 impl<S: ArmSystem> SysWrapper<S> {
     pub fn swi(&mut self) {
@@ -52,11 +52,13 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
     }
 
+    /// Idle for 1 cycle and set access type to non-sequential.
     pub fn idle_nonseq(&mut self) {
         self.add_i_cycles(1);
-        self.cpu().access_type = Access::NonSeq;
+        self.cpu().access_type = NonSeq;
     }
 
+    /// Calculate MUL instruction wait cycles for ARMv4.
     pub fn mul_wait_cycles(&mut self, mut value: u32, signed: bool) {
         self.idle_nonseq();
         let mut mask = 0xFFFF_FF00;
@@ -70,6 +72,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
     }
 
+    /// Create a 'span' of a handler in a LUT. See `lut.rs` for example usage.
     pub const fn lut_span<T: Copy>(lut: &mut [T], idx: usize, size: usize, handler: T) {
         let inst = 8 - size;
         let start = idx << inst;

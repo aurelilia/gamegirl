@@ -4,6 +4,13 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+//! Implementation of the GGA PPU interface.
+//! Note that since we have 2 PPUs, it is implemented for
+//! Nds7/9. This is really an unintended use of those wrappers
+//! since the PPUs are not actually bound to the CPUs, but it avoids
+//! implementing yet more wrapper types, even if it is
+//! a hack.
+
 use arm_cpu::Cpu;
 use common::misc::EmulateOptions;
 use gga_ppu::{
@@ -31,10 +38,6 @@ impl PpuSystem for Nds7 {
         [(); Self::W * Self::H]:,
     {
         &self.ppu.ppu_a
-    }
-
-    fn options(&mut self) -> &mut EmulateOptions {
-        &mut self.options
     }
 
     fn ppu_mmio(&mut self) -> PpuMmio {
@@ -85,10 +88,6 @@ impl PpuSystem for Nds9 {
         [(); Self::W * Self::H]:,
     {
         &self.ppu.ppu_b
-    }
-
-    fn options(&mut self) -> &mut EmulateOptions {
-        &mut self.options
     }
 
     fn ppu_mmio(&mut self) -> PpuMmio {

@@ -45,7 +45,10 @@ use crate::{
     timer::Timers,
 };
 
-macro_rules! deref {
+/// Macro for creating a wrapper of the system, specifically with
+/// the use case of being able to implement ARM CPU support twice,
+/// since the NDS has 2 CPUs.
+macro_rules! nds_wrapper {
     ($name:ident, $mmio:ident, $idx:expr) => {
         /// Wrapper for one of the CPUs.
         /// Raw pointer was chosen to avoid lifetimes.
@@ -99,8 +102,8 @@ macro_rules! deref {
     };
 }
 
-deref!(Nds7, mmio7, 0);
-deref!(Nds9, mmio9, 1);
+nds_wrapper!(Nds7, mmio7, 0);
+nds_wrapper!(Nds9, mmio9, 1);
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Nds {

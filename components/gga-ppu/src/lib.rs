@@ -66,6 +66,10 @@ type Layer<S: PpuSystem> = [Colour; S::W];
 #[allow(type_alias_bounds)]
 type WindowMask<S: PpuSystem> = [bool; S::W];
 
+/// PPU of the GGA, as well as NDS.
+/// Generic over the system; see `interface.rs`.
+/// Supports a threaded rendering process to speed up execution,
+/// see `threading.rs`.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu<S: PpuSystem>
 where
@@ -78,29 +82,41 @@ where
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub oam: [u8; KB],
 
+    /// Pixels of the frame currently being constructed.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr::<S>"))]
     pixels: [Colour; S::W * S::H],
+    /// BG layers of the current scanline. Each entry corresponds to a BG
+    /// priority
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr::<S>"))]
     bg_layers: [Layer<S>; 4],
+    /// BG layers of the current scanline. Each entry corresponds to a BG
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr::<S>"))]
     bg_pixels: [Layer<S>; 4],
+    /// OBJ layers of the current scanline. Each entry corresponds to an OBJ
+    /// priority
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr::<S>"))]
     obj_layers: [Layer<S>; 4],
 
+    /// Masks for windows, in order BG0-3, OBJ.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_mask_arr::<S>"))]
     win_masks: [WindowMask<S>; 5],
+    /// If blending is enabled at the given pixel.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_mask2_arr::<S>"))]
     win_blend: [bool; S::W],
 
+    /// Parameters for affine background offsets, reset after each frame.
     bg_x: [i32; 2],
+    /// Parameters for affine background offsets, reset after each frame.
     bg_y: [i32; 2],
 
+    /// Last frame. If using the threaded implementation, this is outside
+    /// the main PPU itself.
     #[cfg_attr(all(feature = "serde", not(feature = "threaded")), serde(default))]
     #[cfg_attr(all(feature = "serde", not(feature = "threaded")), serde(skip))]
     #[cfg(not(feature = "threaded"))]
@@ -111,6 +127,7 @@ impl<S: PpuSystem> Ppu<S>
 where
     [(); S::W * S::H]:,
 {
+    /// Handle a scheduler event.
     pub fn handle_event(gg: &mut S, event: PpuEvent, late_by: i32) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
@@ -184,6 +201,7 @@ where
         gg.ppu().thread.render(mmio);
     }
 
+    /// Render a scanline in full.
     fn render_line(gg: &mut PpuType<S>) {
         let line = gg[VCOUNT];
         if line >= S::H.u16() {
@@ -211,6 +229,7 @@ where
         Self::finish_line(gg, line);
     }
 
+    /// Calculate the windows, if they are active.
     fn calc_windows(gg: &mut PpuType<S>, line: u8) {
         let cnt = gg[DISPCNT];
         let win0_en = cnt.is_bit(WIN0_EN);
@@ -276,6 +295,8 @@ where
         }
     }
 
+    /// Finish composing the scanline, by combining all layers
+    /// while considering special effects and windowing.
     fn finish_line(gg: &mut PpuType<S>, line: u16) {
         let start = line.us() * S::W;
         let mut backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
@@ -412,6 +433,7 @@ where
         gg.ppu.obj_layers = serde_layer_arr::<S>();
     }
 
+    /// Calculate a special effect pixel.
     #[allow(clippy::too_many_arguments)]
     fn calc_pixel<const OBJ: bool>(
         pixel: &mut Colour,
@@ -466,6 +488,7 @@ where
         }
     }
 
+    /// Blend a pixel with the given 2 colours.
     fn blend_pixel(first: Colour, second: Colour, factor_a: u16, factor_b: u16) -> Colour {
         let fa = factor_a.min(0x10);
         let fb = factor_b.min(0x10);
@@ -475,6 +498,7 @@ where
         [r.u8(), g.u8(), b.u8(), 255]
     }
 
+    /// End the current frame and reset state.
     fn end_frame(gg: &mut S) -> Vec<Colour> {
         // Reload affine backgrounds
         let bg_x0 = Self::get_affine_offs(gg[BG2PA + 0x8], gg[BG2PA + 0xA]);
@@ -498,6 +522,7 @@ where
         ppu.pixels.to_vec()
     }
 
+    /// Adjust a pixel from 5bit to 8bit colour space.
     #[inline]
     fn adjust_pixel(pixel: &mut Colour) {
         for col in pixel.iter_mut().take(3) {
@@ -551,5 +576,7 @@ fn serde_mask2_arr<S: PpuSystem>() -> [bool; S::W] {
     [true; S::W]
 }
 
+/// Colour for empty pixels.
 const EMPTY: Colour = [0, 0, 0, 0];
+/// Alpha for empty pixels, to easily see if a pixel is empty.
 const EMPTY_A: u8 = 0;

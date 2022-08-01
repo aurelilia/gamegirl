@@ -15,12 +15,14 @@ impl<S: PpuSystem> Ppu<S>
 where
     [(); S::W * S::H]:,
 {
+    /// Turn a halfword in VRAM into a 5bit colour.
     pub fn hword_to_colour_vram(&self, addr: usize) -> Colour {
         let lo = self.vram[addr];
         let hi = self.vram[addr + 1];
         Self::hword_to_colour(hword(lo, hi))
     }
 
+    /// Turn a palette index (0-255) into a colour.
     pub fn idx_to_palette<const OBJ: bool>(&self, idx: u8) -> Colour {
         let addr = (idx.us() << 1) + (OBJ as usize * 0x200);
         let lo = self.palette[addr];
@@ -28,6 +30,7 @@ where
         Self::hword_to_colour(hword(lo, hi))
     }
 
+    /// Extract a 5bit colour from a halfword.
     fn hword_to_colour(hword: u16) -> Colour {
         let r = hword.bits(0, 5).u8();
         let g = hword.bits(5, 5).u8();

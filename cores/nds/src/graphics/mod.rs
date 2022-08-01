@@ -13,7 +13,9 @@ use crate::{Nds7, Nds9};
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct NdsEngines {
+    /// See notes in `gga.rs`
     pub(crate) ppu_a: GgaPpu<Nds7>,
+    /// See notes in `gga.rs`
     pub(crate) ppu_b: GgaPpu<Nds9>,
     pub last_frame: Option<Vec<Colour>>,
 }

@@ -4,6 +4,9 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+//! Module for threading the PPU, making it able to execute in
+//! parallel with the rest of the system when rendering a scanline.
+
 use std::ops::Index;
 
 use common::numutil::NumExt;
@@ -32,6 +35,8 @@ mod inner {
 
     pub type GgaPpu<S> = Ppu<S>;
 
+    /// Unthreaded PPU. Simply has a reference to the PPU itself and
+    /// MMIO, that's it.
     pub struct PpuType<'t, S: PpuSystem>
     where
         [(); S::W * S::H]:,
@@ -62,6 +67,7 @@ mod inner {
 
     pub type PpuType<'t, S> = Threaded<'t, S>;
 
+    /// Threaded PPU. The PPU itself is behind a Mutex.
     pub struct Threaded<'t, S: PpuSystem>
     where
         [(); S::W * S::H]:,
@@ -83,6 +89,9 @@ mod inner {
         }
     }
 
+    /// Struct containing PPU state. The PPU itself is behind a Mutex,
+    /// and the last frame is outside that for fast access.
+    /// Communication with the render thread happens over an MPSC channel.
     pub struct GgaPpu<S: PpuSystem>
     where
         [(); S::W * S::H]:,
@@ -124,7 +133,10 @@ mod inner {
         }
     }
 
+    /// Reference to the thread that renders.
     pub struct RenderThread {
+        /// Sender for PPU IO registers.
+        /// Whenever a value is received, the thread will render a scanline.
         mmio_sender: mpsc::Sender<PpuMmio>,
     }
 

@@ -8,14 +8,30 @@ use std::ptr;
 
 use crate::numutil::NumExt;
 
+/// Trait to be implemented by systems that want fast
+/// memory access. Implemented using page tables.
 pub trait MemoryMappedSystem<const SIZE: usize>: Sized {
+    /// Pointer size of the system.
     type Usize: NumExt;
+    /// A set of masks to use when masking the pointer offset
+    /// of the page table entry.
     const ADDR_MASK: &'static [usize];
+    /// The size of a page, expressed as 2^PAGE_POW.
     const PAGE_POW: usize;
+    /// The size of an address mask region in `ADDR_MASK`, expressed as
+    /// 2^PAGE_POW.
     const MASK_POW: usize;
 
+    /// Function to return the mapper.
     fn get_mapper(&self) -> &MemoryMapper<SIZE>;
+    /// Function to return the mapper.
     fn get_mapper_mut(&mut self) -> &mut MemoryMapper<SIZE>;
+    /// Function that should return the page at the given address.
+    ///
+    /// # Safety
+    /// This function is unsafe since it deals with raw pointers,
+    /// doing arithmetic. It should not do any more than that
+    /// and therefore is expected to be safe to call with any address.
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8;
 }
 
@@ -89,6 +105,7 @@ impl<const SIZE: usize> MemoryMapper<SIZE> {
         }
     }
 
+    /// Initialize page tables based on the pages given by the system.
     pub fn init_pages<Sys: MemoryMappedSystem<SIZE>>(this: &mut Sys) {
         for i in 0..SIZE {
             this.get_mapper_mut().read_pages[i] =

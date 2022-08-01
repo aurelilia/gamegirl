@@ -4,6 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+//! Lookup tables for instructions, both ARM and THUMB.
+
 use super::{
     inst_thumb::ThumbLut,
     interface::{ArmSystem, SysWrapper},

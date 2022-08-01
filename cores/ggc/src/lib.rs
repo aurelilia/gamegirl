@@ -60,7 +60,7 @@ pub struct GameGirl {
     pub apu: Apu,
     pub hdma: Hdma,
 
-    /// CPU speed, 1/2x.
+    /// CPU speed, 1x or 2x.
     speed: u8,
     /// Shift of m-cycles to t-clocks, which is different in CGB double speed
     /// mode. Regular: 2, CGB 2x: 1.

@@ -10,9 +10,13 @@ use common::numutil::NumExt;
 
 use crate::{inst_arm::ArmHandler, inst_thumb::ThumbHandler, interface::ArmSystem};
 
+/// Size of pages in IWRAM, since it might need clearing
 const IWRAM_PAGE_SIZE: u32 = 128;
+/// End of IWRAM, subtract a guess at the stack's max size
 const IWRAM_END: u32 = 0x300_7FFF - 0x400;
 
+/// Storage for instruction caching.
+/// Currently heavily assumes GGA, TODO: More generic for NDS.
 pub struct Cache<S: ArmSystem> {
     bios: Vec<Option<CacheEntry<S>>>,
     rom: Vec<Option<CacheEntry<S>>>,
@@ -24,6 +28,7 @@ pub struct Cache<S: ArmSystem> {
 }
 
 impl<S: ArmSystem> Cache<S> {
+    /// Get the cache at the given location, if available.
     pub fn get(&self, pc: u32) -> Option<CacheEntry<S>> {
         match pc {
             0..=0x3FFF => self.bios.get(pc.us() >> 1).cloned().flatten(),
@@ -33,6 +38,7 @@ impl<S: ArmSystem> Cache<S> {
         }
     }
 
+    /// Put a cache at the given PC.
     pub fn put(&mut self, pc: u32, entry: CacheEntry<S>) {
         match pc {
             0..=0x3FFF => Self::insert(&mut self.bios, pc >> 1, entry),
@@ -50,6 +56,7 @@ impl<S: ArmSystem> Cache<S> {
         set[location.us()] = Some(entry);
     }
 
+    /// Initialize caches.
     pub fn init(&mut self, cart_size: usize) {
         self.bios.resize(0x2000, None);
         self.iwram.resize(0x4000, None);
@@ -59,10 +66,14 @@ impl<S: ArmSystem> Cache<S> {
         self.enabled = true;
     }
 
+    /// If a block should be forcibly ended. True at IWRAM
+    /// page boundaries.
     pub fn force_end_block(pc: u32) -> bool {
         (0x300_0000..=0x3FF_FFFF).contains(&pc) && (pc & (IWRAM_PAGE_SIZE - 1)) == 0
     }
 
+    /// Should be called when a write occured, if write to
+    /// IWRAM happened then the cache in that page needs to be invalidated.
     pub fn write(&mut self, addr: u32) {
         if !self.iwram.is_empty() && (0x300_0000..=IWRAM_END).contains(&addr) {
             let location = (addr & 0x7FFF) >> 1;
@@ -72,6 +83,8 @@ impl<S: ArmSystem> Cache<S> {
         }
     }
 
+    /// Invalidate all ROM caches. Usually because WAITCNT changed
+    /// and timings with it.
     pub fn invalidate_rom(&mut self) {
         if !self.enabled {
             return;
@@ -95,6 +108,7 @@ impl<S: ArmSystem> Default for Cache<S> {
     }
 }
 
+/// Cache entry, ARM or THUMB instructions
 pub enum CacheEntry<S: ArmSystem> {
     Arm(Arc<Vec<CachedInst<u32, ArmHandler<S>>>>),
     Thumb(Arc<Vec<CachedInst<u16, ThumbHandler<S>>>>),
@@ -109,8 +123,12 @@ impl<S: ArmSystem> Clone for CacheEntry<S> {
     }
 }
 
+/// A cached instruction/
 pub struct CachedInst<I, H> {
+    /// The instruction itself, an unsigned integer
     pub inst: I,
+    /// The handler to execute for it
     pub handler: H,
+    /// The amount of cycles the instruction took
     pub sn_cycles: u16,
 }

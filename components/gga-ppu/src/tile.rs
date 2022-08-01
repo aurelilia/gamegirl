@@ -17,7 +17,7 @@ where
     [(); S::W * S::H]:,
 {
     pub fn render_mode0(gg: &mut PpuType<S>, line: u16) {
-        Self::render_objs::<0>(gg, line);
+        Self::render_objs(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
         Self::render_bg_text::<2>(gg, line);
@@ -25,18 +25,19 @@ where
     }
 
     pub fn render_mode1(gg: &mut PpuType<S>, line: u16) {
-        Self::render_objs::<0>(gg, line);
+        Self::render_objs(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
     }
 
     pub fn render_mode2(gg: &mut PpuType<S>, line: u16) {
-        Self::render_objs::<0>(gg, line);
+        Self::render_objs(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
         Self::render_bg_affine::<3>(gg, BG3PA);
     }
 
+    /// Render a text mode BG.
     fn render_bg_text<const IDX: u16>(gg: &mut PpuType<S>, line: u16) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
@@ -95,6 +96,7 @@ where
         }
     }
 
+    /// Render an affine mode BG.
     fn render_bg_affine<const IDX: u16>(gg: &mut PpuType<S>, offset: u32) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;

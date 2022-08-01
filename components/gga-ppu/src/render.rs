@@ -12,6 +12,7 @@ impl<S: PpuSystem> Ppu<S>
 where
     [(); S::W * S::H]:,
 {
+    /// Render a 4bpp tile on the current scanline.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn render_tile_4bpp<const OBJ: bool>(
         gg: &mut PpuType<S>,
@@ -32,6 +33,7 @@ where
         }
     }
 
+    /// Render a 8bpp tile on the current scanline.
     pub(super) fn render_tile_8bpp<const OBJ: bool>(
         gg: &mut PpuType<S>,
         prio: u16,
@@ -48,6 +50,7 @@ where
         }
     }
 
+    /// Get a pixel at the given location and priority.
     fn get_pixel<const OBJ: bool>(&self, x: u16, prio: u16) -> Option<Colour> {
         if !(0..(S::W.u16())).contains(&x) {
             return None;

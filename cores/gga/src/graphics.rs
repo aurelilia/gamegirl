@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use arm_cpu::Cpu;
-use common::misc::EmulateOptions;
 use gga_ppu::{
     interface::{PpuDmaReason, PpuInterrupt, PpuSystem},
     scheduling::PpuEvent,
@@ -32,10 +31,6 @@ impl PpuSystem for GameGirlAdv {
         [(); Self::W * Self::H]:,
     {
         &self.ppu
-    }
-
-    fn options(&mut self) -> &mut EmulateOptions {
-        &mut self.options
     }
 
     fn ppu_mmio(&mut self) -> PpuMmio {
@@ -72,12 +67,12 @@ impl PpuSystem for GameGirlAdv {
 #[cfg(not(feature = "threaded-ppu"))]
 impl GameGirlAdv {
     #[inline]
-    pub fn ppu(&mut self) -> &mut Ppu<Self> {
+    pub fn ppu(&mut self) -> &mut GgaPpu<GameGirlAdv> {
         &mut self.ppu
     }
 
     #[inline]
-    pub fn ppu_nomut(&self) -> &Ppu<Self> {
+    pub fn ppu_nomut(&self) -> &GgaPpu<GameGirlAdv> {
         &self.ppu
     }
 }
