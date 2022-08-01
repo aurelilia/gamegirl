@@ -6,11 +6,9 @@
 
 use std::ptr;
 
+use arm_cpu::{interface::RwType, Cpu};
 use common::{
-    components::{
-        arm::{interface::RwType, Cpu},
-        memory::{MemoryMappedSystem, MemoryMapper},
-    },
+    components::memory::{MemoryMappedSystem, MemoryMapper},
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
@@ -33,9 +31,9 @@ pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     wram: [u8; 32 * KB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub mmio7: [u16; 0x1010 / 2],
+    pub mmio7: [u16; 0x520 / 2],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub mmio9: [u16; 0x520 / 2],
+    pub mmio9: [u16; 0x1010 / 2],
 
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     wram7: [u8; 64 * KB],
@@ -199,8 +197,8 @@ impl Default for Memory {
         Self {
             psram: [0; 4 * MB],
             wram: [0; 32 * KB],
-            mmio7: [0; 0x1010 / 2],
-            mmio9: [0; 0x520 / 2],
+            mmio7: [0; 0x520 / 2],
+            mmio9: [0; 0x1010 / 2],
 
             wram7: [0; 64 * KB],
             inst_tcm: [0; 32 * KB],
@@ -308,18 +306,18 @@ impl MemoryMappedSystem<8192> for Nds9 {
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.wram, a - 0x300_0000),
 
             0x0500_0000..=0x05FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-                offs(&self.ppu_nomut::<0>().palette, a - 0x500_0000)
+                offs(&self.ppu_a_nomut().palette, a - 0x500_0000)
             }
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_nomut::<1>().palette, a - 0x501_0000),
-            0x0600_0000..=0x061F_FFFF => offs(&self.ppu_nomut::<0>().vram, a - 0x600_0000),
-            0x0620_0000..=0x063F_FFFF => offs(&self.ppu_nomut::<1>().vram, a - 0x620_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_b_nomut().palette, a - 0x501_0000),
+            0x0600_0000..=0x061F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x600_0000),
+            0x0620_0000..=0x063F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x620_0000),
             // TODO not quite right...
-            0x0640_0000..=0x065F_FFFF => offs(&self.ppu_nomut::<0>().vram, a - 0x640_0000),
-            0x0660_0000..=0x067F_FFFF => offs(&self.ppu_nomut::<1>().vram, a - 0x660_0000),
+            0x0640_0000..=0x065F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x640_0000),
+            0x0660_0000..=0x067F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x660_0000),
             0x0700_0000..=0x07FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-                offs(&self.ppu_nomut::<0>().oam, a - 0x700_0000)
+                offs(&self.ppu_a_nomut().oam, a - 0x700_0000)
             }
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_nomut::<1>().oam, a - 0x701_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_b_nomut().oam, a - 0x701_0000),
 
             0x0600_0000..=0x06FF_FFFF if false => todo!(),
 

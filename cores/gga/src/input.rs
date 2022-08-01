@@ -7,11 +7,8 @@
 //! Input handler.
 //! Luckily, GGA input is dead simple compared to even GG.
 
-use common::{
-    components::arm::{Cpu, Interrupt},
-    misc::Button,
-    numutil::NumExt,
-};
+use arm_cpu::{Cpu, Interrupt};
+use common::{misc::Button, numutil::NumExt};
 
 use crate::{
     addr::{KEYCNT, KEYINPUT},

@@ -4,10 +4,12 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::components::{apu_psg::GenApuEvent, scheduler::Kind};
+use common::components::scheduler::Kind;
+use gga_ppu::{scheduling::PpuEvent, Ppu};
+use psg_apu::GenApuEvent;
 use AdvEvent::*;
 
-use crate::{audio::Apu, graphics::Ppu, timer::Timers, GameGirlAdv};
+use crate::{audio::Apu, timer::Timers, GameGirlAdv};
 
 /// All scheduler events on the GGA.
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -48,19 +50,6 @@ impl Default for AdvEvent {
 }
 
 impl Kind for AdvEvent {}
-
-/// Events the PPU generates.
-#[derive(Copy, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[repr(u16)]
-pub enum PpuEvent {
-    /// Start of HBlank.
-    HblankStart,
-    /// Set HBlank flag in DISPSTAT (this is delayed by 46 cycles)
-    SetHblank,
-    /// End of HBlank, which is the start of the next scanline.
-    HblankEnd,
-}
 
 /// Events the APU generates.
 #[derive(Copy, Clone, Eq, PartialEq)]

@@ -9,15 +9,13 @@ use std::{
     ptr,
 };
 
+use arm_cpu::{
+    registers::Flag,
+    Access::{self, *},
+    Cpu, Interrupt,
+};
 use common::{
-    components::{
-        arm::{
-            registers::Flag,
-            Access::{self, *},
-            Cpu, Interrupt,
-        },
-        memory::{MemoryMappedSystem, MemoryMapper},
-    },
+    components::memory::{MemoryMappedSystem, MemoryMapper},
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 

@@ -4,33 +4,31 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+#![allow(incomplete_features)]
 #![feature(mixed_integer_ops)]
+#![feature(generic_const_exprs)]
 
 use std::{iter, mem, path::PathBuf};
 
+use arm_cpu::{registers::Flag, Cpu};
 use audio::Apu;
 use cartridge::Cartridge;
 use common::{
     common_functions,
-    components::{
-        arm::{registers::Flag, Cpu},
-        debugger::Debugger,
-        scheduler::Scheduler,
-        storage::Storage,
-    },
+    components::{debugger::Debugger, scheduler::Scheduler, storage::Storage},
     misc::{EmulateOptions, SystemConfig},
     Colour,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
+use gga_ppu::{scheduling::PpuEvent, threading::GgaPpu};
 use memory::Memory;
 
 use crate::{
     addr::{KEYINPUT, SOUNDBIAS},
     audio::SAMPLE_EVERY_N_CLOCKS,
     dma::Dmas,
-    graphics::threading::{new_ppu, GgaPpu},
-    scheduling::{AdvEvent, ApuEvent, PpuEvent},
+    scheduling::{AdvEvent, ApuEvent},
     timer::Timers,
 };
 
@@ -53,7 +51,7 @@ pub type GGADebugger = Debugger<u32>;
 pub struct GameGirlAdv {
     pub cpu: Cpu<Self>,
     pub memory: Memory,
-    pub ppu: GgaPpu,
+    pub ppu: GgaPpu<Self>,
     pub apu: Apu,
     pub dma: Dmas,
     pub timers: Timers,
@@ -174,7 +172,7 @@ impl Default for GameGirlAdv {
         let mut gg = Self {
             cpu: Cpu::default(),
             memory: Memory::default(),
-            ppu: new_ppu(),
+            ppu: gga_ppu::threading::new_ppu(),
             apu: Apu::default(),
             dma: Dmas::default(),
             timers: Timers::default(),

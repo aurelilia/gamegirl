@@ -4,10 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{
-    components::arm::{interface::RwType, Access, Cpu, Interrupt},
-    numutil::{word, NumExt},
-};
+use arm_cpu::{interface::RwType, Access, Cpu, Interrupt};
+use common::numutil::{word, NumExt};
 
 use crate::{addr::VCOUNT, NdsCpu};
 

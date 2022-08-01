@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use super::{envelope::EnvelopGenerator, Channel, GenApuEvent, ScheduleFn};
-use crate::numutil::NumExt;
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -106,7 +105,7 @@ impl<const T: bool> PulseChannel<T> {
 
     pub fn clock(&mut self) -> u32 {
         self.clock_sequencer();
-        (0x7FF - self.frequency).u32() << 2
+        (0x7FF - self.frequency as u32) << 2
     }
 
     pub fn clock_sweeper(&mut self) {

@@ -7,13 +7,11 @@
 use std::collections::VecDeque;
 
 use common::{
-    components::{
-        apu_psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
-        scheduler::Scheduler,
-    },
+    components::scheduler::Scheduler,
     numutil::{NumExt, U16Ext},
     SAMPLE_RATE,
 };
+use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use super::scheduling::AdvEvent;
 use crate::{

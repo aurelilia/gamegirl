@@ -6,11 +6,10 @@
 
 use std::ops::{Deref, DerefMut, IndexMut};
 
+use common::numutil::NumExt;
+
 use super::Exception;
-use crate::{
-    components::arm::{inst_arm::ArmLut, inst_thumb::ThumbLut, Access, Cpu},
-    numutil::NumExt,
-};
+use crate::{inst_arm::ArmLut, inst_thumb::ThumbLut, Access, Cpu};
 
 pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     const IS_V5: bool;

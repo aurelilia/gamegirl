@@ -1,9 +1,14 @@
+// Unless otherwise noted, this file is released and thus subject to the
+// terms of the Mozilla Public License Version 2.0 (MPL2). Also, it is
+// "Incompatible With Secondary Licenses", as defined by the MPL2.
+// If a copy of the MPL2 was not distributed with this file, you can
+// obtain one at https://mozilla.org/MPL/2.0/.
+
 use std::sync::Arc;
 
-use crate::{
-    components::arm::{inst_arm::ArmHandler, inst_thumb::ThumbHandler, interface::ArmSystem},
-    numutil::NumExt,
-};
+use common::numutil::NumExt;
+
+use crate::{inst_arm::ArmHandler, inst_thumb::ThumbHandler, interface::ArmSystem};
 
 const IWRAM_PAGE_SIZE: u32 = 128;
 const IWRAM_END: u32 = 0x300_7FFF - 0x400;

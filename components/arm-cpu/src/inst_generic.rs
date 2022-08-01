@@ -6,11 +6,10 @@
 
 use std::fmt::UpperHex;
 
+use common::numutil::NumExt;
+
 use super::interface::{ArmSystem, SysWrapper};
-use crate::{
-    components::arm::{Access, Access::NonSeq, Cpu, Exception},
-    numutil::NumExt,
-};
+use crate::{Access, Access::NonSeq, Cpu, Exception};
 
 impl<S: ArmSystem> SysWrapper<S> {
     pub fn swi(&mut self) {

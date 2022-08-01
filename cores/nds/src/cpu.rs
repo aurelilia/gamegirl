@@ -4,21 +4,16 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{
-    components::{
-        arm::{
-            interface::{ArmSystem, RwType},
-            registers::Flag::IrqDisable,
-            Access, Cpu, Exception,
-        },
-        memory::MemoryMapper,
-    },
-    numutil::NumExt,
+use arm_cpu::{
+    interface::{ArmSystem, RwType},
+    registers::Flag::IrqDisable,
+    Access, Cpu, Exception,
 };
+use common::{components::memory::MemoryMapper, numutil::NumExt};
 
 use crate::{
     addr::{IE_H, IE_L, IF_H, IF_L, IME},
-    Nds, Nds7, Nds9, NdsCpu,
+    Nds7, Nds9, NdsCpu,
 };
 
 pub const NDS9_CLOCK: u32 = 67_027_964;

@@ -4,14 +4,12 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{
-    components::arm::{
-        interface::{ArmSystem, RwType},
-        registers::Flag::IrqDisable,
-        Access, Cpu, Exception,
-    },
-    numutil::NumExt,
+use arm_cpu::{
+    interface::{ArmSystem, RwType},
+    registers::Flag::IrqDisable,
+    Access, Cpu, Exception,
 };
+use common::numutil::NumExt;
 
 use crate::{
     addr,

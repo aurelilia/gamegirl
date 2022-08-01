@@ -4,6 +4,11 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+#![allow(incomplete_features)]
+#![feature(mixed_integer_ops)]
+#![feature(adt_const_params)]
+#![feature(const_mut_refs)]
+
 mod alu;
 mod caching;
 pub mod inst_arm;
@@ -13,22 +18,20 @@ pub mod interface;
 mod lut;
 pub mod registers;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
-use self::interface::SysWrapper;
+use common::numutil::NumExt;
+
 use crate::{
-    components::arm::{
-        caching::{Cache, CacheEntry, CachedInst},
-        inst_arm::ArmInst,
-        inst_thumb::ThumbInst,
-        interface::{ArmSystem, RwType},
-        registers::{
-            FiqReg,
-            Flag::{FiqDisable, IrqDisable, Thumb},
-            Mode, ModeReg,
-        },
+    caching::{Cache, CacheEntry, CachedInst},
+    inst_arm::ArmInst,
+    inst_thumb::ThumbInst,
+    interface::{ArmSystem, RwType, SysWrapper},
+    registers::{
+        FiqReg,
+        Flag::{FiqDisable, IrqDisable, Thumb},
+        Mode, ModeReg,
     },
-    numutil::NumExt,
 };
 
 /// Represents the CPU of the console - an ARM7TDMI.
@@ -56,10 +59,6 @@ pub struct Cpu<S: ArmSystem + 'static> {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg(feature = "instruction-tracing")]
     pub instruction_tracer: Option<Box<dyn Fn(&S, u32) + Send + 'static>>,
-
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(skip))]
-    _phantom: PhantomData<S>,
 }
 
 impl<S: ArmSystem> Cpu<S> {
@@ -217,7 +216,7 @@ impl<S: ArmSystem> Cpu<S> {
     }
 
     fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32) {
-        if crate::TRACING {
+        if common::TRACING {
             let mnem = if TY::WIDTH == 2 {
                 Self::get_mnemonic_thumb(inst.u16())
             } else {
@@ -349,7 +348,6 @@ impl<S: ArmSystem> Default for Cpu<S> {
 
             #[cfg(feature = "instruction-tracing")]
             instruction_tracer: None,
-            _phantom: PhantomData::default(),
         }
     }
 }

@@ -4,7 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+#![allow(unused)]
+#![allow(incomplete_features)]
 #![feature(mixed_integer_ops)]
+#![feature(generic_const_exprs)]
 
 mod addr;
 mod audio;
@@ -22,13 +25,10 @@ use std::{
     path::PathBuf,
 };
 
+use arm_cpu::{interface::ArmSystem, Cpu};
 use common::{
     common_functions,
-    components::{
-        arm::{interface::ArmSystem, Cpu},
-        debugger::Debugger,
-        scheduler::Scheduler,
-    },
+    components::{debugger::Debugger, scheduler::Scheduler},
     misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
     Colour,

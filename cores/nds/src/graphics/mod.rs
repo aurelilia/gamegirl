@@ -4,60 +4,26 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+mod gga;
+
 use common::Colour;
-use gga::graphics::threading::{new_ppu, GgaPpu};
+use gga_ppu::threading::{new_ppu, GgaPpu};
+
+use crate::{Nds7, Nds9};
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct NdsEngines {
-    pub ppus: [GgaPpu; 2],
+    pub(crate) ppu_a: GgaPpu<Nds7>,
+    pub(crate) ppu_b: GgaPpu<Nds9>,
     pub last_frame: Option<Vec<Colour>>,
 }
 
 impl Default for NdsEngines {
     fn default() -> Self {
         Self {
-            ppus: [new_ppu(), new_ppu()],
+            ppu_a: new_ppu(),
+            ppu_b: new_ppu(),
             last_frame: None,
-        }
-    }
-}
-
-#[cfg(feature = "threaded-ppu")]
-mod thread {
-    use std::sync::MutexGuard;
-
-    use gga::graphics::Ppu;
-
-    use crate::Nds;
-
-    impl Nds {
-        #[inline]
-        pub fn ppu<const E: usize>(&mut self) -> MutexGuard<Ppu> {
-            self.ppu.ppus[E].ppu.lock().unwrap()
-        }
-
-        #[inline]
-        pub fn ppu_nomut<const E: usize>(&self) -> MutexGuard<Ppu> {
-            self.ppu.ppus[E].ppu.lock().unwrap()
-        }
-    }
-}
-
-#[cfg(not(feature = "threaded-ppu"))]
-mod thread {
-    use gga::graphics::Ppu;
-
-    use crate::Nds;
-
-    impl Nds {
-        #[inline]
-        pub fn ppu<const E: usize>(&mut self) -> &mut Ppu {
-            &mut self.ppu.ppus[E]
-        }
-
-        #[inline]
-        pub fn ppu_nomut<const E: usize>(&self) -> &Ppu {
-            &self.ppu.ppus[E]
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::{sync::mpsc, thread};
 
-use common::{components::arm::Cpu, misc::SystemConfig, numutil::NumExt};
+use arm_cpu::Cpu;
+use common::{misc::SystemConfig, numutil::NumExt};
 use gga::GameGirlAdv;
 
 fn main() {

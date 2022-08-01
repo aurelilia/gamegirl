@@ -4,6 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+#![feature(trait_alias)]
+
 //! This implementation is abridged from mizu: https://github.com/Amjad50/mizu
 //! It is under the MIT license. See the linked repository for more info.
 //! Thank you to Amjad50 for mizu!

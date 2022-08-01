@@ -6,14 +6,12 @@
 
 use std::mem;
 
-use arrayvec::ArrayVec;
-use common::{
-    components::arm::{
-        interface::{ArmSystem, RwType},
-        Access, Cpu, Interrupt,
-    },
-    numutil::{word, NumExt},
+use arm_cpu::{
+    interface::{ArmSystem, RwType},
+    Access, Cpu, Interrupt,
 };
+use arrayvec::ArrayVec;
+use common::numutil::{word, NumExt};
 
 use crate::{addr::VCOUNT, cartridge::SaveType, GameGirlAdv};
 

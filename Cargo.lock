@@ -106,6 +106,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "arm-cpu"
+version = "0.1.0"
+dependencies = [
+ "bitmatch",
+ "common",
+ "log",
+ "serde",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -392,8 +402,6 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "bincode",
- "bitflags",
- "bitmatch",
  "log",
  "serde",
  "serde_arrays",
@@ -948,9 +956,22 @@ dependencies = [
 name = "gga"
 version = "0.1.0"
 dependencies = [
+ "arm-cpu",
  "arrayvec",
  "common",
  "elf_rs",
+ "gga-ppu",
+ "log",
+ "psg-apu",
+ "serde",
+ "serde_arrays",
+]
+
+[[package]]
+name = "gga-ppu"
+version = "0.1.0"
+dependencies = [
+ "common",
  "log",
  "serde",
  "serde_arrays",
@@ -962,6 +983,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "log",
+ "psg-apu",
  "serde",
  "serde_arrays",
 ]
@@ -1453,8 +1475,9 @@ dependencies = [
 name = "nds"
 version = "0.1.0"
 dependencies = [
+ "arm-cpu",
  "common",
- "gga",
+ "gga-ppu",
  "log",
  "serde",
  "serde_arrays",
@@ -1755,6 +1778,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54b25569025b7fc9651de43004ae593a75ad88543b17178aa5e1b9c4f15f56f"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "psg-apu"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "serde",
 ]
 
 [[package]]
@@ -2139,6 +2170,7 @@ dependencies = [
 name = "tracing"
 version = "0.1.0"
 dependencies = [
+ "arm-cpu",
  "common",
  "env_logger",
  "gga",

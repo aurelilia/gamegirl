@@ -8,14 +8,18 @@ use common::numutil::{hword, NumExt};
 
 use crate::{
     addr::{DISPCNT, MOSAIC, WINOUT},
-    graphics::{threading::PpuType, Ppu, OBJ_EN, OBJ_MAPPING_1D, WIN_OBJS},
+    threading::PpuType,
+    Ppu, PpuSystem, OBJ_EN, OBJ_MAPPING_1D, WIN_OBJS,
 };
 
 const OBJ_X_SIZE: [u16; 16] = [8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32, 0, 0, 0, 0];
 const OBJ_Y_SIZE: [u16; 16] = [8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64, 0, 0, 0, 0];
 
-impl Ppu {
-    pub fn render_objs<const _START: u16>(gg: &mut PpuType, line: u16) {
+impl<S: PpuSystem> Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
+    pub fn render_objs<const _START: u16>(gg: &mut PpuType<S>, line: u16) {
         if !gg[DISPCNT].is_bit(OBJ_EN) {
             return;
         }
@@ -35,7 +39,7 @@ impl Ppu {
         }
     }
 
-    fn render_obj(gg: &mut PpuType, line: u16, obj: Object, is_2d: bool) {
+    fn render_obj(gg: &mut PpuType<S>, line: u16, obj: Object, is_2d: bool) {
         match obj.attr0 & 3 {
             0 => Self::render_obj_regular(gg, line, obj, is_2d),
             1 => Self::render_obj_affine(gg, line, obj, is_2d, false),
@@ -44,7 +48,7 @@ impl Ppu {
         }
     }
 
-    fn render_obj_regular(gg: &mut PpuType, line: u16, obj: Object, is_2d: bool) {
+    fn render_obj_regular(gg: &mut PpuType<S>, line: u16, obj: Object, is_2d: bool) {
         let size = obj.size();
         if !obj.draw_on(line, size.1.u8()) {
             return;
@@ -122,7 +126,7 @@ impl Ppu {
         }
     }
 
-    fn render_obj_affine(gg: &mut PpuType, line: u16, obj: Object, is_2d: bool, size_2x: bool) {
+    fn render_obj_affine(gg: &mut PpuType<S>, line: u16, obj: Object, is_2d: bool, size_2x: bool) {
         let size = obj.size();
         if !obj.draw_on(line, if size_2x { size.1 << 1 } else { size.1 }.u8()) {
             return;
@@ -160,7 +164,7 @@ impl Ppu {
             if pixel_x < 0 {
                 continue;
             }
-            if pixel_x >= 240 {
+            if pixel_x >= S::W as i16 {
                 break;
             }
 
@@ -184,7 +188,7 @@ impl Ppu {
     }
 
     fn get_affine_pixel(
-        gg: &mut PpuType,
+        gg: &mut PpuType<S>,
         base_tile_idx: usize,
         size: (u16, u16),
         trans_x: u16,
@@ -226,8 +230,8 @@ impl Ppu {
         out
     }
 
-    fn set_window_pixel(gg: &mut PpuType, pixel: i16, colour: u8) {
-        if !(0..240).contains(&pixel) || colour == 0 {
+    fn set_window_pixel(gg: &mut PpuType<S>, pixel: i16, colour: u8) {
+        if !(0..(S::W as i16)).contains(&pixel) || colour == 0 {
             return;
         }
 

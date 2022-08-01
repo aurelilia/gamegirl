@@ -1,5 +1,5 @@
 [workspace]
-members = ["common", "cores/*", "gamegirl", "gamegirl-egui", "tests", "tests/tracing"]
+members = ["common", "components/*", "cores/*", "gamegirl", "gamegirl-egui", "tests", "tests/tracing"]
 resolver = "2"
 
 [profile.release]

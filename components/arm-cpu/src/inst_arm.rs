@@ -5,15 +5,13 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use bitmatch::bitmatch;
+use common::numutil::{NumExt, U32Ext};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{
-    components::arm::{
-        registers::{Flag::*, Mode},
-        Access::*,
-        Cpu,
-    },
-    numutil::{NumExt, U32Ext},
+    registers::{Flag::*, Mode},
+    Access::*,
+    Cpu,
 };
 
 pub type ArmHandler<S> = fn(&mut SysWrapper<S>, ArmInst);

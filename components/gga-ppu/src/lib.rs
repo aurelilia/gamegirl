@@ -10,31 +10,35 @@
 //! The code is under the MIT license at https://github.com/DenSinH/GBAC-.
 
 #![allow(clippy::significant_drop_in_scrutinee)]
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 
+mod addr;
 mod bitmap;
+pub mod interface;
 mod objects;
 mod palette;
 mod render;
+pub mod scheduling;
 pub mod threading;
 mod tile;
 
 use common::{
-    components::arm::{Cpu, Interrupt},
     numutil::{NumExt, U16Ext},
     Colour,
 };
 
-use self::threading::PpuType;
-use super::memory::KB;
 use crate::{
     addr::{
         BG0CNT, BG2PA, BG3PA, BLDALPHA, BLDCNT, BLDY, DISPCNT, DISPSTAT, VCOUNT, WIN0H, WIN0V,
         WININ, WINOUT,
     },
-    dma::{Dmas, Reason},
-    scheduling::{AdvEvent, PpuEvent},
-    GameGirlAdv,
+    interface::{PpuDmaReason, PpuInterrupt, PpuSystem},
+    scheduling::PpuEvent,
+    threading::PpuType,
 };
+
+const KB: usize = 1024;
 
 // DISPCNT
 const FRAME_SELECT: u16 = 4;
@@ -56,11 +60,17 @@ const VBLANK_IRQ: u16 = 3;
 const HBLANK_IRQ: u16 = 4;
 const LYC_IRQ: u16 = 5;
 
-type Layer = [Colour; 240];
-type WindowMask = [bool; 240];
+// False positives since a constant of the bound is used
+#[allow(type_alias_bounds)]
+type Layer<S: PpuSystem> = [Colour; S::W];
+#[allow(type_alias_bounds)]
+type WindowMask<S: PpuSystem> = [bool; S::W];
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Ppu {
+pub struct Ppu<S: PpuSystem>
+where
+    [(); S::W * S::H]:,
+{
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub palette: [u8; KB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
@@ -69,41 +79,44 @@ pub struct Ppu {
     pub oam: [u8; KB],
 
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr"))]
-    pixels: [Colour; 240 * 160],
+    #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr::<S>"))]
+    pixels: [Colour; S::W * S::H],
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr"))]
-    bg_layers: [Layer; 4],
+    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr::<S>"))]
+    bg_layers: [Layer<S>; 4],
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr"))]
-    bg_pixels: [Layer; 4],
+    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr::<S>"))]
+    bg_pixels: [Layer<S>; 4],
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr"))]
-    obj_layers: [Layer; 4],
+    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr::<S>"))]
+    obj_layers: [Layer<S>; 4],
 
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_mask_arr"))]
-    win_masks: [WindowMask; 5],
+    #[cfg_attr(feature = "serde", serde(default = "serde_mask_arr::<S>"))]
+    win_masks: [WindowMask<S>; 5],
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_mask2_arr"))]
-    win_blend: [bool; 240],
+    #[cfg_attr(feature = "serde", serde(default = "serde_mask2_arr::<S>"))]
+    win_blend: [bool; S::W],
 
     bg_x: [i32; 2],
     bg_y: [i32; 2],
 
-    #[cfg_attr(not(feature = "threaded-ppu"), serde(default))]
-    #[cfg_attr(not(feature = "threaded-ppu"), serde(skip))]
-    #[cfg(not(feature = "threaded-ppu"))]
+    #[cfg_attr(all(feature = "serde", not(feature = "threaded")), serde(default))]
+    #[cfg_attr(all(feature = "serde", not(feature = "threaded")), serde(skip))]
+    #[cfg(not(feature = "threaded"))]
     pub last_frame: Option<Vec<Colour>>,
 }
 
-impl Ppu {
-    pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: i32) {
+impl<S: PpuSystem> Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
+    pub fn handle_event(gg: &mut S, event: PpuEvent, late_by: i32) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 Self::render_line_maybe_threaded(gg);
-                Self::maybe_interrupt(gg, Interrupt::HBlank, HBLANK_IRQ);
-                Dmas::update_all(gg, Reason::HBlank);
+                Self::maybe_interrupt(gg, PpuInterrupt::HBlank, HBLANK_IRQ);
+                gg.notify_dma(PpuDmaReason::HBlank);
 
                 (PpuEvent::SetHblank, 46i32)
             }
@@ -118,26 +131,27 @@ impl Ppu {
 
                 if gg[VCOUNT] == gg[DISPSTAT].bits(8, 8) {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, true);
-                    Self::maybe_interrupt(gg, Interrupt::VCounter, LYC_IRQ);
+                    Self::maybe_interrupt(gg, PpuInterrupt::VCounter, LYC_IRQ);
                 } else {
                     gg[DISPSTAT] = gg[DISPSTAT].set_bit(LYC_MATCH, false);
                 }
 
-                match gg[VCOUNT] {
-                    160 => {
+                let vcount = gg[VCOUNT].us();
+                match () {
+                    _ if vcount == S::H => {
                         gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, true);
-                        Self::maybe_interrupt(gg, Interrupt::VBlank, VBLANK_IRQ);
-                        Dmas::update_all(gg, Reason::VBlank);
+                        Self::maybe_interrupt(gg, PpuInterrupt::VBlank, VBLANK_IRQ);
+                        gg.notify_dma(PpuDmaReason::VBlank);
                     }
                     // VBlank flag gets set one scanline early
-                    227 => gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false),
-                    228 => {
+                    _ if vcount == (S::VBLANK_END - 1) => {
+                        gg[DISPSTAT] = gg[DISPSTAT].set_bit(VBLANK, false)
+                    }
+                    _ if vcount == S::VBLANK_END => {
                         gg[VCOUNT] = 0;
                         let frame = Self::end_frame(gg);
-                        gg.ppu.last_frame = Some(frame);
-
-                        #[cfg(feature = "serde")]
-                        (gg.options.frame_finished)(gg.save_state());
+                        gg.ppu().last_frame = Some(frame);
+                        gg.frame_finished();
                     }
                     _ => (),
                 }
@@ -146,36 +160,38 @@ impl Ppu {
                 (PpuEvent::HblankStart, 960)
             }
         };
-        gg.scheduler
-            .schedule(AdvEvent::PpuEvent(next_event), cycles - late_by);
+        gg.schedule(next_event, cycles - late_by);
     }
 
-    fn maybe_interrupt(gg: &mut GameGirlAdv, int: Interrupt, bit: u16) {
+    fn maybe_interrupt(gg: &mut S, int: PpuInterrupt, bit: u16) {
         if gg[DISPSTAT].is_bit(bit) {
-            Cpu::request_interrupt(gg, int);
+            gg.request_interrupt(int);
         }
     }
 
-    #[cfg(not(feature = "threaded-ppu"))]
-    fn render_line_maybe_threaded(gg: &mut GameGirlAdv) {
-        Self::render_line(gg);
+    #[cfg(not(feature = "threaded"))]
+    fn render_line_maybe_threaded(gg: &mut S) {
+        let mmio = gg.ppu_mmio();
+        Self::render_line(&mut PpuType {
+            mmio,
+            ppu: gg.ppu(),
+        });
     }
 
-    #[cfg(feature = "threaded-ppu")]
-    fn render_line_maybe_threaded(gg: &mut GameGirlAdv) {
-        let mut mmio = [0; 0x56 / 2];
-        mmio.copy_from_slice(&gg.memory.mmio[..0x56 / 2]);
-        gg.ppu.thread.render(mmio);
+    #[cfg(feature = "threaded")]
+    fn render_line_maybe_threaded(gg: &mut S) {
+        let mmio = gg.ppu_mmio();
+        gg.ppu().thread.render(mmio);
     }
 
-    fn render_line(gg: &mut PpuType) {
+    fn render_line(gg: &mut PpuType<S>) {
         let line = gg[VCOUNT];
-        if line >= 160 {
+        if line >= S::H.u16() {
             return;
         }
         if gg[DISPCNT].is_bit(FORCED_BLANK) {
-            let start = line.us() * 240;
-            for pixel in 0..240 {
+            let start = line.us() * S::W;
+            for pixel in 0..S::W {
                 gg.ppu.pixels[start + pixel] = [31, 31, 31, 255];
             }
             return;
@@ -195,15 +211,15 @@ impl Ppu {
         Self::finish_line(gg, line);
     }
 
-    fn calc_windows(gg: &mut PpuType, line: u8) {
+    fn calc_windows(gg: &mut PpuType<S>, line: u8) {
         let cnt = gg[DISPCNT];
         let win0_en = cnt.is_bit(WIN0_EN);
         let win1_en = cnt.is_bit(WIN1_EN);
         let win_obj_en = cnt.is_bit(WIN_OBJS);
         if !win0_en && !win1_en && !win_obj_en {
             // No windows enabled, allow everything to draw
-            gg.ppu.win_masks = serde_mask_arr();
-            gg.ppu.win_blend = serde_mask2_arr();
+            gg.ppu.win_masks = serde_mask_arr::<S>();
+            gg.ppu.win_blend = serde_mask2_arr::<S>();
             return;
         }
 
@@ -214,10 +230,10 @@ impl Ppu {
         // will be overwritten later.
         for mask in 0..5 {
             let enable = wout.is_bit(mask);
-            gg.ppu.win_masks[mask.us()] = [enable; 240];
+            gg.ppu.win_masks[mask.us()] = [enable; S::W];
         }
         let blend = wout.is_bit(5);
-        gg.ppu.win_blend = [blend; 240];
+        gg.ppu.win_blend = [blend; S::W];
 
         // Do window 1 first, since it has lower priority and we want
         // window 0 to overwrite it
@@ -228,8 +244,8 @@ impl Ppu {
             }
 
             let win_offs = (window * 8).u16();
-            let (x1, x2) = Self::window_coords::<240>(gg[WIN0H + window * 2]);
-            let (y1, y2) = Self::window_coords::<160>(gg[WIN0V + window * 2]);
+            let (x1, x2) = Self::window_coords(S::W as u8, gg[WIN0H + window * 2]);
+            let (y1, y2) = Self::window_coords(S::H as u8, gg[WIN0V + window * 2]);
 
             if !(y1..y2).contains(&line) {
                 // Window outside this line.
@@ -250,18 +266,18 @@ impl Ppu {
     }
 
     // Return WIN0/WIN1 coordinates, first is start, second is end.
-    fn window_coords<const MAX: u8>(value: u16) -> (u8, u8) {
+    fn window_coords(max: u8, value: u16) -> (u8, u8) {
         let x1 = value.high();
-        let x2 = value.low().saturating_add(1).min(MAX);
+        let x2 = value.low().saturating_add(1).min(max);
         if x1 > x2 {
-            (x1, MAX)
+            (x1, max)
         } else {
             (x1, x2)
         }
     }
 
-    fn finish_line(gg: &mut PpuType, line: u16) {
-        let start = line.us() * 240;
+    fn finish_line(gg: &mut PpuType<S>, line: u16) {
+        let start = line.us() * S::W;
         let mut backdrop = gg.ppu.idx_to_palette::<false>(0); // BG0 is backdrop
 
         let bldcnt = gg[BLDCNT];
@@ -271,12 +287,12 @@ impl Ppu {
             // Fast path: No blending
             Self::adjust_pixel(&mut backdrop);
 
-            #[cfg(not(feature = "threaded-ppu"))]
+            #[cfg(not(feature = "threaded"))]
             let ppu = &mut gg.ppu;
-            #[cfg(feature = "threaded-ppu")]
+            #[cfg(feature = "threaded")]
             let ppu = &mut *gg.ppu;
 
-            'pixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(240).enumerate() {
+            'pixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(S::W).enumerate() {
                 for prio in 0..4 {
                     if ppu.obj_layers[prio][x][3] != EMPTY_A {
                         *pixel = ppu.obj_layers[prio][x];
@@ -330,12 +346,12 @@ impl Ppu {
                 gg[BLDY]
             };
 
-            #[cfg(not(feature = "threaded-ppu"))]
+            #[cfg(not(feature = "threaded"))]
             let ppu = &mut gg.ppu;
-            #[cfg(feature = "threaded-ppu")]
+            #[cfg(feature = "threaded")]
             let ppu = &mut *gg.ppu;
 
-            'bldpixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(240).enumerate() {
+            'bldpixels: for (x, pixel) in ppu.pixels[start..].iter_mut().take(S::W).enumerate() {
                 pixel[3] = EMPTY_A;
                 let enabled = ppu.win_blend[x];
 
@@ -385,15 +401,15 @@ impl Ppu {
                 );
             }
 
-            for pixel in gg.ppu.pixels[start..].iter_mut().take(240) {
+            for pixel in gg.ppu.pixels[start..].iter_mut().take(S::W) {
                 Self::adjust_pixel(pixel);
             }
         }
 
         // Clear last line buffers
-        gg.ppu.bg_layers = serde_layer_arr();
-        gg.ppu.bg_pixels = serde_layer_arr();
-        gg.ppu.obj_layers = serde_layer_arr();
+        gg.ppu.bg_layers = serde_layer_arr::<S>();
+        gg.ppu.bg_pixels = serde_layer_arr::<S>();
+        gg.ppu.obj_layers = serde_layer_arr::<S>();
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -459,13 +475,21 @@ impl Ppu {
         [r.u8(), g.u8(), b.u8(), 255]
     }
 
-    fn end_frame(gg: &mut GameGirlAdv) -> Vec<Colour> {
+    fn end_frame(gg: &mut S) -> Vec<Colour> {
         // Reload affine backgrounds
         let bg_x0 = Self::get_affine_offs(gg[BG2PA + 0x8], gg[BG2PA + 0xA]);
         let bg_y0 = Self::get_affine_offs(gg[BG2PA + 0xC], gg[BG2PA + 0xE]);
         let bg_x1 = Self::get_affine_offs(gg[BG3PA + 0x8], gg[BG3PA + 0xA]);
         let bg_y1 = Self::get_affine_offs(gg[BG3PA + 0xC], gg[BG3PA + 0xE]);
-        let mut ppu = gg.ppu();
+
+        let mut ppu = {
+            #[cfg(feature = "threaded")]
+            {
+                gg.ppu().ppu.lock().unwrap()
+            }
+            #[cfg(not(feature = "threaded"))]
+            gg.ppu()
+        };
         ppu.bg_x[0] = bg_x0;
         ppu.bg_y[0] = bg_y0;
         ppu.bg_x[1] = bg_x1;
@@ -482,7 +506,10 @@ impl Ppu {
     }
 }
 
-impl Default for Ppu {
+impl<S: PpuSystem> Default for Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
     fn default() -> Self {
         Self {
             palette: [0; KB],
@@ -492,30 +519,36 @@ impl Default for Ppu {
             bg_x: [0; 2],
             bg_y: [0; 2],
 
-            pixels: serde_colour_arr(),
-            bg_layers: serde_layer_arr(),
-            bg_pixels: serde_layer_arr(),
-            obj_layers: serde_layer_arr(),
-            win_masks: serde_mask_arr(),
-            win_blend: serde_mask2_arr(),
+            pixels: serde_colour_arr::<S>(),
+            bg_layers: serde_layer_arr::<S>(),
+            bg_pixels: serde_layer_arr::<S>(),
+            obj_layers: serde_layer_arr::<S>(),
+            win_masks: serde_mask_arr::<S>(),
+            win_blend: serde_mask2_arr::<S>(),
 
-            #[cfg(not(feature = "threaded-ppu"))]
+            #[cfg(not(feature = "threaded"))]
             last_frame: None,
         }
     }
 }
 
-fn serde_colour_arr() -> [Colour; 240 * 160] {
-    [[0, 0, 0, 255]; 240 * 160]
+fn serde_colour_arr<S: PpuSystem>() -> [Colour; S::W * S::H] {
+    [[0, 0, 0, 255]; S::W * S::H]
 }
-fn serde_layer_arr() -> [Layer; 4] {
-    [[EMPTY; 240]; 4]
+fn serde_layer_arr<S: PpuSystem>() -> [Layer<S>; 4]
+where
+    [(); S::W]:,
+{
+    [[EMPTY; S::W]; 4]
 }
-fn serde_mask_arr() -> [WindowMask; 5] {
-    [[true; 240]; 5]
+fn serde_mask_arr<S: PpuSystem>() -> [WindowMask<S>; 5]
+where
+    [(); S::W]:,
+{
+    [[true; S::W]; 5]
 }
-fn serde_mask2_arr() -> [bool; 240] {
-    [true; 240]
+fn serde_mask2_arr<S: PpuSystem>() -> [bool; S::W] {
+    [true; S::W]
 }
 
 const EMPTY: Colour = [0, 0, 0, 0];

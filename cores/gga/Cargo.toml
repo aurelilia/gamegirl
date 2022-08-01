@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../../common" }
+arm-cpu = { path = "../../components/arm-cpu" }
+gga-ppu = { path = "../../components/gga-ppu" }
+psg-apu = { path = "../../components/psg-apu" }
 
 serde = { version = "1.0.140", features = ["derive", "rc"], optional = true }
 serde_arrays = { version = "0.1.0", optional = true }
@@ -18,5 +21,5 @@ elf_rs = "0.2.0"
 
 [features]
 default = ["threaded-ppu"]
-threaded-ppu = []
-serde = ["dep:serde", "dep:serde_arrays", "arrayvec/serde", "common/serde"]
+threaded-ppu = ["gga-ppu/threaded"]
+serde = ["dep:serde", "dep:serde_arrays", "arrayvec/serde", "common/serde", "arm-cpu/serde", "gga-ppu/serde", "psg-apu/serde"]

@@ -6,19 +6,19 @@
 
 use common::numutil::NumExt;
 
-use crate::{
-    addr::*,
-    graphics::{threading::PpuType, Ppu, BG2_EN, FRAME_SELECT},
-};
+use crate::{addr::*, threading::PpuType, Ppu, PpuSystem, BG2_EN, FRAME_SELECT};
 
-impl Ppu {
-    pub fn render_mode3(gg: &mut PpuType, line: u16) {
+impl<S: PpuSystem> Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
+    pub fn render_mode3(gg: &mut PpuType<S>, line: u16) {
         if !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
 
-        let line_start = line.us() * 240;
-        for offs in 0..240 {
+        let line_start = line.us() * S::W;
+        for offs in 0..S::W {
             let pixel = line_start + offs;
             gg.ppu.bg_layers[0][offs] = gg.ppu.hword_to_colour_vram(pixel << 1);
         }
@@ -26,14 +26,14 @@ impl Ppu {
         Self::render_objs::<512>(gg, line);
     }
 
-    pub fn render_mode4(gg: &mut PpuType, line: u16) {
+    pub fn render_mode4(gg: &mut PpuType<S>, line: u16) {
         if !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
 
-        let line_start = line.us() * 240;
+        let line_start = line.us() * S::W;
         let start_addr = Self::bitmap_start_addr(gg) + line_start;
-        for offs in 0..240 {
+        for offs in 0..S::W {
             let palette = gg.ppu.vram[start_addr + offs];
             if palette != 0 {
                 gg.ppu.bg_layers[0][offs] = gg.ppu.idx_to_palette::<false>(palette);
@@ -43,7 +43,7 @@ impl Ppu {
         Self::render_objs::<512>(gg, line);
     }
 
-    pub fn render_mode5(gg: &mut PpuType, line: u16) {
+    pub fn render_mode5(gg: &mut PpuType<S>, line: u16) {
         if line > 127 || !gg[DISPCNT].is_bit(BG2_EN) {
             return;
         }
@@ -58,7 +58,7 @@ impl Ppu {
         Self::render_objs::<512>(gg, line);
     }
 
-    fn bitmap_start_addr(gg: &PpuType) -> usize {
+    fn bitmap_start_addr(gg: &PpuType<S>) -> usize {
         if gg[DISPCNT].is_bit(FRAME_SELECT) {
             0xA000
         } else {

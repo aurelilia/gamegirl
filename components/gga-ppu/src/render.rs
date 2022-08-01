@@ -6,15 +6,15 @@
 
 use common::{numutil::NumExt, Colour};
 
-use crate::{
-    addr::MOSAIC,
-    graphics::{threading::PpuType, Ppu, EMPTY},
-};
+use crate::{addr::MOSAIC, threading::PpuType, Ppu, PpuSystem, EMPTY};
 
-impl Ppu {
+impl<S: PpuSystem> Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
     #[allow(clippy::too_many_arguments)]
     pub(super) fn render_tile_4bpp<const OBJ: bool>(
-        gg: &mut PpuType,
+        gg: &mut PpuType<S>,
         prio: u16,
         mut x: i16,
         x_step: i16,
@@ -33,7 +33,7 @@ impl Ppu {
     }
 
     pub(super) fn render_tile_8bpp<const OBJ: bool>(
-        gg: &mut PpuType,
+        gg: &mut PpuType<S>,
         prio: u16,
         mut x: i16,
         x_step: i16,
@@ -49,7 +49,7 @@ impl Ppu {
     }
 
     fn get_pixel<const OBJ: bool>(&self, x: u16, prio: u16) -> Option<Colour> {
-        if !(0..240).contains(&x) {
+        if !(0..(S::W.u16())).contains(&x) {
             return None;
         }
         let layers = if OBJ {
@@ -61,7 +61,7 @@ impl Ppu {
     }
 
     pub(super) fn set_pixel<const OBJ: bool>(
-        gg: &mut PpuType,
+        gg: &mut PpuType<S>,
         x: i16,
         prio: u16,
         palette: u8,
@@ -69,7 +69,7 @@ impl Ppu {
         mosaic: bool,
         window: usize,
     ) {
-        if !(0..240).contains(&x)
+        if !(0..(S::W as i16)).contains(&x)
             || colour_idx == 0
             || gg.ppu.is_occupied::<OBJ>(x as u16, prio)
             || !gg.ppu.win_masks[window][x as usize]
@@ -106,7 +106,7 @@ impl Ppu {
         self.get_pixel::<OBJ>(x, prio) != Some(EMPTY)
     }
 
-    fn get_layers<'l, const OBJ: bool>(gg: &'l mut PpuType) -> &'l mut [[Colour; 240]; 4] {
+    fn get_layers<'l, const OBJ: bool>(gg: &'l mut PpuType<S>) -> &'l mut [[Colour; S::W]; 4] {
         if OBJ {
             &mut gg.ppu.obj_layers
         } else {

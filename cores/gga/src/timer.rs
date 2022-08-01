@@ -4,10 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{
-    components::arm::{Cpu, Interrupt},
-    numutil::NumExt,
-};
+use arm_cpu::{Cpu, Interrupt};
+use common::numutil::NumExt;
 
 use crate::{
     addr::{SOUNDCNT_H, TM0CNT_H},

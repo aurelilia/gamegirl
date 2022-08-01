@@ -4,12 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-#![allow(incomplete_features)]
-#![feature(const_mut_refs)]
 #![feature(mixed_integer_ops)]
-#![feature(trait_alias)]
-#![feature(adt_const_params)]
-#![feature(generic_const_exprs)]
 
 pub mod components;
 pub mod misc;

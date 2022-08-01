@@ -1,5 +1,5 @@
 [package]
-name = "ggc"
+name = "gga-ppu"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,12 +7,11 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../../common" }
-psg-apu = { path = "../../components/psg-apu" }
+log = "0.4.17"
 
 serde = { version = "1.0.140", features = ["derive", "rc"], optional = true }
 serde_arrays = { version = "0.1.0", optional = true }
-log = "0.4.17"
-
 
 [features]
-serde = ["dep:serde", "dep:serde_arrays", "common/serde", "psg-apu/serde"]
+serde = ["dep:serde", "dep:serde_arrays"]
+threaded = []

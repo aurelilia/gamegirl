@@ -8,11 +8,15 @@ use common::numutil::{hword, word, NumExt};
 
 use crate::{
     addr::{BG0CNT, BG0HOFS, BG0VOFS, BG2PA, BG3PA, DISPCNT},
-    graphics::{threading::PpuType, Ppu, BG0_EN},
+    threading::PpuType,
+    Ppu, PpuSystem, BG0_EN,
 };
 
-impl Ppu {
-    pub fn render_mode0(gg: &mut PpuType, line: u16) {
+impl<S: PpuSystem> Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
+    pub fn render_mode0(gg: &mut PpuType<S>, line: u16) {
         Self::render_objs::<0>(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
@@ -20,20 +24,20 @@ impl Ppu {
         Self::render_bg_text::<3>(gg, line);
     }
 
-    pub fn render_mode1(gg: &mut PpuType, line: u16) {
+    pub fn render_mode1(gg: &mut PpuType<S>, line: u16) {
         Self::render_objs::<0>(gg, line);
         Self::render_bg_text::<0>(gg, line);
         Self::render_bg_text::<1>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
     }
 
-    pub fn render_mode2(gg: &mut PpuType, line: u16) {
+    pub fn render_mode2(gg: &mut PpuType<S>, line: u16) {
         Self::render_objs::<0>(gg, line);
         Self::render_bg_affine::<2>(gg, BG2PA);
         Self::render_bg_affine::<3>(gg, BG3PA);
     }
 
-    fn render_bg_text<const IDX: u16>(gg: &mut PpuType, line: u16) {
+    fn render_bg_text<const IDX: u16>(gg: &mut PpuType<S>, line: u16) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
         }
@@ -91,7 +95,7 @@ impl Ppu {
         }
     }
 
-    fn render_bg_affine<const IDX: u16>(gg: &mut PpuType, offset: u32) {
+    fn render_bg_affine<const IDX: u16>(gg: &mut PpuType<S>, offset: u32) {
         if !gg[DISPCNT].is_bit(BG0_EN + IDX) {
             return;
         }
@@ -114,7 +118,7 @@ impl Ppu {
         let pc = gg[offset + 4] as i16 as i32;
         let pd = gg[offset + 6] as i16 as i32;
 
-        for pixel_x in 0..240 {
+        for pixel_x in 0..(S::W as i32) {
             let mut x = (bg_x + pa * pixel_x) >> 8;
             let mut y = (bg_y + pc * pixel_x) >> 8;
 

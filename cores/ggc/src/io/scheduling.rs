@@ -4,7 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::components::{apu_psg::GenApuEvent, scheduler::Kind};
+use common::components::scheduler::Kind;
+use psg_apu::GenApuEvent;
 use GGEvent::*;
 
 use crate::{

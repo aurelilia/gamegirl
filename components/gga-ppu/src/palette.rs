@@ -9,9 +9,12 @@ use common::{
     Colour,
 };
 
-use crate::graphics::Ppu;
+use crate::{Ppu, PpuSystem};
 
-impl Ppu {
+impl<S: PpuSystem> Ppu<S>
+where
+    [(); S::W * S::H]:,
+{
     pub fn hword_to_colour_vram(&self, addr: usize) -> Colour {
         let lo = self.vram[addr];
         let hi = self.vram[addr + 1];

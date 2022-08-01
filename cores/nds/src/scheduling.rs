@@ -5,6 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::components::scheduler::Kind;
+use gga_ppu::{scheduling::PpuEvent, Ppu};
 use NdsEvent::*;
 
 use crate::{audio::Apu, timer::Timers, Nds};
@@ -13,6 +14,8 @@ use crate::{audio::Apu, timer::Timers, Nds};
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum NdsEvent {
     PauseEmulation,
+    /// An event handled by the PPU.
+    PpuEvent(PpuEvent),
     /// An event handled by the APU.
     ApuEvent(ApuEvent),
     /// A timer overflow.
@@ -26,6 +29,10 @@ impl NdsEvent {
     pub fn dispatch(self, ds: &mut Nds, late_by: i32) {
         match self {
             PauseEmulation => ds.ticking = false,
+            PpuEvent(evt) => {
+                Ppu::handle_event(&mut ds.nds7(), evt, late_by);
+                Ppu::handle_event(&mut ds.nds9(), evt, late_by);
+            }
             ApuEvent(evt) => {
                 let time = Apu::handle_event(ds, evt, late_by);
                 ds.scheduler.schedule(self, time);

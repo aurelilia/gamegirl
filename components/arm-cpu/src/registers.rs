@@ -5,9 +5,10 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use bitmatch::bitmatch;
+use common::numutil::NumExt;
 
 use super::interface::{ArmSystem, SysWrapper};
-use crate::{components::arm::Cpu, numutil::NumExt};
+use crate::Cpu;
 
 /// Macro for creating accessors for mode-dependent registers.
 macro_rules! mode_reg {

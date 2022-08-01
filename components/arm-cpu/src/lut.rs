@@ -8,7 +8,7 @@ use super::{
     inst_thumb::ThumbLut,
     interface::{ArmSystem, SysWrapper},
 };
-use crate::components::arm::inst_arm::ArmLut;
+use crate::inst_arm::ArmLut;
 
 impl<S: ArmSystem> SysWrapper<S> {
     #[allow(clippy::unusual_byte_groupings)]

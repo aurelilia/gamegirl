@@ -5,7 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use super::{Channel, ScheduleFn};
-use crate::{components::apu_psg::GenApuEvent, numutil::NumExt};
+use crate::GenApuEvent;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
@@ -51,7 +51,7 @@ impl WaveChannel {
 
     pub fn clock(&mut self) -> u32 {
         self.clock_position();
-        (0x7FF - self.frequency).u32() << 2
+        (0x7FF - self.frequency as u32) << 2
     }
 
     pub fn reset_buffer_index(&mut self) {

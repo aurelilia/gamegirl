@@ -5,12 +5,10 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use bitmatch::bitmatch;
+use common::numutil::{NumExt, U16Ext};
 
 use super::interface::{ArmSystem, SysWrapper};
-use crate::{
-    components::arm::{registers::Flag::*, Access::*, Cpu},
-    numutil::{NumExt, U16Ext},
-};
+use crate::{registers::Flag::*, Access::*, Cpu};
 
 pub type ThumbHandler<S> = fn(&mut SysWrapper<S>, ThumbInst);
 pub type ThumbLut<S> = [ThumbHandler<S>; 256];

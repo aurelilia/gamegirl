@@ -4,13 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{
-    components::{
-        apu_psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn},
-        scheduler::Scheduler,
-    },
-    SAMPLE_RATE,
-};
+use common::{components::scheduler::Scheduler, SAMPLE_RATE};
+use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use crate::{
     io::scheduling::{ApuEvent, GGEvent},

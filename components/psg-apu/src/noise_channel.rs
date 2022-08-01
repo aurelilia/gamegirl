@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use super::{envelope::EnvelopGenerator, Channel, ScheduleFn};
-use crate::numutil::NumExt;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -43,7 +42,7 @@ impl NoiseChannel {
 
     pub fn clock(&mut self) -> u32 {
         self.clock_feedback_register();
-        self.get_frequency().u32() << 2
+        (self.get_frequency() as u32) << 2
     }
 }
 

@@ -4,11 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use common::numutil::NumExt;
+
 use super::interface::ArmSystem;
-use crate::{
-    components::arm::{registers::Flag, Cpu},
-    numutil::NumExt,
-};
+use crate::{registers::Flag, Cpu};
 
 impl<S: ArmSystem> Cpu<S> {
     /// Logical/Arithmetic shift left
