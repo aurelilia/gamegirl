@@ -1,0 +1,38 @@
+[package]
+name = "gamegirl-egui"
+default-run = "gamegirl_bin"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "gamegirl_bin"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+common = { path = "../common" }
+gamegirl = { path = "../gamegirl" }
+ggc = { path = "../cores/ggc" }
+gga = { path = "../cores/gga" }
+
+eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = ["default_fonts", "persistence", "glow"] }
+cpal = "0.13.5"
+gilrs = "0.9.0"
+rfd = "0.10.0"
+futures-executor = "0.3.21"
+serde = "1.0.140"
+env_logger = "0.9.0"
+
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+tracing-wasm = "0.2.1"
+wasm-bindgen-futures = "0.4.32"
+cpal = { version = "0.13.5", features = ["wasm-bindgen"] }
+# Disable the threaded PPU, wasm doesn't support std::thread
+gga = { path = "../cores/gga", default-features = false }
+nds = { path = "../cores/nds", default-features = false }

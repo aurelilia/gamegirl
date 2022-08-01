@@ -4,8 +4,9 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use core::ggc::cpu::{DReg::*, Reg::A};
 use std::ops::ControlFlow::{Break, Continue};
+
+use gamegirl::ggc::cpu::{DReg::*, Reg::A};
 
 use crate::Status;
 

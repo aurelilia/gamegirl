@@ -9,7 +9,6 @@
 mod gb;
 mod gba;
 
-use core::{common::SystemConfig, System};
 use std::{
     env, fs,
     fs::File,
@@ -21,6 +20,10 @@ use std::{
 };
 
 use ansi_term::Colour;
+use gamegirl::{
+    common::{self, misc::SystemConfig},
+    System,
+};
 use png::{BitDepth, ColorType, Decoder, Encoder};
 use seahorse::{App, Command, Flag, FlagType};
 
@@ -201,9 +204,9 @@ fn run_inner<const SKIP_BOOTROM: bool, const IMG_COMPARE: bool>(
 
 fn run<const SKIP_BOOTROM: bool, const TIMEOUT_GOOD: bool>(
     test: Vec<u8>,
-    image: Option<Vec<core::Colour>>,
+    image: Option<Vec<common::Colour>>,
     cond: fn(&System) -> ControlFlow<Status>,
-) -> Result<Vec<core::Colour>, String> {
+) -> Result<Vec<common::Colour>, String> {
     let mut gg = System::default();
     gg.load_cart(test, None, &SystemConfig::default());
     if SKIP_BOOTROM {
@@ -239,7 +242,7 @@ pub enum Status {
     FailAt(String),
 }
 
-fn load_png(path: &Path) -> Option<Vec<core::Colour>> {
+fn load_png(path: &Path) -> Option<Vec<common::Colour>> {
     let raw_img = File::open(path).ok();
     raw_img.map(|i| {
         let dec = Decoder::new(i);
@@ -257,7 +260,7 @@ fn load_png(path: &Path) -> Option<Vec<core::Colour>> {
     })
 }
 
-fn save_png(path: &Path, png: Vec<core::Colour>) {
+fn save_png(path: &Path, png: Vec<common::Colour>) {
     let (w, h) = match png.len() {
         23040 => (160, 144),
         38400 => (240, 160),

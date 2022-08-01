@@ -4,65 +4,237 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-#![feature(duration_consts_float)]
-#![feature(exclusive_range_pattern)]
-#![feature(mixed_integer_ops)]
+//! This crate contains common structures shared by all systems.
 
-pub mod gui;
+use std::{mem, path::PathBuf};
 
-use core::{common::SAMPLE_RATE, System};
-use std::sync::{Arc, Mutex};
-
-use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-    BufferSize, SampleRate, Stream, StreamConfig,
+pub use common;
+use common::{
+    components::storage::Storage,
+    misc::{Button, EmulateOptions, SystemConfig},
+    Colour,
 };
-use eframe::egui::Color32;
-#[cfg(target_arch = "wasm32")]
-use eframe::wasm_bindgen::{self, prelude::*};
+pub use gga;
+use gga::GameGirlAdv;
+pub use ggc;
+use ggc::{
+    io::{cartridge::Cartridge, joypad::Joypad},
+    GameGirl,
+};
+pub use nds;
+use nds::Nds;
+pub use psx;
+use psx::PlayStation;
 
-/// Colour type used by the PPU for display output.
-pub type Colour = Color32;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod remote_debugger;
 
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub struct Handle(Stream);
-
-/// Start the emulator on WASM. See web/index.html for usage.
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
-    console_error_panic_hook::set_once();
-    tracing_wasm::set_as_global_default();
-
-    let gg = System::default();
-    let gg = Arc::new(Mutex::new(gg));
-    let stream = setup_cpal(gg.clone());
-    gui::start(gg, canvas_id).map(|_| Handle(stream))
+/// Macro for forwarding functions on the main system enum to individual
+/// systems.
+macro_rules! forward_fn {
+    ($name:ident, $ret:ty, $arg:ty) => {
+        pub fn $name(&mut self, arg: $arg) -> $ret {
+            match self {
+                System::GGC(gg) => gg.$name(arg),
+                System::GGA(gg) => gg.$name(arg),
+                System::NDS(ds) => ds.$name(arg),
+                System::PSX(_ps) => todo!(),
+            }
+        }
+    };
+    ($name:ident, $ret:ty) => {
+        pub fn $name(&mut self) -> $ret {
+            match self {
+                System::GGC(gg) => gg.$name(),
+                System::GGA(gg) => gg.$name(),
+                System::NDS(ds) => ds.$name(),
+                System::PSX(ps) => ps.$name(),
+            }
+        }
+    };
+    ($name:ident) => {
+        forward_fn!($name, ());
+    };
 }
 
-/// Setup audio playback on the default audio device using CPAL.
-/// Will automatically poll the gg for audio when needed on a separate thread.
-/// *NOT* used for synchronization, since audio samples are requested less than
-/// 60 times per second, which would lead to choppy display.
-/// Make sure to keep the returned Stream around to prevent the audio playback
-/// thread from closing.
-pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Stream {
-    let device = cpal::default_host().default_output_device().unwrap();
-    let stream = device
-        .build_output_stream(
-            &StreamConfig {
-                channels: 2,
-                sample_rate: SampleRate(SAMPLE_RATE),
-                buffer_size: BufferSize::Default,
-            },
-            move |data: &mut [f32], _| {
-                let mut gg = gg.lock().unwrap();
-                gg.produce_samples(data)
-            },
-            move |err| panic!("{err}"),
-        )
-        .unwrap();
-    stream.play().unwrap();
-    stream
+/// Macro for forwarding properties on the main system enum to individual
+/// systems.
+macro_rules! forward_member {
+    ($self:ty, $name:ident, $ret:ty, $sys:ident, $expr:expr) => {
+        pub fn $name(self: $self) -> $ret {
+            match self {
+                System::GGC($sys) => $expr,
+                System::GGA($sys) => $expr,
+                System::NDS($sys) => $expr,
+                System::PSX($sys) => todo!(),
+            }
+        }
+    };
+}
+
+/// Enum for the system currently loaded.
+pub enum System {
+    /// A GGC. Is also used for DMG games.
+    GGC(Box<GameGirl>),
+    /// A GGA. Only used for GGA games.
+    GGA(Box<GameGirlAdv>),
+    /// An NDS. Only used for NDS games.
+    NDS(Box<Nds>),
+    /// A PSX. Only used for PSX games, obviously.
+    PSX(Box<PlayStation>),
+}
+
+impl System {
+    forward_fn!(advance_delta, (), f32);
+    forward_fn!(produce_frame, Option<Vec<Colour>>);
+    forward_fn!(produce_samples, (), &mut [f32]);
+    forward_fn!(save_state, Vec<u8>);
+    forward_fn!(load_state, (), &[u8]);
+
+    forward_fn!(advance);
+    forward_fn!(reset);
+    forward_fn!(skip_bootrom);
+
+    forward_member!(
+        &mut Self,
+        last_frame,
+        Option<Vec<Colour>>,
+        _sys,
+        _sys.ppu.last_frame.take()
+    );
+    forward_member!(
+        &mut Self,
+        options,
+        &mut EmulateOptions,
+        _sys,
+        &mut _sys.options
+    );
+    forward_member!(&Self, config, &SystemConfig, _sys, &_sys.config);
+    forward_member!(
+        &mut Self,
+        config_mut,
+        &mut SystemConfig,
+        _sys,
+        &mut _sys.config
+    );
+
+    /// Set a button on the joypad.
+    pub fn set_button(&mut self, btn: Button, pressed: bool) {
+        match self {
+            System::GGC(gg) => Joypad::set(gg, btn, pressed),
+            System::GGA(gg) => gg.set_button(btn, pressed),
+            _ => todo!(),
+        }
+    }
+
+    /// Returns the screen size for the current system.
+    pub fn screen_size(&self) -> [usize; 2] {
+        match self {
+            System::GGC(_) => [160, 144],
+            System::GGA(_) => [240, 160],
+            System::NDS(_) => [256, 192 * 2],
+            System::PSX(_) => [640, 480],
+        }
+    }
+
+    /// Save the game to disk.
+    pub fn save_game(&self, path: Option<PathBuf>) {
+        let save = match self {
+            System::GGC(gg) => gg.cart.make_save(),
+            System::GGA(gg) => gg.cart.make_save(),
+            _ => todo!(),
+        };
+        if let Some(save) = save {
+            Storage::save(path, save);
+        }
+    }
+
+    pub fn as_ggc(&self) -> &GameGirl {
+        match self {
+            System::GGC(gg) => gg,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_gga(&self) -> &GameGirlAdv {
+        match self {
+            System::GGA(gg) => gg,
+            _ => panic!(),
+        }
+    }
+
+    pub fn gga_mut(&mut self) -> &mut GameGirlAdv {
+        match self {
+            System::GGA(gg) => gg,
+            _ => panic!(),
+        }
+    }
+
+    /// Load a cart. Automatically picks the right system kind.
+    pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+        // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
+        // that is present on every cartridge.
+        let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
+        // We detect GGA carts by a zero-filled header region
+        let is_gga = cart.iter().skip(0xB5).take(6).all(|b| *b == 0);
+        // We detect NDS carts by a zero-filled header region
+        let is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
+
+        let frame_finished = mem::replace(
+            &mut self.options().frame_finished,
+            EmulateOptions::serde_frame_finished(),
+        );
+        match () {
+            _ if is_ggc => self.load_ggc(cart, path, config),
+            _ if is_gga => *self = System::GGA(GameGirlAdv::with_cart(cart, path, config)),
+            _ if is_nds => self.load_nds(cart, path, config),
+            _ => {
+                log::error!("Failed to detect cart! Guessing GGA.");
+                *self = System::GGA(GameGirlAdv::with_cart(cart, path, config));
+            }
+        }
+
+        self.options().frame_finished = frame_finished;
+        self.options().running = true;
+        self.options().rom_loaded = true;
+        if common::TRACING {
+            self.options().running = false;
+            self.skip_bootrom();
+        }
+    }
+
+    fn load_ggc(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
+        let mut cart = Cartridge::from_rom(cart);
+        if let Some(save) = Storage::load(path, cart.title(true)) {
+            cart.load_save(save);
+        }
+
+        let mut ggc = Box::new(GameGirl::default());
+        ggc.load_cart(cart, config, false);
+        ggc.options.frame_finished = mem::replace(
+            &mut self.options().frame_finished,
+            EmulateOptions::serde_frame_finished(),
+        );
+        *self = Self::GGC(ggc);
+    }
+
+    fn load_nds(&mut self, cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) {
+        let mut nds = Box::new(Nds::default());
+        nds.config = config.clone();
+        nds.cart.load_rom(cart);
+        nds.init_memory();
+        nds.options.frame_finished = mem::replace(
+            &mut self.options().frame_finished,
+            EmulateOptions::serde_frame_finished(),
+        );
+
+        *self = Self::NDS(nds);
+    }
+}
+
+impl Default for System {
+    fn default() -> Self {
+        // We start with a GGC, will be changed later if user loads a GGA cart.
+        Self::GGC(Box::default())
+    }
 }

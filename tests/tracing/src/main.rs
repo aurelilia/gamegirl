@@ -1,14 +1,14 @@
-use core::{common::SystemConfig, components::arm::Cpu, gga::GameGirlAdv, numutil::NumExt, System};
 use std::{sync::mpsc, thread};
+
+use common::{components::arm::Cpu, misc::SystemConfig};
+use gga::GameGirlAdv;
 
 fn main() {
     env_logger::init();
-    let mut non_cached = System::default();
-    let mut cached = System::default();
 
     let rom = include_bytes!("../../../bench.gb").to_vec();
-    cached.load_cart(rom.clone(), None, &SystemConfig::default());
-    non_cached.load_cart(
+    let mut cached = GameGirlAdv::with_cart(rom.clone(), None, &SystemConfig::default());
+    let mut non_cached = GameGirlAdv::with_cart(
         rom,
         None,
         &SystemConfig {
