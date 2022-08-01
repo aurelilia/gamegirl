@@ -87,7 +87,11 @@ impl ArmSystem for Nds9 {
     }
 
     fn advance_clock(&mut self) {
-        Nds::advance_clock(self);
+        if self.scheduler.has_events() {
+            while let Some(event) = self.scheduler.get_next_pending() {
+                event.kind.dispatch(self, event.late_by);
+            }
+        }
     }
 
     fn add_sn_cycles(&mut self, cycles: u16) {

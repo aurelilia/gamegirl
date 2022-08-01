@@ -15,7 +15,7 @@ use common::{
 };
 
 use super::{Nds7, Nds9};
-use crate::{addr::*, dma::Dmas, timer::Timers, Nds, NdsCpu};
+use crate::{addr::*, dma::Dmas, timer::Timers, CpuDevice, Nds, NdsCpu};
 
 pub const KB: usize = 1024;
 pub const MB: usize = KB * KB;
@@ -25,6 +25,7 @@ pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
 
 /// Memory struct containing the NDS's memory regions along with page tables
 /// and other auxiliary cached information relating to memory.
+/// A lot is separated by the 2 CPUs.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
@@ -43,13 +44,9 @@ pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     data_tcm: [u8; 16 * KB],
 
-    mapper7: MemoryMapper<8192>,
-    mapper9: MemoryMapper<8192>,
-
-    wait_word7: [u16; 32],
-    wait_other7: [u16; 32],
-    wait_word9: [u16; 32],
-    wait_other9: [u16; 32],
+    mapper: CpuDevice<MemoryMapper<8192>>,
+    wait_word: CpuDevice<[u16; 32]>,
+    wait_other: CpuDevice<[u16; 32]>,
 }
 
 impl Nds {
@@ -209,12 +206,9 @@ impl Default for Memory {
             inst_tcm: [0; 32 * KB],
             data_tcm: [0; 16 * KB],
 
-            mapper7: MemoryMapper::default(),
-            mapper9: MemoryMapper::default(),
-            wait_word7: [0; 32],
-            wait_other7: [0; 32],
-            wait_word9: [0; 32],
-            wait_other9: [0; 32],
+            mapper: [MemoryMapper::default(), MemoryMapper::default()],
+            wait_word: [[0; 32]; 2],
+            wait_other: [[0; 32]; 2],
         }
     }
 }
@@ -245,11 +239,11 @@ impl MemoryMappedSystem<8192> for Nds7 {
     const MASK_POW: usize = 24;
 
     fn get_mapper(&self) -> &MemoryMapper<8192> {
-        &self.memory.mapper7
+        &self.memory.mapper[0]
     }
 
     fn get_mapper_mut(&mut self) -> &mut MemoryMapper<8192> {
-        &mut self.memory.mapper7
+        &mut self.memory.mapper[0]
     }
 
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
@@ -295,11 +289,11 @@ impl MemoryMappedSystem<8192> for Nds9 {
     const MASK_POW: usize = 24;
 
     fn get_mapper(&self) -> &MemoryMapper<8192> {
-        &self.memory.mapper9
+        &self.memory.mapper[1]
     }
 
     fn get_mapper_mut(&mut self) -> &mut MemoryMapper<8192> {
-        &mut self.memory.mapper9
+        &mut self.memory.mapper[1]
     }
 
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {

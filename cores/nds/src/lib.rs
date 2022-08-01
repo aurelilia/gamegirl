@@ -47,6 +47,11 @@ use crate::{
 
 macro_rules! deref {
     ($name:ident, $mmio:ident, $idx:expr) => {
+        /// Wrapper for one of the CPUs.
+        /// Raw pointer was chosen to avoid lifetimes.
+        #[repr(transparent)]
+        struct $name(*mut Nds);
+
         impl Deref for $name {
             type Target = Nds;
 
@@ -82,6 +87,8 @@ macro_rules! deref {
         impl NdsCpu for $name {
             const I: usize = $idx;
         }
+
+        unsafe impl Send for $name {}
 
         // Satisfy serde...
         impl Default for $name {
@@ -128,14 +135,6 @@ impl Nds {
         let mut nds7 = self.nds7();
         while self.time_7 < self.scheduler.now() {
             Cpu::continue_running(&mut nds7);
-        }
-    }
-
-    fn advance_clock(&mut self) {
-        if self.scheduler.has_events() {
-            while let Some(event) = self.scheduler.get_next_pending() {
-                event.kind.dispatch(self, event.late_by);
-            }
         }
     }
 
@@ -203,16 +202,14 @@ impl Default for Nds {
     }
 }
 
+/// Trait for things that need to operate on a single CPU,
+/// line a DMA or timer.
+/// I = 0 for the ARM7, I = 1 for the ARM9;
+/// things separated by CPU generally use CpuDevice for easy
+/// access with I.
 pub trait NdsCpu: ArmSystem + DerefMut<Target = Nds> {
     const I: usize;
 }
 
+/// Type for devices that both CPUs have.
 type CpuDevice<T> = [T; 2];
-
-#[repr(transparent)]
-struct Nds7(*mut Nds);
-#[repr(transparent)]
-struct Nds9(*mut Nds);
-
-unsafe impl Send for Nds7 {}
-unsafe impl Send for Nds9 {}
