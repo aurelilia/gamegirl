@@ -6,7 +6,6 @@
 
 use common::{numutil::NumExt, Colour};
 pub use dmg::COLOURS;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     cpu::Interrupt,
@@ -41,21 +40,21 @@ const CGB_BANK: u16 = 3;
 
 /// PPU of the system, with differing ways of function depending on
 /// DMG/CGB mode.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
-    #[serde(skip)]
-    #[serde(default = "serde_bool_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_bool_arr"))]
     bg_occupied_pixels: [bool; 160],
     window_line: u8,
     line: u8,
     kind: PpuKind,
 
-    #[serde(skip)]
-    #[serde(default = "serde_colour_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr"))]
     pixels: [Colour; 160 * 144],
     /// The last frame finished by the PPU, ready for display.
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub last_frame: Option<Vec<Colour>>,
 }
 
@@ -381,7 +380,7 @@ impl Ppu {
 }
 
 /// The kind of PPU this is
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum PpuKind {
     Dmg { used_x_obj_coords: [Option<u8>; 10] },
@@ -430,10 +429,11 @@ impl GameGirl {
     }
 }
 
+#[cfg(feature = "serde")]
 fn serde_bool_arr() -> [bool; 160] {
     [false; 160]
 }
-
+#[cfg(feature = "serde")]
 fn serde_colour_arr() -> [Colour; 160 * 144] {
     [[0, 0, 0, 255]; 160 * 144]
 }

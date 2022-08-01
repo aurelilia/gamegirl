@@ -1,8 +1,6 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
 /// Options that are used by the GUI and shared between all systems.
 /// These can be changed at runtime.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct EmulateOptions {
     /// If the system is running. If false, any calls to [advance_delta] and
     /// [produce_samples] do nothing.
@@ -17,8 +15,11 @@ pub struct EmulateOptions {
     /// Affects [advance_delta] and sound sample output.
     pub speed_multiplier: usize,
     /// Called when a frame is finished rendering. (End of VBlank)
-    #[serde(skip)]
-    #[serde(default = "EmulateOptions::serde_frame_finished")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "EmulateOptions::serde_frame_finished")
+    )]
     pub frame_finished: Box<dyn Fn() + Send>,
 }
 
@@ -42,7 +43,8 @@ impl Default for EmulateOptions {
 
 /// Configuration used when initializing the system.
 /// These options don't change at runtime.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
 pub struct SystemConfig {
     /// How to handle CGB mode.
     pub mode: CgbMode,
@@ -69,7 +71,8 @@ impl Default for SystemConfig {
 }
 
 /// How to handle CGB mode depending on cart compatibility.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
 pub enum CgbMode {
     /// Always run in CGB mode, even when the cart does not support it.
     /// If it does not, it is run in DMG compatibility mode, just like on a
@@ -82,7 +85,8 @@ pub enum CgbMode {
 }
 
 /// Buttons on a system. Not all are used for all systems.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
 #[repr(C)]
 pub enum Button {
     A,
@@ -114,7 +118,8 @@ impl Button {
 
 /// Serialize an object that can be loaded with [deserialize].
 /// It is (optionally zstd-compressed) bincode.
-pub fn serialize<T: Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
+#[cfg(feature = "serde")]
+pub fn serialize<T: serde::Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
     if cfg!(target_arch = "wasm32") {
         // Currently crashes when loading...
         return vec![];
@@ -132,7 +137,8 @@ pub fn serialize<T: Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
 
 /// Deserialize an object that was made with [serialize].
 /// It is (optionally zstd-compressed) bincode.
-pub fn deserialize<T: DeserializeOwned>(state: &[u8], with_zstd: bool) -> T {
+#[cfg(feature = "serde")]
+pub fn deserialize<T: serde::de::DeserializeOwned>(state: &[u8], with_zstd: bool) -> T {
     if with_zstd {
         let decoder = zstd::stream::Decoder::new(state).unwrap();
         bincode::deserialize_from(decoder).unwrap()

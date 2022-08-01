@@ -10,7 +10,6 @@ use std::{
 };
 
 use common::{components::storage::GameSave, numutil::NumExt};
-use serde::{Deserialize, Serialize};
 
 use crate::io::cartridge::MBCKind::*;
 
@@ -22,10 +21,11 @@ const RAM_BANKS: u16 = 0x0149;
 const BANK_COUNT_1MB: u16 = 64;
 
 /// Struct representing the game cartridge.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cartridge {
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub rom: Vec<u8>,
     /// Bank of the ROM area 0-4000. This is used by some MBCs.
     pub rom0_bank: u16,
@@ -271,7 +271,8 @@ impl Cartridge {
 }
 
 /// Various MBCs supported by GG.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum MBCKind {
     NoMBC,
     MBC1 {
@@ -288,7 +289,8 @@ pub enum MBCKind {
     MBC5,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Rtc {
     pub(crate) start: u64,
     latched_at: Option<u64>,

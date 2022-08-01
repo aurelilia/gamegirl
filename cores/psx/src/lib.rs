@@ -19,7 +19,6 @@ use common::{
     misc::{EmulateOptions, SystemConfig},
     Colour,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{apu::Apu, cpu::Cpu, gpu::Gpu, memory::Memory, scheduling::PsxEvent};
 
@@ -32,15 +31,16 @@ mod scheduling;
 pub type PsxDebugger = Debugger<u32>;
 
 /// System state representing entire console.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PlayStation {
     cpu: Cpu,
     ppu: Gpu,
     apu: Apu,
     memory: Memory,
 
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub debugger: PsxDebugger,
     scheduler: Scheduler<PsxEvent>,
 

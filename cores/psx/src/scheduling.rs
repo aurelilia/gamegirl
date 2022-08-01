@@ -5,11 +5,11 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::components::scheduler::Kind;
-use serde::{Deserialize, Serialize};
 
 use crate::PlayStation;
 
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum PsxEvent {
     PauseEmulation,
 }

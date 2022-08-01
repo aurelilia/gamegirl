@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 use common::misc::{Button, Button::*};
 use eframe::egui::Key;
-use serde::{Deserialize, Serialize};
 use InputAction::*;
 
 use crate::gui::{file_dialog, App};
@@ -47,6 +46,7 @@ pub(super) const HOTKEYS: &[(&str, HotkeyFn)] = &[
             }
         });
     }),
+    #[cfg(feature = "savestates")]
     ("Rewind (Hold)", |app, pressed| {
         app.rewinder.rewinding = pressed;
         app.gg.lock().unwrap().options().invert_audio_samples = pressed;
@@ -60,11 +60,11 @@ fn pressed(app: &mut App, pressed: bool, inner: fn(&mut App)) {
 }
 
 /// Input configuration struct.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub struct Input {
     mappings: HashMap<Key, InputAction>,
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[cfg_attr(feature = "persistence", serde(default))]
     pub(crate) pending: Option<InputAction>,
 }
 
@@ -121,7 +121,8 @@ impl Input {
 /// An action that is to be performed when the user hits a key.
 /// Can be a button or a hotkey, the latter is stored
 /// as an index into an array of functions.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub enum InputAction {
     Button(Button),
     Hotkey(u8),

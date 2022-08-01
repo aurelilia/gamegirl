@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use bitmatch::bitmatch;
-use serde::{Deserialize, Serialize};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{components::arm::Cpu, numutil::NumExt};
@@ -34,7 +33,8 @@ macro_rules! mode_reg {
 }
 
 /// A register with values for FIQ and all other modes
-#[derive(Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct FiqReg {
     pub reg: u32,
     pub fiq: u32,

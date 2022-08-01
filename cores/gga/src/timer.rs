@@ -8,7 +8,6 @@ use common::{
     components::arm::{Cpu, Interrupt},
     numutil::NumExt,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     addr::{SOUNDCNT_H, TM0CNT_H},
@@ -23,7 +22,8 @@ const DIVS: [u16; 4] = [1, 64, 256, 1024];
 /// They run on the scheduler when in regular counting mode.
 /// The scheduler variables have a bunch of small additions that work for some
 /// reason, still not sure why. Some other timings that are inaccurate?
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Timers {
     /// Counter value. Used for cascading counters; for scheduled counters this
     /// will be the reload value (actual counter is calculated on read)

@@ -1,9 +1,10 @@
-#![feature(mixed_integer_ops)]
 // Unless otherwise noted, this file is released and thus subject to the
 // terms of the Mozilla Public License Version 2.0 (MPL2). Also, it is
 // "Incompatible With Secondary Licenses", as defined by the MPL2.
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
+
+#![feature(mixed_integer_ops)]
 
 mod addr;
 mod audio;
@@ -18,6 +19,7 @@ mod timer;
 use std::{
     mem,
     ops::{Deref, DerefMut, Index, IndexMut},
+    path::PathBuf,
 };
 
 use common::{
@@ -31,7 +33,6 @@ use common::{
     numutil::NumExt,
     Colour,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     audio::Apu,
@@ -94,7 +95,7 @@ macro_rules! deref {
 deref!(Nds7, mmio7, 0);
 deref!(Nds9, mmio9, 1);
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Nds {
     cpu7: Cpu<Nds7>,
     cpu9: Cpu<Nds9>,
@@ -108,8 +109,8 @@ pub struct Nds {
     scheduler: Scheduler<NdsEvent>,
     time_7: u32,
 
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub debugger: Debugger<u32>,
     pub options: EmulateOptions,
     pub config: SystemConfig,
@@ -159,6 +160,14 @@ impl Nds {
 
     pub fn skip_bootrom(&mut self) {
         todo!();
+    }
+
+    pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
+        let mut nds = Box::new(Nds::default());
+        nds.config = config.clone();
+        nds.cart.load_rom(cart);
+        nds.init_memory();
+        nds
     }
 }
 

@@ -32,7 +32,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     pub fn check_arm_cond(&mut self, inst: u32) -> bool {
         // BLX/CP15 on ARMv5 is a special case: it is encoded with NV.
         let armv5_uncond =
-            S::IS_V5 && (inst.bits(25, 7) == 0b1111_101) || (inst.bits(24, 9) == 0b1111_1110);
+            S::IS_V5 && (inst.bits(25, 7) == 0b111_1101) || (inst.bits(24, 9) == 0b1111_1110);
         self.cpu().eval_condition(inst.bits(28, 4).u16()) || armv5_uncond
     }
 
@@ -40,12 +40,12 @@ impl<S: ArmSystem> SysWrapper<S> {
         S::ARM_LUT[(inst.us() >> 20) & 0xFF]
     }
 
-    pub fn arm_unknown_opcode(self: &mut Self, inst: ArmInst) {
+    pub fn arm_unknown_opcode(&mut self, inst: ArmInst) {
         self.und_inst(inst.0);
     }
 
     pub fn arm_b<const BL: bool>(&mut self, inst: ArmInst) {
-        if S::IS_V5 && inst.0.bits(25, 7) == 0b1111_101 {
+        if S::IS_V5 && inst.0.bits(25, 7) == 0b111_1101 {
             self.armv5_blx::<BL>(inst);
         } else {
             let nn = inst.0.i24() * 4; // Step 4

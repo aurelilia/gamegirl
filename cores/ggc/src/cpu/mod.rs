@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::numutil::NumExt;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     io::addr::{IE, IF},
@@ -17,7 +16,8 @@ mod data;
 pub mod inst;
 
 /// The system CPU and it's registers.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cpu {
     pub pc: u16,
     pub sp: u16,

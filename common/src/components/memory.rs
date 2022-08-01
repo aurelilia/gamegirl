@@ -6,8 +6,6 @@
 
 use std::ptr;
 
-use serde::{Deserialize, Serialize};
-
 use crate::numutil::NumExt;
 
 pub trait MemoryMappedSystem<const SIZE: usize>: Sized {
@@ -21,13 +19,13 @@ pub trait MemoryMappedSystem<const SIZE: usize>: Sized {
     unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8;
 }
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryMapper<const SIZE: usize> {
-    #[serde(skip)]
-    #[serde(default = "serde_pages")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_pages"))]
     read_pages: [*mut u8; SIZE],
-    #[serde(skip)]
-    #[serde(default = "serde_pages")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_pages"))]
     write_pages: [*mut u8; SIZE],
 }
 

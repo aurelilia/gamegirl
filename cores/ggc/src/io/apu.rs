@@ -11,7 +11,6 @@ use common::{
     },
     SAMPLE_RATE,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     io::scheduling::{ApuEvent, GGEvent},
@@ -21,7 +20,7 @@ use crate::{
 pub const SAMPLE_EVERY_N_CLOCKS: i32 = (T_CLOCK_HZ / SAMPLE_RATE) as i32;
 
 /// APU variant used by DMG/CGB.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Apu {
     pub(super) inner: GenericApu,
     pub buffer: Vec<f32>,

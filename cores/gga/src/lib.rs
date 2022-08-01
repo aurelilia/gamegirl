@@ -24,7 +24,6 @@ use common::{
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
 use memory::Memory;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     addr::{KEYINPUT, SOUNDBIAS},
@@ -50,7 +49,7 @@ pub type GGADebugger = Debugger<u32>;
 
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct GameGirlAdv {
     pub cpu: Cpu<Self>,
     pub memory: Memory,
@@ -64,8 +63,8 @@ pub struct GameGirlAdv {
     pub options: EmulateOptions,
     pub config: SystemConfig,
 
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub debugger: GGADebugger,
     /// Temporary used by [advance_delta]. Will be true until the scheduled
     /// PauseEmulation event fires.

@@ -4,8 +4,6 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use serde::{Deserialize, Serialize};
-
 use super::{envelope::EnvelopGenerator, Channel, GenApuEvent, ScheduleFn};
 use crate::numutil::NumExt;
 
@@ -16,7 +14,7 @@ const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PulseChannel<const SECOND: bool> {
     sweep_period: u8,
     sweep_current_time: u8,

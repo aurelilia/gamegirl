@@ -23,7 +23,6 @@ use common::{
     numutil::{NumExt, U16Ext},
     Colour,
 };
-use serde::{Deserialize, Serialize};
 
 use self::threading::PpuType;
 use super::memory::KB;
@@ -60,33 +59,33 @@ const LYC_IRQ: u16 = 5;
 type Layer = [Colour; 240];
 type WindowMask = [bool; 240];
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub palette: [u8; KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub vram: [u8; 96 * KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub oam: [u8; KB],
 
-    #[serde(skip)]
-    #[serde(default = "serde_colour_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr"))]
     pixels: [Colour; 240 * 160],
-    #[serde(skip)]
-    #[serde(default = "serde_layer_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr"))]
     bg_layers: [Layer; 4],
-    #[serde(skip)]
-    #[serde(default = "serde_layer_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr"))]
     bg_pixels: [Layer; 4],
-    #[serde(skip)]
-    #[serde(default = "serde_layer_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_layer_arr"))]
     obj_layers: [Layer; 4],
 
-    #[serde(skip)]
-    #[serde(default = "serde_mask_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_mask_arr"))]
     win_masks: [WindowMask; 5],
-    #[serde(skip)]
-    #[serde(default = "serde_mask2_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "serde_mask2_arr"))]
     win_blend: [bool; 240],
 
     bg_x: [i32; 2],

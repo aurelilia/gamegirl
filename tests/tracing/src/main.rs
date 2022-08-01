@@ -1,6 +1,6 @@
 use std::{sync::mpsc, thread};
 
-use common::{components::arm::Cpu, misc::SystemConfig};
+use common::{components::arm::Cpu, misc::SystemConfig, numutil::NumExt};
 use gga::GameGirlAdv;
 
 fn main() {
@@ -20,10 +20,10 @@ fn main() {
     let (c_tx, c_rx) = mpsc::channel();
     let (n_tx, n_rx) = mpsc::channel();
 
-    cached.gga_mut().cpu.instruction_tracer = Some(Box::new(move |gg, inst| {
+    cached.cpu.instruction_tracer = Some(Box::new(move |gg, inst| {
         c_tx.send((gg.cpu.registers, gg.cpu.cpsr, inst)).unwrap();
     }));
-    non_cached.gga_mut().cpu.instruction_tracer = Some(Box::new(move |gg, inst| {
+    non_cached.cpu.instruction_tracer = Some(Box::new(move |gg, inst| {
         n_tx.send((gg.cpu.registers, gg.cpu.cpsr, inst)).unwrap();
     }));
 

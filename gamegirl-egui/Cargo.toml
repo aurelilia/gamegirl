@@ -15,24 +15,29 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 common = { path = "../common" }
-gamegirl = { path = "../gamegirl" }
-ggc = { path = "../cores/ggc" }
-gga = { path = "../cores/gga" }
+gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nds"] }
 
-eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = ["default_fonts", "persistence", "glow"] }
+eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = ["default_fonts", "glow"] }
 cpal = "0.13.5"
-gilrs = "0.9.0"
 rfd = "0.10.0"
 futures-executor = "0.3.21"
-serde = "1.0.140"
 env_logger = "0.9.0"
 
+serde = { version = "1.0.140", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
 tracing-wasm = "0.2.1"
 wasm-bindgen-futures = "0.4.32"
 cpal = { version = "0.13.5", features = ["wasm-bindgen"] }
+
 # Disable the threaded PPU, wasm doesn't support std::thread
 gga = { path = "../cores/gga", default-features = false }
 nds = { path = "../cores/nds", default-features = false }
+
+
+[features]
+default = ["persistence", "savestates"]
+persistence = ["dep:serde", "common/serde_config", "eframe/persistence"]
+savestates = ["dep:serde", "common/serde", "gamegirl/serde"]
+remote-debugger = ["gamegirl/remote-debugger"]

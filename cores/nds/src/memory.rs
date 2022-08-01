@@ -13,7 +13,6 @@ use common::{
     },
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
-use serde::{Deserialize, Serialize};
 
 use super::{Nds7, Nds9};
 use crate::{addr::*, dma::Dmas, timer::Timers, Nds, NdsCpu};
@@ -26,22 +25,22 @@ pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
 
 /// Memory struct containing the NDS's memory regions along with page tables
 /// and other auxiliary cached information relating to memory.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     psram: [u8; 4 * MB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     wram: [u8; 32 * KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub mmio7: [u16; 0x1010 / 2],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub mmio9: [u16; 0x520 / 2],
 
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     wram7: [u8; 64 * KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     inst_tcm: [u8; 32 * KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     data_tcm: [u8; 16 * KB],
 
     mapper7: MemoryMapper<8192>,

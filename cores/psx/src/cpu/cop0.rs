@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::numutil::NumExt;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     cpu::inst::{Inst, InstructionHandler},
@@ -15,7 +14,8 @@ use crate::{
 type CopLut = [InstructionHandler; 32];
 const COP0: CopLut = PlayStation::cop0_table();
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cop0 {
     pub(crate) sr: u32,
     pub(crate) cause: u32,

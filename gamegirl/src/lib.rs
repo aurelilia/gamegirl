@@ -14,19 +14,16 @@ use common::{
     misc::{Button, EmulateOptions, SystemConfig},
     Colour,
 };
+#[cfg(feature = "gga")]
 pub use gga;
-use gga::GameGirlAdv;
+#[cfg(feature = "ggc")]
 pub use ggc;
-use ggc::{
-    io::{cartridge::Cartridge, joypad::Joypad},
-    GameGirl,
-};
+#[cfg(feature = "nds")]
 pub use nds;
-use nds::Nds;
+#[cfg(feature = "psx")]
 pub use psx;
-use psx::PlayStation;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "remote-debugger")]
 pub mod remote_debugger;
 
 /// Macro for forwarding functions on the main system enum to individual
@@ -35,9 +32,13 @@ macro_rules! forward_fn {
     ($name:ident, $ret:ty, $arg:ty) => {
         pub fn $name(&mut self, arg: $arg) -> $ret {
             match self {
+                #[cfg(feature = "ggc")]
                 System::GGC(gg) => gg.$name(arg),
+                #[cfg(feature = "gga")]
                 System::GGA(gg) => gg.$name(arg),
+                #[cfg(feature = "nds")]
                 System::NDS(ds) => ds.$name(arg),
+                #[cfg(feature = "psx")]
                 System::PSX(_ps) => todo!(),
             }
         }
@@ -45,9 +46,13 @@ macro_rules! forward_fn {
     ($name:ident, $ret:ty) => {
         pub fn $name(&mut self) -> $ret {
             match self {
+                #[cfg(feature = "ggc")]
                 System::GGC(gg) => gg.$name(),
+                #[cfg(feature = "gga")]
                 System::GGA(gg) => gg.$name(),
+                #[cfg(feature = "nds")]
                 System::NDS(ds) => ds.$name(),
+                #[cfg(feature = "psx")]
                 System::PSX(ps) => ps.$name(),
             }
         }
@@ -63,9 +68,13 @@ macro_rules! forward_member {
     ($self:ty, $name:ident, $ret:ty, $sys:ident, $expr:expr) => {
         pub fn $name(self: $self) -> $ret {
             match self {
+                #[cfg(feature = "ggc")]
                 System::GGC($sys) => $expr,
+                #[cfg(feature = "gga")]
                 System::GGA($sys) => $expr,
+                #[cfg(feature = "nds")]
                 System::NDS($sys) => $expr,
+                #[cfg(feature = "psx")]
                 System::PSX($sys) => todo!(),
             }
         }
@@ -75,20 +84,27 @@ macro_rules! forward_member {
 /// Enum for the system currently loaded.
 pub enum System {
     /// A GGC. Is also used for DMG games.
-    GGC(Box<GameGirl>),
+    #[cfg(feature = "ggc")]
+    GGC(Box<ggc::GameGirl>),
     /// A GGA. Only used for GGA games.
-    GGA(Box<GameGirlAdv>),
+    #[cfg(feature = "gga")]
+    GGA(Box<gga::GameGirlAdv>),
     /// An NDS. Only used for NDS games.
-    NDS(Box<Nds>),
+    #[cfg(feature = "nds")]
+    NDS(Box<nds::Nds>),
     /// A PSX. Only used for PSX games, obviously.
-    PSX(Box<PlayStation>),
+    #[cfg(feature = "psx")]
+    PSX(Box<psx::PlayStation>),
 }
 
 impl System {
     forward_fn!(advance_delta, (), f32);
     forward_fn!(produce_frame, Option<Vec<Colour>>);
     forward_fn!(produce_samples, (), &mut [f32]);
+
+    #[cfg(feature = "serde")]
     forward_fn!(save_state, Vec<u8>);
+    #[cfg(feature = "serde")]
     forward_fn!(load_state, (), &[u8]);
 
     forward_fn!(advance);
@@ -121,7 +137,9 @@ impl System {
     /// Set a button on the joypad.
     pub fn set_button(&mut self, btn: Button, pressed: bool) {
         match self {
-            System::GGC(gg) => Joypad::set(gg, btn, pressed),
+            #[cfg(feature = "ggc")]
+            System::GGC(gg) => ggc::io::joypad::Joypad::set(gg, btn, pressed),
+            #[cfg(feature = "gga")]
             System::GGA(gg) => gg.set_button(btn, pressed),
             _ => todo!(),
         }
@@ -130,9 +148,13 @@ impl System {
     /// Returns the screen size for the current system.
     pub fn screen_size(&self) -> [usize; 2] {
         match self {
+            #[cfg(feature = "ggc")]
             System::GGC(_) => [160, 144],
+            #[cfg(feature = "gga")]
             System::GGA(_) => [240, 160],
+            #[cfg(feature = "nds")]
             System::NDS(_) => [256, 192 * 2],
+            #[cfg(feature = "psx")]
             System::PSX(_) => [640, 480],
         }
     }
@@ -140,7 +162,9 @@ impl System {
     /// Save the game to disk.
     pub fn save_game(&self, path: Option<PathBuf>) {
         let save = match self {
+            #[cfg(feature = "ggc")]
             System::GGC(gg) => gg.cart.make_save(),
+            #[cfg(feature = "gga")]
             System::GGA(gg) => gg.cart.make_save(),
             _ => todo!(),
         };
@@ -149,21 +173,24 @@ impl System {
         }
     }
 
-    pub fn as_ggc(&self) -> &GameGirl {
+    #[cfg(feature = "ggc")]
+    pub fn as_ggc(&self) -> &ggc::GameGirl {
         match self {
             System::GGC(gg) => gg,
             _ => panic!(),
         }
     }
 
-    pub fn as_gga(&self) -> &GameGirlAdv {
+    #[cfg(feature = "gga")]
+    pub fn as_gga(&self) -> &gga::GameGirlAdv {
         match self {
             System::GGA(gg) => gg,
             _ => panic!(),
         }
     }
 
-    pub fn gga_mut(&mut self) -> &mut GameGirlAdv {
+    #[cfg(feature = "gga")]
+    pub fn gga_mut(&mut self) -> &mut gga::GameGirlAdv {
         match self {
             System::GGA(gg) => gg,
             _ => panic!(),
@@ -174,24 +201,32 @@ impl System {
     pub fn load_cart(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
         // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
         // that is present on every cartridge.
-        let is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
+        let _is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
         // We detect GGA carts by a zero-filled header region
-        let is_gga = cart.iter().skip(0xB5).take(6).all(|b| *b == 0);
+        let _is_gga = cart.iter().skip(0xB5).take(6).all(|b| *b == 0);
         // We detect NDS carts by a zero-filled header region
-        let is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
+        let _is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
 
         let frame_finished = mem::replace(
             &mut self.options().frame_finished,
             EmulateOptions::serde_frame_finished(),
         );
         match () {
-            _ if is_ggc => self.load_ggc(cart, path, config),
-            _ if is_gga => *self = System::GGA(GameGirlAdv::with_cart(cart, path, config)),
-            _ if is_nds => self.load_nds(cart, path, config),
+            #[cfg(feature = "ggc")]
+            _ if _is_ggc => *self = System::GGC(ggc::GameGirl::with_cart(cart, path, config)),
+            #[cfg(feature = "gga")]
+            _ if _is_gga => *self = System::GGA(gga::GameGirlAdv::with_cart(cart, path, config)),
+            #[cfg(feature = "nds")]
+            _ if _is_nds => *self = System::NDS(nds::Nds::with_cart(cart, path, config)),
+
+            #[cfg(feature = "gga")]
             _ => {
                 log::error!("Failed to detect cart! Guessing GGA.");
-                *self = System::GGA(GameGirlAdv::with_cart(cart, path, config));
+                *self = System::GGA(gga::GameGirlAdv::with_cart(cart, path, config));
             }
+
+            #[cfg(not(feature = "gga"))]
+            _ => panic!("Failed to detect cart and no GGA core available!."),
         }
 
         self.options().frame_finished = frame_finished;
@@ -202,39 +237,11 @@ impl System {
             self.skip_bootrom();
         }
     }
-
-    fn load_ggc(&mut self, cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) {
-        let mut cart = Cartridge::from_rom(cart);
-        if let Some(save) = Storage::load(path, cart.title(true)) {
-            cart.load_save(save);
-        }
-
-        let mut ggc = Box::new(GameGirl::default());
-        ggc.load_cart(cart, config, false);
-        ggc.options.frame_finished = mem::replace(
-            &mut self.options().frame_finished,
-            EmulateOptions::serde_frame_finished(),
-        );
-        *self = Self::GGC(ggc);
-    }
-
-    fn load_nds(&mut self, cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) {
-        let mut nds = Box::new(Nds::default());
-        nds.config = config.clone();
-        nds.cart.load_rom(cart);
-        nds.init_memory();
-        nds.options.frame_finished = mem::replace(
-            &mut self.options().frame_finished,
-            EmulateOptions::serde_frame_finished(),
-        );
-
-        *self = Self::NDS(nds);
-    }
 }
 
 impl Default for System {
     fn default() -> Self {
-        // We start with a GGC, will be changed later if user loads a GGA cart.
+        // We start with a GGA, will be changed later if user loads a GGA cart.
         Self::GGC(Box::default())
     }
 }

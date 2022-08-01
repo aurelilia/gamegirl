@@ -9,7 +9,6 @@ use eframe::{
     egui,
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui},
 };
-use serde::{Deserialize, Serialize};
 
 use crate::gui::{
     input::{Input, InputAction, HOTKEYS},
@@ -17,7 +16,7 @@ use crate::gui::{
 };
 
 /// User-configurable options.
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub struct Options {
     /// Options passed to the system when loading a ROM.
     pub gg: SystemConfig,
@@ -79,18 +78,21 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         });
         ui.separator();
 
-        ui.checkbox(&mut opt.gg.compress_savestates, "Compress save states/rewinding")
-            .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
-        ui.checkbox(&mut opt.enable_rewind, "Enable Rewinding");
-        if opt.enable_rewind {
-            ui.horizontal(|ui| {
-                ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60))
-                    .on_hover_text(format!(
-                        "Uses about ~{}MB of RAM",
-                        opt.rewind_buffer_size + opt.rewind_buffer_size * (!opt.gg.compress_savestates as usize * 4),
-                    ));
-                ui.label("Rewind time in seconds");
-            });
+        #[cfg(feature = "savestates")]
+        {
+            ui.checkbox(&mut opt.gg.compress_savestates, "Compress save states/rewinding")
+                .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
+            ui.checkbox(&mut opt.enable_rewind, "Enable Rewinding");
+            if opt.enable_rewind {
+                ui.horizontal(|ui| {
+                    ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60))
+                        .on_hover_text(format!(
+                            "Uses about ~{}MB of RAM",
+                            opt.rewind_buffer_size + opt.rewind_buffer_size * (!opt.gg.compress_savestates as usize * 4),
+                        ));
+                    ui.label("Rewind time in seconds");
+                });
+            }
         }
     });
 

@@ -14,11 +14,13 @@ use eframe::{
     },
     epaint::ImageDelta,
 };
-use gamegirl::System;
-use ggc::{
-    cpu::{inst, DReg},
-    io::{ppu, ppu::Ppu},
-    GameGirl,
+use gamegirl::{
+    ggc::{
+        cpu::{inst, DReg},
+        io::{ppu, ppu::Ppu},
+        GameGirl,
+    },
+    System,
 };
 
 use crate::{gui::App, Colour};

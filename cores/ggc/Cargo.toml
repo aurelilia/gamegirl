@@ -8,6 +8,10 @@ edition = "2021"
 [dependencies]
 common = { path = "../../common" }
 
-serde = { version = "1.0.140", features = ["derive", "rc"] }
-serde_arrays = "0.1.0"
+serde = { version = "1.0.140", features = ["derive", "rc"], optional = true }
+serde_arrays = { version = "0.1.0", optional = true }
 log = "0.4.17"
+
+
+[features]
+serde = ["dep:serde", "dep:serde_arrays", "common/serde"]

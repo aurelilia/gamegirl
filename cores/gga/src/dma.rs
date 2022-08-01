@@ -14,7 +14,6 @@ use common::{
     },
     numutil::{word, NumExt},
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{addr::VCOUNT, cartridge::SaveType, GameGirlAdv};
 
@@ -22,7 +21,8 @@ const SRC_MASK: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
 const DST_MASK: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
 
 /// GGA's 4 DMA channels.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dmas {
     /// Internal source registers
     src: [u32; 4],
@@ -230,7 +230,8 @@ impl Dmas {
 }
 
 /// Reason for why a DMA transfer attempt was initiated.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Reason {
     /// The control register was written.
     CtrlWrite,

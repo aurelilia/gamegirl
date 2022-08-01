@@ -5,19 +5,19 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use arrayvec::ArrayVec;
-use serde::{Deserialize, Serialize};
 
 /// A scheduler used by the emulation cores to schedule peripherals.
 /// It is generic over the possible events and uses a binary heap
 /// in combination with a circular u32 timer.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Scheduler<E: Kind> {
     /// Current time of the scheduler.
     time: u32,
     /// Time of the next event.
     next: u32,
     /// Events currently awaiting execution.
-    #[serde(bound = "")]
+    #[cfg_attr(feature = "serde", serde(bound = ""))]
     events: ArrayVec<ScheduledEvent<E>, 16>,
 }
 
@@ -128,17 +128,24 @@ impl<E: Kind> Scheduler<E> {
 }
 
 /// An event awaiting execution
-#[derive(Copy, Clone, Deserialize, Serialize)]
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct ScheduledEvent<E: Kind> {
     /// Kind of event to execute
-    #[serde(bound = "")]
+    #[cfg_attr(feature = "serde", serde(bound = ""))]
     kind: E,
     /// Time of the scheduler to execute it at
     execute_at: u32,
 }
 
 /// Trait for event kinds.
-pub trait Kind: for<'de> Deserialize<'de> + Serialize + PartialEq + Copy + Clone {}
+#[cfg(feature = "serde")]
+pub trait Kind:
+    for<'de> serde::Deserialize<'de> + serde::Serialize + PartialEq + Copy + Clone
+{
+}
+#[cfg(not(feature = "serde"))]
+pub trait Kind: PartialEq + Copy + Clone {}
 
 /// Event that is ready to be handled.
 #[derive(Copy, Clone)]

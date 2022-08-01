@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::numutil::{hword, word, NumExt, U16Ext, U32Ext};
-use serde::{Deserialize, Serialize};
 
 use crate::PlayStation;
 
@@ -13,13 +12,13 @@ const KB: usize = 1024;
 const MB: usize = KB * KB;
 const BIOS: &[u8] = include_bytes!("bios.bin");
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     ram: [u8; 2 * MB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     scratchpad: [u8; KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub mmio: [u8; 8 * KB],
 }
 

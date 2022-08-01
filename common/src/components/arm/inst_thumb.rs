@@ -25,7 +25,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         S::THUMB_LUT[inst.us() >> 8]
     }
 
-    pub fn thumb_unknown_opcode(self: &mut Self, inst: ThumbInst) {
+    pub fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
         self.und_inst(inst.0);
     }
 

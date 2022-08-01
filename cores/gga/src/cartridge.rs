@@ -7,7 +7,6 @@
 use std::{cell::RefCell, iter};
 
 use common::{components::storage::GameSave, numutil::NumExt};
-use serde::{Deserialize, Serialize};
 use FlashCmdStage::*;
 use SaveType::*;
 
@@ -17,10 +16,11 @@ use crate::memory::KB;
 const FLASH64_ID: [u8; 2] = [0xC2, 0x1C];
 const FLASH128_ID: [u8; 2] = [0xC2, 0x09];
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cartridge {
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub rom: Vec<u8>,
     pub ram: Vec<u8>,
     pub save_type: SaveType,
@@ -143,7 +143,8 @@ impl Cartridge {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SaveType {
     Nothing,
     Eeprom(Eeprom),
@@ -158,7 +159,8 @@ impl Default for SaveType {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Eeprom {
     size: EepromSize,
     command: EepromCmd,
@@ -263,7 +265,8 @@ impl Eeprom {
 }
 
 /// Eeprom size. Integer equals address size.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum EepromSize {
     Unknown = 99,
     E512 = 6,
@@ -272,14 +275,16 @@ pub enum EepromSize {
 
 /// Eeprom commands. Size equals length of the command, minus
 /// the 2 bits of the command itself and the address.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum EepromCmd {
     Nothing = 0,
     Read = 1,
     Write = 65,
 }
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct FlashState {
     command_stage: Option<FlashCmdStage>,
     mode: FlashMode,
@@ -363,13 +368,15 @@ impl FlashState {
     }
 }
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum FlashCmdStage {
     FirstWritten,
     SecondWritten,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum FlashMode {
     Regular,
     Write,

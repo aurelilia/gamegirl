@@ -8,7 +8,6 @@ use common::{
     components::arm::{Cpu, Interrupt},
     numutil::NumExt,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{addr::TM0CNT_H, scheduling::NdsEvent, NdsCpu};
 
@@ -23,7 +22,8 @@ const DIVS: [u16; 4] = [2, 128, 512, 2048];
 ///
 /// Since they run on the scheduler, they are *all* timed by the
 /// ARM9. Hopefully good enough?
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Timers {
     /// Counter value. Used for cascading counters; for scheduled counters this
     /// will be the reload value (actual counter is calculated on read)

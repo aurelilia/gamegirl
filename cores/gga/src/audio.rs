@@ -14,7 +14,6 @@ use common::{
     numutil::{NumExt, U16Ext},
     SAMPLE_RATE,
 };
-use serde::{Deserialize, Serialize};
 
 use super::scheduling::AdvEvent;
 use crate::{
@@ -28,7 +27,8 @@ pub const SAMPLE_EVERY_N_CLOCKS: i32 = (CPU_CLOCK / SAMPLE_RATE as f32) as i32;
 const GG_OFFS: i32 = 4;
 
 /// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Apu {
     // 4 channels found on GG(C)
     pub(crate) cgb_chans: GenericApu,

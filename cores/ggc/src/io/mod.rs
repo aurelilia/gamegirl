@@ -14,7 +14,6 @@ use common::{
     misc::{CgbMode, SystemConfig},
     numutil::{hword, NumExt},
 };
-use serde::{Deserialize, Serialize};
 
 use super::GameGirl;
 use crate::io::{
@@ -39,26 +38,26 @@ pub mod timer;
 ///
 /// IO registers can be directly read by IO devices by indexing the GG,
 /// the various addresses are defined in the `addr` submodule.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub vram: [u8; 2 * 8192],
     vram_bank: u8,
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     wram: [u8; 4 * 8192],
     wram_bank: u8,
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     oam: [u8; 160],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     high: [u8; 256],
     dma_active: bool,
 
     mapper: MemoryMapper<256>,
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     page_offsets: [u32; 16],
 
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(super) bootrom: Option<Vec<u8>>,
 }
 

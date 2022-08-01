@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::{numutil::NumExt, Colour};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     io::{
@@ -16,7 +15,7 @@ use crate::{
 };
 
 /// Data required for a CGB PPU, mainly palette data.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cgb {
     bg_palette_idx: u8,
     bg_palette_inc: bool,
@@ -26,11 +25,11 @@ pub struct Cgb {
     pub(super) obj_palettes: [CgbColour; 32],
 
     pub(super) colour_correction: bool,
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(super) dmg_used_x_obj_cords: Option<[Option<u8>; 10]>,
-    #[serde(skip)]
-    #[serde(default = "super::serde_bool_arr")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "super::serde_bool_arr"))]
     pub unavailable_pixels: [bool; 160],
 }
 
@@ -51,7 +50,8 @@ impl Cgb {
 }
 
 /// A CGB palette colour.
-#[derive(Copy, Clone, Default, Deserialize, Serialize)]
+#[derive(Copy, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct CgbColour {
     pub colour: Colour,
     raw_high: u8,

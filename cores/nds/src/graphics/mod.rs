@@ -6,9 +6,8 @@
 
 use common::Colour;
 use gga::graphics::threading::{new_ppu, GgaPpu};
-use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct NdsEngines {
     pub ppus: [GgaPpu; 2],
     pub last_frame: Option<Vec<Colour>>,

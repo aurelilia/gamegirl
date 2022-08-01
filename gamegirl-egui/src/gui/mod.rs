@@ -9,9 +9,11 @@ mod debugger_ggc;
 mod file_dialog;
 mod input;
 mod options;
+
+#[cfg(feature = "savestates")]
 mod rewind;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "remote-debugger")]
 use std::sync::RwLock;
 use std::{
     fs, mem,
@@ -28,17 +30,13 @@ use eframe::{
     epaint::{ColorImage, ImageDelta, TextureId},
     CreationContext, Frame, Storage, Theme,
 };
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "remote-debugger")]
 use gamegirl::remote_debugger::DebuggerStatus;
-use gamegirl::System;
-use gga::GameGirlAdv;
-use ggc::GameGirl;
-use serde::{Deserialize, Serialize};
+use gamegirl::{gga::GameGirlAdv, ggc::GameGirl, System};
 
 use crate::{
     gui::{
         debugger_ggc::VisualDebugState, file_dialog::File, input::InputAction, options::Options,
-        rewind::Rewinding,
     },
     Colour,
 };
@@ -105,17 +103,26 @@ pub fn start(gg: Arc<Mutex<System>>, canvas_id: &str) -> Result<(), eframe::wasm
 }
 
 fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
-    let state: State = ctx
-        .storage
-        .and_then(|s| eframe::get_value(s, "gamegirl_data"))
-        .unwrap_or_default();
+    let state: State = {
+        #[cfg(feature = "persistence")]
+        {
+            ctx.storage
+                .and_then(|s| eframe::get_value(s, "gamegirl_data"))
+                .unwrap_or_default()
+        }
+
+        #[cfg(not(feature = "persistence"))]
+        State::default()
+    };
+
     let texture = App::make_screen_texture(&ctx.egui_ctx, [160, 144], state.options.tex_filter);
     let mut app = App {
         gg,
         current_rom_path: None,
-        rewinder: Rewinding::default(),
+        #[cfg(feature = "savestates")]
+        rewinder: rewind::Rewinding::default(),
         visual_debug: VisualDebugState::default(),
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(feature = "remote-debugger")]
         remote_dbg: Arc::new(RwLock::new(DebuggerStatus::NotActive)),
         fast_forward_toggled: false,
 
@@ -126,7 +133,10 @@ fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
 
         state,
     };
+
+    #[cfg(feature = "savestates")]
     app.setup_rewind();
+
     Box::new(app)
 }
 
@@ -137,11 +147,12 @@ struct App {
     /// The path to the ROM currently running, if any. Always None on WASM.
     current_rom_path: Option<PathBuf>,
     /// Rewinder state.
-    rewinder: Rewinding,
+    #[cfg(feature = "savestates")]
+    rewinder: rewind::Rewinding,
     /// State for visual debugging tools.
     visual_debug: VisualDebugState,
     /// Remote debugger status.
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "remote-debugger")]
     remote_dbg: Arc<RwLock<DebuggerStatus>>,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     fast_forward_toggled: bool,
@@ -160,6 +171,7 @@ struct App {
 }
 
 impl App {
+    #[cfg(feature = "savestates")]
     fn setup_rewind(&mut self) {
         self.rewinder
             .set_rw_buf_size(self.state.options.rewind_buffer_size);
@@ -237,7 +249,11 @@ impl eframe::App for App {
 
     fn save(&mut self, storage: &mut dyn Storage) {
         self.save_game();
-        eframe::set_value(storage, "gamegirl_data", &self.state);
+
+        #[cfg(feature = "persistence")]
+        {
+            eframe::set_value(storage, "gamegirl_data", &self.state);
+        }
     }
 
     fn max_size_points(&self) -> Vec2 {
@@ -289,6 +305,8 @@ impl App {
 
         let mut gg = self.gg.lock().unwrap();
         let size = gg.screen_size();
+
+        #[cfg(feature = "savestates")]
         if self.rewinder.rewinding {
             if let Some(state) = self.rewinder.rewind_buffer.lock().unwrap().pop() {
                 gg.load_state(state);
@@ -301,9 +319,10 @@ impl App {
                 self.rewinder.rewinding = false;
                 gg.options().invert_audio_samples = false;
             }
-        } else {
-            gg.advance_delta(advance_by.as_secs_f32());
+            return (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size);
         }
+
+        gg.advance_delta(advance_by.as_secs_f32());
         (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size)
     }
 
@@ -400,13 +419,14 @@ impl App {
             self.window_states[6] |= ui.button("VRAM Viewer").clicked();
             self.window_states[7] |= ui.button("Background Map Viewer").clicked();
 
-            #[cfg(not(target_arch = "wasm32"))]
+            #[cfg(feature = "remote-debugger")]
             {
                 ui.separator();
                 self.window_states[8] |= ui.button("Remote Debugger").clicked();
             }
         });
 
+        #[cfg(feature = "savestates")]
         ui.menu_button("Savestates", |ui| {
             for (i, state) in self.rewinder.save_states.iter_mut().enumerate() {
                 if ui.button(format!("Save State {}", i + 1)).clicked() {
@@ -468,7 +488,8 @@ impl App {
 }
 
 /// State that is persisted on app reboot.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub struct State {
     /// A list of last opened ROMs. Size is capped to 10, last opened
     /// ROM is at index 0. The oldest ROM gets removed first.

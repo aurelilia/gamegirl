@@ -79,12 +79,14 @@ macro_rules! common_functions {
         }
 
         /// Create a save state that can be loaded with [load_state].
+        #[cfg(feature = "serde")]
         pub fn save_state(&self) -> Vec<u8> {
             common::misc::serialize(self, self.config.compress_savestates)
         }
 
         /// Load a state produced by [save_state].
         /// Will restore the current cartridge and debugger.
+        #[cfg(feature = "serde")]
         pub fn load_state(&mut self, state: &[u8]) {
             if cfg!(target_arch = "wasm32") {
                 // Currently crashes...

@@ -5,12 +5,12 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::components::scheduler::Kind;
-use serde::{Deserialize, Serialize};
 use NdsEvent::*;
 
 use crate::{audio::Apu, timer::Timers, Nds};
 
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum NdsEvent {
     PauseEmulation,
     /// An event handled by the APU.
@@ -49,7 +49,8 @@ impl Default for NdsEvent {
 }
 
 /// Events the APU generates.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum ApuEvent {
     /// Push a sample to the output.

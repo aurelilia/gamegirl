@@ -7,19 +7,22 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
-ggc = { path = "../cores/ggc" }
-gga = { path = "../cores/gga" }
-nds = { path = "../cores/nds" }
-psx = { path = "../cores/psx" }
+ggc = { path = "../cores/ggc", optional = true }
+gga = { path = "../cores/gga", optional = true }
+nds = { path = "../cores/nds", optional = true }
+psx = { path = "../cores/psx", optional = true }
 log = "0.4.17"
 
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-gdbstub = "0.6.2"
-gdbstub_arch = "0.2.3"
+gdbstub = { version = "0.6.2", optional = true}
+gdbstub_arch = { version = "0.2.3", optional = true}
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 zstd = { version = "0.11.2", default-features = false, features = ["wasm"] }
 web-sys = { version = "0.3.59", features = ["Storage", "Window"] }
 base64 = "0.13.0"
+
+
+[features]
+serde = ["common/serde", "ggc/serde", "gga/serde", "nds/serde", "psx/serde"]
+remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch"]

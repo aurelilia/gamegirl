@@ -13,7 +13,6 @@ pub use channel::Channel;
 use channel::{Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;
 use pulse_channel::PulseChannel;
-use serde::{Deserialize, Serialize};
 use wave_channel::WaveChannel;
 
 mod channel;
@@ -23,7 +22,7 @@ mod pulse_channel;
 mod wave_channel;
 
 bitflags! {
-    #[derive(Deserialize, Serialize)]
+    #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
     pub struct ChannelsControl: u8 {
         const VIN_LEFT  = 1 << 7;
         const VOL_LEFT  = 7 << 4;
@@ -43,7 +42,7 @@ impl ChannelsControl {
 }
 
 bitflags! {
-    #[derive(Deserialize, Serialize)]
+    #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
     pub struct ChannelsSelection: u8 {
         const NOISE_LEFT   = 1 << 7;
         const WAVE_LEFT    = 1 << 6;
@@ -56,7 +55,7 @@ bitflags! {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct GenericApu {
     pub pulse1: Dac<LengthCountedChannel<PulseChannel<false>>>,
     pub pulse2: Dac<LengthCountedChannel<PulseChannel<true>>>,
@@ -88,7 +87,7 @@ impl GenericApu {
 
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
-            wave: Dac::new(LengthCountedChannel::new(WaveChannel::new(cgb), 256)),
+            wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             sequencer_position: 0,
 
@@ -281,7 +280,8 @@ impl Default for GenericApu {
 
 pub trait ScheduleFn = FnMut(GenApuEvent, i32);
 
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum GenApuEvent {
     Pulse1Reload,
     Pulse2Reload,

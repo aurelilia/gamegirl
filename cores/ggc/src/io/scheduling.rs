@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::components::{apu_psg::GenApuEvent, scheduler::Kind};
-use serde::{Deserialize, Serialize};
 use GGEvent::*;
 
 use crate::{
@@ -22,7 +21,8 @@ use crate::{
 };
 
 /// All scheduler events on the GG.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum GGEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
@@ -74,7 +74,8 @@ impl Default for GGEvent {
 impl Kind for GGEvent {}
 
 /// Events the PPU generates.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum PpuEvent {
     OamScanEnd,
@@ -99,7 +100,8 @@ impl PpuEvent {
 }
 
 /// Events the APU generates.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum ApuEvent {
     /// Push a sample to the output.

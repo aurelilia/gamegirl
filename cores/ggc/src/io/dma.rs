@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::numutil::NumExt;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     io::{
@@ -30,7 +29,8 @@ pub fn do_oam_dma(gg: &mut GameGirl) {
 }
 
 /// HDMA VRAM transfer available only on CGB.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Hdma {
     source: u16,
     dest: u16,

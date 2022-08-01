@@ -5,12 +5,12 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::misc::Button;
-use serde::{Deserialize, Serialize};
 
 use crate::{cpu::Interrupt, io::addr::JOYP, GameGirl};
 
 /// Joypad of the console.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Joypad {
     key_states: [bool; 8],
 }

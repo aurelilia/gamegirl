@@ -4,8 +4,6 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use serde::{Deserialize, Serialize};
-
 use super::ScheduleFn;
 
 pub trait Channel {
@@ -18,7 +16,7 @@ pub trait Channel {
     fn trigger(&mut self, sched: &mut impl ScheduleFn);
 }
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct LengthCountedChannel<C: Channel> {
     // FIXME: re-order the organization of apu channels,
     //  `dac_enable`, should not be here like this
@@ -135,7 +133,7 @@ impl<C: Channel> Channel for LengthCountedChannel<C> {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dac<C: Channel> {
     capacitor: f32,
     channel: C,

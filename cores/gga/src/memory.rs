@@ -20,7 +20,6 @@ use common::{
     },
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
-use serde::{Deserialize, Serialize};
 
 use super::audio;
 use crate::{addr::*, dma::Dmas, timer::Timers, Apu, GameGirlAdv};
@@ -30,13 +29,13 @@ pub const BIOS: &[u8] = include_bytes!("bios.bin");
 
 /// Memory struct containing the GGA's memory regions along with page tables
 /// and other auxiliary cached information relating to memory.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub ewram: [u8; 256 * KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub iwram: [u8; 32 * KB],
-    #[serde(with = "serde_arrays")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub mmio: [u16; KB / 2],
 
     /// Value to return when trying to read BIOS outside of it

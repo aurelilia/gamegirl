@@ -5,13 +5,13 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::components::{apu_psg::GenApuEvent, scheduler::Kind};
-use serde::{Deserialize, Serialize};
 use AdvEvent::*;
 
 use crate::{audio::Apu, graphics::Ppu, timer::Timers, GameGirlAdv};
 
 /// All scheduler events on the GGA.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum AdvEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
@@ -50,7 +50,8 @@ impl Default for AdvEvent {
 impl Kind for AdvEvent {}
 
 /// Events the PPU generates.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum PpuEvent {
     /// Start of HBlank.
@@ -62,7 +63,8 @@ pub enum PpuEvent {
 }
 
 /// Events the APU generates.
-#[derive(Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum ApuEvent {
     /// Event from the generic CGB APU.

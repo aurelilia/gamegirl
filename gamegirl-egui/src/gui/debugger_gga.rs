@@ -6,7 +6,7 @@
 
 use common::{components::debugger::Breakpoint, numutil::NumExt};
 use eframe::egui::{Context, Label, RichText, TextEdit, Ui};
-use gga::{addr::IME, GameGirlAdv};
+use gamegirl::gga::{addr::IME, GameGirlAdv};
 
 use crate::{gui::App, Colour};
 
@@ -134,7 +134,7 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui) {
 }
 
 /// Window showing status of the remote debugger.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "remote-debugger")]
 pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
     {
         let gg = app.gg.lock().unwrap();
@@ -174,7 +174,7 @@ pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "remote-debugger")]
 fn launch_debugger(app: &mut App) {
     let gg = app.gg.clone();
     let path = app.current_rom_path.clone().unwrap();
@@ -182,5 +182,5 @@ fn launch_debugger(app: &mut App) {
     std::thread::spawn(|| gamegirl::remote_debugger::init(gg, path, remote));
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "remote-debugger"))]
 pub(super) fn remote_debugger(_app: &mut App, _ctx: &Context, _ui: &mut Ui) {}

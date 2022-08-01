@@ -1,20 +1,22 @@
-#![feature(mixed_integer_ops)]
 // Unless otherwise noted, this file is released and thus subject to the
 // terms of the Mozilla Public License Version 2.0 (MPL2). Also, it is
 // "Incompatible With Secondary Licenses", as defined by the MPL2.
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::mem;
+#![feature(mixed_integer_ops)]
+
+use std::{mem, path::PathBuf};
 
 use common::{
     common_functions,
-    components::{debugger::Debugger, memory::MemoryMapper, scheduler::Scheduler},
+    components::{
+        debugger::Debugger, memory::MemoryMapper, scheduler::Scheduler, storage::Storage,
+    },
     misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
     Colour,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     cpu::{Cpu, Interrupt},
@@ -40,14 +42,14 @@ pub type GGDebugger = Debugger<u16>;
 
 /// The system and it's state.
 /// Represents the entire console.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mem: Memory,
 
     cgb: bool,
-    #[serde(skip)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub debugger: GGDebugger,
     scheduler: Scheduler<GGEvent>,
 
@@ -134,12 +136,15 @@ impl GameGirl {
     }
 
     /// Create a system with a cart already loaded.
-    pub fn with_cart(rom: Vec<u8>) -> Self {
-        let mut gg = Self::default();
-        gg.load_cart(Cartridge::from_rom(rom), &SystemConfig::default(), false);
-        gg.options.running = true;
-        gg.options.rom_loaded = true;
-        gg
+    pub fn with_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
+        let mut cart = Cartridge::from_rom(cart);
+        if let Some(save) = Storage::load(path, cart.title(true)) {
+            cart.load_save(save);
+        }
+
+        let mut ggc = Box::new(GameGirl::default());
+        ggc.load_cart(cart, config, false);
+        ggc
     }
 
     pub fn skip_bootrom(&mut self) {

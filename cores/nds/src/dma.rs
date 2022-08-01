@@ -8,7 +8,6 @@ use common::{
     components::arm::{interface::RwType, Access, Cpu, Interrupt},
     numutil::{word, NumExt},
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{addr::VCOUNT, NdsCpu};
 
@@ -17,7 +16,8 @@ const DST_MASK_7: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
 
 /// NDS's 2x4 DMA channels.
 /// This is separated by CPU.
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dmas {
     /// Internal source registers
     src: [u32; 4],
@@ -214,7 +214,8 @@ impl Dmas {
 }
 
 /// Reason for why a DMA transfer attempt was initiated.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Reason {
     /// The control register was written.
     CtrlWrite,

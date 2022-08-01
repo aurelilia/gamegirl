@@ -4,12 +4,11 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use serde::{Deserialize, Serialize};
-
 use super::{envelope::EnvelopGenerator, Channel, ScheduleFn};
 use crate::numutil::NumExt;
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct NoiseChannel {
     shift_clock_frequency: u8,
     step_mode_7_bits: bool,

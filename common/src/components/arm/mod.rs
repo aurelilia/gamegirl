@@ -15,8 +15,6 @@ pub mod registers;
 
 use std::{marker::PhantomData, sync::Arc};
 
-use serde::{Deserialize, Serialize};
-
 use self::interface::SysWrapper;
 use crate::{
     components::arm::{
@@ -34,7 +32,7 @@ use crate::{
 };
 
 /// Represents the CPU of the console - an ARM7TDMI.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cpu<S: ArmSystem + 'static> {
     pub fiqs: [FiqReg; 5],
     pub sp: ModeReg,
@@ -48,17 +46,19 @@ pub struct Cpu<S: ArmSystem + 'static> {
 
     block_ended: bool,
     pipeline_valid: bool,
-    #[serde(default)]
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub cache: Cache<S>,
 
-    #[cfg_attr(feature = "instruction-tracing", serde(default))]
-    #[cfg_attr(feature = "instruction-tracing", serde(skip))]
+    #[cfg(feature = "instruction-tracing")]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg(feature = "instruction-tracing")]
+    #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg(feature = "instruction-tracing")]
     pub instruction_tracer: Option<Box<dyn Fn(&S, u32) + Send + 'static>>,
 
-    #[serde(default)]
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip))]
     _phantom: PhantomData<S>,
 }
 
@@ -414,7 +414,8 @@ impl Exception {
 /// Enum for the types of memory accesses; either sequential
 /// or non-sequential. The numbers assigned to the variants are
 /// to speed up reading the wait times in `memory.rs`.
-#[derive(Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Access {
     Seq = 0,
     NonSeq = 16,

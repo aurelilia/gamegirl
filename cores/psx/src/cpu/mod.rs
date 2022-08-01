@@ -8,11 +8,10 @@ mod cop0;
 mod inst;
 
 use common::numutil::NumExt;
-use serde::{Deserialize, Serialize};
 
 use crate::{cpu::cop0::Cop0, PlayStation};
 
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cpu {
     regs: [u32; 32],
     next_regs: [u32; 32],
@@ -119,13 +118,15 @@ impl PlayStation {
     }
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct PendingLoad {
     reg: u32,
     value: u32,
 }
 
-#[derive(Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum Exception {
     UnalignedLoad = 0x4,
     UnalignedStore = 0x5,

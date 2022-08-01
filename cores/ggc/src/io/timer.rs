@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::numutil::NumExt;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     io::{addr::*, scheduling::GGEvent},
@@ -13,7 +12,7 @@ use crate::{
 };
 
 /// Timer available on DMG and CGB.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Timer {
     div_start: u32,
     scheduled_at: u32,
@@ -147,15 +146,14 @@ impl Default for Timer {
 
 #[cfg(test)]
 mod tests {
+    use common::numutil::NumExt;
+
     use crate::{
-        ggc::{
-            io::{
-                addr::{DIV, TAC, TIMA},
-                timer::Timer,
-            },
-            GameGirl,
+        io::{
+            addr::{DIV, TAC, TIMA},
+            timer::Timer,
         },
-        numutil::NumExt,
+        GameGirl,
     };
 
     #[test]

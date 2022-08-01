@@ -33,7 +33,6 @@ mod inner {
     };
 
     use common::{numutil::NumExt, Colour};
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use crate::{graphics::Ppu, GameGirlAdv};
 
@@ -83,10 +82,11 @@ mod inner {
         pub last_frame: Option<Vec<Colour>>,
     }
 
-    impl<'de> Deserialize<'de> for GgaPpu {
+    #[cfg(feature = "serde")]
+    impl<'de> serde::Deserialize<'de> for GgaPpu {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            D: Deserializer<'de>,
+            D: serde::Deserializer<'de>,
         {
             let ppu = Arc::<Mutex<Ppu>>::deserialize(deserializer)?;
             let thread = RenderThread::new(&ppu);
@@ -98,10 +98,11 @@ mod inner {
         }
     }
 
-    impl Serialize for GgaPpu {
+    #[cfg(feature = "serde")]
+    impl serde::Serialize for GgaPpu {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: Serializer,
+            S: serde::Serializer,
         {
             Arc::<Mutex<Ppu>>::serialize(&self.ppu, serializer)
         }
