@@ -143,20 +143,18 @@ impl Cartridge {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SaveType {
+    #[default]
     Nothing,
     Eeprom(Eeprom),
     Sram,
     Flash64(FlashState),
-    Flash128 { state: FlashState, bank: u8 },
-}
-
-impl Default for SaveType {
-    fn default() -> Self {
-        Nothing
-    }
+    Flash128 {
+        state: FlashState,
+        bank: u8,
+    },
 }
 
 #[derive(Debug, Clone)]

@@ -6,7 +6,6 @@
 
 #![allow(unused)]
 #![allow(incomplete_features)]
-#![feature(mixed_integer_ops)]
 #![feature(generic_const_exprs)]
 
 mod addr;
@@ -165,7 +164,7 @@ impl Nds {
     }
 
     pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
-        let mut nds = Box::new(Nds::default());
+        let mut nds = Box::<Self>::default();
         nds.config = config.clone();
         nds.cart.load_rom(cart);
         nds.init_memory();

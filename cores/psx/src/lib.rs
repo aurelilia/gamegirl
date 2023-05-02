@@ -4,7 +4,6 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-#![feature(mixed_integer_ops)]
 #![feature(adt_const_params)]
 #![feature(const_mut_refs)]
 #![allow(incomplete_features)]

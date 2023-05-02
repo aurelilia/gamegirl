@@ -17,7 +17,10 @@ crate-type = ["cdylib", "rlib"]
 common = { path = "../common" }
 gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nds"] }
 
-eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = ["default_fonts", "glow"] }
+eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = [
+    "default_fonts",
+    "glow",
+] }
 cpal = "0.13.5"
 rfd = "0.10.0"
 futures-executor = "0.3.21"
@@ -37,7 +40,7 @@ nds = { path = "../cores/nds", default-features = false }
 
 
 [features]
-default = ["persistence", "savestates"]
+default = ["persistence", "savestates", "remote-debugger"]
 persistence = ["dep:serde", "common/serde_config", "eframe/persistence"]
 savestates = ["dep:serde", "common/serde", "gamegirl/serde"]
 remote-debugger = ["gamegirl/remote-debugger"]

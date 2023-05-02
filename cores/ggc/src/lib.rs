@@ -4,8 +4,6 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-#![feature(mixed_integer_ops)]
-
 use std::{mem, path::PathBuf};
 
 use common::{
@@ -104,7 +102,7 @@ impl GameGirl {
 
     /// Request an interrupt. Sets the bit in IF.
     fn request_interrupt(&mut self, ir: Interrupt) {
-        self[IF] = self[IF].set_bit(ir.to_index(), true) as u8;
+        self[IF] = self[IF].set_bit(ir.to_index(), true);
     }
 
     /// Restore state after a savestate load. `old_self` should be the
@@ -142,7 +140,7 @@ impl GameGirl {
             cart.load_save(save);
         }
 
-        let mut ggc = Box::new(GameGirl::default());
+        let mut ggc = Box::<Self>::default();
         ggc.load_cart(cart, config, false);
         ggc
     }

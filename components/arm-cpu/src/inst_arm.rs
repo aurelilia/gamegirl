@@ -263,7 +263,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         let mut addr = self.reg(n);
         let initial_addr = addr;
         let regs = (0..=15).filter(|b| regs.is_bit(*b)).collect::<Vec<u16>>();
-        let first_reg = *regs.get(0).unwrap_or(&12323);
+        let first_reg = *regs.first().unwrap_or(&12323);
         let end_offs = regs.len().u32() * 4;
         if !up {
             addr = Self::mod_with_offs(addr, 4, !pre);

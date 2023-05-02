@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 #![allow(incomplete_features)]
-#![feature(mixed_integer_ops)]
 #![feature(adt_const_params)]
 #![feature(const_mut_refs)]
 

@@ -5,7 +5,6 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 #![allow(incomplete_features)]
-#![feature(mixed_integer_ops)]
 #![feature(generic_const_exprs)]
 
 use std::{iter, mem, path::PathBuf};
@@ -122,7 +121,7 @@ impl GameGirlAdv {
         let until_full_page = 0x7FFF - (cart.len() & 0x7FFF);
         cart.extend(iter::repeat(0).take(until_full_page));
 
-        let mut gga = Box::new(GameGirlAdv::default());
+        let mut gga = Box::<GameGirlAdv>::default();
         gga.config = config.clone();
         gga.cart.load_rom(cart);
         if let Some(save) = Storage::load(path, gga.cart.title()) {

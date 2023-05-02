@@ -22,12 +22,13 @@ use crate::{
 };
 
 /// All scheduler events on the GG.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum GGEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
     /// amount.
+    #[default]
     PauseEmulation,
     /// An event handled by the PPU.
     PpuEvent(PpuEvent),
@@ -62,13 +63,6 @@ impl GGEvent {
                 gg.request_interrupt(Interrupt::Timer);
             }
         }
-    }
-}
-
-// Not implementing this breaks Scheduler::default for SOME reason
-impl Default for GGEvent {
-    fn default() -> Self {
-        PauseEmulation
     }
 }
 

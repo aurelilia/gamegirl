@@ -151,21 +151,21 @@ impl Apu {
     pub fn read_register_psg(apu: &GenericApu, addr: u16) -> u8 {
         match addr {
             0x60 => apu.pulse1.channel().read_sweep_register(),
-            0x62 => (apu.pulse1.channel().read_pattern_duty() << 6),
+            0x62 => apu.pulse1.channel().read_pattern_duty() << 6,
             0x63 => apu.pulse1.channel().envelope().read_envelope_register(),
-            0x65 => ((apu.pulse1.read_length_enable() as u8) << 6),
+            0x65 => (apu.pulse1.read_length_enable() as u8) << 6,
 
-            0x68 => (apu.pulse2.channel().read_pattern_duty() << 6),
+            0x68 => apu.pulse2.channel().read_pattern_duty() << 6,
             0x69 => apu.pulse2.channel().envelope().read_envelope_register(),
-            0x6D => ((apu.pulse2.read_length_enable() as u8) << 6),
+            0x6D => (apu.pulse2.read_length_enable() as u8) << 6,
 
             0x70 => 0xE0 | ((apu.wave.dac_enabled() as u8) << 7),
             0x73 => 0x80 | ((apu.wave.channel().read_volume()) << 5),
-            0x75 => ((apu.wave.read_length_enable() as u8) << 6),
+            0x75 => (apu.wave.read_length_enable() as u8) << 6,
 
             0x79 => apu.noise.channel().envelope().read_envelope_register(),
             0x7C => apu.noise.channel().read_noise_register(),
-            0x7D => ((apu.noise.read_length_enable() as u8) << 6),
+            0x7D => (apu.noise.read_length_enable() as u8) << 6,
 
             0x80 => 0x77 & apu.channels_control.bits(),
             0x81 => apu.channels_selection.bits(),

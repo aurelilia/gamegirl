@@ -162,7 +162,7 @@ impl GameGirl {
             0x8000..=0x9FFF => {
                 self.mem.vram[(a & 0x1FFF) + (self.mem.vram_bank.us() * 0x2000)] = value;
             }
-            0xC000..=0xCFFF => self.mem.wram[(a & 0x0FFF)] = value,
+            0xC000..=0xCFFF => self.mem.wram[a & 0x0FFF] = value,
             0xD000..=0xDFFF => {
                 self.mem.wram[(a & 0x0FFF) + (self.mem.wram_bank.us() * 0x1000)] = value;
             }

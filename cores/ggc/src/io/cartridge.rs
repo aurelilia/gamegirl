@@ -215,15 +215,7 @@ impl Cartridge {
                     bank2: 0,
                 },
                 0x05..=0x06 => MBC2,
-                0x0F..=0x10 => MBC3RTC {
-                    rtc: Rtc {
-                        start: 0,
-                        latched_at: None,
-                    },
-                    rtc_reg: None,
-                    latch_prepare: false,
-                },
-                0x11..=0x13 => MBC3,
+                0x0F..=0x13 => MBC3, // TODO Broken RTC...
                 0x19..=0x1E => MBC5,
                 _ => NoMBC,
             },
