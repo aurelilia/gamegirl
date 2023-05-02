@@ -33,6 +33,13 @@ macro_rules! common_functions {
             while self.options.running && self.ppu.last_frame == None {
                 self.advance();
             }
+            self.ppu.last_frame = None;
+
+            // Do it twice: Color buffer will be empty after a save state load,
+            // we need to render one frame in full
+            while self.options.running && self.ppu.last_frame == None {
+                self.advance();
+            }
             self.ppu.last_frame.take()
         }
 
@@ -80,12 +87,6 @@ macro_rules! common_functions {
                     *dst = src * self.config.volume;
                 }
             }
-        }
-
-        /// Reset the console, while keeping the current cartridge inserted.
-        pub fn reset(&mut self) {
-            let old_self = mem::take(self);
-            self.restore_from(old_self);
         }
 
         /// Create a save state that can be loaded with [load_state].

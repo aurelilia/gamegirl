@@ -73,7 +73,7 @@ impl Cpu {
         gg.push_stack(gg.cpu.pc);
 
         if !upper_ie_push || gg[IE].is_bit(intr) {
-            gg[IF] = gg[IF].set_bit(intr, false) as u8;
+            gg[IF] = gg[IF].set_bit(intr, false);
             gg.cpu.pc = Interrupt::from_index(intr).addr();
             gg.advance_clock(3);
             true

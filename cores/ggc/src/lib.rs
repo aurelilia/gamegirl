@@ -64,7 +64,7 @@ pub struct GameGirl {
     /// mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
     /// Temporary used by [advance_delta]. Will be true until the scheduled
-    /// PauseEmulation event fires,
+    /// PauseEmulation event fires.
     ticking: bool,
 
     /// System config.
@@ -105,6 +105,21 @@ impl GameGirl {
         self[IF] = self[IF].set_bit(ir.to_index(), true);
     }
 
+    /// Reset the console, while keeping the current cartridge inserted.
+    pub fn reset(&mut self) {
+        let old_self = mem::take(self);
+        let save = old_self.cart.make_save();
+        self.load_cart_mem(old_self.cart, &old_self.config);
+        if let Some(save) = save {
+            self.cart.load_save(save);
+        }
+
+        self.options = old_self.options;
+        self.config = old_self.config;
+        self.debugger = old_self.debugger;
+        MemoryMapper::init_pages(self);
+    }
+
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {
@@ -126,7 +141,6 @@ impl GameGirl {
         if reset {
             let old_self = mem::take(self);
             self.debugger = old_self.debugger;
-            self.options.frame_finished = old_self.options.frame_finished;
         }
         self.load_cart_mem(cart, config);
         self.config = config.clone();

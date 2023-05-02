@@ -54,14 +54,6 @@ impl PpuSystem for GameGirlAdv {
     fn schedule(&mut self, evt: PpuEvent, at: i32) {
         self.scheduler.schedule(AdvEvent::PpuEvent(evt), at);
     }
-
-    fn frame_finished(&mut self) {
-        #[cfg(feature = "serde")]
-        {
-            let state = self.save_state();
-            (self.options.frame_finished)(state);
-        }
-    }
 }
 
 #[cfg(not(feature = "threaded-ppu"))]

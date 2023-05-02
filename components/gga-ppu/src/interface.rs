@@ -38,8 +38,6 @@ pub trait PpuSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     fn notify_dma(&mut self, reason: PpuDmaReason);
     /// Schedule an event on the scheduler,
     fn schedule(&mut self, evt: PpuEvent, at: i32);
-    /// Callback called when a frame finished.
-    fn frame_finished(&mut self);
 }
 
 /// Interrupts the PPU can raise.

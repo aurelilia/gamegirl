@@ -6,7 +6,7 @@
 
 //! This crate contains common structures shared by all systems.
 
-use std::{mem, path::PathBuf};
+use std::path::PathBuf;
 
 pub use common;
 use common::{
@@ -207,10 +207,6 @@ impl System {
         // We detect NDS carts by a zero-filled header region
         let _is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
 
-        let frame_finished = mem::replace(
-            &mut self.options().frame_finished,
-            EmulateOptions::serde_frame_finished(),
-        );
         match () {
             #[cfg(feature = "ggc")]
             _ if _is_ggc => *self = System::GGC(ggc::GameGirl::with_cart(cart, path, config)),
@@ -229,7 +225,6 @@ impl System {
             _ => panic!("Failed to detect cart and no GGA core available!."),
         }
 
-        self.options().frame_finished = frame_finished;
         self.options().running = true;
         self.options().rom_loaded = true;
         if common::TRACING {

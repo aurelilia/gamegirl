@@ -62,8 +62,7 @@ impl Inst {
         let base = base.replace("a16", &format!("{:04X}", arg));
         let base = base.replace("d8", &format!("d{:02X}", arg & 0xFF));
         let base = base.replace("d16", &format!("d{:04X}", arg));
-        let base = base.replace("s8", &format!("d{:02X}", arg.u8() as i8));
-        base
+        base.replace("s8", &format!("d{:02X}", arg.u8() as i8))
     }
 
     pub fn size(&self) -> u8 {

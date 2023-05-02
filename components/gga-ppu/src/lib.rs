@@ -168,7 +168,6 @@ where
                         gg[VCOUNT] = 0;
                         let frame = Self::end_frame(gg);
                         gg.ppu().last_frame = Some(frame);
-                        gg.frame_finished();
                     }
                     _ => (),
                 }

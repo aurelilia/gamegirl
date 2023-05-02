@@ -61,14 +61,6 @@ impl PpuSystem for Nds7 {
     fn schedule(&mut self, evt: PpuEvent, at: i32) {
         self.scheduler.schedule(NdsEvent::PpuEvent(evt), at);
     }
-
-    fn frame_finished(&mut self) {
-        #[cfg(feature = "serde")]
-        {
-            let state = self.save_state();
-            (self.options.frame_finished)(state);
-        }
-    }
 }
 
 impl PpuSystem for Nds9 {
@@ -109,10 +101,6 @@ impl PpuSystem for Nds9 {
 
     fn schedule(&mut self, _evt: PpuEvent, _at: i32) {
         // Do nothing, let PPU A schedule
-    }
-
-    fn frame_finished(&mut self) {
-        // Do nothing, let PPU A handle it
     }
 }
 

@@ -65,6 +65,12 @@ impl PlayStation {
         }
     }
 
+    /// Reset the console, while keeping the current cartridge inserted.
+    pub fn reset(&mut self) {
+        let old_self = mem::take(self);
+        self.restore_from(old_self);
+    }
+
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {

@@ -4,10 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{
-    iter,
-    sync::{Arc, Mutex},
-};
+use std::iter;
 
 /// Struct for storing rewind state.
 pub struct Rewinding {
@@ -17,7 +14,7 @@ pub struct Rewinding {
     /// to undo a load.
     pub before_last_ss_load: Option<Vec<u8>>,
     /// Rewind buffer.
-    pub rewind_buffer: Arc<Mutex<RWBuffer>>,
+    pub rewind_buffer: RWBuffer,
     /// If the emulation is currently rewinding.
     /// If we are, then instead of advancing the system normally, we load the
     /// saved state from the frame before out of the rewind buffer,
@@ -31,7 +28,7 @@ pub struct Rewinding {
 impl Rewinding {
     /// Set the size of the rewind buffer in seconds.
     pub fn set_rw_buf_size(&mut self, secs: usize) {
-        *self.rewind_buffer.lock().unwrap() = RWBuffer::new(secs);
+        self.rewind_buffer = RWBuffer::new(secs);
     }
 }
 
@@ -40,7 +37,7 @@ impl Default for Rewinding {
         Self {
             save_states: [None, None, None, None, None, None, None, None, None, None],
             before_last_ss_load: None,
-            rewind_buffer: Arc::new(Mutex::new(RWBuffer::new(60 * 10))),
+            rewind_buffer: RWBuffer::new(60 * 10),
             rewinding: false,
         }
     }

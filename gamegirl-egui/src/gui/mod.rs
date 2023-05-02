@@ -175,13 +175,6 @@ impl App {
     fn setup_rewind(&mut self) {
         self.rewinder
             .set_rw_buf_size(self.state.options.rewind_buffer_size);
-        let buffer = self.rewinder.rewind_buffer.clone();
-
-        if self.state.options.enable_rewind {
-            self.gg.lock().unwrap().options().frame_finished = Box::new(move |state| {
-                buffer.lock().unwrap().push(state);
-            });
-        }
     }
 }
 
@@ -295,24 +288,31 @@ impl App {
         let mut gg = self.gg.lock().unwrap();
         let size = gg.screen_size();
 
-        #[cfg(feature = "savestates")]
-        if self.rewinder.rewinding {
-            if let Some(state) = self.rewinder.rewind_buffer.lock().unwrap().pop() {
-                gg.load_state(state);
-                gg.options().invert_audio_samples = true;
-                return (
-                    gg.produce_frame().map(|p| unsafe { mem::transmute(p) }),
-                    size,
-                );
+        if cfg!(feature = "savestates") {
+            if self.rewinder.rewinding {
+                let frame = if let Some(state) = self.rewinder.rewind_buffer.pop() {
+                    gg.load_state(state);
+                    gg.options().invert_audio_samples = true;
+                    gg.produce_frame()
+                } else {
+                    self.rewinder.rewinding = false;
+                    gg.options().invert_audio_samples = false;
+                    gg.last_frame()
+                };
+                (frame.map(|p| unsafe { mem::transmute(p) }), size)
             } else {
-                self.rewinder.rewinding = false;
-                gg.options().invert_audio_samples = false;
+                gg.advance_delta(advance_by.as_secs_f32());
+                let frame = gg.last_frame().map(|p| unsafe { mem::transmute(p) });
+                if frame.is_some() {
+                    let state = gg.save_state();
+                    self.rewinder.rewind_buffer.push(state);
+                }
+                (frame, size)
             }
-            return (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size);
+        } else {
+            gg.advance_delta(advance_by.as_secs_f32());
+            (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size)
         }
-
-        gg.advance_delta(advance_by.as_secs_f32());
-        (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size)
     }
 
     /// Process all async messages that came in during this frame.
