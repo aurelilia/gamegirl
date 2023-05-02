@@ -56,9 +56,7 @@ pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     page_offsets: [u32; 16],
 
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub(super) bootrom: Option<Vec<u8>>,
+    pub(super) bootrom_enable: bool,
 }
 
 impl GameGirl {
@@ -193,7 +191,7 @@ impl GameGirl {
             IF => self[IF] = value | 0xE0,
             IE => self[IE] = value,
             BOOTROM_DISABLE => {
-                self.mem.bootrom = None;
+                self.mem.bootrom_enable = false;
                 // Refresh page tables
                 MemoryMapper::init_pages(self);
             }
@@ -230,11 +228,6 @@ impl GameGirl {
             CgbMode::Prefer => cart.supports_cgb(),
             CgbMode::Never => cart.requires_cgb(),
         };
-        self.mem.bootrom = Some(if self.cgb {
-            CGB_BOOTROM.to_vec()
-        } else {
-            BOOTIX_ROM.to_vec()
-        });
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
         self.apu = Apu::new(self.cgb);
         self.cart = cart;
@@ -309,7 +302,7 @@ impl Memory {
                 0, 0, 0, 0, 0x4000, 0x4000, 0x4000, 0x4000, 0, 0, 0, 0, 0, 0x1000, 0, 0,
             ],
 
-            bootrom: None,
+            bootrom_enable: true,
         }
     }
 }
@@ -354,12 +347,9 @@ impl MemoryMappedSystem<256> for GameGirl {
         }
 
         match a {
-            0x0000..=0x00FF if self.mem.bootrom.is_some() => {
-                offs(self.mem.bootrom.as_ref().unwrap(), a)
-            }
-            0x0200..=0x08FF if self.mem.bootrom.is_some() && self.cgb => {
-                offs(self.mem.bootrom.as_ref().unwrap(), a - 0x0100)
-            }
+            0x0000..=0x00FF if self.mem.bootrom_enable && self.cgb => offs(CGB_BOOTROM, a),
+            0x0000..=0x00FF if self.mem.bootrom_enable => offs(BOOTIX_ROM, a),
+            0x0200..=0x08FF if self.mem.bootrom_enable && self.cgb => offs(CGB_BOOTROM, a - 0x0100),
             0x0000..=0x3FFF => offs(&self.cart.rom, a),
             0x4000..=0x7FFF => offs(&self.cart.rom, a - 0x4000),
 

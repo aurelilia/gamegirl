@@ -12,12 +12,13 @@ use AdvEvent::*;
 use crate::{audio::Apu, timer::Timers, GameGirlAdv};
 
 /// All scheduler events on the GGA.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u16)]
 pub enum AdvEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
     /// amount.
+    #[default]
     PauseEmulation,
     /// An event handled by the PPU.
     PpuEvent(PpuEvent),
@@ -39,13 +40,6 @@ impl AdvEvent {
             }
             TimerOverflow(idx) => Timers::handle_overflow_event(gg, idx, late_by),
         }
-    }
-}
-
-// Not implementing this breaks Scheduler::default for SOME reason
-impl Default for AdvEvent {
-    fn default() -> Self {
-        PauseEmulation
     }
 }
 
