@@ -180,12 +180,12 @@ fn input_section(
 /// Show a nice little "About" window. c:
 pub(super) fn about(_app: &mut App, _ctx: &Context, ui: &mut Ui) {
     ui.horizontal(|ui| {
-        ui.label("GameGirl v0.1 made by");
-        ui.hyperlink_to("ellie leela", "https://angm.xyz");
+        ui.label("GameGirl v0.1.1 made by");
+        ui.hyperlink_to("leela aurelia", "https://elia.garden");
     });
     ui.horizontal(|ui| {
         ui.label("Based on my previous emulator");
-        ui.hyperlink_to("gamelin", "https://git.angm.xyz/ellie/gamelin");
+        ui.hyperlink_to("gamelin", "https://git.elia.garden/leela/gamelin");
     });
     ui.horizontal(|ui| {
         ui.label("Made possible thanks to many amazing people. <3");
