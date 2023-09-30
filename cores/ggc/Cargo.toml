@@ -9,9 +9,9 @@ edition = "2021"
 common = { path = "../../common" }
 psg-apu = { path = "../../components/psg-apu" }
 
-serde = { version = "1.0.140", features = ["derive", "rc"], optional = true }
+serde = { version = "1.0.188", features = ["derive", "rc"], optional = true }
 serde_arrays = { version = "0.1.0", optional = true }
-log = "0.4.17"
+log = "0.4.20"
 
 
 [features]

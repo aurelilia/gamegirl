@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 gamegirl = { path = "../gamegirl", features = ["ggc", "gga"] }
 ansi_term = "0.12.1"
-png = "0.17.5"
+png = "0.17.10"
 seahorse = "2.1.0"
