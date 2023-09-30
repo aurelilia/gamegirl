@@ -69,7 +69,7 @@ impl Dmas {
     }
 
     /// Get the destination register for a DMA; this is not the internal one.
-    pub fn get_dest(gg: &mut GameGirlAdv, idx: u16) -> u32 {
+    pub fn get_dest(gg: &GameGirlAdv, idx: u16) -> u32 {
         let base = Self::base_addr(idx);
         word(gg[base + 4], gg[base + 6])
     }

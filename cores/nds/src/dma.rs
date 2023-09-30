@@ -58,7 +58,7 @@ impl Dmas {
     }
 
     /// Get the destination register for a DMA; this is not the internal one.
-    pub fn get_dest(ds: &mut impl NdsCpu, idx: u16) -> u32 {
+    pub fn get_dest(ds: &impl NdsCpu, idx: u16) -> u32 {
         let base = Self::base_addr(idx);
         word(ds[base + 4], ds[base + 6])
     }

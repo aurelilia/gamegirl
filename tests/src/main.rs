@@ -4,8 +4,6 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-#![feature(is_some_and)]
-
 mod gb;
 mod gba;
 

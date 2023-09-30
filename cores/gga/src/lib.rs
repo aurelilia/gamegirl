@@ -153,6 +153,7 @@ impl GameGirlAdv {
             let dst_offs = header.addr() - 0x800_0000;
             for (src, dst) in header
                 .content()
+                .unwrap()
                 .iter()
                 .zip(buf.iter_mut().skip(dst_offs as usize))
             {

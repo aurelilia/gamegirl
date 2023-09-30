@@ -21,6 +21,7 @@ mod wave_channel;
 
 bitflags! {
     #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ChannelsControl: u8 {
         const VIN_LEFT  = 1 << 7;
         const VOL_LEFT  = 7 << 4;
@@ -41,6 +42,7 @@ impl ChannelsControl {
 
 bitflags! {
     #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ChannelsSelection: u8 {
         const NOISE_LEFT   = 1 << 7;
         const WAVE_LEFT    = 1 << 6;

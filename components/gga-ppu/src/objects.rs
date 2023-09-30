@@ -189,7 +189,7 @@ where
     }
 
     fn get_affine_pixel(
-        gg: &mut PpuType<S>,
+        gg: &PpuType<S>,
         base_tile_idx: usize,
         size: (u16, u16),
         trans_x: u16,

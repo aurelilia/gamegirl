@@ -7,6 +7,8 @@
 mod cop0;
 mod inst;
 
+use std::marker::ConstParamTy;
+
 use common::numutil::NumExt;
 
 use crate::{cpu::cop0::Cop0, PlayStation};
@@ -125,7 +127,7 @@ struct PendingLoad {
     value: u32,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, ConstParamTy)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum Exception {
     UnalignedLoad = 0x4,

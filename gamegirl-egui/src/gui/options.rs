@@ -7,7 +7,7 @@
 use common::misc::{Button, CgbMode, SystemConfig};
 use eframe::{
     egui,
-    egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureFilter, Ui},
+    egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureOptions, Ui},
 };
 
 use crate::gui::{
@@ -35,7 +35,7 @@ pub struct Options {
     /// Scale of the GG display.
     pub display_scale: usize,
     /// Texture filter applied to the display.
-    pub tex_filter: TextureFilter,
+    pub tex_filter: TextureOptions,
 }
 
 impl Default for Options {
@@ -48,7 +48,7 @@ impl Default for Options {
             enable_rewind: true,
             rewind_buffer_size: 10,
             display_scale: 2,
-            tex_filter: TextureFilter::Nearest,
+            tex_filter: TextureOptions::NEAREST,
         }
     }
 }
@@ -104,10 +104,10 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         .on_hover_text("Adjust colours to be more accurate to a real GBC screen.");
 
         ComboBox::from_label("Texture filter")
-            .selected_text(format!("{:?}", opt.tex_filter))
+            .selected_text(format!("{:?}", opt.tex_filter.magnification))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut opt.tex_filter, TextureFilter::Nearest, "Nearest");
-                ui.selectable_value(&mut opt.tex_filter, TextureFilter::Linear, "Linear");
+                ui.selectable_value(&mut opt.tex_filter, TextureOptions::NEAREST, "Nearest");
+                ui.selectable_value(&mut opt.tex_filter, TextureOptions::LINEAR, "Linear");
             });
 
         ui.horizontal(|ui| {

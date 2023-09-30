@@ -9,8 +9,8 @@ use std::{fmt::Write, iter};
 use common::{components::debugger::Breakpoint, numutil::NumExt};
 use eframe::{
     egui::{
-        vec2, Align, ColorImage, Context, ImageData, Label, RichText, ScrollArea, TextEdit,
-        TextureFilter, TextureId, Ui,
+        load::SizedTexture, vec2, Align, ColorImage, Context, ImageData, Label, RichText,
+        ScrollArea, TextEdit, TextureId, TextureOptions, Ui,
     },
     epaint::ImageDelta,
 };
@@ -258,9 +258,12 @@ pub(super) fn vram_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
         24,
         &mut app.visual_debug.vram_texture,
         buf,
-        TextureFilter::Nearest,
+        TextureOptions::NEAREST,
     );
-    ui.image(img, vec2(32. * 16., 24. * 16.));
+    ui.image(Into::<SizedTexture>::into((
+        img,
+        vec2(32. * 16., 24. * 16.),
+    )));
 }
 
 /// Window showing 32x32 tile map of background and window.
@@ -282,7 +285,7 @@ pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 data_addr,
             );
         }
-        upload_texture(ctx, 32, 32, id, buf, TextureFilter::Nearest)
+        upload_texture(ctx, 32, 32, id, buf, TextureOptions::NEAREST)
     }
 
     let gg = app.gg.lock().unwrap();
@@ -303,12 +306,18 @@ pub(super) fn bg_map_viewer(app: &mut App, ctx: &Context, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.label("Background Map");
-            ui.image(bg_id, vec2(32. * 16., 32. * 16.));
+            ui.image(Into::<SizedTexture>::into((
+                bg_id,
+                vec2(32. * 16., 32. * 16.),
+            )));
         });
         ui.separator();
         ui.vertical(|ui| {
             ui.label("Window Map");
-            ui.image(win_id, vec2(32. * 16., 32. * 16.));
+            ui.image(Into::<SizedTexture>::into((
+                win_id,
+                vec2(32. * 16., 32. * 16.),
+            )));
         });
     });
 }
@@ -328,14 +337,17 @@ fn upload_texture(
     y: usize,
     id: &mut Option<TextureId>,
     buf: Vec<Colour>,
-    filter: TextureFilter,
+    filter: TextureOptions,
 ) -> TextureId {
     let id = get_or_make_texture(ctx, id);
     let img = ImageDelta::full(
-        ImageData::Color(ColorImage {
-            size: [x * 8, y * 8],
-            pixels: buf,
-        }),
+        ImageData::Color(
+            ColorImage {
+                size: [x * 8, y * 8],
+                pixels: buf,
+            }
+            .into(), // TODO meh. Arc is a kinda annoying here
+        ),
         filter,
     );
     let manager = ctx.tex_manager();
@@ -363,5 +375,5 @@ fn draw_tile(gg: &GameGirl, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u16) {
 
 /// Get or create the given texture ID.
 fn get_or_make_texture(ctx: &Context, tex: &mut Option<TextureId>) -> TextureId {
-    *tex.get_or_insert_with(|| App::make_screen_texture(ctx, [0, 0], TextureFilter::Nearest))
+    *tex.get_or_insert_with(|| App::make_screen_texture(ctx, [0, 0], TextureOptions::NEAREST))
 }

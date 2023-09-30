@@ -8,7 +8,10 @@
 
 pub mod gui;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use common::SAMPLE_RATE;
 use cpal::{
@@ -25,7 +28,7 @@ pub type Colour = Color32;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub struct Handle(Stream);
+pub struct Handle(Option<Stream>);
 
 /// Start the emulator on WASM. See web/index.html for usage.
 #[cfg(target_arch = "wasm32")]
@@ -46,7 +49,7 @@ pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
 /// 60 times per second, which would lead to choppy display.
 /// Make sure to keep the returned Stream around to prevent the audio playback
 /// thread from closing.
-pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Stream {
+pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Option<Stream> {
     let device = cpal::default_host().default_output_device().unwrap();
     let stream = device
         .build_output_stream(
@@ -60,8 +63,9 @@ pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Stream {
                 gg.produce_samples(data)
             },
             move |err| panic!("{err}"),
+            Some(Duration::from_secs(1)),
         )
-        .unwrap();
-    stream.play().unwrap();
-    stream
+        .ok()?;
+    stream.play().ok();
+    Some(stream)
 }

@@ -24,9 +24,10 @@ use std::{
 
 use eframe::{
     egui::{
-        self, util::History, vec2, widgets, Context, Event, ImageData, Layout, TextureFilter, Ui,
-        Vec2,
+        self, load::SizedTexture, util::History, vec2, widgets, Context, Event, ImageData, Layout,
+        TextureOptions, Ui,
     },
+    emath::Align,
     epaint::{ColorImage, ImageDelta, TextureId},
     CreationContext, Frame, Storage, Theme,
 };
@@ -89,7 +90,7 @@ pub fn start(gg: Arc<Mutex<System>>) {
         default_theme: Theme::Dark,
         ..Default::default()
     };
-    eframe::run_native("gamegirl", options, Box::new(|ctx| make_app(ctx, gg)))
+    eframe::run_native("gamegirl", options, Box::new(|ctx| make_app(ctx, gg))).unwrap()
 }
 
 /// Start the GUI. Since this is WASM, this call will return.
@@ -186,7 +187,7 @@ impl eframe::App for App {
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.visuals_mut().button_frame = false;
-                let now = { ctx.input().time };
+                let now = { ctx.input(|i| i.time) };
                 self.navbar(now, frame, ui);
             });
         });
@@ -194,13 +195,13 @@ impl eframe::App for App {
         egui::Window::new("GameGirl")
             .resizable(false)
             .show(ctx, |ui| {
-                ui.image(
+                ui.image(Into::<SizedTexture>::into((
                     self.texture,
-                    [
+                    vec2(
                         (size[0] * self.state.options.display_scale) as f32,
                         (size[1] * self.state.options.display_scale) as f32,
-                    ],
-                );
+                    ),
+                )));
             });
 
         let mut states = self.window_states;
@@ -237,10 +238,6 @@ impl eframe::App for App {
             eframe::set_value(storage, "gamegirl_data", &self.state);
         }
     }
-
-    fn max_size_points(&self) -> Vec2 {
-        vec2(4000.0, 4000.0)
-    }
 }
 
 impl App {
@@ -250,7 +247,7 @@ impl App {
         let (frame, size) = self.get_gg_frame(ctx, advance_by);
         if let Some(pixels) = frame {
             let img = ImageDelta::full(
-                ImageData::Color(ColorImage { size, pixels }),
+                ImageData::Color(ColorImage { size, pixels }.into()), // todo meh
                 self.state.options.tex_filter,
             );
             let manager = ctx.tex_manager();
@@ -266,24 +263,26 @@ impl App {
         ctx: &Context,
         advance_by: Duration,
     ) -> (Option<Vec<Colour>>, [usize; 2]) {
-        for event in &ctx.input().events {
-            if let Event::Key { key, pressed, .. } = event {
-                if let Some(action) = self.state.options.input.pending.take() {
-                    self.state.options.input.set_key(*key, action);
-                    continue;
-                }
+        ctx.input(|i| {
+            for event in &i.events {
+                if let Event::Key { key, pressed, .. } = event {
+                    if let Some(action) = self.state.options.input.pending.take() {
+                        self.state.options.input.set_key(*key, action);
+                        continue;
+                    }
 
-                match self.state.options.input.get_key(*key) {
-                    Some(InputAction::Button(btn)) => {
-                        self.gg.lock().unwrap().set_button(btn, *pressed)
+                    match self.state.options.input.get_key(*key) {
+                        Some(InputAction::Button(btn)) => {
+                            self.gg.lock().unwrap().set_button(btn, *pressed)
+                        }
+                        Some(InputAction::Hotkey(idx)) => {
+                            input::HOTKEYS[idx as usize].1(self, *pressed)
+                        }
+                        None => (),
                     }
-                    Some(InputAction::Hotkey(idx)) => {
-                        input::HOTKEYS[idx as usize].1(self, *pressed)
-                    }
-                    None => (),
                 }
             }
-        }
+        });
 
         let mut gg = self.gg.lock().unwrap();
         let size = gg.screen_size();
@@ -394,7 +393,7 @@ impl App {
             {
                 ui.separator();
                 if ui.button("Exit").clicked() {
-                    frame.quit();
+                    frame.close();
                 }
             }
         });
@@ -452,7 +451,7 @@ impl App {
             }
         });
 
-        ui.with_layout(Layout::right_to_left(), |ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             let time = frame.info().cpu_usage.unwrap_or(0.0);
             self.frame_times.add(now, time);
             // Backwards because we're in RTL layout
@@ -465,7 +464,7 @@ impl App {
     }
 
     /// Create the screen texture.
-    fn make_screen_texture(ctx: &Context, size: [usize; 2], filter: TextureFilter) -> TextureId {
+    fn make_screen_texture(ctx: &Context, size: [usize; 2], filter: TextureOptions) -> TextureId {
         let manager = ctx.tex_manager();
         let id = manager.write().alloc(
             "screen".into(),
