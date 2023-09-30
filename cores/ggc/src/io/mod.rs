@@ -278,7 +278,7 @@ impl GameGirl {
                 .add(self.mem.page_offsets.get_unchecked(a.us() >> 12).us())
         };
 
-        if ptr as usize > 0xFF_FFFF {
+        if ptr as usize > 0xFFFF {
             unsafe { (ptr as *const T).read() }
         } else {
             slow(self, a)

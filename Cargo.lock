@@ -921,6 +921,7 @@ dependencies = [
  "futures-executor",
  "gamegirl",
  "gga",
+ "log",
  "nds",
  "rfd",
  "serde",

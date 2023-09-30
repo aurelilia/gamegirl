@@ -30,19 +30,6 @@ pub type Colour = Color32;
 #[wasm_bindgen]
 pub struct Handle(Option<Stream>);
 
-/// Start the emulator on WASM. See web/index.html for usage.
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub fn start(canvas_id: &str) -> Result<Handle, eframe::wasm_bindgen::JsValue> {
-    console_error_panic_hook::set_once();
-    tracing_wasm::set_as_global_default();
-
-    let gg = System::default();
-    let gg = Arc::new(Mutex::new(gg));
-    let stream = setup_cpal(gg.clone());
-    gui::start(gg, canvas_id).map(|_| Handle(stream))
-}
-
 /// Setup audio playback on the default audio device using CPAL.
 /// Will automatically poll the gg for audio when needed on a separate thread.
 /// *NOT* used for synchronization, since audio samples are requested less than

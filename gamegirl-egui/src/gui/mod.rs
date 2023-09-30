@@ -19,9 +19,9 @@ use std::{
     fs, mem,
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
-    time::Duration,
 };
 
+use cpal::Stream;
 use eframe::{
     egui::{
         self, load::SizedTexture, util::History, vec2, widgets, Context, Event, ImageData, Layout,
@@ -41,10 +41,6 @@ use crate::{
     },
     Colour,
 };
-
-/// How long a frame takes, and how much the GG should be advanced
-/// each frame. TODO: This assumption only holds for 60hz devices!
-const FRAME_LEN: f64 = 1.0 / 60.0;
 
 /// Total count of windows in GUI.
 const WINDOW_COUNT: usize = DBG_WINDOW_COUNT + APP_WINDOW_COUNT;
@@ -82,28 +78,30 @@ const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] = [
     ("Remote Debugger", debugger_gga::remote_debugger),
 ];
 
-/// Start the GUI. Since this is native, this call will never return.
+/// Start the GUI.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn start(gg: Arc<Mutex<System>>) {
+pub fn start() {
     let options = eframe::NativeOptions {
         transparent: true,
         default_theme: Theme::Dark,
         ..Default::default()
     };
-    eframe::run_native("gamegirl", options, Box::new(|ctx| make_app(ctx, gg))).unwrap()
+    eframe::run_native("gamegirl", options, Box::new(|ctx| make_app(ctx))).unwrap()
 }
 
-/// Start the GUI. Since this is WASM, this call will return.
+/// Start the GUI.
 #[cfg(target_arch = "wasm32")]
-pub fn start(gg: Arc<Mutex<System>>, canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
+pub async fn start() -> Result<(), eframe::wasm_bindgen::JsValue> {
     let options = eframe::WebOptions {
         default_theme: Theme::Dark,
         ..Default::default()
     };
-    eframe::start_web(canvas_id, options, Box::new(|ctx| make_app(ctx, gg)))
+    eframe::WebRunner::new()
+        .start("the_canvas_id", options, Box::new(|ctx| make_app(ctx)))
+        .await
 }
 
-fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
+fn make_app(ctx: &CreationContext<'_>) -> Box<App> {
     let state: State = {
         #[cfg(feature = "persistence")]
         {
@@ -115,6 +113,9 @@ fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
         #[cfg(not(feature = "persistence"))]
         State::default()
     };
+
+    let gg = System::default();
+    let gg = Arc::new(Mutex::new(gg));
 
     let texture = App::make_screen_texture(&ctx.egui_ctx, [160, 144], state.options.tex_filter);
     let mut app = App {
@@ -131,6 +132,8 @@ fn make_app(ctx: &CreationContext<'_>, gg: Arc<Mutex<System>>) -> Box<App> {
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
         frame_times: History::new(0..120, 2.0),
+        last_time: 0.0,
+        audio_stream: None,
 
         state,
     };
@@ -166,6 +169,10 @@ struct App {
     message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
     /// Frame times.
     frame_times: History<f32>,
+    /// Last frame time according to egui's input subsystem.
+    last_time: f32,
+    /// Stream for audio.
+    audio_stream: Option<Stream>,
 
     /// The App state, which is persisted on reboot.
     state: State,
@@ -181,7 +188,7 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        let size = self.update_gg(ctx, Duration::from_secs_f64(FRAME_LEN));
+        let size = self.update_gg(ctx);
         self.process_messages();
 
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
@@ -230,12 +237,12 @@ impl eframe::App for App {
         ctx.request_repaint();
     }
 
-    fn save(&mut self, storage: &mut dyn Storage) {
+    fn save(&mut self, _storage: &mut dyn Storage) {
         self.save_game();
 
         #[cfg(feature = "persistence")]
         {
-            eframe::set_value(storage, "gamegirl_data", &self.state);
+            eframe::set_value(_storage, "gamegirl_data", &self.state);
         }
     }
 }
@@ -243,8 +250,8 @@ impl eframe::App for App {
 impl App {
     /// Update the system's state.
     /// Returns screen dimensions.
-    fn update_gg(&mut self, ctx: &Context, advance_by: Duration) -> [usize; 2] {
-        let (frame, size) = self.get_gg_frame(ctx, advance_by);
+    fn update_gg(&mut self, ctx: &Context) -> [usize; 2] {
+        let (frame, size) = self.get_gg_frame(ctx);
         if let Some(pixels) = frame {
             let img = ImageDelta::full(
                 ImageData::Color(ColorImage { size, pixels }.into()), // todo meh
@@ -258,12 +265,8 @@ impl App {
 
     /// Process keyboard inputs and return the GG's next frame, if one was
     /// produced.
-    fn get_gg_frame(
-        &mut self,
-        ctx: &Context,
-        advance_by: Duration,
-    ) -> (Option<Vec<Colour>>, [usize; 2]) {
-        ctx.input(|i| {
+    fn get_gg_frame(&mut self, ctx: &Context) -> (Option<Vec<Colour>>, [usize; 2]) {
+        let time = ctx.input(|i| {
             for event in &i.events {
                 if let Event::Key { key, pressed, .. } = event {
                     if let Some(action) = self.state.options.input.pending.take() {
@@ -282,12 +285,18 @@ impl App {
                     }
                 }
             }
+            i.time as f32
         });
+        // slightly lower than actual delta - we want to keep pace with audio,
+        // so make sure we don't run ahead of it.
+        let delta = (time - self.last_time).min(0.1) - 0.0001;
+        self.last_time = time;
 
         let mut gg = self.gg.lock().unwrap();
         let size = gg.screen_size();
 
-        if cfg!(feature = "savestates") {
+        #[cfg(feature = "savestates")]
+        {
             if self.rewinder.rewinding {
                 let frame = if let Some(state) = self.rewinder.rewind_buffer.pop() {
                     gg.load_state(state);
@@ -300,7 +309,7 @@ impl App {
                 };
                 (frame.map(|p| unsafe { mem::transmute(p) }), size)
             } else {
-                gg.advance_delta(advance_by.as_secs_f32());
+                gg.advance_delta(delta);
                 let frame = gg.last_frame().map(|p| unsafe { mem::transmute(p) });
                 if frame.is_some() {
                     let state = gg.save_state();
@@ -308,8 +317,10 @@ impl App {
                 }
                 (frame, size)
             }
-        } else {
-            gg.advance_delta(advance_by.as_secs_f32());
+        }
+        #[cfg(not(feature = "savestates"))]
+        {
+            gg.advance_delta(delta);
             (gg.last_frame().map(|p| unsafe { mem::transmute(p) }), size)
         }
     }
@@ -323,6 +334,10 @@ impl App {
                 file.path.clone(),
                 &self.state.options.gg,
             );
+
+            if self.audio_stream.is_none() {
+                self.audio_stream = crate::setup_cpal(self.gg.clone());
+            }
 
             self.current_rom_path = file.path.clone();
             if let Some(path) = file.path {

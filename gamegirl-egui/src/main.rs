@@ -4,16 +4,20 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::sync::{Arc, Mutex};
-
-use gamegirl::System;
 use gamegirl_egui::gui;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     env_logger::init();
-    let gg = System::default();
-    let gg = Arc::new(Mutex::new(gg));
-    let _stream = gamegirl_egui::setup_cpal(gg.clone());
-    gui::start(gg);
+    gui::start();
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    console_error_panic_hook::set_once();
+    tracing_wasm::set_as_global_default();
+    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
+    wasm_bindgen_futures::spawn_local(async {
+        gui::start().await.unwrap();
+    });
 }
