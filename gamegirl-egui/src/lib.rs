@@ -19,16 +19,10 @@ use cpal::{
     BufferSize, SampleRate, Stream, StreamConfig,
 };
 use eframe::egui::Color32;
-#[cfg(target_arch = "wasm32")]
-use eframe::wasm_bindgen::{self, prelude::*};
 use gamegirl::System;
 
 /// Colour type used by the PPU for display output.
 pub type Colour = Color32;
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub struct Handle(Option<Stream>);
 
 /// Setup audio playback on the default audio device using CPAL.
 /// Will automatically poll the gg for audio when needed on a separate thread.

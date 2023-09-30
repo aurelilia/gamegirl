@@ -112,10 +112,6 @@ impl Button {
 /// It is (optionally zstd-compressed) bincode.
 #[cfg(feature = "serde")]
 pub fn serialize<T: serde::Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
-    if cfg!(target_arch = "wasm32") {
-        // Currently crashes when loading...
-        return vec![];
-    }
     if with_zstd {
         let mut dest = vec![];
         let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();

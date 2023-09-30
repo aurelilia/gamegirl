@@ -99,11 +99,6 @@ macro_rules! common_functions {
         /// Will restore the current cartridge and debugger.
         #[cfg(feature = "serde")]
         pub fn load_state(&mut self, state: &[u8]) {
-            if cfg!(target_arch = "wasm32") {
-                // Currently crashes...
-                return;
-            }
-
             let old_self = mem::replace(
                 self,
                 common::misc::deserialize(state, self.config.compress_savestates),
