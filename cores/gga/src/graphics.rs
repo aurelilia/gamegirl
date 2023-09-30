@@ -9,7 +9,6 @@ use gga_ppu::{
     interface::{PpuDmaReason, PpuInterrupt, PpuSystem},
     scheduling::PpuEvent,
     threading::{GgaPpu, PpuMmio},
-    Ppu,
 };
 
 use crate::{dma::Reason, AdvEvent, Dmas, GameGirlAdv};
@@ -72,12 +71,12 @@ impl GameGirlAdv {
 #[cfg(feature = "threaded-ppu")]
 impl GameGirlAdv {
     #[inline]
-    pub fn ppu(&mut self) -> std::sync::MutexGuard<Ppu<Self>> {
+    pub fn ppu(&mut self) -> std::sync::MutexGuard<gga_ppu::Ppu<Self>> {
         self.ppu.ppu.lock().unwrap()
     }
 
     #[inline]
-    pub fn ppu_nomut(&self) -> std::sync::MutexGuard<Ppu<Self>> {
+    pub fn ppu_nomut(&self) -> std::sync::MutexGuard<gga_ppu::Ppu<Self>> {
         self.ppu.ppu.lock().unwrap()
     }
 }

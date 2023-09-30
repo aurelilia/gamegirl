@@ -36,8 +36,8 @@ while test $# -gt 0; do
 done
 
 # ./setup_web.sh # <- call this first!
-CRATE_NAME="gamegirl"
-CRATE_NAME_SNAKE_CASE="gamegirl"
+CRATE_NAME="gamegirl-egui"
+CRATE_NAME_SNAKE_CASE="gamegirl_egui"
 
 # This is required to enable the web_sys clipboard API which egui_web uses
 # https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.Clipboard.html
@@ -49,7 +49,7 @@ rm -f "web/gamegirl_bg.wasm"
 
 echo "Building rust…"
 BUILD=release
-cargo build -p "gamegirl" --release --lib --target wasm32-unknown-unknown
+cargo build -p "gamegirl-egui" --release --lib --target wasm32-unknown-unknown
 
 # Get the output directory (in the workspace it is in another location)
 TARGET=$(cargo metadata --format-version=1 | jq --raw-output .target_directory)

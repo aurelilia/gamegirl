@@ -20,6 +20,14 @@ elf_rs = "0.2.0"
 
 
 [features]
-default = ["threaded-ppu"]
+default = []
 threaded-ppu = ["gga-ppu/threaded"]
-serde = ["dep:serde", "dep:serde_arrays", "arrayvec/serde", "common/serde", "arm-cpu/serde", "gga-ppu/serde", "psg-apu/serde"]
+serde = [
+    "dep:serde",
+    "dep:serde_arrays",
+    "arrayvec/serde",
+    "common/serde",
+    "arm-cpu/serde",
+    "gga-ppu/serde",
+    "psg-apu/serde",
+]

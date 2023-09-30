@@ -40,7 +40,7 @@ nds = { path = "../cores/nds", default-features = false }
 
 
 [features]
-default = ["persistence", "savestates", "remote-debugger"]
+default = ["persistence", "savestates"]
 persistence = ["dep:serde", "common/serde_config", "eframe/persistence"]
 savestates = ["dep:serde", "common/serde", "gamegirl/serde"]
 remote-debugger = ["gamegirl/remote-debugger"]

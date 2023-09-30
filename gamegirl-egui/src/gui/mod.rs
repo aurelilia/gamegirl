@@ -43,7 +43,7 @@ use crate::{
 
 /// How long a frame takes, and how much the GG should be advanced
 /// each frame. TODO: This assumption only holds for 60hz devices!
-const FRAME_LEN: Duration = Duration::from_secs_f64(1.0 / 60.0);
+const FRAME_LEN: f64 = 1.0 / 60.0;
 
 /// Total count of windows in GUI.
 const WINDOW_COUNT: usize = DBG_WINDOW_COUNT + APP_WINDOW_COUNT;
@@ -180,7 +180,7 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        let size = self.update_gg(ctx, FRAME_LEN);
+        let size = self.update_gg(ctx, Duration::from_secs_f64(FRAME_LEN));
         self.process_messages();
 
         egui::TopBottomPanel::top("navbar").show(ctx, |ui| {

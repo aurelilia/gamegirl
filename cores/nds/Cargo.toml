@@ -16,6 +16,12 @@ log = "0.4.17"
 
 
 [features]
-default = ["threaded-ppu"]
+default = []
 threaded-ppu = ["gga-ppu/threaded"]
-serde = ["dep:serde", "dep:serde_arrays", "common/serde", "arm-cpu/serde", "gga-ppu/serde"]
+serde = [
+    "dep:serde",
+    "dep:serde_arrays",
+    "common/serde",
+    "arm-cpu/serde",
+    "gga-ppu/serde",
+]

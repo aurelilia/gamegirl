@@ -13,8 +13,8 @@ nds = { path = "../cores/nds", optional = true }
 psx = { path = "../cores/psx", optional = true }
 log = "0.4.17"
 
-gdbstub = { version = "0.6.2", optional = true}
-gdbstub_arch = { version = "0.2.3", optional = true}
+gdbstub = { version = "0.6.2", optional = true }
+gdbstub_arch = { version = "0.2.3", optional = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -22,7 +22,10 @@ zstd = { version = "0.11.2", default-features = false, features = ["wasm"] }
 web-sys = { version = "0.3.59", features = ["Storage", "Window"] }
 base64 = "0.13.0"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+gga = { path = "../cores/gga", optional = true, features = ["threaded-ppu"] }
+nds = { path = "../cores/nds", optional = true, features = ["threaded-ppu"] }
 
 [features]
-serde = ["common/serde", "ggc/serde", "gga/serde", "nds/serde", "psx/serde"]
+serde = ["common/serde", "ggc/serde", "gga/serde", "nds/serde"]
 remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch"]

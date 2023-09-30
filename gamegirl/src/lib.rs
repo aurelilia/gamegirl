@@ -236,7 +236,7 @@ impl System {
 
 impl Default for System {
     fn default() -> Self {
-        // We start with a GGA, will be changed later if user loads a GGA cart.
+        // We start with a GGC, will be changed later if user loads a GGA cart.
         Self::GGC(Box::default())
     }
 }
