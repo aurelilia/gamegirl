@@ -198,9 +198,24 @@ impl GameGirl {
 
             DIV | TIMA | TAC => Timer::write(self, addr, value),
             LCDC => {
+                let was_on = self[LCDC].is_bit(7);
+                let is_on = value.is_bit(7);
                 self[LCDC] = value;
-                if !value.is_bit(7) {
+
+                if !is_on {
                     self[STAT] &= 0xF8;
+                }
+                if was_on && !is_on {
+                    let time = self
+                        .scheduler
+                        .cancel_with_remaining(|e| matches!(e, GGEvent::PpuEvent(_)));
+                    self.ppu.resume_data = Some(time);
+                }
+                if !was_on && is_on {
+                    let data = self.ppu.resume_data.take();
+                    if let Some(data) = data {
+                        self.scheduler.schedule(data.1, data.0 as i32);
+                    }
                 }
             }
             STAT => self[STAT] = value | 0x80, // Bit 7 unavailable

@@ -56,10 +56,19 @@ pub struct Ppu {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub last_frame: Option<Vec<Colour>>,
+
+    /// Info about what event to schedule in case of LCDC bit 7 being
+    /// unset, disabling the PPU.
+    /// When bit 7 is set again, this event is to be scheduled.
+    pub resume_data: Option<(u32, GGEvent)>,
 }
 
 impl Ppu {
     pub(super) fn handle_event(gg: &mut GameGirl, evt: PpuEvent, late_by: i32) {
+        if gg.ppu.resume_data.is_some() {
+            return;
+        }
+
         let (next_mode, time) = match evt {
             PpuEvent::OamScanEnd => (PpuEvent::UploadEnd, 172),
 
@@ -364,6 +373,7 @@ impl Ppu {
             },
             pixels: [[0; 4]; 160 * 144],
             last_frame: None,
+            resume_data: None,
         }
     }
 
