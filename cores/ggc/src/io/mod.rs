@@ -88,12 +88,12 @@ impl GameGirl {
 
     /// Get an 8-bit argument for the current CPU instruction.
     pub fn arg8(&mut self) -> u8 {
-        self.read8(self.cpu.pc + 1)
+        self.read8(self.cpu.pc.wrapping_add(1))
     }
 
     /// Get a 16-bit argument for the current CPU instruction.
     pub fn arg16(&mut self) -> u16 {
-        self.read16(self.cpu.pc + 1)
+        self.read16(self.cpu.pc.wrapping_add(1))
     }
 
     /// Pop the current value off the SP.

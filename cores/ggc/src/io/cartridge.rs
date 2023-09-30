@@ -62,6 +62,7 @@ impl Cartridge {
     }
 
     pub(super) fn write(&mut self, addr: u16, value: u8) {
+        let count = self.ram_bank_count();
         match (&mut self.kind, addr) {
             // MBC2
             (MBC2, 0x0000..=0x3FFF) if addr.is_bit(8) => {
@@ -111,8 +112,11 @@ impl Cartridge {
             }
 
             // Shared between some
-            (MBC3 | MBC5, 0x4000..=0x5FFF) => {
-                self.ram_bank = (value & 0x03) % self.ram_bank_count();
+            (MBC3, 0x4000..=0x5FFF) if count > 0 => {
+                self.ram_bank = (value & 0x03) % count;
+            }
+            (MBC5, 0x4000..=0x5FFF) if count > 0 => {
+                self.ram_bank = (value & 0x0F) % count;
             }
 
             // MBC1

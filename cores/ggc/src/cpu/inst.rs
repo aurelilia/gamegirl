@@ -384,7 +384,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         _ if inst.0 & 0x0F == 0x07 || inst.0 & 0x0F == 0x0F => {
             gg.advance_clock(1);
             let idx = inst.0 - 0xC7;
-            gg.push_stack(gg.cpu.pc + 1);
+            gg.push_stack(gg.cpu.pc.wrapping_add(1));
             gg.cpu.pc = idx.u16();
             return false;
         }
