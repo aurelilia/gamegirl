@@ -92,7 +92,7 @@ pub enum System {
     /// An NDS. Only used for NDS games.
     #[cfg(feature = "nds")]
     NDS(Box<nds::Nds>),
-    /// A PSX. Only used for PSX games, obviously.
+    /// A PSX. Only used for PSX games.
     #[cfg(feature = "psx")]
     PSX(Box<psx::PlayStation>),
 }

@@ -132,7 +132,6 @@ fn make_app(ctx: &CreationContext<'_>) -> Box<App> {
         window_states: [false; WINDOW_COUNT],
         message_channel: mpsc::channel(),
         frame_times: History::new(0..120, 2.0),
-        last_time: 0.0,
         audio_stream: None,
 
         state,
@@ -169,8 +168,6 @@ struct App {
     message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
     /// Frame times.
     frame_times: History<f32>,
-    /// Last frame time according to egui's input subsystem.
-    last_time: f32,
     /// Stream for audio.
     audio_stream: Option<Stream>,
 
@@ -266,7 +263,7 @@ impl App {
     /// Process keyboard inputs and return the GG's next frame, if one was
     /// produced.
     fn get_gg_frame(&mut self, ctx: &Context) -> (Option<Vec<Colour>>, [usize; 2]) {
-        let time = ctx.input(|i| {
+        let delta = ctx.input(|i| {
             for event in &i.events {
                 if let Event::Key { key, pressed, .. } = event {
                     if let Some(action) = self.state.options.input.pending.take() {
@@ -285,12 +282,8 @@ impl App {
                     }
                 }
             }
-            i.time as f32
+            i.stable_dt - 0.0001
         });
-        // slightly lower than actual delta - we want to keep pace with audio,
-        // so make sure we don't run ahead of it.
-        let delta = (time - self.last_time).min(0.1) - 0.0001;
-        self.last_time = time;
 
         let mut gg = self.gg.lock().unwrap();
         let size = gg.screen_size();
