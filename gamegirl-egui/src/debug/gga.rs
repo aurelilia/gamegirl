@@ -16,7 +16,7 @@ pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
     app.debugger_window_states[1] |= ui.button("Breakpoints").clicked();
     app.debugger_window_states[2] |= ui.button("Cartridge Viewer").clicked();
 
-    if cfg!(feature = "remote-debugger") {
+    if cfg!(all(feature = "remote-debugger", target_family = "unix")) {
         app.debugger_window_states[3] |= ui.button("Remote Debugger").clicked();
     }
 }
@@ -149,23 +149,27 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
 }
 
 /// Window showing status of the remote debugger.
-#[cfg(feature = "remote-debugger")]
-pub(super) fn remote_debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
-    {
-        let gg = app.gg.lock().unwrap();
-        if !matches!(&*gg, gamegirl::System::GGA(_)) {
-            ui.label("Only available on GGA!");
-            return;
-        }
-    }
+#[cfg(all(feature = "remote-debugger", target_family = "unix"))]
+fn remote_debugger(_: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, _: &Context) {
+    use std::sync::{Arc, RwLock};
 
     use gamegirl::remote_debugger::DebuggerStatus;
-    let stat = *app.remote_dbg.read().unwrap();
+    use once_cell::sync::Lazy;
+
+    static DBG: Lazy<Arc<RwLock<DebuggerStatus>>> = Lazy::new(Arc::default);
+
+    fn launch_debugger(app: &App) {
+        let gg = app.core.clone();
+        let path = app.current_rom_path.clone().unwrap();
+        std::thread::spawn(|| gamegirl::remote_debugger::init(gg, path, DBG.clone()));
+    }
+
+    let stat = *DBG.read().unwrap();
     match stat {
         DebuggerStatus::NotActive => {
             ui.label("Remote debugger is not active.");
             if ui.button("Launch Server").clicked() {
-                launch_debugger(app)
+                launch_debugger(app);
             }
         }
         DebuggerStatus::WaitingForConnection => {
@@ -183,19 +187,11 @@ pub(super) fn remote_debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _:
         DebuggerStatus::Disconnected => {
             ui.label("Remote debugger disconnected/exited.");
             if ui.button("Relaunch Server").clicked() {
-                launch_debugger(app)
+                launch_debugger(app);
             }
         }
     }
 }
 
-#[cfg(feature = "remote-debugger")]
-fn launch_debugger(app: &mut App) {
-    let gg = app.gg.clone();
-    let path = app.current_rom_path.clone().unwrap();
-    let remote = app.remote_dbg.clone();
-    std::thread::spawn(|| gamegirl::remote_debugger::init(gg, path, remote));
-}
-
-#[cfg(not(feature = "remote-debugger"))]
+#[cfg(not(all(feature = "remote-debugger", target_family = "unix")))]
 pub(super) fn remote_debugger(_: &mut GameGirlAdv, _: &mut Ui, _: &mut App, _: &Context) {}

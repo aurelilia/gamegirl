@@ -33,8 +33,9 @@ rfd = "0.12.0"
 futures-executor = "0.3.28"
 env_logger = "0.10.0"
 log = "0.4"
+serde = "1.0.188"
 
-serde = { version = "1.0.188" }
+once_cell = { version = "*", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
@@ -46,6 +47,6 @@ cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
 gga = { path = "../cores/gga", default-features = false }
 nds = { path = "../cores/nds", default-features = false }
 
-
 [features]
-remote-debugger = ["gamegirl/remote-debugger"]
+default = ["remote-debugger"]
+remote-debugger = ["gamegirl/remote-debugger", "once_cell"]

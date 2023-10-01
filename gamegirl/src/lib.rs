@@ -22,7 +22,7 @@ pub use nds;
 #[cfg(feature = "psx")]
 pub use psx;
 
-#[cfg(feature = "remote-debugger")]
+#[cfg(all(feature = "remote-debugger", target_family = "unix"))]
 pub mod remote_debugger;
 
 /// Save a game to disk.

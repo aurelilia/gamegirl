@@ -40,16 +40,17 @@ use gdbstub::{
     },
 };
 use gdbstub_arch::arm::{reg::id::ArmCoreRegId, Armv4t};
+use gga::GameGirlAdv;
 
 use crate::{
     remote_debugger::DebuggerStatus::{Disconnected, Running, WaitingForConnection},
-    System,
+    Core,
 };
 
-pub struct SyncSys(Arc<Mutex<System>>, bool, PathBuf);
+pub struct SyncSys(Arc<Mutex<Box<dyn Core>>>, bool, PathBuf);
 
 impl SyncSys {
-    fn lock(&mut self) -> MutexGuard<System> {
+    fn lock(&mut self) -> MutexGuard<Box<dyn Core>> {
         self.0.lock().unwrap()
     }
 }
@@ -76,8 +77,8 @@ impl SingleThreadBase for SyncSys {
         &mut self,
         regs: &mut <Self::Arch as Arch>::Registers,
     ) -> TargetResult<(), Self> {
-        let gg = self.lock();
-        let gg = gg.as_gga();
+        let mut gg = self.lock();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
 
         for (i, reg) in regs.r.iter_mut().enumerate() {
             *reg = gg.cpu.reg(i.u32());
@@ -95,7 +96,7 @@ impl SingleThreadBase for SyncSys {
         regs: &<Self::Arch as Arch>::Registers,
     ) -> TargetResult<(), Self> {
         let mut gg = self.lock();
-        let mut gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
 
         for (i, reg) in regs.r.iter().enumerate() {
             gg.cpu.registers[i] = *reg;
@@ -119,8 +120,8 @@ impl SingleThreadBase for SyncSys {
         start_addr: <Self::Arch as Arch>::Usize,
         data: &mut [u8],
     ) -> TargetResult<(), Self> {
-        let gg = self.lock();
-        let gg = gg.as_gga();
+        let mut gg = self.lock();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         for (offs, data) in data.iter_mut().enumerate() {
             *data = gg.get_byte(start_addr + offs.u32());
         }
@@ -133,7 +134,7 @@ impl SingleThreadBase for SyncSys {
         data: &[u8],
     ) -> TargetResult<(), Self> {
         let mut gg = self.lock();
-        let gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         for (offs, data) in data.iter().enumerate() {
             gg.set_byte(start_addr + offs.u32(), *data);
         }
@@ -152,8 +153,8 @@ impl SingleRegisterAccess<()> for SyncSys {
         reg_id: <Self::Arch as Arch>::RegId,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
-        let gg = self.lock();
-        let gg = gg.as_gga();
+        let mut gg = self.lock();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
 
         let value = match reg_id {
             ArmCoreRegId::Gpr(id) => gg.cpu.reg(id.u32()),
@@ -178,7 +179,7 @@ impl SingleRegisterAccess<()> for SyncSys {
     ) -> TargetResult<(), Self> {
         let value = u32::from_le_bytes([val[0], val[1], val[2], val[3]]);
         let mut gg = self.lock();
-        let gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
 
         match reg_id {
             ArmCoreRegId::Gpr(id) => gg.cpu.registers[id.us()] = value,
@@ -194,7 +195,7 @@ impl SingleRegisterAccess<()> for SyncSys {
 
 impl SingleThreadResume for SyncSys {
     fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
-        self.0.lock().unwrap().gga_mut().options.running = true;
+        self.0.lock().unwrap().options().running = true;
         Ok(())
     }
 
@@ -205,7 +206,7 @@ impl SingleThreadResume for SyncSys {
 
 impl SingleThreadSingleStep for SyncSys {
     fn step(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
-        self.0.lock().unwrap().gga_mut().advance();
+        self.0.lock().unwrap().advance();
         self.1 = true;
         Ok(())
     }
@@ -228,7 +229,7 @@ impl SwBreakpoint for SyncSys {
         _kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self> {
         let mut gg = self.lock();
-        let gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         gg.debugger.breakpoints.push(Breakpoint {
             value: Some(addr),
             value_text: addr.to_string(),
@@ -244,7 +245,7 @@ impl SwBreakpoint for SyncSys {
         _kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self> {
         let mut gg = self.lock();
-        let gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         let len = gg.debugger.breakpoints.len();
         gg.debugger
             .breakpoints
@@ -265,7 +266,7 @@ impl HwWatchpoint for SyncSys {
         }
 
         let mut gg = self.lock();
-        let gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         gg.debugger.breakpoints.push(Breakpoint {
             value: Some(addr),
             value_text: addr.to_string(),
@@ -286,7 +287,7 @@ impl HwWatchpoint for SyncSys {
         }
 
         let mut gg = self.lock();
-        let gg = gg.gga_mut();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         let len = gg.debugger.breakpoints.len();
         gg.debugger
             .breakpoints
@@ -336,7 +337,7 @@ impl BlockingEventLoop for EventLoop {
             <Self::Connection as Connection>::Error,
         >,
     > {
-        let hit_bp = target.0.lock().unwrap().as_gga().options.running;
+        let hit_bp = target.0.lock().unwrap().options().running;
         match () {
             _ if hit_bp => Ok(Event::TargetStopped(SingleThreadStopReason::SwBreak(()))),
             _ if target.1 => {
@@ -357,8 +358,9 @@ impl BlockingEventLoop for EventLoop {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub enum DebuggerStatus {
+    #[default]
     NotActive,
     WaitingForConnection,
     Running(SocketAddr),
@@ -366,7 +368,11 @@ pub enum DebuggerStatus {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn init(sys: Arc<Mutex<System>>, rom_path: PathBuf, status: Arc<RwLock<DebuggerStatus>>) {
+pub fn init(
+    sys: Arc<Mutex<Box<dyn Core>>>,
+    rom_path: PathBuf,
+    status: Arc<RwLock<DebuggerStatus>>,
+) {
     {
         *status.write().unwrap() = WaitingForConnection;
     }

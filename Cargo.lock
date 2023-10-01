@@ -923,6 +923,7 @@ dependencies = [
  "gga",
  "log",
  "nds",
+ "once_cell",
  "rfd",
  "serde",
  "tracing-wasm",

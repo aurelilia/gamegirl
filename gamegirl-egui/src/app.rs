@@ -31,7 +31,7 @@ pub struct App {
     /// The core currently running.
     pub core: Arc<Mutex<Box<dyn Core>>>,
     /// The path to the ROM currently running, if any. Always None on WASM.
-    current_rom_path: Option<PathBuf>,
+    pub current_rom_path: Option<PathBuf>,
 
     /// Rewinder state.
     pub rewinder: Rewinder,
