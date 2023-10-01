@@ -19,17 +19,26 @@ use crate::{
 pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
     let opt = &mut app.state.options;
     CollapsingHeader::new("Emulation").show(ui, |ui| {
-        ComboBox::from_label("GB Colour mode")
+        ui.heading("GameBoy");
+        ComboBox::from_label("GB Color mode")
             .selected_text(format!("{:?}", opt.sys.mode))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut opt.sys.mode, CgbMode::Always, "Always");
                 ui.selectable_value(&mut opt.sys.mode, CgbMode::Prefer, "Prefer");
                 ui.selectable_value(&mut opt.sys.mode, CgbMode::Never, "Never");
             });
-        ui.checkbox(&mut opt.sys.cached_interpreter, "GGA: Enable Cached Interpreter")
+            ui.checkbox(
+                &mut opt.sys.cgb_colour_correction,
+                "Enable GBC colour correction",
+            )
+            .on_hover_text("Adjust colours to be more accurate to a real GBC screen.");
+        
+        ui.heading("Gameboy Advance");
+        ui.checkbox(&mut opt.sys.cached_interpreter, "Enable Cached Interpreter")
             .on_hover_text("Enables caching in the interpreter. Speeds up emulation at the cost of RAM usage. Also breaks breakpoints.");
-        ui.separator();
+    });
 
+    CollapsingHeader::new("Features").show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.add(Slider::new(&mut opt.fast_forward_hold_speed, 2..=10));
             ui.label("Fast forward speed (Hold)");
@@ -40,10 +49,10 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         });
         ui.separator();
 
-        ui.checkbox(&mut opt.sys.compress_savestates, "Compress save states/rewinding")
-            .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
         ui.checkbox(&mut opt.enable_rewind, "Enable Rewinding");
         if opt.enable_rewind {
+            ui.checkbox(&mut opt.sys.compress_savestates, "Compress rewind data")
+            .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
             ui.horizontal(|ui| {
                 ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60))
                     .on_hover_text(format!(
@@ -56,12 +65,6 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
     });
 
     CollapsingHeader::new("Graphics").show(ui, |ui| {
-        ui.checkbox(
-            &mut opt.sys.cgb_colour_correction,
-            "Enable GBC colour correction",
-        )
-        .on_hover_text("Adjust colours to be more accurate to a real GBC screen.");
-
         ComboBox::from_label("Texture filter")
             .selected_text(format!("{:?}", opt.tex_filter.magnification))
             .show_ui(ui, |ui| {
