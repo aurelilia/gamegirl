@@ -5,15 +5,13 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 /// A macro that can be used by systems to implement common functions
-/// in a generic manner.
+/// in a generic manner, as part of the system trait.
 /// This macro simply grew as it became clear that some functionality
 /// is easily shared between systems.
 #[macro_export]
 macro_rules! common_functions {
-    ($clock:expr, $pause_event:expr) => {
-        /// Advance the system clock by the given delta in seconds.
-        /// Might advance a few clocks more.
-        pub fn advance_delta(&mut self, delta: f32) {
+    ($clock:expr, $pause_event:expr, $size:expr) => {
+        fn advance_delta(&mut self, delta: f32) {
             if !self.options.running {
                 return;
             }
@@ -27,9 +25,7 @@ macro_rules! common_functions {
             }
         }
 
-        /// Step until the PPU has finished producing the current frame.
-        /// Only used for rewinding since it causes audio desync very easily.
-        pub fn produce_frame(&mut self) -> Option<Vec<Colour>> {
+        fn produce_frame(&mut self) -> Option<Vec<Colour>> {
             while self.options.running && self.ppu.last_frame == None {
                 self.advance();
             }
@@ -43,10 +39,7 @@ macro_rules! common_functions {
             self.ppu.last_frame.take()
         }
 
-        /// Produce the next audio samples and write them to the given buffer.
-        /// Writes zeroes if the system is not currently running
-        /// and no audio should be played.
-        pub fn produce_samples(&mut self, samples: &mut [f32]) {
+        fn produce_samples(&mut self, samples: &mut [f32]) {
             if !self.options.running {
                 samples.fill(0.0);
                 return;
@@ -89,21 +82,42 @@ macro_rules! common_functions {
             }
         }
 
-        /// Create a save state that can be loaded with [load_state].
         #[cfg(feature = "serde")]
-        pub fn save_state(&self) -> Vec<u8> {
+        fn save_state(&mut self) -> Vec<u8> {
             common::misc::serialize(self, self.config.compress_savestates)
         }
 
-        /// Load a state produced by [save_state].
-        /// Will restore the current cartridge and debugger.
         #[cfg(feature = "serde")]
-        pub fn load_state(&mut self, state: &[u8]) {
+        fn load_state(&mut self, state: &[u8]) {
             let old_self = mem::replace(
                 self,
                 common::misc::deserialize(state, self.config.compress_savestates),
             );
             self.restore_from(old_self);
+        }
+
+        fn last_frame(&mut self) -> Option<Vec<Colour>> {
+            self.ppu.last_frame.take()
+        }
+
+        fn options(&mut self) -> &mut EmulateOptions {
+            &mut self.options
+        }
+
+        fn config(&self) -> &SystemConfig {
+            &self.config
+        }
+
+        fn config_mut(&mut self) -> &mut SystemConfig {
+            &mut self.config
+        }
+
+        fn screen_size(&self) -> [usize; 2] {
+            $size
+        }
+
+        fn as_any(&mut self) -> &mut dyn std::any::Any {
+            self
         }
     };
 }

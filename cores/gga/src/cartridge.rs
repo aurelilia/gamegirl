@@ -4,7 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{cell::RefCell, iter};
+use std::{
+    iter,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use common::{components::storage::GameSave, numutil::NumExt};
 use FlashCmdStage::*;
@@ -143,7 +146,7 @@ impl Cartridge {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SaveType {
     #[default]
@@ -157,7 +160,7 @@ pub enum SaveType {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Eeprom {
     size: EepromSize,
@@ -167,17 +170,18 @@ pub struct Eeprom {
     recv_count: u32,
 
     send_buffer: u128,
-    send_count: RefCell<u32>,
+    send_count: AtomicU32,
 }
 
 impl Eeprom {
     pub fn read(&self) -> u16 {
-        let mut count = self.send_count.borrow_mut();
-        if *count == 0 {
+        let mut count = self.send_count.load(Ordering::Relaxed);
+        if count == 0 {
             1
         } else {
-            *count -= 1;
-            (self.send_buffer >> *count) as u16 & 1
+            count -= 1;
+            self.send_count.store(count, Ordering::Relaxed);
+            (self.send_buffer >> count) as u16 & 1
         }
     }
 
@@ -208,7 +212,7 @@ impl Eeprom {
                         self.send_buffer <<= 8;
                         self.send_buffer |= *byte as u128;
                     }
-                    *self.send_count.borrow_mut() = 68; // 4 dummy bits
+                    self.send_count.store(68, Ordering::Relaxed); // 4 dummy bits
                 }
 
                 EepromCmd::Write => {
@@ -221,7 +225,7 @@ impl Eeprom {
                     }
                     // We want to send 1's, which indicate the operation is done.
                     self.send_buffer = u128::MAX;
-                    *self.send_count.borrow_mut() = 128;
+                    self.send_count.store(128, Ordering::Relaxed);
                 }
             }
             self.reset_rx();
@@ -257,7 +261,7 @@ impl Eeprom {
             recv_buffer: 0,
             recv_count: 0,
             send_buffer: 0,
-            send_count: RefCell::new(0),
+            send_count: AtomicU32::new(0),
         }
     }
 }

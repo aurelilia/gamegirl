@@ -7,7 +7,9 @@
 use std::iter;
 
 /// Struct for storing rewind state.
-pub struct Rewinding {
+/// "Rewinding" in the context of this is considered anything that 'turns back'
+/// the clock - both literal frame-by-frame rewinding, and savestates.
+pub struct Rewinder {
     /// Save states that the user can store/load at any time.
     pub save_states: [Option<Vec<u8>>; 10],
     /// Save state created before the last load, to allow the user
@@ -25,19 +27,17 @@ pub struct Rewinding {
     pub rewinding: bool,
 }
 
-impl Rewinding {
+impl Rewinder {
     /// Set the size of the rewind buffer in seconds.
     pub fn set_rw_buf_size(&mut self, secs: usize) {
         self.rewind_buffer = RWBuffer::new(secs);
     }
-}
 
-impl Default for Rewinding {
-    fn default() -> Self {
+    pub fn new(buffer_secs: usize) -> Self {
         Self {
             save_states: [None, None, None, None, None, None, None, None, None, None],
             before_last_ss_load: None,
-            rewind_buffer: RWBuffer::new(60 * 10),
+            rewind_buffer: RWBuffer::new(buffer_secs),
             rewinding: false,
         }
     }

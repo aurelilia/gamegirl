@@ -14,12 +14,19 @@ path = "src/main.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-common = { path = "../common" }
-gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nds"] }
+common = { path = "../common", features = ["serde_config", "serde"] }
+gamegirl = { path = "../gamegirl", features = [
+    "ggc",
+    "gga",
+    "nds",
+    "psx",
+    "serde",
+] }
 
 eframe = { version = "0.23.0", default-features = false, features = [
     "default_fonts",
     "glow",
+    "persistence",
 ] }
 cpal = "0.15.2"
 rfd = "0.12.0"
@@ -27,7 +34,7 @@ futures-executor = "0.3.28"
 env_logger = "0.10.0"
 log = "0.4"
 
-serde = { version = "1.0.188", optional = true }
+serde = { version = "1.0.188" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
@@ -41,7 +48,4 @@ nds = { path = "../cores/nds", default-features = false }
 
 
 [features]
-default = ["persistence", "savestates"]
-persistence = ["dep:serde", "common/serde_config", "eframe/persistence"]
-savestates = ["dep:serde", "common/serde", "gamegirl/serde"]
 remote-debugger = ["gamegirl/remote-debugger"]

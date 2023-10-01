@@ -4,12 +4,18 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use gamegirl_egui::gui;
+use eframe::Theme;
+use gamegirl_egui::App;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     env_logger::init();
-    gui::start();
+    let options = eframe::NativeOptions {
+        transparent: true,
+        default_theme: Theme::Dark,
+        ..Default::default()
+    };
+    eframe::run_native("gamegirl", options, Box::new(|ctx| App::new(ctx))).unwrap()
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -18,6 +24,13 @@ fn main() {
     tracing_wasm::set_as_global_default();
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
     wasm_bindgen_futures::spawn_local(async {
-        gui::start().await.unwrap();
+        let options = eframe::WebOptions {
+            default_theme: Theme::Dark,
+            ..Default::default()
+        };
+        eframe::WebRunner::new()
+            .start("the_canvas_id", options, Box::new(|ctx| App::new(ctx)))
+            .await
+            .unwrap();
     });
 }

@@ -9,11 +9,14 @@ use std::{mem, path::PathBuf};
 use common::{
     common_functions,
     components::{
-        debugger::Debugger, memory::MemoryMapper, scheduler::Scheduler, storage::Storage,
+        debugger::Debugger,
+        memory::MemoryMapper,
+        scheduler::Scheduler,
+        storage::{GameSave, Storage},
     },
-    misc::{EmulateOptions, SystemConfig},
+    misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    Colour,
+    Colour, Core,
 };
 
 use crate::{
@@ -73,14 +76,42 @@ pub struct GameGirl {
     pub options: EmulateOptions,
 }
 
-impl GameGirl {
-    common_functions!(T_CLOCK_HZ, GGEvent::PauseEmulation);
+impl Core for GameGirl {
+    common_functions!(T_CLOCK_HZ, GGEvent::PauseEmulation, [160, 144]);
 
-    /// Advance the system by a single CPU instruction.
-    pub fn advance(&mut self) {
+    fn advance(&mut self) {
         Cpu::exec_next_inst(self);
     }
 
+    fn reset(&mut self) {
+        let old_self = mem::take(self);
+        let save = old_self.cart.make_save();
+        self.load_cart_mem(old_self.cart, &old_self.config);
+        if let Some(save) = save {
+            self.cart.load_save(save);
+        }
+
+        self.options = old_self.options;
+        self.config = old_self.config;
+        self.debugger = old_self.debugger;
+        MemoryMapper::init_pages(self);
+    }
+
+    fn skip_bootrom(&mut self) {
+        self.cpu.pc = 0x100;
+        self.set8(BOOTROM_DISABLE, 1);
+    }
+
+    fn set_button(&mut self, btn: Button, pressed: bool) {
+        Joypad::set(self, btn, pressed);
+    }
+
+    fn make_save(&self) -> Option<GameSave> {
+        self.cart.make_save()
+    }
+}
+
+impl GameGirl {
     /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, m_cycles: u16) {
         self.scheduler.advance((m_cycles << self.t_shift).u32());
@@ -103,21 +134,6 @@ impl GameGirl {
     /// Request an interrupt. Sets the bit in IF.
     fn request_interrupt(&mut self, ir: Interrupt) {
         self[IF] = self[IF].set_bit(ir.to_index(), true);
-    }
-
-    /// Reset the console, while keeping the current cartridge inserted.
-    pub fn reset(&mut self) {
-        let old_self = mem::take(self);
-        let save = old_self.cart.make_save();
-        self.load_cart_mem(old_self.cart, &old_self.config);
-        if let Some(save) = save {
-            self.cart.load_save(save);
-        }
-
-        self.options = old_self.options;
-        self.config = old_self.config;
-        self.debugger = old_self.debugger;
-        MemoryMapper::init_pages(self);
     }
 
     /// Restore state after a savestate load. `old_self` should be the
@@ -156,11 +172,6 @@ impl GameGirl {
         let mut ggc = Box::<Self>::default();
         ggc.load_cart(cart, config, false);
         ggc
-    }
-
-    pub fn skip_bootrom(&mut self) {
-        self.cpu.pc = 0x100;
-        self.set8(BOOTROM_DISABLE, 1);
     }
 }
 

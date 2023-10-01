@@ -27,10 +27,10 @@ use std::{
 use arm_cpu::{interface::ArmSystem, Cpu};
 use common::{
     common_functions,
-    components::{debugger::Debugger, scheduler::Scheduler},
-    misc::{EmulateOptions, SystemConfig},
+    components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
+    misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    Colour,
+    Colour, Core,
 };
 
 use crate::{
@@ -126,11 +126,10 @@ pub struct Nds {
     ticking: bool,
 }
 
-impl Nds {
-    common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation);
+impl Core for Nds {
+    common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [240, 160 * 2]);
 
-    /// Step forward the emulated console including all subsystems.
-    pub fn advance(&mut self) {
+    fn advance(&mut self) {
         // Run an instruction on the ARM9, then keep running the ARM7
         // until it has caught up
         Cpu::continue_running(&mut self.nds9());
@@ -140,6 +139,29 @@ impl Nds {
         }
     }
 
+    fn reset(&mut self) {
+        let old_self = mem::take(self);
+        self.restore_from(old_self);
+    }
+
+    fn skip_bootrom(&mut self) {
+        /// Really HLE init on NDS
+        for addr in 0..0x200 {
+            self.nds9()
+                .set(0x27FFE00 + addr as u32, self.cart.rom[addr])
+        }
+    }
+
+    fn set_button(&mut self, btn: Button, pressed: bool) {
+        todo!();
+    }
+
+    fn make_save(&self) -> Option<GameSave> {
+        todo!();
+    }
+}
+
+impl Nds {
     #[inline]
     fn nds7(&mut self) -> Nds7 {
         Nds7(self as *mut Nds)
@@ -148,12 +170,6 @@ impl Nds {
     #[inline]
     fn nds9(&mut self) -> Nds9 {
         Nds9(self as *mut Nds)
-    }
-
-    /// Reset the console, while keeping the current cartridge inserted.
-    pub fn reset(&mut self) {
-        let old_self = mem::take(self);
-        self.restore_from(old_self);
     }
 
     /// Restore state after a savestate load. `old_self` should be the
@@ -165,15 +181,12 @@ impl Nds {
         self.init_memory();
     }
 
-    pub fn skip_bootrom(&mut self) {
-        todo!();
-    }
-
     pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
         let mut nds = Box::<Self>::default();
         nds.config = config.clone();
         nds.cart.load_rom(cart);
         nds.init_memory();
+        nds.skip_bootrom();
         nds
     }
 }

@@ -20,7 +20,7 @@ use std::{
 use ansi_term::Colour;
 use gamegirl::{
     common::{self, misc::SystemConfig},
-    System,
+    Core,
 };
 use png::{BitDepth, ColorType, Decoder, Encoder};
 use seahorse::{App, Command, Flag, FlagType};
@@ -59,8 +59,7 @@ fn main() {
                         .description("Reset the console every 30 seconds and measure"),
                 )
                 .action(|c| {
-                    let mut gg = System::default();
-                    gg.load_cart(
+                    let mut gg = gamegirl::load_cart(
                         fs::read("bench.gb").unwrap(),
                         None,
                         &SystemConfig::default(),
@@ -115,7 +114,7 @@ fn main() {
 
 pub fn run_dir<const SKIP_BOOTROM: bool, const IMG_COMPARE: bool>(
     dir: &str,
-    cond: fn(&System) -> ControlFlow<Status>,
+    cond: fn(&mut dyn Core) -> ControlFlow<Status>,
 ) {
     let total = AtomicUsize::new(0);
     let success = AtomicUsize::new(0);
@@ -138,7 +137,7 @@ fn run_inner<const SKIP_BOOTROM: bool, const IMG_COMPARE: bool>(
     name: &str,
     total: &AtomicUsize,
     success: &AtomicUsize,
-    cond: fn(&System) -> ControlFlow<Status>,
+    cond: fn(&mut dyn Core) -> ControlFlow<Status>,
 ) {
     let mut entries = dir
         .read_dir()
@@ -203,10 +202,9 @@ fn run_inner<const SKIP_BOOTROM: bool, const IMG_COMPARE: bool>(
 fn run<const SKIP_BOOTROM: bool, const TIMEOUT_GOOD: bool>(
     test: Vec<u8>,
     image: Option<Vec<common::Colour>>,
-    cond: fn(&System) -> ControlFlow<Status>,
+    cond: fn(&mut dyn Core) -> ControlFlow<Status>,
 ) -> Result<Vec<common::Colour>, String> {
-    let mut gg = System::default();
-    gg.load_cart(test, None, &SystemConfig::default());
+    let mut gg = gamegirl::load_cart(test, None, &SystemConfig::default());
     if SKIP_BOOTROM {
         gg.skip_bootrom();
     }
@@ -219,7 +217,7 @@ fn run<const SKIP_BOOTROM: bool, const TIMEOUT_GOOD: bool>(
                 return Ok(frame);
             }
         }
-        match cond(&gg) {
+        match cond(&mut *gg) {
             ControlFlow::Break(Status::Success) => return Ok(frame),
             ControlFlow::Break(Status::Fail) => return Err("FAILED".to_string()),
             ControlFlow::Break(Status::FailAt(pos)) => return Err(format!("FAILED AT {pos}")),

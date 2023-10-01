@@ -9,7 +9,7 @@
 pub struct Cartridge {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
-    rom: Vec<u8>,
+    pub rom: Vec<u8>,
 }
 
 impl Cartridge {

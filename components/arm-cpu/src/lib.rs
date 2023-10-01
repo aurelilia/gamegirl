@@ -58,7 +58,7 @@ pub struct Cpu<S: ArmSystem + 'static> {
     #[cfg(feature = "instruction-tracing")]
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg(feature = "instruction-tracing")]
-    pub instruction_tracer: Option<Box<dyn Fn(&S, u32) + Send + 'static>>,
+    pub instruction_tracer: Option<Box<dyn Fn(&S, u32) + Sync + Send + 'static>>,
 }
 
 impl<S: ArmSystem> Cpu<S> {

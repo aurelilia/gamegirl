@@ -4,22 +4,27 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-#![feature(duration_consts_float)]
+#![feature(trait_upcasting)]
 
-pub mod gui;
+mod app;
+mod debug;
+mod gui;
+mod input;
+mod rewind;
 
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
 
+pub use app::App;
 use common::SAMPLE_RATE;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     BufferSize, SampleRate, Stream, StreamConfig,
 };
 use eframe::egui::Color32;
-use gamegirl::System;
+use gamegirl::Core;
 
 /// Colour type used by the PPU for display output.
 pub type Colour = Color32;
@@ -30,7 +35,7 @@ pub type Colour = Color32;
 /// 60 times per second, which would lead to choppy display.
 /// Make sure to keep the returned Stream around to prevent the audio playback
 /// thread from closing.
-pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Option<Stream> {
+pub fn setup_cpal(sys: Arc<Mutex<Box<dyn Core>>>) -> Option<Stream> {
     let device = cpal::default_host().default_output_device().unwrap();
     let stream = device
         .build_output_stream(
@@ -40,8 +45,8 @@ pub fn setup_cpal(gg: Arc<Mutex<System>>) -> Option<Stream> {
                 buffer_size: BufferSize::Default,
             },
             move |data: &mut [f32], _| {
-                let mut gg = gg.lock().unwrap();
-                gg.produce_samples(data)
+                let mut core = sys.lock().unwrap();
+                core.produce_samples(data)
             },
             move |err| panic!("{err}"),
             Some(Duration::from_secs(1)),

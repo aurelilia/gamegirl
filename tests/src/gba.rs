@@ -6,11 +6,13 @@
 
 use std::ops::ControlFlow::{Break, Continue};
 
+use gamegirl::gga::GameGirlAdv;
+
 use crate::Status;
 
 pub fn exec_jsmolka() {
     crate::run_dir::<true, true>("jsmolka", |gg| {
-        let gg = gg.as_gga();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         if gg.cpu.sp() == 0x03008014 {
             let ones = gg.cpu.reg(10);
             let tens = gg.cpu.reg(9);
@@ -25,7 +27,7 @@ pub fn exec_jsmolka() {
 
 pub fn exec_fuzzarm() {
     crate::run_dir::<true, false>("fuzzarm", |gg| {
-        let gg = gg.as_gga();
+        let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         if gg.cpu.pc() == 0x0800_00F4 {
             // These tests set PC to this value; the current instruction is always 'b 0x0'
             Break(Status::Success)

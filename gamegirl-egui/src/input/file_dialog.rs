@@ -8,7 +8,7 @@ use std::{future::Future, path::PathBuf, sync::mpsc};
 
 use rfd::FileHandle;
 
-use crate::gui::Message;
+use crate::app::Message;
 
 /// A file picked by the user.
 pub struct File {

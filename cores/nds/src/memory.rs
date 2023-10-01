@@ -27,7 +27,7 @@ pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    psram: [u8; 4 * MB],
+    pub psram: [u8; 4 * MB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     wram: [u8; 32 * KB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]

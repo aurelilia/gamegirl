@@ -60,7 +60,7 @@ impl Timer {
             // Make sure we account for DIV being the timer's source of increases
             // properly, would count too little if not
             let time_elapsed = gg.scheduler.now() - gg.timer.scheduled_at;
-            let time_ds = time_elapsed.u16() * gg.speed.u16();
+            let time_ds = time_elapsed.u16().wrapping_mul(gg.speed.u16());
             gg[TIMA] + (time_ds / gg.timer.counter_divider).u8()
         } else {
             gg[TIMA]

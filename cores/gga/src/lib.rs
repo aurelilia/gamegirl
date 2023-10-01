@@ -14,9 +14,13 @@ use audio::Apu;
 use cartridge::Cartridge;
 use common::{
     common_functions,
-    components::{debugger::Debugger, scheduler::Scheduler, storage::Storage},
-    misc::{EmulateOptions, SystemConfig},
-    Colour,
+    components::{
+        debugger::Debugger,
+        scheduler::Scheduler,
+        storage::{GameSave, Storage},
+    },
+    misc::{Button, EmulateOptions, SystemConfig},
+    Colour, Core,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
@@ -68,14 +72,36 @@ pub struct GameGirlAdv {
     ticking: bool,
 }
 
-impl GameGirlAdv {
-    common_functions!(CPU_CLOCK, AdvEvent::PauseEmulation);
+impl Core for GameGirlAdv {
+    common_functions!(CPU_CLOCK, AdvEvent::PauseEmulation, [240, 160]);
 
-    /// Step forward the emulated console including all subsystems.
-    pub fn advance(&mut self) {
+    fn advance(&mut self) {
         Cpu::continue_running(self);
     }
 
+    fn reset(&mut self) {
+        let old_self = mem::take(self);
+        self.restore_from(old_self);
+    }
+
+    fn skip_bootrom(&mut self) {
+        self.cpu.set_cpsr(0x1F);
+        self.cpu.registers[15] = 0x0800_0000;
+        self.cpu.sp[1] = 0x0300_7F00;
+        self.cpu.sp[3] = 0x0300_7F00;
+        self.cpu.sp[5] = 0x0300_7F00;
+    }
+
+    fn set_button(&mut self, btn: Button, pressed: bool) {
+        self.set_button(btn, pressed);
+    }
+
+    fn make_save(&self) -> Option<GameSave> {
+        self.cart.make_save()
+    }
+}
+
+impl GameGirlAdv {
     /// Advance everything but the CPU by a clock cycle.
     fn advance_clock(&mut self) {
         if self.scheduler.has_events() {
@@ -93,12 +119,6 @@ impl GameGirlAdv {
             let inst = self.get_word(ptr);
             Cpu::<Self>::get_mnemonic_arm(inst)
         }
-    }
-
-    /// Reset the console, while keeping the current cartridge inserted.
-    pub fn reset(&mut self) {
-        let old_self = mem::take(self);
-        self.restore_from(old_self);
     }
 
     /// Restore state after a savestate load. `old_self` should be the
@@ -162,14 +182,6 @@ impl GameGirlAdv {
         }
 
         Some(buf)
-    }
-
-    pub fn skip_bootrom(&mut self) {
-        self.cpu.set_cpsr(0x1F);
-        self.cpu.registers[15] = 0x0800_0000;
-        self.cpu.sp[1] = 0x0300_7F00;
-        self.cpu.sp[3] = 0x0300_7F00;
-        self.cpu.sp[5] = 0x0300_7F00;
     }
 }
 

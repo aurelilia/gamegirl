@@ -14,9 +14,9 @@ use std::mem;
 
 use common::{
     common_functions,
-    components::{debugger::Debugger, scheduler::Scheduler},
-    misc::{EmulateOptions, SystemConfig},
-    Colour,
+    components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
+    misc::{Button, EmulateOptions, SystemConfig},
+    Colour, Core,
 };
 
 use crate::{apu::Apu, cpu::Cpu, gpu::Gpu, memory::Memory, scheduling::PsxEvent};
@@ -48,15 +48,32 @@ pub struct PlayStation {
     ticking: bool,
 }
 
-impl PlayStation {
-    #![allow(clippy::diverging_sub_expression)]
-    common_functions!(todo!(), todo!());
+impl Core for PlayStation {
+    common_functions!(1, PsxEvent::PauseEmulation, [640, 480]);
 
-    /// Advance the system by a single CPU instruction.
-    pub fn advance(&mut self) {
+    fn advance(&mut self) {
         Cpu::execute_next(self);
     }
 
+    fn reset(&mut self) {
+        let old_self = mem::take(self);
+        self.restore_from(old_self);
+    }
+
+    fn skip_bootrom(&mut self) {
+        todo!();
+    }
+
+    fn set_button(&mut self, btn: Button, pressed: bool) {
+        todo!();
+    }
+
+    fn make_save(&self) -> Option<GameSave> {
+        todo!();
+    }
+}
+
+impl PlayStation {
     /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, cycles: u32) {
         self.scheduler.advance(cycles);

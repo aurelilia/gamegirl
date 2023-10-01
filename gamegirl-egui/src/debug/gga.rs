@@ -4,15 +4,35 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{components::debugger::Breakpoint, numutil::NumExt};
+use common::{components::debugger::Breakpoint, numutil::NumExt, Core};
 use eframe::egui::{Context, Label, RichText, TextEdit, Ui};
 use gamegirl::gga::{addr::IME, GameGirlAdv};
 
-use crate::{gui::App, Colour};
+use super::Windows;
+use crate::{App, Colour};
+
+pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
+    app.debugger_window_states[0] |= ui.button("Debugger").clicked();
+    app.debugger_window_states[1] |= ui.button("Breakpoints").clicked();
+    app.debugger_window_states[2] |= ui.button("Cartridge Viewer").clicked();
+
+    if cfg!(feature = "remote-debugger") {
+        app.debugger_window_states[3] |= ui.button("Remote Debugger").clicked();
+    }
+}
+
+pub fn get_windows() -> Windows<GameGirlAdv> {
+    &[
+        ("Debugger", debugger),
+        ("Breakpoints", breakpoints),
+        ("Cartridge", cart_info),
+        ("Remote Debugger", remote_debugger),
+    ]
+}
 
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.
-pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
+fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     if !gg.options.rom_loaded {
         ui.label("No ROM loaded yet!");
         return;
@@ -92,7 +112,7 @@ pub fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui) {
 }
 
 /// Window for configuring active breakpoints.
-pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui) {
+pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     for bp in gg.debugger.breakpoints.iter_mut() {
         ui.horizontal(|ui| {
             ui.label("0x");
@@ -117,13 +137,8 @@ pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui) {
     });
 }
 
-/// Memory viewer showing the entire GG's address space.
-pub fn memory(_gg: &mut GameGirlAdv, ui: &mut Ui) {
-    ui.label("On a GGA? Good luck with rendering that.");
-}
-
 /// Window showing information about the loaded ROM/cart.
-pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui) {
+pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     if !gg.options.rom_loaded {
         ui.label("No ROM loaded yet!");
         return;
@@ -135,7 +150,7 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui) {
 
 /// Window showing status of the remote debugger.
 #[cfg(feature = "remote-debugger")]
-pub(super) fn remote_debugger(app: &mut App, _ctx: &Context, ui: &mut Ui) {
+pub(super) fn remote_debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     {
         let gg = app.gg.lock().unwrap();
         if !matches!(&*gg, gamegirl::System::GGA(_)) {
@@ -183,4 +198,4 @@ fn launch_debugger(app: &mut App) {
 }
 
 #[cfg(not(feature = "remote-debugger"))]
-pub(super) fn remote_debugger(_app: &mut App, _ctx: &Context, _ui: &mut Ui) {}
+pub(super) fn remote_debugger(_: &mut GameGirlAdv, _: &mut Ui, _: &mut App, _: &Context) {}

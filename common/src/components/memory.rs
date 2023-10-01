@@ -125,6 +125,9 @@ impl<const SIZE: usize> Default for MemoryMapper<SIZE> {
     }
 }
 
+unsafe impl<const SIZE: usize> Send for MemoryMapper<SIZE> {}
+unsafe impl<const SIZE: usize> Sync for MemoryMapper<SIZE> {}
+
 fn serde_pages<const SIZE: usize>() -> [*mut u8; SIZE] {
     [ptr::null::<u8>() as *mut u8; SIZE]
 }
