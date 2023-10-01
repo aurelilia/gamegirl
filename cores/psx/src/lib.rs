@@ -10,20 +10,29 @@
 #![allow(unused)]
 #![allow(clippy::unused_self)]
 
-use std::mem;
+use std::{mem, path::PathBuf};
 
+use addr::DMACTRL;
 use common::{
     common_functions,
-    components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
+    components::{
+        debugger::Debugger,
+        scheduler::Scheduler,
+        storage::{GameSave, Storage},
+    },
     misc::{Button, EmulateOptions, SystemConfig},
     Colour, Core,
 };
+use iso::Iso;
 
 use crate::{apu::Apu, cpu::Cpu, gpu::Gpu, memory::Memory, scheduling::PsxEvent};
 
+mod addr;
 mod apu;
 mod cpu;
+mod dma;
 mod gpu;
+mod iso;
 mod memory;
 mod scheduling;
 
@@ -37,6 +46,7 @@ pub struct PlayStation {
     ppu: Gpu,
     apu: Apu,
     memory: Memory,
+    iso: Iso,
 
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -82,12 +92,6 @@ impl PlayStation {
         }
     }
 
-    /// Reset the console, while keeping the current cartridge inserted.
-    pub fn reset(&mut self) {
-        let old_self = mem::take(self);
-        self.restore_from(old_self);
-    }
-
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {
@@ -96,7 +100,18 @@ impl PlayStation {
         self.debugger = old_self.debugger;
     }
 
-    pub fn skip_bootrom(&mut self) {
-        todo!()
+    /// Create a system with an ISO already loaded.
+    pub fn with_iso(iso: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
+        let mut iso = Iso { raw: iso };
+        if let Some(save) = Storage::load(path, iso.title()) {
+            todo!()
+        }
+
+        let mut psx = Box::<Self>::default();
+
+        // DMA control
+        psx.set_iow(DMACTRL, 0x07654321);
+
+        psx
     }
 }

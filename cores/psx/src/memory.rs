@@ -4,6 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use std::ops::{Index, IndexMut};
+
 use common::numutil::{hword, word, NumExt, U16Ext, U32Ext};
 
 use crate::PlayStation;
@@ -51,7 +53,7 @@ impl PlayStation {
         match Self::phys_addr(addr) {
             0x0000_0000..=0x001F_FFFF => self.memory.ram[addr.us() - 0xA000_0000] = value,
             0x1F80_0000..=0x1F80_03FF => self.memory.scratchpad[addr.us() - 0x1F80_0000] = value,
-            0x1F80_1000..=0x1F80_1FFF => self.memory.mmio[addr.us() - 0x1F80_1000] = value,
+            0x1F80_1000..=0x1F80_2FFF => self.memory.mmio[addr.us() - 0x1F80_1000] = value,
 
             unknown => log::warn!(
                 "Write to unmapped address {addr} (physical address {unknown}), discarding write"
@@ -67,6 +69,16 @@ impl PlayStation {
     pub fn write_word(&mut self, addr: u32, value: u32) {
         self.write_hword(addr, value.low());
         self.write_hword(addr + 2, value.high());
+    }
+
+    pub fn set_ioh(&mut self, addr: u32, value: u16) {
+        self.write_byte(0x1F80_1000 + addr, value.low());
+        self.write_byte(0x1F80_1000 + addr + 1, value.high());
+    }
+
+    pub fn set_iow(&mut self, addr: u32, value: u32) {
+        self.set_ioh(addr, value.low());
+        self.set_ioh(addr + 2, value.high());
     }
 
     fn phys_addr(addr: u32) -> u32 {
@@ -92,5 +104,21 @@ impl Default for Memory {
             scratchpad: [0; KB],
             mmio: [0; 8 * KB],
         }
+    }
+}
+
+impl Index<u32> for PlayStation {
+    type Output = u8;
+
+    fn index(&self, addr: u32) -> &Self::Output {
+        assert!(addr < 0x1FFF);
+        &self.memory.mmio[(addr).us()]
+    }
+}
+
+impl IndexMut<u32> for PlayStation {
+    fn index_mut(&mut self, addr: u32) -> &mut Self::Output {
+        assert!(addr < 0x1FFF);
+        &mut self.memory.mmio[(addr).us()]
     }
 }

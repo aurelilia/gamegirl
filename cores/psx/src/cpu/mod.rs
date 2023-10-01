@@ -41,8 +41,9 @@ impl Cpu {
         ps.cpu.is_delay = ps.cpu.is_branch;
         ps.cpu.is_branch = true;
 
-        let inst = ps.read_word(ps.cpu.pc);
         ps.cpu.inst_pc = ps.cpu.pc;
+        Cpu::ensure_aligned(ps, ps.cpu.pc, 4, Exception::UnalignedLoad);
+        let inst = ps.read_word(ps.cpu.pc);
         ps.cpu.pc = ps.cpu.next_pc;
         ps.cpu.next_pc = ps.cpu.next_pc.wrapping_add(4);
         ps.run_inst(inst);

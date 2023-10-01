@@ -158,7 +158,7 @@ impl PlayStation {
             "XOR" => a ^ b,
             "LUI" => b << 16,
             "SLT" => (a < b) as u32,
-            "NOR" => u32::MAX ^ (a | b),
+            "NOR" => !(a | b),
             _ => panic!("Unknown math operation"),
         };
 
