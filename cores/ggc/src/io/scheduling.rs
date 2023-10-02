@@ -9,15 +9,7 @@ use psg_apu::GenApuEvent;
 use GGEvent::*;
 
 use crate::{
-    cpu::Interrupt,
-    io::{
-        addr::{TIMA, TMA},
-        apu::Apu,
-        dma,
-        dma::Hdma,
-        ppu::Ppu,
-        timer::Timer,
-    },
+    io::{apu::Apu, dma, dma::Hdma, ppu::Ppu, timer::Timer},
     GameGirl,
 };
 
@@ -58,10 +50,7 @@ impl GGEvent {
             HdmaTransferStep => Hdma::handle_hdma(gg),
             GdmaTransfer => Hdma::handle_gdma(gg),
             TimerOverflow => Timer::on_overflow(gg, late_by),
-            TmaReload => {
-                gg[TIMA] = gg[TMA];
-                gg.request_interrupt(Interrupt::Timer);
-            }
+            TmaReload => Timer::tma_reload(gg),
         }
     }
 }

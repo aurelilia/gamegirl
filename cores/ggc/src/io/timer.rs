@@ -7,6 +7,7 @@
 use common::numutil::NumExt;
 
 use crate::{
+    cpu::Interrupt,
     io::{addr::*, scheduling::GGEvent},
     GameGirl,
 };
@@ -20,6 +21,9 @@ pub struct Timer {
     counter_running: bool,
     counter_divider: u16,
     counter_bit: u16,
+
+    pub tma: u8,
+    pub tima: u8,
 }
 
 impl Timer {
@@ -30,16 +34,20 @@ impl Timer {
         let time = Self::next_overflow_time(gg) as i32;
 
         // Obscure behavior: It takes 1 M-cycle for the timer to actually reload
-        gg[TIMA] = 0;
+        gg.timer.tima = 0;
         gg.scheduler.schedule(GGEvent::TmaReload, 4 - late_by);
-
         gg.scheduler
             .schedule(GGEvent::TimerOverflow, time - late_by);
     }
 
+    pub fn tma_reload(gg: &mut GameGirl) {
+        gg.timer.tima = gg.timer.tma;
+        gg.request_interrupt(Interrupt::Timer);
+    }
+
     /// Get the time when the next overflow will occur, in t-cycles.
     fn next_overflow_time(gg: &GameGirl) -> u32 {
-        let time = gg.timer.counter_divider.u32() * (0x100 - gg[TIMA].u32());
+        let time = gg.timer.counter_divider.u32() * (0x100 - gg.timer.tima.u32());
         // Account for already-running DIV causing less time for the first step
         let div = Self::div(gg) & (gg.timer.counter_divider - 1);
         // Account for 2x speed affecting the timer
@@ -61,9 +69,9 @@ impl Timer {
             // properly, would count too little if not
             let time_elapsed = gg.scheduler.now() - gg.timer.scheduled_at;
             let time_ds = time_elapsed.u16().wrapping_mul(gg.speed.u16());
-            gg[TIMA] + (time_ds / gg.timer.counter_divider).u8()
+            gg.timer.tima + (time_ds / gg.timer.counter_divider).u8()
         } else {
-            gg[TIMA]
+            gg.timer.tima
         }
     }
 
@@ -79,17 +87,17 @@ impl Timer {
                 // anew If the DIV counter bit was set, increment TIMA
                 // (increment on falling DIV edge)
                 if gg.timer.counter_running {
-                    gg[TIMA] = Self::get_tima(gg) + prev.bit(gg.timer.counter_bit).u8();
+                    gg.timer.tima = Self::get_tima(gg) + prev.bit(gg.timer.counter_bit).u8();
                     Self::reschedule(gg);
                 }
             }
             TIMA => {
-                gg[TIMA] = value;
+                gg.timer.tima = value;
                 Self::reschedule(gg);
             }
             TAC => {
                 // Update TIMA first of all
-                gg[TIMA] = Self::get_tima(gg);
+                gg.timer.tima = Self::get_tima(gg);
 
                 // Update control values...
                 gg.timer.control = value & 7;
@@ -140,6 +148,8 @@ impl Default for Timer {
             counter_running: false,
             counter_divider: 1024,
             counter_bit: 9,
+            tima: 0,
+            tma: 0,
         }
     }
 }

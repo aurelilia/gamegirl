@@ -109,6 +109,13 @@ impl<E: Kind> Scheduler<E> {
         self.next = self.events.last().unwrap().execute_at;
     }
 
+    /// Cancel all events that match a predicate.
+    /// Somewhat expensive.
+    pub fn cancel_pred(&mut self, mut evt: impl FnMut(E) -> bool) {
+        self.events.retain(|e| !evt(e.kind));
+        self.next = self.events.last().unwrap().execute_at;
+    }
+
     /// Cancel a single (!) matching event and return it's remaining time.
     pub fn cancel_with_remaining(&mut self, mut evt: impl FnMut(E) -> bool) -> (u32, E) {
         let idx = self.events.iter().position(|e| evt(e.kind)).unwrap();

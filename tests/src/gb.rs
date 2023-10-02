@@ -30,7 +30,7 @@ pub fn blargg() {
 pub fn blargg_sound() {
     crate::run_dir::<true, true>("blargg_sound", |gg| {
         let gg = gg.as_any().downcast_mut::<GameGirl>().unwrap();
-        if gg.get8(0xA000) == 0 {
+        if gg.get::<u8>(0xA000) == 0 {
             Break(Status::Success)
         } else {
             Continue(())

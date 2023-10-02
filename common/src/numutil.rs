@@ -24,6 +24,8 @@ pub trait NumExt: BitAnd<Output = Self> + Copy {
     fn u32(self) -> u32;
     /// Convert to usize
     fn us(self) -> usize;
+    /// Assert this to be a certain width
+    fn assert_width(self, w: u32) -> Self;
 
     /// Convert from u8
     fn from_u8(from: u8) -> Self;
@@ -79,6 +81,12 @@ macro_rules! num_ext_impl {
             #[inline(always)]
             fn us(self) -> usize {
                 self as usize
+            }
+
+            #[inline(always)]
+            fn assert_width(self, w: u32) -> Self {
+                assert_eq!($w, w, "Unexpected width!");
+                self
             }
 
             #[inline(always)]

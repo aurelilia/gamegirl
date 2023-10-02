@@ -59,6 +59,7 @@ pub struct GameGirl {
     pub ppu: Ppu,
     pub joypad: Joypad,
     pub apu: Apu,
+    pub dma: u8,
     pub hdma: Hdma,
 
     /// CPU speed, 1x or 2x.
@@ -99,7 +100,7 @@ impl Core for GameGirl {
 
     fn skip_bootrom(&mut self) {
         self.cpu.pc = 0x100;
-        self.set8(BOOTROM_DISABLE, 1);
+        self.set(BOOTROM_DISABLE, 1u8);
     }
 
     fn set_button(&mut self, btn: Button, pressed: bool) {
@@ -191,6 +192,7 @@ impl Default for GameGirl {
             ppu: Ppu::new(),
             joypad: Joypad::default(),
             apu: Apu::new(false),
+            dma: 0,
             hdma: Hdma::default(),
             cart: Cartridge::dummy(),
 

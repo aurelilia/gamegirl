@@ -50,11 +50,13 @@ pub struct Memory {
     oam: [u8; 160],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     high: [u8; 256],
-    dma_active: bool,
+    pending_dma: bool,
 
     mapper: MemoryMapper<256>,
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     page_offsets: [u32; 16],
+
+    key1: u8,
 
     pub(super) bootrom_enable: bool,
 }
@@ -62,7 +64,7 @@ pub struct Memory {
 impl GameGirl {
     pub fn read8(&mut self, addr: u16) -> u8 {
         self.advance_clock(1);
-        self.get8(addr)
+        self.get(addr)
     }
 
     pub fn read_s8(&mut self, addr: u16) -> i8 {
@@ -72,7 +74,7 @@ impl GameGirl {
     pub fn write8(&mut self, addr: u16, value: u8) {
         self.options.running &= self.debugger.write_occurred(addr);
         self.advance_clock(1);
-        self.set8(addr, value);
+        self.set(addr, value);
     }
 
     pub fn read16(&mut self, addr: u16) -> u16 {
@@ -109,41 +111,22 @@ impl GameGirl {
         self.write16(self.cpu.sp, value);
     }
 
-    pub fn get8(&self, addr: u16) -> u8 {
-        self.get(addr, |this, addr| match addr {
+    pub fn get<T: NumExt>(&mut self, addr: u16) -> T {
+        if T::WIDTH == 2 {
+            let low = self.get::<u8>(addr);
+            let high = self.get::<u8>(addr.wrapping_add(1));
+            return T::from_u16(hword(low, high));
+        }
+
+        T::from_u8(self.get_inner(addr, |this, addr| match addr {
             0xA000..=0xBFFF => this.cart.read(addr),
-            0xFE00..=0xFE9F if !this.mem.dma_active => this.mem.oam[addr.us() & 0xFF],
+            0xFE00..=0xFE9F if !this.mem.pending_dma => this.mem.oam[addr.us() & 0xFF],
             0xFF00..=0xFFFF => this.get_high(addr & 0x00FF),
             _ => 0xFF,
-        })
+        }))
     }
 
-    pub fn get16(&self, addr: u16) -> u16 {
-        let low = self.get8(addr);
-        let high = self.get8(addr.wrapping_add(1));
-        hword(low, high)
-    }
-
-    fn get_high(&self, addr: u16) -> u8 {
-        match addr {
-            JOYP => self.joypad.read(self[JOYP]),
-            DIV | TIMA | TAC => Timer::read(self, addr),
-
-            LY if !self[LCDC].is_bit(7) => 0,
-            BCPS..=OCPD => self.ppu.read_high(addr),
-
-            NR10..=WAV_END => Apu::read_register(&self.apu.inner, HIGH_START + addr),
-            0x76 if self.cgb => Apu::read_pcm12(&self.apu.inner),
-            0x77 if self.cgb => Apu::read_pcm34(&self.apu.inner),
-
-            HDMA_START if self.cgb => self.hdma.transfer_left as u8,
-            HDMA_SRC_HIGH..=HDMA_DEST_LOW => 0xFF,
-
-            _ => self[addr],
-        }
-    }
-
-    pub fn set8(&mut self, addr: u16, value: u8) {
+    pub fn set(&mut self, addr: u16, value: u8) {
         let a = addr.us();
         match addr {
             0x0000..=0x7FFF => {
@@ -171,23 +154,30 @@ impl GameGirl {
         }
     }
 
+    fn get_high(&self, addr: u16) -> u8 {
+        match addr {
+            DMA => self.dma,
+            JOYP => self.joypad.read(self[JOYP]),
+            DIV..=TAC => Timer::read(self, addr),
+
+            LY if !self[LCDC].is_bit(7) => 0,
+            BCPS..=OCPD => self.ppu.read_high(addr),
+
+            NR10..=WAV_END => Apu::read_register(&self.apu.inner, HIGH_START + addr),
+            0x76 if self.cgb => Apu::read_pcm12(&self.apu.inner),
+            0x77 if self.cgb => Apu::read_pcm34(&self.apu.inner),
+
+            VRAM_SELECT if self.cgb => self.mem.vram_bank | 0xFE,
+            WRAM_SELECT if self.cgb => self.mem.wram_bank | 0xF8,
+            KEY1 if self.cgb => self.mem.key1,
+            HDMA_SRC_HIGH..=HDMA_START if self.cgb => self.hdma.get(addr),
+
+            _ => self[addr],
+        }
+    }
+
     fn set_high(&mut self, addr: u16, value: u8) {
         match addr {
-            VRAM_SELECT if self.cgb => {
-                self.mem.vram_bank = value & 1;
-                self.mem.page_offsets[8] = self.mem.vram_bank.u32() * 0x2000;
-                self.mem.page_offsets[9] = self.mem.vram_bank.u32() * 0x2000;
-                self[VRAM_SELECT] = value | 0xFE;
-            }
-            WRAM_SELECT if self.cgb => {
-                self.mem.wram_bank = u8::max(1, value & 7);
-                self.mem.page_offsets[0xD] = self.mem.wram_bank.u32() * 0x1000;
-                self[WRAM_SELECT] = value | 0xF8;
-            }
-            KEY1 if self.cgb => self[KEY1] = (value & 1) | self[KEY1] & 0x80,
-            HDMA_START if self.cgb => Hdma::write_start(self, value),
-            HDMA_SRC_HIGH..=HDMA_DEST_LOW if self.cgb => self[addr] = value,
-
             IF => self[IF] = value | 0xE0,
             IE => self[IE] = value,
             BOOTROM_DISABLE => {
@@ -196,7 +186,7 @@ impl GameGirl {
                 MemoryMapper::init_pages(self);
             }
 
-            DIV | TIMA | TAC => Timer::write(self, addr, value),
+            DIV..=TAC => Timer::write(self, addr, value),
             LCDC => {
                 let was_on = self[LCDC].is_bit(7);
                 let is_on = value.is_bit(7);
@@ -219,17 +209,23 @@ impl GameGirl {
                 }
             }
             STAT => self[STAT] = value | 0x80, // Bit 7 unavailable
-            DMA => {
-                self[addr] = value;
-                let time = 648 / self.speed as i32;
-                self.scheduler.cancel(GGEvent::DMAFinish);
-                self.scheduler.schedule(GGEvent::DMAFinish, time);
-                self.mem.dma_active = true;
-            }
+            DMA => dma::dma_written(self, value),
             BCPS..=OPRI => self.ppu.write_high(addr, value),
             NR10..=WAV_END => Apu::write(self, HIGH_START + addr, value),
 
             SB => self.debugger.serial_output.push(value as char),
+
+            VRAM_SELECT if self.cgb => {
+                self.mem.vram_bank = value & 1;
+                self.mem.page_offsets[8] = self.mem.vram_bank.u32() * 0x2000;
+                self.mem.page_offsets[9] = self.mem.vram_bank.u32() * 0x2000;
+            }
+            WRAM_SELECT if self.cgb => {
+                self.mem.wram_bank = u8::max(1, value & 7);
+                self.mem.page_offsets[0xD] = self.mem.wram_bank.u32() * 0x1000;
+            }
+            KEY1 if self.cgb => self.mem.key1 = (value & 1) | self.mem.key1 & 0x80,
+            HDMA_SRC_HIGH..=HDMA_START if self.cgb => Hdma::set(self, addr, value),
 
             // Last 3 are unmapped regions.
             LY | SC | 0x03 | 0x08..=0x0E | 0x4C..=0x7F => (),
@@ -285,7 +281,7 @@ impl GameGirl {
     /// Get a value in memory. Will try to do a fast read from page tables,
     /// falls back to given closure if no page table is mapped at that address.
     #[inline]
-    fn get<T>(&self, a: u16, slow: fn(&Self, u16) -> T) -> T {
+    fn get_inner<T>(&self, a: u16, slow: fn(&Self, u16) -> T) -> T {
         let ptr = unsafe {
             self.mem
                 .mapper
@@ -309,8 +305,10 @@ impl Memory {
             wram: [0; 32768],
             wram_bank: 1,
             oam: [0; 160],
-            dma_active: false,
+            pending_dma: false,
             high: [0xFF; 256],
+
+            key1: 0,
 
             mapper: MemoryMapper::default(),
             page_offsets: [

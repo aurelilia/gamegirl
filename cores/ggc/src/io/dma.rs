@@ -6,26 +6,36 @@
 
 use common::numutil::NumExt;
 
+use super::addr::HDMA_START;
 use crate::{
     io::{
-        addr::{DMA, HDMA_DEST_HIGH, HDMA_DEST_LOW, HDMA_SRC_HIGH, HDMA_SRC_LOW, LCDC},
+        addr::{HDMA_DEST_HIGH, HDMA_DEST_LOW, HDMA_SRC_HIGH, HDMA_SRC_LOW, LCDC},
         ppu::DISP_EN,
         scheduling::GGEvent,
     },
     GameGirl,
 };
 
+pub fn dma_written(gg: &mut GameGirl, value: u8) {
+    gg.dma = value;
+    let time = 648 / gg.speed as i32;
+    gg.scheduler
+        .cancel_pred(|e| matches!(e, GGEvent::DMAFinish));
+    gg.scheduler.schedule(GGEvent::DMAFinish, time);
+    gg.mem.pending_dma = true;
+}
+
 /// OAM DMA transfer available on DMG and CGB.
 /// This implementation writes everything at once
 /// once the timer of 648 cycles is up.
 pub fn do_oam_dma(gg: &mut GameGirl) {
-    let src = gg[DMA].u16() * 0x100;
+    let src = gg.dma.u16() * 0x100;
     let mut src = if src > 0xDF00 { src - 0x2000 } else { src };
     for dest in 0..0xA0 {
-        gg.mem.oam[dest] = gg.get8(src);
+        gg.mem.oam[dest] = gg.get(src);
         src += 1;
     }
-    gg.mem.dma_active = false;
+    gg.mem.pending_dma = false;
 }
 
 /// HDMA VRAM transfer available only on CGB.
@@ -40,16 +50,31 @@ pub struct Hdma {
 }
 
 impl Hdma {
+    pub fn get(&self, addr: u16) -> u8 {
+        match addr {
+            HDMA_START => self.transfer_left as u8,
+            _ => 0xFF,
+        }
+    }
+
+    pub fn set(gg: &mut GameGirl, addr: u16, value: u8) {
+        match addr {
+            HDMA_START => Hdma::write_start(gg, value),
+            HDMA_SRC_LOW => gg.hdma.source = (gg.hdma.source & 0xFF00) | (value.u16() & 0xF0),
+            HDMA_SRC_HIGH => gg.hdma.source = (gg.hdma.source & 0x00FF) | (value.u16() << 8),
+            HDMA_DEST_LOW => gg.hdma.dest = (gg.hdma.dest & 0xFF00) | (value.u16() & 0xF0),
+            HDMA_DEST_HIGH => gg.hdma.dest = (gg.hdma.dest & 0x00FF) | ((value.u16() & 0x1F) << 8),
+            _ => (),
+        }
+        gg.hdma.dest = (gg.hdma.dest & 0x1FFF) | 0x8000;
+    }
+
     pub fn write_start(gg: &mut GameGirl, value: u8) {
         if gg.hdma.hblank_transferring && !value.is_bit(7) {
             gg.hdma.hblank_transferring = false;
             gg.hdma.transfer_left |= 0x80;
             gg.scheduler.cancel(GGEvent::HdmaTransferStep);
         } else {
-            gg.hdma.source = (gg[HDMA_SRC_LOW].u16() & 0xF0) | (gg[HDMA_SRC_HIGH].u16() << 8);
-            gg.hdma.dest =
-                (gg[HDMA_DEST_LOW].u16() & 0xF0) | ((gg[HDMA_DEST_HIGH].u16() & 0x1F) << 8);
-            gg.hdma.dest = (gg.hdma.dest & 0x1FFF) | 0x8000;
             gg.hdma.transfer_left = value as i16 & 0x7F;
             gg.hdma.hblank_transferring = value.is_bit(7);
 
@@ -83,7 +108,8 @@ impl Hdma {
 
     fn advance_transfer(gg: &mut GameGirl) {
         for _ in 0..0x10 {
-            gg.set8(gg.hdma.dest, gg.get8(gg.hdma.source));
+            let src: u8 = gg.get(gg.hdma.source);
+            gg.set(gg.hdma.dest, src);
             gg.hdma.source = gg.hdma.source.wrapping_add(1);
             gg.hdma.dest = gg.hdma.dest.wrapping_add(1);
         }

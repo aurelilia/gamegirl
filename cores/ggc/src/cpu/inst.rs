@@ -96,11 +96,12 @@ pub(crate) fn get_next(gg: &mut GameGirl) -> Inst {
     };
 
     if common::TRACING {
+        let spv = gg.get::<u16>(gg.cpu.sp);
         println!(
             "PC={:04X}, SP={:04X}, SPV={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, I={}",
             gg.cpu.pc,
             gg.cpu.sp,
-            gg.get16(gg.cpu.sp),
+            spv,
             gg.cpu.dreg(AF),
             gg.cpu.dreg(BC),
             gg.cpu.dreg(DE),
@@ -112,8 +113,8 @@ pub(crate) fn get_next(gg: &mut GameGirl) -> Inst {
     inst
 }
 
-pub fn get_at(gg: &GameGirl, addr: u16) -> Inst {
-    Inst(gg.get8(addr), gg.get8(addr + 1))
+pub fn get_at(gg: &mut GameGirl, addr: u16) -> Inst {
+    Inst(gg.get(addr), gg.get(addr + 1))
 }
 
 const MATH_REGS: [Reg; 8] = [B, C, D, E, H, L, A, A];
@@ -520,7 +521,7 @@ fn reg_ext<const ADV: bool, T: FnOnce(&mut GameGirl, u8) -> u8>(
         if ADV {
             gg.advance_clock(1);
         }
-        gg.set8(addr, value);
+        gg.set(addr, value);
     } else {
         let reg = MATH_REGS[reg as usize];
         let value = gg.cpu.reg(reg);

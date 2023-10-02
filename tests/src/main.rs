@@ -211,7 +211,11 @@ fn run<const SKIP_BOOTROM: bool, const TIMEOUT_GOOD: bool>(
 
     for i in 0..=TIMEOUT {
         gg.advance_delta(1.0);
-        let frame = gg.last_frame().unwrap();
+        let frame = if let Some(frame) = gg.last_frame() {
+            frame
+        } else {
+            return Err("FAILED (PPU)".to_string());
+        };
         if let Some(img) = &image {
             if *img == frame {
                 return Ok(frame);
