@@ -19,7 +19,7 @@ pub struct Cpu {
     next_regs: [u32; 32],
     pending_load: PendingLoad,
 
-    pc: u32,
+    pub pc: u32,
     next_pc: u32,
     inst_pc: u32,
     pipeline: u32,
@@ -28,8 +28,8 @@ pub struct Cpu {
     is_delay: bool,
 
     cop0: Cop0,
-    hi: u32,
-    lo: u32,
+    pub hi: u32,
+    pub lo: u32,
 }
 
 impl Cpu {
@@ -46,13 +46,17 @@ impl Cpu {
         let inst = ps.read_word(ps.cpu.pc);
         ps.cpu.pc = ps.cpu.next_pc;
         ps.cpu.next_pc = ps.cpu.next_pc.wrapping_add(4);
+        log::debug!("Running inst {}", PlayStation::get_mnemonic(inst));
         ps.run_inst(inst);
 
         // Do not overwrite zero register
         ps.cpu.regs[1..].copy_from_slice(&ps.cpu.next_regs[1..]);
+
+        // TODO timing
+        ps.scheduler.advance(2);
     }
 
-    fn reg(&self, idx: u32) -> u32 {
+    pub fn reg(&self, idx: u32) -> u32 {
         self.regs[idx.us()]
     }
 

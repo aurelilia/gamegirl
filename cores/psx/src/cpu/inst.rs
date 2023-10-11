@@ -4,6 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use bitmatch::bitmatch;
 use common::numutil::{NumExt, U32Ext};
 
 use crate::{
@@ -438,6 +439,95 @@ impl PlayStation {
                 (a.wrapping_div(b) as u32, (a % b) as u32)
             }
         };
+    }
+}
+
+impl PlayStation {
+    #[bitmatch]
+    pub fn get_mnemonic(inst: u32) -> String {
+        #[bitmatch]
+        match inst {
+            "000000_sssss_ttttt_ddddd_mmmmm_000000" => format!("sll r{d}, r{t}, {m}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_000010" => format!("srl r{d}, r{t}, {m}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_000011" => format!("sra r{d}, r{t}, {m}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_000100" => format!("sll r{d}, r{t}, r{s}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_000110" => format!("srl r{d}, r{t}, r{s}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_000111" => format!("sra r{d}, r{t}, r{s}"),
+
+            "000000_sssss_ttttt_ddddd_mmmmm_001000" => format!("jr r{s}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_001001" => format!("jalr r{s} (r{d})"),
+            "000000_sssss_sssss_sssss_sssss_001100" => format!("sys 0x{s:X}"),
+            "000000_sssss_sssss_sssss_sssss_001101" => format!("break 0x{s:X}"),
+
+            "000000_sssss_ttttt_ddddd_mmmmm_010000" => format!("mfhi r{d}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_010001" => format!("mthi r{d}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_010010" => format!("mflo r{d}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_010011" => format!("mtlo r{d}"),
+
+            "000000_sssss_ttttt_ddddd_mmmmm_011000" => format!("mult r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_011001" => format!("multu r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_011010" => format!("div r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_011011" => format!("divu r{s}, r{t}"),
+
+            "000000_sssss_ttttt_ddddd_mmmmm_100000" => format!("add r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100001" => format!("addu r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100010" => format!("sub r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100011" => format!("subu r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100100" => format!("and r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100101" => format!("or r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100110" => format!("xor r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_100111" => format!("nor r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_101010" => format!("slt r{d}, r{s}, r{t}"),
+            "000000_sssss_ttttt_ddddd_mmmmm_101011" => format!("sltu r{d}, r{s}, r{t}"),
+
+            "000001_sssss_0zzz0_mmmmm_mmmmm_mmmmmm" => format!("bltz r{s}, 0x{m:X}"),
+            "000001_sssss_0zzz1_mmmmm_mmmmm_mmmmmm" => format!("bgez r{s}, 0x{m:X}"),
+            "000001_sssss_10000_mmmmm_mmmmm_mmmmmm" => format!("bltzal r{s}, 0x{m:X}"),
+            "000001_sssss_10001_mmmmm_mmmmm_mmmmmm" => format!("bgezal r{s}, 0x{m:X}"),
+
+            "000010_mmmmm_mmmmm_mmmmm_mmmmm_mmmmmm" => format!("j 0x{m:X}"),
+            "000011_mmmmm_mmmmm_mmmmm_mmmmm_mmmmmm" => format!("jal 0x{m:X}"),
+
+            "000100_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("beq r{s}, r{t}, 0x{m:X}"),
+            "000101_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("bne r{s}, r{t}, 0x{m:X}"),
+            "000110_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("blez r{s}, 0x{m:X}"),
+            "000111_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("bgtz r{s}, 0x{m:X}"),
+
+            "001000_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("add r{t}, r{s}, 0x{m:X}"),
+            "001001_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("addu r{t}, r{s}, 0x{m:X}"),
+            "001010_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("slt r{t}, r{s}, 0x{m:X}"),
+            "001011_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("sltu r{t}, r{s}, 0x{m:X}"),
+            "001100_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("and r{t}, r{s}, 0x{m:X}"),
+            "001101_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("or r{t}, r{s}, 0x{m:X}"),
+            "001110_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("xor r{t}, r{s}, 0x{m:X}"),
+            "001111_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lui r{t}, 0x{m:X}"),
+
+            "0100nn_00000_ttttt_ddddd_mmmmm_000000" => format!("mfc{n} r{t}, r{d}"),
+            "0100nn_00010_ttttt_ddddd_mmmmm_000000" => format!("cfc{n} r{t}, r{d}"),
+            "0100nn_00100_ttttt_ddddd_mmmmm_000000" => format!("mtc{n} r{t}, r{d}"),
+            "0100nn_00110_ttttt_ddddd_mmmmm_000000" => format!("ctc{n} r{t}, r{d}"),
+            "0100nn_01000_00000_mmmmm_mmmmm_mmmmmm" => format!("bc{n}f 0x{m}"),
+            "0100nn_01000_00001_mmmmm_mmmmm_mmmmmm" => format!("bc{n}t 0x{m}"),
+            "0100nn_1mmmm_mmmmm_mmmmm_mmmmm_mmmmmm" => format!("cop{n} 0x{m}"),
+
+            "1100nn_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lwc{n} r{t}, [r{s}+0x{m:X}]"),
+            "1110nn_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("swc{n} r{t}, [r{s}+0x{m:X}]"),
+
+            "100000_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lb r{t}, [r{s}+0x{m:X}]"),
+            "100001_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lh r{t}, [r{s}+0x{m:X}]"),
+            "100010_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lwl r{t}, [r{s}+0x{m:X}]"),
+            "100011_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lw r{t}, [r{s}+0x{m:X}]"),
+            "100100_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lbu r{t}, [r{s}+0x{m:X}]"),
+            "100101_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lhu r{t}, [r{s}+0x{m:X}]"),
+            "100110_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("lwr r{t}, [r{s}+0x{m:X}]"),
+            "101000_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("sb r{t}, [r{s}+0x{m:X}]"),
+            "101001_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("sh r{t}, [r{s}+0x{m:X}]"),
+            "101010_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("swl r{t}, [r{s}+0x{m:X}]"),
+            "101011_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("sw r{t}, [r{s}+0x{m:X}]"),
+            "101110_sssss_ttttt_mmmmm_mmmmm_mmmmmm" => format!("swr r{t}, [r{s}+0x{m:X}]"),
+
+            _ => format!("{:08X}??", inst),
+        }
     }
 }
 

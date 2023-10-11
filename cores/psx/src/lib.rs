@@ -12,7 +12,7 @@
 
 use std::{mem, path::PathBuf};
 
-use addr::DMACTRL;
+use addr::{DMACTRL, GPUSTAT};
 use common::{
     common_functions,
     components::{
@@ -42,11 +42,11 @@ pub type PsxDebugger = Debugger<u32>;
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PlayStation {
-    cpu: Cpu,
-    ppu: Gpu,
-    apu: Apu,
-    memory: Memory,
-    iso: Iso,
+    pub cpu: Cpu,
+    pub ppu: Gpu,
+    pub apu: Apu,
+    pub memory: Memory,
+    pub iso: Iso,
 
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -59,7 +59,7 @@ pub struct PlayStation {
 }
 
 impl Core for PlayStation {
-    common_functions!(1, PsxEvent::PauseEmulation, [640, 480]);
+    common_functions!(100000, PsxEvent::PauseEmulation, [640, 480]);
 
     fn advance(&mut self) {
         Cpu::execute_next(self);
@@ -71,15 +71,16 @@ impl Core for PlayStation {
     }
 
     fn skip_bootrom(&mut self) {
-        todo!();
+        log::error!("PSX does not support skipping bootrom yet");
     }
 
     fn set_button(&mut self, btn: Button, pressed: bool) {
-        todo!();
+        log::error!("PSX does not support buttons yet");
     }
 
     fn make_save(&self) -> Option<GameSave> {
-        todo!();
+        log::error!("PSX does not support making a save yet");
+        None
     }
 }
 
@@ -109,8 +110,13 @@ impl PlayStation {
 
         let mut psx = Box::<Self>::default();
 
-        // DMA control
-        psx.set_iow(DMACTRL, 0x07654321);
+        // DMA
+        psx[DMACTRL] = 0x07654321;
+        // Unknown DMA registers with fixed values
+        psx[0x0F8] = 0x7FFAC68B;
+        psx[0x0FC] = 0x00FFFFF7;
+        // GPU
+        psx[GPUSTAT] = 0x1C00_0000;
 
         psx
     }

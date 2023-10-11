@@ -6,6 +6,8 @@
 
 use common::Colour;
 
+use crate::PlayStation;
+
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Gpu {
@@ -13,4 +15,10 @@ pub struct Gpu {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub last_frame: Option<Vec<Colour>>,
+}
+
+impl Gpu {
+    pub fn process_command(ps: &mut PlayStation, cmd: u32) {
+        log::debug!("GPU command: 0x{cmd:08X}");
+    }
 }

@@ -6,12 +6,13 @@
 
 mod gga;
 mod ggc;
+mod psx;
 
 use std::any::Any;
 
 use common::Core;
 use eframe::egui::{self, Context, Ui};
-use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
+use gamegirl::{gga::GameGirlAdv, ggc::GameGirl, psx::PlayStation};
 
 use crate::app::App;
 
@@ -24,6 +25,7 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
 
     maybe_system::<GameGirl>(core, |_| ggc::ui_menu(app, ui));
     maybe_system::<GameGirlAdv>(core, |_| gga::ui_menu(app, ui));
+    maybe_system::<PlayStation>(core, |_| psx::ui_menu(app, ui));
 }
 
 pub fn render(app: &mut App, ctx: &Context) {
@@ -33,6 +35,7 @@ pub fn render(app: &mut App, ctx: &Context) {
 
     maybe_system::<GameGirl>(core, |c| render_inner(ggc::get_windows(), c, app, ctx));
     maybe_system::<GameGirlAdv>(core, |c| render_inner(gga::get_windows(), c, app, ctx));
+    maybe_system::<PlayStation>(core, |c| render_inner(psx::get_windows(), c, app, ctx));
 }
 
 fn render_inner<T: Core>(windows: Windows<T>, core: &mut T, app: &mut App, ctx: &Context) {

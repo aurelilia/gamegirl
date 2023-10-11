@@ -6,7 +6,7 @@
 
 //! This crate contains common structures shared by all systems.
 
-use std::path::PathBuf;
+use std::{os::unix::prelude::OsStrExt, path::PathBuf};
 
 pub use common::{self, Core};
 use common::{
@@ -42,6 +42,8 @@ pub fn load_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) ->
     let _is_gga = cart.iter().skip(0xB5).take(6).all(|b| *b == 0);
     // We detect NDS carts by a zero-filled header region
     let _is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
+    // We detect PSX games by being ISOs
+    let _is_psx = path.as_ref().unwrap().extension().unwrap().as_bytes() == b"iso";
 
     let mut sys: Box<dyn Core> = match () {
         #[cfg(feature = "ggc")]
@@ -50,6 +52,8 @@ pub fn load_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) ->
         _ if _is_gga => gga::GameGirlAdv::with_cart(cart, path, config),
         #[cfg(feature = "nds")]
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
+        #[cfg(feature = "psx")]
+        _ if _is_psx => psx::PlayStation::with_iso(cart, path, config),
 
         #[cfg(feature = "gga")]
         _ => {
