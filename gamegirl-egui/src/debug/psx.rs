@@ -37,7 +37,7 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
         ui.vertical(|ui| {
             ui.set_min_width(200.0);
             let mut pc = ps.cpu.pc;
-            let inst = ps.read_word(pc);
+            let inst = ps.get(pc);
             ui.add(
                 Label::new(
                     RichText::new(format!("0x{:08X} {}", pc, PlayStation::get_mnemonic(inst)))
@@ -48,7 +48,7 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
             );
             pc += 4;
             for _ in 0..0x1F {
-                let inst = ps.read_word(pc);
+                let inst = ps.get(pc);
                 ui.add(
                     Label::new(
                         RichText::new(format!("0x{:08X} {}", pc, PlayStation::get_mnemonic(inst)))
@@ -115,5 +115,5 @@ pub fn cart_info(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
         ui.label("No ISO loaded yet!");
         return;
     }
-    ui.label("lol");
+    ui.label(format!("Reported Title: {}", ps.iso.title()));
 }

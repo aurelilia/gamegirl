@@ -36,6 +36,11 @@ mod iso;
 mod memory;
 mod scheduling;
 
+const CPU_CLOCK: usize = 33868800;
+const GPU_CLOCK: usize = 53222400;
+const FRAME_CLOCK: i32 = 571212;
+const SAMPLE_CLOCK: i32 = 768;
+
 pub type PsxDebugger = Debugger<u32>;
 
 /// System state representing entire console.
@@ -59,7 +64,7 @@ pub struct PlayStation {
 }
 
 impl Core for PlayStation {
-    common_functions!(100000, PsxEvent::PauseEmulation, [640, 480]);
+    common_functions!(CPU_CLOCK, PsxEvent::PauseEmulation, [640, 480]);
 
     fn advance(&mut self) {
         Cpu::execute_next(self);
@@ -108,16 +113,17 @@ impl PlayStation {
             todo!()
         }
 
-        let mut psx = Box::<Self>::default();
+        let mut ps = Box::<Self>::default();
 
         // DMA
-        psx[DMACTRL] = 0x07654321;
+        ps[DMACTRL] = 0x07654321;
         // Unknown DMA registers with fixed values
-        psx[0x0F8] = 0x7FFAC68B;
-        psx[0x0FC] = 0x00FFFFF7;
-        // GPU
-        psx[GPUSTAT] = 0x1C00_0000;
+        ps[0x0F8] = 0x7FFAC68B;
+        ps[0x0FC] = 0x00FFFFF7;
 
-        psx
+        ps.scheduler.schedule(PsxEvent::OutputFrame, FRAME_CLOCK);
+        ps.scheduler.schedule(PsxEvent::ProduceSample, SAMPLE_CLOCK);
+
+        ps
     }
 }

@@ -21,7 +21,7 @@ pub struct Cpu {
 
     pub pc: u32,
     next_pc: u32,
-    inst_pc: u32,
+    current_pc: u32,
     pipeline: u32,
 
     is_branch: bool,
@@ -34,26 +34,31 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn execute_next(ps: &mut PlayStation) {
+        if !ps.debugger.should_execute(ps.cpu.pc) {
+            ps.options.running = false; // Pause emulation, we hit a BP
+            return;
+        }
+
         ps.cpu
             .set_reg(ps.cpu.pending_load.reg, ps.cpu.pending_load.value);
         ps.cpu.pending_load = PendingLoad::default();
 
-        ps.cpu.is_delay = ps.cpu.is_branch;
-        ps.cpu.is_branch = true;
-
-        ps.cpu.inst_pc = ps.cpu.pc;
-        Cpu::ensure_aligned(ps, ps.cpu.pc, 4, Exception::UnalignedLoad);
-        let inst = ps.read_word(ps.cpu.pc);
+        ps.cpu.current_pc = ps.cpu.pc;
         ps.cpu.pc = ps.cpu.next_pc;
         ps.cpu.next_pc = ps.cpu.next_pc.wrapping_add(4);
-        log::debug!("Running inst {}", PlayStation::get_mnemonic(inst));
+        Cpu::ensure_aligned(ps, ps.cpu.pc, 4, Exception::UnalignedLoad);
+
+        ps.cpu.is_delay = ps.cpu.is_branch;
+        ps.cpu.is_branch = false;
+
+        let inst = ps.get(ps.cpu.current_pc);
         ps.run_inst(inst);
 
         // Do not overwrite zero register
         ps.cpu.regs[1..].copy_from_slice(&ps.cpu.next_regs[1..]);
 
         // TODO timing
-        ps.scheduler.advance(2);
+        ps.advance_clock(2);
     }
 
     pub fn reg(&self, idx: u32) -> u32 {
@@ -81,13 +86,13 @@ impl Cpu {
         ps.cpu.cop0.sr &= !0x3F;
         ps.cpu.cop0.sr |= (context << 2) & 0x3F;
         ps.cpu.cop0.cause = (kind as u32) << 2;
-        ps.cpu.cop0.epc = ps.cpu.inst_pc;
+        ps.cpu.cop0.epc = ps.cpu.current_pc;
 
         if ps.cpu.is_delay {
-            ps.cpu.cop0.epc = ps.cpu.inst_pc.wrapping_sub(4);
+            ps.cpu.cop0.epc = ps.cpu.current_pc.wrapping_sub(4);
             ps.cpu.cop0.cause = ps.cpu.cop0.cause.set_bit(31, true);
         } else {
-            ps.cpu.cop0.epc = ps.cpu.inst_pc;
+            ps.cpu.cop0.epc = ps.cpu.current_pc;
         }
 
         ps.cpu.pc = new_pc;
@@ -103,7 +108,7 @@ impl Default for Cpu {
             pending_load: PendingLoad::default(),
             pc: 0xBFC0_0000,
             next_pc: 0xBFC0_0004,
-            inst_pc: 0xBFC0_0000,
+            current_pc: 0xBFC0_0000,
             pipeline: 0,
 
             is_branch: false,
@@ -120,8 +125,6 @@ impl PlayStation {
     fn jump_pc(&mut self, value: u32) {
         self.cpu.next_pc = value;
         self.cpu.is_branch = true;
-        // One too early, oh well
-        Cpu::ensure_aligned(self, self.cpu.next_pc, 4, Exception::UnalignedLoad);
     }
 }
 

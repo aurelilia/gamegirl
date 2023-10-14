@@ -6,16 +6,31 @@
 
 use common::components::scheduler::Kind;
 
-use crate::PlayStation;
+use crate::{PlayStation, FRAME_CLOCK, SAMPLE_CLOCK};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum PsxEvent {
     PauseEmulation,
+    OutputFrame,
+    ProduceSample,
 }
 
 impl PsxEvent {
-    pub fn dispatch(self, _ps: &mut PlayStation, _late_by: i32) {}
+    pub fn dispatch(self, ps: &mut PlayStation, _late_by: i32) {
+        match self {
+            PsxEvent::PauseEmulation => ps.ticking = false,
+            PsxEvent::OutputFrame => {
+                ps.ppu.output_frame();
+                ps.scheduler.schedule(PsxEvent::OutputFrame, FRAME_CLOCK);
+            }
+            PsxEvent::ProduceSample => {
+                ps.apu.buffer.push(0.0);
+                ps.apu.buffer.push(0.0);
+                ps.scheduler.schedule(PsxEvent::ProduceSample, SAMPLE_CLOCK);
+            }
+        }
+    }
 }
 
 impl Kind for PsxEvent {}

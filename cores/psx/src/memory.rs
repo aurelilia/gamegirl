@@ -4,19 +4,25 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::ops::{Index, IndexMut};
+use std::{
+    ops::{Index, IndexMut},
+    ptr,
+};
 
-use common::numutil::{hword, word, NumExt, U16Ext, U32Ext};
+use common::{
+    components::memory::{MemoryMappedSystem, MemoryMapper},
+    numutil::{hword, word, NumExt, U16Ext, U32Ext},
+};
 
 use crate::{
-    addr::{DMABASE, DMACTRL, DMAINT, MMIOBASE},
+    addr::{DMABASE, DMACTRL, DMAINT, GPUSTAT, MMIOBASE},
     dma::Dma,
     PlayStation,
 };
 
 const KB: usize = 1024;
 const MB: usize = KB * KB;
-const BIOS: &[u8] = include_bytes!("bios.bin");
+const BIOS: [u8; 512 * KB] = *include_bytes!("bios.bin");
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
@@ -25,65 +31,87 @@ pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     scratchpad: [u8; KB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    bios: [u8; 512 * KB],
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub mmio: [u32; 8 * KB / 4],
 }
 
 impl PlayStation {
-    pub fn read_byte(&mut self, addr: u32) -> u8 {
-        match Self::phys_addr(addr) {
-            0x0000_0000..=0x001F_FFFF => self.memory.ram[addr.us() - 0xA000_0000],
-            0x1F80_0000..=0x1F80_03FF => self.memory.scratchpad[addr.us() - 0x1F80_0000],
+    pub fn get<T: NumExt>(&mut self, addr: u32) -> T {
+        let phys = Self::phys_addr(addr);
+        match phys {
+            0x0000_0000..=0x007F_FFFF => Self::raw_read(&self.memory.ram, phys & 0x1F_FFFF),
+            0x1F80_0000..=0x1F80_03FF => {
+                Self::raw_read(&self.memory.scratchpad, phys - 0x1F80_0000)
+            }
+            0x1F80_1000..=0x1F80_1FFF => match phys - MMIOBASE {
+                GPUSTAT => T::from_u32(self.ppu.stat.into()),
 
-            0x1FC0_0000..=0x1FC7_FFFF => BIOS[addr.us() - 0xBFC0_0000],
+                _ => {
+                    let ptr = self.memory.mmio.as_ptr() as *const u8;
+                    unsafe {
+                        let ptr = ptr.add(phys.us() - 0x1F80_1000);
+                        ptr::read(ptr as *const T)
+                    }
+                }
+            },
+            0x1FC0_0000..=0x1FC7_FFFF => Self::raw_read(&self.memory.bios, phys - 0x1FC0_0000),
+
             unknown => {
                 log::warn!(
-                    "Read from unmapped address 0x{addr:X} (physical address 0x{unknown:X}), reading 0xFF"
+                    "Read from unmapped address 0x{addr:X} (physical address 0x{unknown:X}), reading max value"
                 );
-                0xFF
+                T::from_u32(0xFFFF_FFFF)
             }
         }
     }
 
-    pub fn read_hword(&mut self, addr: u32) -> u16 {
-        hword(self.read_byte(addr), self.read_byte(addr + 1))
-    }
-
-    pub fn read_word(&mut self, addr: u32) -> u32 {
-        match Self::phys_addr(addr) {
-            0x1F80_1000..=0x1F80_1FFF => self.memory.mmio[(addr.us() - 0x1F80_1000) / 4],
-            _ => word(self.read_hword(addr), self.read_hword(addr + 2)),
-        }
-    }
-
-    pub fn write_byte(&mut self, addr: u32, value: u8) {
-        match Self::phys_addr(addr) {
-            0x0000_0000..=0x001F_FFFF => self.memory.ram[addr.us() - 0xA000_0000] = value,
-            0x1F80_0000..=0x1F80_03FF => self.memory.scratchpad[addr.us() - 0x1F80_0000] = value,
+    pub fn set<T: NumExt>(&mut self, addr: u32, value: T) {
+        let phys = Self::phys_addr(addr);
+        self.options.running &= self.debugger.write_occurred(addr);
+        match phys {
             0x1f801800 => panic!("HA"),
 
-            unknown => log::warn!(
-                "Write to unmapped address 0x{addr:X} (physical address 0x{unknown:X}), discarding write"
-            ),
-        }
-    }
+            0x0000_0000..=0x007F_FFFF => {
+                Self::raw_write(&mut self.memory.ram, phys & 0x1F_FFFF, value)
+            }
+            0x1F80_0000..=0x1F80_03FF => {
+                Self::raw_write(&mut self.memory.scratchpad, phys - 0x1F80_0000, value)
+            }
+            0x1F80_1000..=0x1F80_1FFF => self.set_io(phys - MMIOBASE, value),
+            0x1FC0_0000..=0x1FC7_FFFF => {
+                Self::raw_write(&mut self.memory.bios, phys - 0x1FC0_0000, value)
+            }
 
-    pub fn write_hword(&mut self, addr: u32, value: u16) {
-        self.write_byte(addr, value.low());
-        self.write_byte(addr + 1, value.high());
-    }
-
-    pub fn write_word(&mut self, addr: u32, value: u32) {
-        match Self::phys_addr(addr) {
-            0x1F80_1000..=0x1F80_1FFF => self[addr - 0x1F80_1000] = value,
-            _ => {
-                self.write_hword(addr, value.low());
-                self.write_hword(addr + 2, value.high());
+            unknown => {
+                log::warn!(
+                    "Write to unmapped address 0x{addr:X} (physical address 0x{unknown:X}), ignoring"
+                );
             }
         }
     }
 
-    pub fn set_iow(&mut self, addr: u32, value: u32) {
-        match addr - MMIOBASE {
+    fn raw_read<T: NumExt>(arr: &[u8], offset: u32) -> T {
+        unsafe { ptr::read(Self::raw_ptr(arr, offset)) }
+    }
+
+    fn raw_write<T: NumExt>(arr: &mut [u8], offset: u32, value: T) {
+        unsafe { ptr::write(Self::raw_ptr_mut(arr, offset), value) }
+    }
+
+    fn raw_ptr<T: NumExt>(arr: &[u8], offset: u32) -> *const T {
+        assert!((offset + T::WIDTH).us() <= arr.len());
+        &arr[offset.us()] as *const u8 as *const T
+    }
+
+    fn raw_ptr_mut<T: NumExt>(arr: &mut [u8], offset: u32) -> *mut T {
+        assert!((offset + T::WIDTH).us() <= arr.len());
+        &mut arr[offset.us()] as *mut u8 as *mut T
+    }
+
+    pub fn set_io<T: NumExt>(&mut self, addr: u32, value: T) {
+        let value = value.u32(); // TODO not all MMIO is 32b
+        match addr {
             // DMA
             DMAINT => self[DMAINT] = value & 0xFFFF_803F,
             // Address register. Upper bits unused
@@ -122,6 +150,7 @@ impl Default for Memory {
         Self {
             ram: [0; 2 * MB],
             scratchpad: [0; KB],
+            bios: BIOS,
             mmio: [0; 2 * KB],
         }
     }

@@ -21,6 +21,7 @@ use crate::{
 
 #[bitfield]
 #[repr(u32)]
+#[derive(Debug)]
 pub struct DmaChControl {
     is_from_ram: bool,
     step_backward: bool,
@@ -41,6 +42,7 @@ pub struct DmaChControl {
 
 #[derive(BitfieldSpecifier)]
 #[bits = 2]
+#[derive(Debug)]
 pub enum SyncMode {
     Manual = 0,
     Block = 1,
@@ -57,14 +59,14 @@ impl Dma {
 
         let triggered = match ctrl.sync_mode() {
             SyncMode::Manual => ctrl.trigger(),
-            SyncMode::Block => todo!(),
-            SyncMode::LinkedList => todo!(),
+            SyncMode::Block | SyncMode::LinkedList => true, // ?
 
             SyncMode::Reserved => {
                 log::warn!("Reserved DMA transfer configured?");
                 false
             }
         };
+        log::debug!("DMA: {triggered} on DMA {dma}");
         if ctrl.enable() && triggered {
             Self::perform_transfer(ps, dma, ctrl);
         }
@@ -87,12 +89,13 @@ impl Dma {
     fn regular_transfer(ps: &mut PlayStation, dma: u32, ctrl: DmaChControl, size: u32) {
         let mut addr = ps[Self::addr(dma, DMAADDR)];
         let increment = if ctrl.step_backward() { -4 } else { 4 };
+        log::debug!("DMA{dma} transfer: Size: {size}, Address {addr:08X}, Control: {ctrl:#?}");
 
         let mut remaining = size;
         while remaining > 0 {
             let current = addr & 0x1F_FFFC;
             if ctrl.is_from_ram() {
-                let src = ps.read_word(current);
+                let src = ps.get::<u32>(current);
                 match dma {
                     port => {
                         log::debug!("Sending 0x{src:08X} via DMA to Port {port}: unimplemented")
@@ -105,7 +108,7 @@ impl Dma {
 
                     _ => panic!("Unknown DMA port"),
                 };
-                ps.write_word(current, src);
+                ps.set(current, src);
             }
 
             addr = addr.wrapping_add_signed(increment);
@@ -121,11 +124,11 @@ impl Dma {
         assert!(ctrl.is_from_ram(), "LL DMA must be from RAM!");
 
         loop {
-            let header = ps.read_word(addr);
+            let header = ps.get::<u32>(addr);
             let mut remaining = header >> 24;
             while remaining > 0 {
                 addr = addr.wrapping_add(4) & 0x1F_FFFC;
-                let command = ps.read_word(addr);
+                let command = ps.get(addr);
                 Gpu::process_command(ps, command);
                 remaining -= 1;
             }

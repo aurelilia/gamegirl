@@ -58,12 +58,12 @@ impl PlayStation {
         lut[0x12] = Self::cop2;
         lut[0x13] = Self::exception_inst::<{ Exception::CopError }>; // COP3
 
-        lut[0x20] = Self::load::<1, true>; // LB
-        lut[0x21] = Self::load::<2, true>; // LH
+        lut[0x20] = Self::load::<u8, true>; // LB
+        lut[0x21] = Self::load::<u16, true>; // LH
         lut[0x22] = Self::lwl;
-        lut[0x23] = Self::load::<4, true>; // LW
-        lut[0x24] = Self::load::<1, false>; // LBU
-        lut[0x25] = Self::load::<2, false>; // LHU
+        lut[0x23] = Self::load::<u32, true>; // LW
+        lut[0x24] = Self::load::<u8, false>; // LBU
+        lut[0x25] = Self::load::<u16, false>; // LHU
         lut[0x26] = Self::lwr;
 
         lut[0x28] = Self::store::<1>; // SB
@@ -108,9 +108,9 @@ impl PlayStation {
         lut[0x1B] = Self::muldiv::<true, false>; // DIVU
 
         lut[0x20] = Self::math_signed::<false, "ADD">; // ADD
-        lut[0x21] = Self::math_unsigned::<false, "ADDU">; // ADDU
+        lut[0x21] = Self::math_signed::<false, "ADDU">; // ADDU
         lut[0x22] = Self::math_signed::<false, "SUB">; // SUB
-        lut[0x23] = Self::math_unsigned::<false, "SUB">; // SUBU
+        lut[0x23] = Self::math_signed::<false, "SUBU">; // SUBU
         lut[0x24] = Self::math_unsigned::<false, "AND">; // AND
         lut[0x25] = Self::math_unsigned::<false, "OR">; // OR
         lut[0x26] = Self::math_unsigned::<false, "XOR">; // XOR
@@ -127,8 +127,7 @@ impl PlayStation {
     fn branch(&mut self, imm: i32) {
         // Always word-aligned
         let offs = imm << 2;
-        // Account for Pc increment after instruction, TODO correct?
-        self.jump_pc(self.cpu.pc.wrapping_add_signed(offs).wrapping_sub(4));
+        self.jump_pc(self.cpu.pc.wrapping_add_signed(offs));
     }
 
     fn cache_isolated(&self) -> bool {
@@ -152,18 +151,17 @@ impl PlayStation {
         };
 
         let value = match OP {
-            "ADD" => a.wrapping_add(b),
-            "SUB" => a.wrapping_sub(b),
             "AND" => a & b,
             "OR" => a | b,
             "XOR" => a ^ b,
             "LUI" => b << 16,
             "SLT" => (a < b) as u32,
             "NOR" => !(a | b),
-            _ => panic!("Unknown math operation"),
+            t => panic!("Unknown math operation {t}"),
         };
 
-        self.cpu.set_reg(inst.rt(), value);
+        let reg = if IMM { inst.rt() } else { inst.rd() };
+        self.cpu.set_reg(reg, value);
     }
 
     fn math_signed<const IMM: bool, const OP: &'static str>(&mut self, inst: Inst) {
@@ -192,10 +190,11 @@ impl PlayStation {
                 }
             },
             "SLT" => (a < b) as i32,
-            _ => panic!("Unknown math operation"),
+            t => panic!("Unknown math operation {t}"),
         };
 
-        self.cpu.set_reg(inst.rt(), value as u32);
+        let reg = if IMM { inst.rt() } else { inst.rd() };
+        self.cpu.set_reg(reg, value as u32);
     }
 
     fn unknown_instruction(&mut self, inst: Inst) {
@@ -214,7 +213,7 @@ impl PlayStation {
         let cond = cond != is_ge;
 
         if link {
-            self.cpu.set_reg(31, self.cpu.pc);
+            self.cpu.set_reg(31, self.cpu.next_pc);
         }
         if cond {
             self.branch(inst.imm16s());
@@ -227,7 +226,7 @@ impl PlayStation {
     }
 
     fn jal(&mut self, inst: Inst) {
-        self.cpu.set_reg(31, self.cpu.pc);
+        self.cpu.set_reg(31, self.cpu.next_pc);
         self.j(inst);
     }
 
@@ -259,17 +258,17 @@ impl PlayStation {
         todo!();
     }
 
-    fn load<const SIZE: u8, const SIGN: bool>(&mut self, inst: Inst) {
+    fn load<T: NumExt, const SIGN: bool>(&mut self, inst: Inst) {
         check_cache!(self);
         let addr = self.addr_with_imm(inst);
-        Cpu::ensure_aligned(self, addr, SIZE.u32(), Exception::UnalignedLoad);
+        Cpu::ensure_aligned(self, addr, T::WIDTH.u32(), Exception::UnalignedLoad);
 
-        let value = match (SIZE, SIGN) {
-            (1, false) => self.read_byte(addr).u32(),
-            (1, true) => self.read_byte(addr) as i8 as i32 as u32,
-            (2, false) => self.read_hword(addr).u32(),
-            (2, true) => self.read_hword(addr) as i16 as i32 as u32,
-            (4, _) => self.read_word(addr).u32(),
+        let value = match (T::WIDTH, SIGN) {
+            (1, false) => self.get::<u8>(addr).u32(),
+            (1, true) => self.get::<u8>(addr) as i8 as i32 as u32,
+            (2, false) => self.get::<u16>(addr).u32(),
+            (2, true) => self.get::<u16>(addr) as i16 as i32 as u32,
+            (4, _) => self.get::<u32>(addr).u32(),
             _ => panic!("Invalid load parameters"),
         };
         self.cpu.pending_load = PendingLoad {
@@ -282,7 +281,7 @@ impl PlayStation {
         let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
         let value = self.cpu.next_regs[inst.rt().us()];
 
-        let mem_aligned = self.read_word(addr & !3);
+        let mem_aligned = self.get(addr & !3);
         let value = match addr & 3 {
             0 => mem_aligned,
             1 => (value & 0xFF00_0000) | (mem_aligned >> 8),
@@ -299,7 +298,7 @@ impl PlayStation {
         let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
         let value = self.cpu.next_regs[inst.rt().us()];
 
-        let mem_aligned = self.read_word(addr & !3);
+        let mem_aligned = self.get(addr & !3);
         let value = match addr & 3 {
             0 => (value & 0x00FF_FFFF) | (mem_aligned << 24),
             1 => (value & 0x0000_FFFF) | (mem_aligned << 16),
@@ -319,9 +318,9 @@ impl PlayStation {
 
         let value = self.cpu.reg(inst.rt());
         match SIZE {
-            1 => self.write_byte(addr, value.u8()),
-            2 => self.write_hword(addr, value.u16()),
-            4 => self.write_word(addr, value.u32()),
+            1 => self.set(addr, value.u8()),
+            2 => self.set(addr, value.u16()),
+            4 => self.set(addr, value.u32()),
             _ => panic!("Invalid store parameters"),
         };
     }
@@ -330,28 +329,28 @@ impl PlayStation {
         let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
         let value = self.cpu.reg(inst.rt());
 
-        let mem_aligned = self.read_word(addr & !3);
+        let mem_aligned = self.get::<u32>(addr & !3);
         let value = match addr & 3 {
             0 => (value & 0xFFFF_FF00) | (mem_aligned >> 24),
             1 => (value & 0xFFFF_0000) | (mem_aligned >> 16),
             2 => (value & 0xFF00_0000) | (mem_aligned >> 8),
             _ => mem_aligned,
         };
-        self.write_word(addr & !3, value);
+        self.set(addr & !3, value);
     }
 
     fn swr(&mut self, inst: Inst) {
         let addr = self.cpu.reg(inst.rs()).wrapping_add_signed(inst.imm16s());
         let value = self.cpu.reg(inst.rt());
 
-        let mem_aligned = self.read_word(addr & !3);
+        let mem_aligned = self.get::<u32>(addr & !3);
         let value = match addr & 3 {
             0 => mem_aligned,
             1 => (value & 0x0000_00FF) | (mem_aligned << 8),
             2 => (value & 0x0000_FFFF) | (mem_aligned << 16),
             _ => (value & 0x00FF_FFFF) | (mem_aligned << 24),
         };
-        self.write_word(addr & !3, value);
+        self.set(addr & !3, value);
     }
 
     fn lwc2(&mut self, inst: Inst) {
@@ -390,12 +389,12 @@ impl PlayStation {
     }
 
     fn jr(&mut self, inst: Inst) {
-        self.cpu.pc = self.cpu.reg(inst.rs());
+        self.jump_pc(self.cpu.reg(inst.rs()));
     }
 
     fn jalr(&mut self, inst: Inst) {
         self.cpu.set_reg(inst.rd(), self.cpu.pc);
-        self.cpu.pc = self.cpu.reg(inst.rs());
+        self.jump_pc(self.cpu.reg(inst.rs()));
     }
 
     fn lohi_mov<const TO_REG: bool, const HI: bool>(&mut self, inst: Inst) {
