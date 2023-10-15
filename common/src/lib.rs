@@ -16,10 +16,10 @@ pub mod macros;
 pub mod numutil;
 
 /// Audio sample rate of all emulated systems.
-pub const SAMPLE_RATE: u32 = 44100;
+pub const SAMPLE_RATE: u32 = 48000;
 
 /// For debugging: If instruction-level tracing output should be printed.
-pub const TRACING: bool = true;
+pub const TRACING: bool = false;
 
 /// Colour type used by the system's PPUs for image data.
 /// This type is analogus to egui's `Color32`, which allows the GUI to

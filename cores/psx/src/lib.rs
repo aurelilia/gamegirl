@@ -21,7 +21,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
-    Colour, Core,
+    produce_samples_buffered, Colour, Core,
 };
 use glow::Context;
 use iso::Iso;
@@ -66,6 +66,7 @@ pub struct PlayStation {
 
 impl Core for PlayStation {
     common_functions!(CPU_CLOCK, PsxEvent::PauseEmulation, [1024, 512]);
+    produce_samples_buffered!();
 
     fn advance(&mut self) {
         Cpu::execute_next(self);

@@ -30,7 +30,7 @@ use common::{
     components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    Colour, Core,
+    produce_samples_buffered, Colour, Core,
 };
 
 use crate::{
@@ -128,6 +128,7 @@ pub struct Nds {
 
 impl Core for Nds {
     common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [240, 160 * 2]);
+    produce_samples_buffered!();
 
     fn advance(&mut self) {
         // Run an instruction on the ARM9, then keep running the ARM7

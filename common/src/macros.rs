@@ -39,49 +39,6 @@ macro_rules! common_functions {
             self.ppu.last_frame.take()
         }
 
-        fn produce_samples(&mut self, samples: &mut [f32]) {
-            if !self.options.running {
-                samples.fill(0.0);
-                return;
-            }
-
-            let target = samples.len() * self.options.speed_multiplier;
-            while self.apu.buffer.len() < target {
-                if !self.options.running {
-                    samples.fill(0.0);
-                    return;
-                }
-                self.advance();
-            }
-
-            let mut buffer = mem::take(&mut self.apu.buffer);
-            if self.options.invert_audio_samples {
-                // If rewinding, truncate and get rid of any excess samples to prevent
-                // audio samples getting backed up
-                for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
-                    *dst = src * self.config.volume;
-                }
-            } else {
-                // Otherwise, store any excess samples back in the buffer for next time
-                // while again not storing too many to avoid backing up.
-                // This way can cause clipping if the console produces audio too fast,
-                // however this is preferred to audio falling behind and eating
-                // a lot of memory.
-                for sample in buffer.drain(target..) {
-                    self.apu.buffer.push(sample);
-                }
-                self.apu.buffer.truncate(5_000);
-
-                for (src, dst) in buffer
-                    .into_iter()
-                    .step_by(self.options.speed_multiplier)
-                    .zip(samples.iter_mut())
-                {
-                    *dst = src * self.config.volume;
-                }
-            }
-        }
-
         #[cfg(feature = "serde")]
         fn save_state(&mut self) -> Vec<u8> {
             common::misc::serialize(self, self.config.compress_savestates)
@@ -118,6 +75,59 @@ macro_rules! common_functions {
 
         fn as_any(&mut self) -> &mut dyn std::any::Any {
             self
+        }
+    };
+}
+
+/// An implementation of [Core::produce_samples] for systems that regularly
+/// push finished samples to an output buffer.
+#[macro_export]
+macro_rules! produce_samples_buffered {
+    () => {
+        fn produce_samples(&mut self, samples: &mut [f32]) {
+            if !self.options.running {
+                samples.fill(0.0);
+                return;
+            }
+
+            let target = samples.len() * self.options.speed_multiplier;
+            while self.apu.buffer.len() < target {
+                if !self.options.running {
+                    samples.fill(0.0);
+                    return;
+                }
+                self.advance();
+            }
+
+            let mut buffer = mem::take(&mut self.apu.buffer);
+            if self.options.invert_audio_samples {
+                // If rewinding, truncate and get rid of any excess samples to prevent
+                // audio samples getting backed up
+                for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
+                    *dst = src * self.config.volume;
+                }
+            } else {
+                // Otherwise, store any excess samples back in the buffer for next time
+                // while again not storing too many to avoid backing up.
+                // This way can cause clipping if the console produces audio too fast,
+                // however this is preferred to audio falling behind and eating
+                // a lot of memory.
+                for sample in buffer.drain(target..) {
+                    self.apu.buffer.push(sample);
+                }
+                if self.apu.buffer.len() > 1_000 {
+                    log::warn!("Audio samples are backing up! Truncating");
+                    self.apu.buffer.truncate(100);
+                }
+
+                for (src, dst) in buffer
+                    .into_iter()
+                    .step_by(self.options.speed_multiplier)
+                    .zip(samples.iter_mut())
+                {
+                    *dst = src * self.config.volume;
+                }
+            }
         }
     };
 }

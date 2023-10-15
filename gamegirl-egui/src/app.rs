@@ -111,7 +111,7 @@ impl App {
                     }
                 }
             }
-            i.stable_dt - 0.0001
+            i.stable_dt.min(0.016).max(0.001) - 0.0005
         });
 
         let mut core = self.core.lock().unwrap();

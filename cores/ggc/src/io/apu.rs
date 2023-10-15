@@ -12,13 +12,14 @@ use crate::{
     GameGirl, T_CLOCK_HZ,
 };
 
-pub const SAMPLE_EVERY_N_CLOCKS: i32 = (T_CLOCK_HZ / SAMPLE_RATE) as i32;
+pub const SAMPLE_EVERY_N_CLOCKS: f64 = T_CLOCK_HZ as f64 / SAMPLE_RATE as f64;
 
 /// APU variant used by DMG/CGB.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Apu {
     pub(super) inner: GenericApu,
     pub buffer: Vec<f32>,
+    next_sample_offs: f64,
 }
 
 impl Apu {
@@ -28,8 +29,10 @@ impl Apu {
                 let sample = gg.apu.inner.make_sample();
                 gg.apu.buffer.push(sample[0]);
                 gg.apu.buffer.push(sample[1]);
-                gg.scheduler
-                    .schedule(GGEvent::ApuEvent(event), SAMPLE_EVERY_N_CLOCKS - late_by);
+                gg.scheduler.schedule(
+                    GGEvent::ApuEvent(event),
+                    gg.apu.get_next_sample_time() - late_by,
+                );
             }
 
             ApuEvent::TickSequencer => {
@@ -54,16 +57,24 @@ impl Apu {
         GenericApu::init_scheduler(&mut shed(&mut gg.scheduler));
         gg.scheduler.schedule(
             GGEvent::ApuEvent(ApuEvent::PushSample),
-            SAMPLE_EVERY_N_CLOCKS,
+            gg.apu.get_next_sample_time(),
         );
         gg.scheduler
             .schedule(GGEvent::ApuEvent(ApuEvent::TickSequencer), 0x2000);
+    }
+
+    fn get_next_sample_time(&mut self) -> i32 {
+        let time = self.next_sample_offs as i32;
+        self.next_sample_offs -= time as f64;
+        self.next_sample_offs += SAMPLE_EVERY_N_CLOCKS;
+        time
     }
 
     pub fn new(cgb: bool) -> Self {
         Self {
             inner: GenericApu::new(cgb),
             buffer: Vec::with_capacity(5000),
+            next_sample_offs: SAMPLE_EVERY_N_CLOCKS,
         }
     }
 }

@@ -29,7 +29,6 @@ use memory::Memory;
 
 use crate::{
     addr::{KEYINPUT, SOUNDBIAS},
-    audio::SAMPLE_EVERY_N_CLOCKS,
     dma::Dmas,
     scheduling::{AdvEvent, ApuEvent},
     timer::Timers,
@@ -77,6 +76,54 @@ impl Core for GameGirlAdv {
 
     fn advance(&mut self) {
         Cpu::continue_running(self);
+    }
+
+    fn produce_samples(&mut self, samples: &mut [f32]) {
+        if !self.options.running {
+            samples.fill(0.0);
+            return;
+        }
+
+        // DIV 2: stereo
+        let target = samples.len() * self.options.speed_multiplier / 2;
+        while self.apu.samples_ready < target {
+            if !self.options.running {
+                samples.fill(0.0);
+                return;
+            }
+            self.advance();
+        }
+
+        let buffer = self.apu.resample_buffer();
+        if self.options.invert_audio_samples {
+            // If rewinding, truncate and get rid of any excess samples to prevent
+            // audio samples getting backed up
+            for i in 0..(samples.len() / 2) {
+                samples[i * 2] = buffer[0][i];
+                samples[(i * 2) + 1] = buffer[1][i];
+            }
+        } else {
+            // Otherwise, store any excess samples back in the buffer for next time
+            // while again not storing too many to avoid backing up.
+            // This way can cause clipping if the console produces audio too fast,
+            // however this is preferred to audio falling behind and eating
+            // a lot of memory.
+            for i in target..(buffer[0].len()) {
+                self.apu.overshoot_buffer[0].push(buffer[0][i]);
+                self.apu.overshoot_buffer[1].push(buffer[1][i]);
+            }
+            if self.apu.overshoot_buffer[0].len() > 1_000 {
+                log::warn!("Audio samples are backing up! Truncating");
+                self.apu.overshoot_buffer[0].truncate(100);
+                self.apu.overshoot_buffer[1].truncate(100);
+            }
+
+            for i in 0..(samples.len() / 2) {
+                samples[i * 2] = buffer[0][i * self.options.speed_multiplier] * self.config.volume;
+                samples[(i * 2) + 1] =
+                    buffer[1][i * self.options.speed_multiplier] * self.config.volume;
+            }
+        }
     }
 
     fn reset(&mut self) {
@@ -213,10 +260,6 @@ impl Default for GameGirlAdv {
         Apu::init_scheduler(&mut gg);
         gg.scheduler
             .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
-        gg.scheduler.schedule(
-            AdvEvent::ApuEvent(ApuEvent::PushSample),
-            SAMPLE_EVERY_N_CLOCKS,
-        );
 
         // Initialize DMA
         gg.dma.running = 99;

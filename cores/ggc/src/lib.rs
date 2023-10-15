@@ -16,7 +16,7 @@ use common::{
     },
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    Colour, Core,
+    produce_samples_buffered, Colour, Core,
 };
 
 use crate::{
@@ -79,6 +79,7 @@ pub struct GameGirl {
 
 impl Core for GameGirl {
     common_functions!(T_CLOCK_HZ, GGEvent::PauseEmulation, [160, 144]);
+    produce_samples_buffered!();
 
     fn advance(&mut self) {
         Cpu::exec_next_inst(self);
