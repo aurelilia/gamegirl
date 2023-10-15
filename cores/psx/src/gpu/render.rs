@@ -66,7 +66,6 @@ impl GlRender {
     }
 
     pub fn draw(&mut self) {
-        log::warn!("Drawing {} vertices", self.count);
         unsafe {
             self.gl.use_program(Some(self.program));
             self.gl.bind_framebuffer(glow::FRAMEBUFFER, Some(self.fbo));

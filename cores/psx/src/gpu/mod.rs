@@ -245,7 +245,7 @@ impl Gpu {
         let width = input[2].low().us();
         let height = input[2].high().us();
         // Round up
-        let size = (width * height).set_bit(0, false);
+        let size = ((width * height) + 1) & !1;
         self.gp0_image_remaining = size / 2;
     }
 
