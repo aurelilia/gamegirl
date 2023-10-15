@@ -97,6 +97,7 @@ impl Dma {
             if ctrl.is_from_ram() {
                 let src = ps.get::<u32>(current);
                 match dma {
+                    PORT_GPU => Gpu::gp0_write(ps, src),
                     port => {
                         log::debug!("Sending 0x{src:08X} via DMA to Port {port}: unimplemented")
                     }
@@ -104,7 +105,7 @@ impl Dma {
             } else {
                 let src = match dma {
                     PORT_OTC if remaining == 1 => 0xFF_FFFF,
-                    PORT_OTC => addr.wrapping_add_signed(-increment) & 0x1F_FFFC,
+                    PORT_OTC => addr.wrapping_sub(4) & 0x1F_FFFC,
 
                     _ => panic!("Unknown DMA port"),
                 };
@@ -122,6 +123,7 @@ impl Dma {
         let mut addr = ps[Self::addr(dma, DMAADDR)];
         assert!(dma == PORT_GPU, "LL not support for non-GPU DMA!");
         assert!(ctrl.is_from_ram(), "LL DMA must be from RAM!");
+        log::debug!("DMA{dma} LL transfer: Address {addr:08X}, Control: {ctrl:#?}");
 
         loop {
             let header = ps.get::<u32>(addr);
@@ -129,7 +131,7 @@ impl Dma {
             while remaining > 0 {
                 addr = addr.wrapping_add(4) & 0x1F_FFFC;
                 let command = ps.get(addr);
-                Gpu::process_command(ps, command);
+                Gpu::gp0_write(ps, command);
                 remaining -= 1;
             }
 
@@ -147,6 +149,7 @@ impl Dma {
         ctrl.set_enable(false);
         ctrl.set_trigger(false);
         ps[Self::addr(dma, DMACHCTRL)] = ctrl.into();
+        log::debug!("DMA{dma} finished.")
     }
 
     fn ctrl(ps: &PlayStation, dma: u32) -> DmaChControl {

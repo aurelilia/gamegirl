@@ -12,4 +12,7 @@ pub const PORT_GPU: u32 = 0x2;
 pub const PORT_OTC: u32 = 0x6;
 
 // GPU
+pub const GPUREAD: u32 = 0x810;
 pub const GPUSTAT: u32 = 0x814;
+pub const GP0: u32 = 0x810;
+pub const GP1: u32 = 0x814;

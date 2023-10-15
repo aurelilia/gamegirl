@@ -10,7 +10,7 @@
 #![allow(unused)]
 #![allow(clippy::unused_self)]
 
-use std::{mem, path::PathBuf};
+use std::{mem, path::PathBuf, sync::Arc};
 
 use addr::{DMACTRL, GPUSTAT};
 use common::{
@@ -23,6 +23,7 @@ use common::{
     misc::{Button, EmulateOptions, SystemConfig},
     Colour, Core,
 };
+use glow::Context;
 use iso::Iso;
 
 use crate::{apu::Apu, cpu::Cpu, gpu::Gpu, memory::Memory, scheduling::PsxEvent};
@@ -107,13 +108,20 @@ impl PlayStation {
     }
 
     /// Create a system with an ISO already loaded.
-    pub fn with_iso(iso: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
+    pub fn with_iso(
+        iso: Vec<u8>,
+        path: Option<PathBuf>,
+        config: &SystemConfig,
+        ogl_ctx: Option<Arc<Context>>,
+        ogl_tex_id: u64,
+    ) -> Box<Self> {
         let mut iso = Iso { raw: iso };
         if let Some(save) = Storage::load(path, iso.title()) {
             todo!()
         }
 
         let mut ps = Box::<Self>::default();
+        ps.ppu.init(ogl_ctx, ogl_tex_id);
 
         // DMA
         ps[DMACTRL] = 0x07654321;

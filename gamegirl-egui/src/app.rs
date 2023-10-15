@@ -16,6 +16,7 @@ use eframe::{
     egui::{Context, Event, TextureOptions},
     emath::History,
     epaint::{ColorImage, ImageData, ImageDelta, TextureId},
+    glow::{self},
     CreationContext, Frame, Storage,
 };
 
@@ -58,7 +59,7 @@ pub struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         let size = self.update_gg(ctx);
-        self.process_messages();
+        self.process_messages(frame.gl());
         gui::draw(self, ctx, frame, size);
 
         // Immediately repaint, since the GG will have a new frame.
@@ -139,11 +140,22 @@ impl App {
     }
 
     /// Process all async messages that came in during this frame.
-    fn process_messages(&mut self) {
+    fn process_messages(&mut self, gl: Option<&Arc<glow::Context>>) {
         while let Ok(Message::FileOpen(file)) = self.message_channel.1.try_recv() {
             self.save_game();
-            *self.core.lock().unwrap() =
-                gamegirl::load_cart(file.content, file.path.clone(), &self.state.options.sys);
+
+            let tex = match self.textures[0] {
+                TextureId::Managed(m) => m,
+                _ => panic!(),
+            };
+
+            *self.core.lock().unwrap() = gamegirl::load_cart(
+                file.content,
+                file.path.clone(),
+                &self.state.options.sys,
+                gl.cloned(),
+                tex,
+            );
 
             if self.audio_stream.is_none() {
                 self.audio_stream = crate::setup_cpal(self.core.clone());

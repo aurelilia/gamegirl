@@ -902,6 +902,7 @@ dependencies = [
  "gdbstub_arch",
  "gga",
  "ggc",
+ "glow",
  "log",
  "nds",
  "psx",
@@ -1898,8 +1899,10 @@ dependencies = [
 name = "psx"
 version = "0.1.0"
 dependencies = [
+ "arrayvec",
  "bitmatch",
  "common",
+ "glow",
  "log",
  "modular-bitfield",
  "serde",

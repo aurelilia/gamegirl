@@ -63,6 +63,8 @@ fn main() {
                         fs::read("bench.gb").unwrap(),
                         None,
                         &SystemConfig::default(),
+                        None,
+                        0,
                     );
 
                     if c.bool_flag("measure") {
@@ -204,7 +206,7 @@ fn run<const SKIP_BOOTROM: bool, const TIMEOUT_GOOD: bool>(
     image: Option<Vec<common::Colour>>,
     cond: fn(&mut dyn Core) -> ControlFlow<Status>,
 ) -> Result<Vec<common::Colour>, String> {
-    let mut gg = gamegirl::load_cart(test, None, &SystemConfig::default());
+    let mut gg = gamegirl::load_cart(test, None, &SystemConfig::default(), None, 0);
     if SKIP_BOOTROM {
         gg.skip_bootrom();
     }

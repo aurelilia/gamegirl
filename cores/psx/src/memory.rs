@@ -15,8 +15,9 @@ use common::{
 };
 
 use crate::{
-    addr::{DMABASE, DMACTRL, DMAINT, GPUSTAT, MMIOBASE},
+    addr::{DMABASE, DMACTRL, DMAINT, GP0, GP1, GPUREAD, GPUSTAT, MMIOBASE},
     dma::Dma,
+    gpu::Gpu,
     PlayStation,
 };
 
@@ -45,7 +46,9 @@ impl PlayStation {
                 Self::raw_read(&self.memory.scratchpad, phys - 0x1F80_0000)
             }
             0x1F80_1000..=0x1F80_1FFF => match phys - MMIOBASE {
-                GPUSTAT => T::from_u32(self.ppu.stat.into()),
+                GPUREAD => T::from_u32(self.ppu.read),
+                // TODO fix
+                GPUSTAT => T::from_u32(Into::<u32>::into(self.ppu.stat).set_bit(19, false)),
 
                 _ => {
                     let ptr = self.memory.mmio.as_ptr() as *const u8;
@@ -70,8 +73,6 @@ impl PlayStation {
         let phys = Self::phys_addr(addr);
         self.options.running &= self.debugger.write_occurred(addr);
         match phys {
-            0x1f801800 => panic!("HA"),
-
             0x0000_0000..=0x007F_FFFF => {
                 Self::raw_write(&mut self.memory.ram, phys & 0x1F_FFFF, value)
             }
@@ -124,6 +125,10 @@ impl PlayStation {
                                     // 0...
                 Dma::maybe_trigger(self, addr);
             }
+
+            // GPU
+            GP0 => Gpu::gp0_write(self, value.u32()),
+            GP1 => Gpu::gp1_write(self, value.u32()),
 
             _ => self[addr] = value,
         }

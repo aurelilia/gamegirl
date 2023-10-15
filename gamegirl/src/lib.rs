@@ -6,7 +6,7 @@
 
 //! This crate contains common structures shared by all systems.
 
-use std::{os::unix::prelude::OsStrExt, path::PathBuf};
+use std::{os::unix::prelude::OsStrExt, path::PathBuf, sync::Arc};
 
 pub use common::{self, Core};
 use common::{
@@ -17,6 +17,7 @@ use common::{
 pub use gga;
 #[cfg(feature = "ggc")]
 pub use ggc;
+use glow::Context;
 #[cfg(feature = "nds")]
 pub use nds;
 #[cfg(feature = "psx")]
@@ -34,7 +35,13 @@ pub fn save_game(system: &dyn Core, path: Option<PathBuf>) {
 }
 
 /// Load a cart. Tries to automatically pick the right system kind.
-pub fn load_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<dyn Core> {
+pub fn load_cart(
+    cart: Vec<u8>,
+    path: Option<PathBuf>,
+    config: &SystemConfig,
+    ogl_ctx: Option<Arc<Context>>,
+    ogl_tex_id: u64,
+) -> Box<dyn Core> {
     // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
     // that is present on every cartridge.
     let _is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
@@ -53,7 +60,7 @@ pub fn load_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) ->
         #[cfg(feature = "nds")]
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
         #[cfg(feature = "psx")]
-        _ if _is_psx => psx::PlayStation::with_iso(cart, path, config),
+        _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, ogl_ctx, ogl_tex_id),
 
         #[cfg(feature = "gga")]
         _ => {
