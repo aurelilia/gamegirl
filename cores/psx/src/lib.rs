@@ -65,7 +65,7 @@ pub struct PlayStation {
 }
 
 impl Core for PlayStation {
-    common_functions!(CPU_CLOCK, PsxEvent::PauseEmulation, [640, 480]);
+    common_functions!(CPU_CLOCK, PsxEvent::PauseEmulation, [1024, 512]);
 
     fn advance(&mut self) {
         Cpu::execute_next(self);
@@ -113,7 +113,7 @@ impl PlayStation {
         path: Option<PathBuf>,
         config: &SystemConfig,
         ogl_ctx: Option<Arc<Context>>,
-        ogl_tex_id: u64,
+        ogl_tex_id: u32,
     ) -> Box<Self> {
         let mut iso = Iso { raw: iso };
         if let Some(save) = Storage::load(path, iso.title()) {

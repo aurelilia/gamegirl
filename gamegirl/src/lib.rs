@@ -40,7 +40,7 @@ pub fn load_cart(
     path: Option<PathBuf>,
     config: &SystemConfig,
     ogl_ctx: Option<Arc<Context>>,
-    ogl_tex_id: u64,
+    ogl_tex_id: u32,
 ) -> Box<dyn Core> {
     // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
     // that is present on every cartridge.

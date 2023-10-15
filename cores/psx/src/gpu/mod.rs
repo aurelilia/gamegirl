@@ -20,7 +20,7 @@ use modular_bitfield::{
     BitfieldSpecifier,
 };
 
-use self::render::GlRender;
+use self::render::{Color, GlRender, Position};
 use crate::PlayStation;
 
 type Gp0Handler = fn(&mut Gpu, &[u32]);
@@ -137,7 +137,9 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn output_frame(&mut self) {}
+    pub fn output_frame(&mut self) {
+        self.render.as_mut().unwrap().draw();
+    }
 
     pub fn gp0_write(ps: &mut PlayStation, value: u32) {
         if ps.ppu.gp0_image_remaining > 0 {
@@ -188,64 +190,55 @@ impl Gpu {
     }
 
     fn gp0_quad_mono_opaque(&mut self, input: &[u32]) {
-        let rect = Rect::from_points(&[
-            Point::from_xy(input[1].bits(0, 16) as f32, input[1].bits(16, 16) as f32),
-            Point::from_xy(input[2].bits(0, 16) as f32, input[2].bits(16, 16) as f32),
-            Point::from_xy(input[3].bits(0, 16) as f32, input[3].bits(16, 16) as f32),
-            Point::from_xy(input[4].bits(0, 16) as f32, input[4].bits(16, 16) as f32),
-        ])
-        .unwrap();
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            input[0].bits(0, 8).u8(),
-            input[0].bits(8, 8).u8(),
-            input[0].bits(16, 8).u8(),
-            255,
-        );
-        self.pixmap
-            .0
-            .fill_rect(rect, &paint, Transform::identity(), None);
+        let positions = [
+            Position::new(input[1]),
+            Position::new(input[2]),
+            Position::new(input[3]),
+            Position::new(input[4]),
+        ];
+        let colors = [Color::new(input[0]); 4];
+        self.render.as_mut().unwrap().add_quad(positions, colors);
     }
 
     fn gp0_quad_texture_opaque(&mut self, input: &[u32]) {
-        let rect = Rect::from_points(&[
-            Point::from_xy(input[1].bits(0, 16) as f32, input[1].bits(16, 16) as f32),
-            Point::from_xy(input[3].bits(0, 16) as f32, input[3].bits(16, 16) as f32),
-            Point::from_xy(input[5].bits(0, 16) as f32, input[5].bits(16, 16) as f32),
-            Point::from_xy(input[7].bits(0, 16) as f32, input[7].bits(16, 16) as f32),
-        ])
-        .unwrap();
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            input[0].bits(0, 8).u8(),
-            input[0].bits(8, 8).u8(),
-            input[0].bits(16, 8).u8(),
-            255,
-        );
-        self.pixmap
-            .0
-            .fill_rect(rect, &paint, Transform::identity(), None);
+        let positions = [
+            Position::new(input[1]),
+            Position::new(input[3]),
+            Position::new(input[5]),
+            Position::new(input[7]),
+        ];
+        let colors = [Color::new(0); 4];
+        self.render.as_mut().unwrap().add_quad(positions, colors);
     }
 
     fn gp0_tri_shaded_opaque(&mut self, input: &[u32]) {
-        let rect = Rect::from_points(&[
-            Point::from_xy(input[1].bits(0, 16) as f32, input[1].bits(16, 16) as f32),
-            Point::from_xy(input[2].bits(0, 16) as f32, input[2].bits(16, 16) as f32),
-            Point::from_xy(input[3].bits(0, 16) as f32, input[3].bits(16, 16) as f32),
-            Point::from_xy(input[4].bits(0, 16) as f32, input[4].bits(16, 16) as f32),
-        ])
-        .unwrap();
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            input[0].bits(0, 8).u8(),
-            input[0].bits(8, 8).u8(),
-            input[0].bits(16, 8).u8(),
-            255,
-        );
+        let positions = [
+            Position::new(input[1]),
+            Position::new(input[3]),
+            Position::new(input[5]),
+        ];
+        let colors = [
+            Color::new(input[0]),
+            Color::new(input[2]),
+            Color::new(input[4]),
+        ];
+        self.render.as_mut().unwrap().add_tri(positions, colors);
     }
 
     fn gp0_quad_shaded_opaque(&mut self, input: &[u32]) {
-        log::warn!("Unimplemented Shaded Quad");
+        let positions = [
+            Position::new(input[1]),
+            Position::new(input[3]),
+            Position::new(input[5]),
+            Position::new(input[7]),
+        ];
+        let colors = [
+            Color::new(input[0]),
+            Color::new(input[2]),
+            Color::new(input[4]),
+            Color::new(input[6]),
+        ];
+        self.render.as_mut().unwrap().add_quad(positions, colors);
     }
 
     fn gp0_image_load(&mut self, input: &[u32]) {
@@ -385,18 +378,13 @@ impl Gpu {
         self.stat.set_reverse_flag(value.is_bit(7));
     }
 
-    pub fn init(&mut self, ogl_ctx: Option<Arc<Context>>, ogl_tex_id: u64) {
+    pub fn init(&mut self, ogl_ctx: Option<Arc<Context>>, ogl_tex_id: u32) {
         self.render = Some(GlRender::init(ogl_ctx.unwrap(), ogl_tex_id));
     }
 
     const fn make_gp0_table() -> Gp0Lut {
-        let mut table: Gp0Lut = [(
-            |g, _| {
-                log::warn!("Unknown GP0 command! {:X}?", g.gp0_cmd_buf[0]);
-                g.gp0_cmd_buf.clear();
-            },
-            1,
-        ); 256];
+        let mut table: Gp0Lut =
+            [(|g, buf| log::warn!("Unknown GP0 command! {:X}?", buf[0]), 1); 256];
 
         table[0x00] = (|_, _| (), 1);
         table[0x01] = (Gpu::gp0_clear_cache, 1);

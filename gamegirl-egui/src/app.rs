@@ -154,7 +154,7 @@ impl App {
                 file.path.clone(),
                 &self.state.options.sys,
                 gl.cloned(),
-                tex,
+                tex as u32,
             );
 
             if self.audio_stream.is_none() {
