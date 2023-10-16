@@ -111,7 +111,7 @@ impl App {
                     }
                 }
             }
-            i.stable_dt.min(0.016).max(0.001) - 0.0005
+            i.stable_dt.min(0.016).max(0.001) - 0.0009
         });
 
         let mut core = self.core.lock().unwrap();
@@ -157,9 +157,7 @@ impl App {
                 tex as u32,
             );
 
-            if self.audio_stream.is_none() {
-                self.audio_stream = crate::setup_cpal(self.core.clone());
-            }
+            self.audio_stream = crate::setup_cpal(self.core.clone());
 
             self.current_rom_path = file.path.clone();
             if let Some(path) = file.path {

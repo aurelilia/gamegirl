@@ -20,7 +20,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
-    Colour, Core,
+    produce_samples_buffered, Colour, Core,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
@@ -73,57 +73,10 @@ pub struct GameGirlAdv {
 
 impl Core for GameGirlAdv {
     common_functions!(CPU_CLOCK, AdvEvent::PauseEmulation, [240, 160]);
+    produce_samples_buffered!(2u32.pow(16));
 
     fn advance(&mut self) {
         Cpu::continue_running(self);
-    }
-
-    fn produce_samples(&mut self, samples: &mut [f32]) {
-        if !self.options.running {
-            samples.fill(0.0);
-            return;
-        }
-
-        // DIV 2: stereo
-        let target = samples.len() * self.options.speed_multiplier / 2;
-        while self.apu.samples_ready < target {
-            if !self.options.running {
-                samples.fill(0.0);
-                return;
-            }
-            self.advance();
-        }
-
-        let buffer = self.apu.resample_buffer();
-        if self.options.invert_audio_samples {
-            // If rewinding, truncate and get rid of any excess samples to prevent
-            // audio samples getting backed up
-            for i in 0..(samples.len() / 2) {
-                samples[i * 2] = buffer[0][i];
-                samples[(i * 2) + 1] = buffer[1][i];
-            }
-        } else {
-            // Otherwise, store any excess samples back in the buffer for next time
-            // while again not storing too many to avoid backing up.
-            // This way can cause clipping if the console produces audio too fast,
-            // however this is preferred to audio falling behind and eating
-            // a lot of memory.
-            for i in target..(buffer[0].len()) {
-                self.apu.overshoot_buffer[0].push(buffer[0][i]);
-                self.apu.overshoot_buffer[1].push(buffer[1][i]);
-            }
-            if self.apu.overshoot_buffer[0].len() > 1_000 {
-                log::warn!("Audio samples are backing up! Truncating");
-                self.apu.overshoot_buffer[0].truncate(100);
-                self.apu.overshoot_buffer[1].truncate(100);
-            }
-
-            for i in 0..(samples.len() / 2) {
-                samples[i * 2] = buffer[0][i * self.options.speed_multiplier] * self.config.volume;
-                samples[(i * 2) + 1] =
-                    buffer[1][i * self.options.speed_multiplier] * self.config.volume;
-            }
-        }
     }
 
     fn reset(&mut self) {

@@ -18,7 +18,6 @@ use std::{
 };
 
 pub use app::App;
-use common::SAMPLE_RATE;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     BufferSize, SampleRate, Stream, StreamConfig,
@@ -36,12 +35,16 @@ pub type Colour = Color32;
 /// Make sure to keep the returned Stream around to prevent the audio playback
 /// thread from closing.
 pub fn setup_cpal(sys: Arc<Mutex<Box<dyn Core>>>) -> Option<Stream> {
+    let sr = {
+        let core = sys.lock().unwrap();
+        core.wanted_sample_rate()
+    };
     let device = cpal::default_host().default_output_device().unwrap();
     let stream = device
         .build_output_stream(
             &StreamConfig {
                 channels: 2,
-                sample_rate: SampleRate(SAMPLE_RATE),
+                sample_rate: SampleRate(sr),
                 buffer_size: BufferSize::Default,
             },
             move |data: &mut [f32], _| {

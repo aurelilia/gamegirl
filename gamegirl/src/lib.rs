@@ -141,4 +141,8 @@ impl Core for Dummy {
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }
+
+    fn wanted_sample_rate(&self) -> u32 {
+        48000
+    }
 }

@@ -83,7 +83,7 @@ macro_rules! common_functions {
 /// push finished samples to an output buffer.
 #[macro_export]
 macro_rules! produce_samples_buffered {
-    () => {
+    ($rate:expr) => {
         fn produce_samples(&mut self, samples: &mut [f32]) {
             if !self.options.running {
                 samples.fill(0.0);
@@ -128,6 +128,10 @@ macro_rules! produce_samples_buffered {
                     *dst = src * self.config.volume;
                 }
             }
+        }
+
+        fn wanted_sample_rate(&self) -> u32 {
+            $rate
         }
     };
 }

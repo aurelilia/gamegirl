@@ -7,15 +7,13 @@
 //! TODO: Resampling is not actually being used properly.
 //! for the time being: broken!
 
-use std::{collections::VecDeque, mem};
+use std::collections::VecDeque;
 
 use common::{
     components::scheduler::Scheduler,
     numutil::{NumExt, U16Ext},
-    SAMPLE_RATE,
 };
 use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
-use rubato::{FftFixedIn, Resampler};
 
 use super::scheduling::AdvEvent;
 use crate::{
@@ -25,7 +23,7 @@ use crate::{
     GameGirlAdv, CPU_CLOCK,
 };
 
-const SAMPLE_EVERY_N_CLOCKS: f64 = CPU_CLOCK as f64 / SAMPLE_RATE as f64;
+const SAMPLE_EVERY_N_CLOCKS: i32 = CPU_CLOCK as i32 / 2i32.pow(16);
 const GG_OFFS: i32 = 4;
 
 /// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
@@ -38,10 +36,7 @@ pub struct Apu {
     buffers: [VecDeque<i8>; 2],
     current_samples: [i8; 2],
     // Output buffer
-    next_sample_offs: f64,
-    gga_samples: Vec<Vec<f32>>,
-    pub samples_ready: usize,
-    pub overshoot_buffer: Vec<Vec<f32>>,
+    pub buffer: Vec<f32>,
 }
 
 impl Apu {
@@ -60,7 +55,7 @@ impl Apu {
 
             ApuEvent::PushSample => {
                 Self::push_output(gg);
-                gg.apu.get_next_sample_time() - late_by
+                SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
     }
@@ -69,58 +64,15 @@ impl Apu {
         GenericApu::init_scheduler(&mut shed(&mut gg.scheduler));
         gg.scheduler.schedule(
             AdvEvent::ApuEvent(ApuEvent::PushSample),
-            gg.apu.get_next_sample_time(),
+            SAMPLE_EVERY_N_CLOCKS,
         );
-        gg.apu.gga_samples = vec![vec![], vec![]];
-        gg.apu.overshoot_buffer = vec![vec![], vec![]];
-    }
-
-    pub fn get_next_sample_time(&mut self) -> i32 {
-        let time = self.next_sample_offs as i32;
-        self.next_sample_offs -= time as f64;
-        self.next_sample_offs += SAMPLE_EVERY_N_CLOCKS;
-        time
-    }
-
-    pub fn resample_buffer(&mut self) -> Vec<Vec<f32>> {
-        let orig_sample_rate =
-            self.gga_samples[0].len() as f64 / (self.samples_ready as f64 / SAMPLE_RATE as f64);
-
-        let mut out = if !self.gga_samples[0].is_empty() {
-            let mut resampler = FftFixedIn::<f32>::new(
-                orig_sample_rate as usize,
-                SAMPLE_RATE as usize,
-                self.gga_samples[0].len(),
-                1024,
-                2,
-            )
-            .unwrap();
-            resampler.process(&self.gga_samples, None).unwrap()
-        } else {
-            vec![vec![], vec![]]
-        };
-
-        let mut buffer = mem::take(&mut self.overshoot_buffer);
-        self.overshoot_buffer = vec![vec![], vec![]];
-        for i in 0..2 {
-            while out[i].len() < self.samples_ready {
-                out[i].push(0.);
-            }
-            buffer[i].append(&mut out[i]);
-        }
-
-        self.samples_ready = 0;
-        self.gga_samples[0].clear();
-        self.gga_samples[1].clear();
-        buffer
     }
 
     fn push_output(gg: &mut GameGirlAdv) {
         if !gg.apu.cgb_chans.power {
             // Master enable, also applies to DMA channels
-            gg.apu.gga_samples[0].push(0.);
-            gg.apu.gga_samples[1].push(0.);
-            gg.apu.samples_ready += 1;
+            gg.apu.buffer.push(0.);
+            gg.apu.buffer.push(0.);
             return;
         }
         let mut left = 0;
@@ -156,9 +108,8 @@ impl Apu {
         left += (cgb_sample[1] * cgb_mul * 0.8) as i16;
 
         let bias = gg[SOUNDBIAS].bits(0, 10) as i16;
-        gg.apu.gga_samples[0].push(Self::bias(right, bias) as f32 / 1024.0);
-        gg.apu.gga_samples[1].push(Self::bias(left, bias) as f32 / 1024.0);
-        gg.apu.samples_ready += 1;
+        gg.apu.buffer.push(Self::bias(right, bias) as f32 / 1024.0);
+        gg.apu.buffer.push(Self::bias(left, bias) as f32 / 1024.0);
     }
 
     fn bias(mut sample: i16, bias: i16) -> i16 {

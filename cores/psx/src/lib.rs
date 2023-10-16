@@ -66,7 +66,7 @@ pub struct PlayStation {
 
 impl Core for PlayStation {
     common_functions!(CPU_CLOCK, PsxEvent::PauseEmulation, [1024, 512]);
-    produce_samples_buffered!();
+    produce_samples_buffered!(48000);
 
     fn advance(&mut self) {
         Cpu::execute_next(self);

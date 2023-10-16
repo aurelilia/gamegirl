@@ -15,9 +15,6 @@ pub mod misc;
 pub mod macros;
 pub mod numutil;
 
-/// Audio sample rate of all emulated systems.
-pub const SAMPLE_RATE: u32 = 48000;
-
 /// For debugging: If instruction-level tracing output should be printed.
 pub const TRACING: bool = false;
 
@@ -64,6 +61,8 @@ pub trait Core: Send + Sync {
     fn set_button(&mut self, btn: Button, pressed: bool);
     /// Returns the screen size for the current system.
     fn screen_size(&self) -> [usize; 2];
+    /// Returns the output audio sample rate for the current system.
+    fn wanted_sample_rate(&self) -> u32;
     /// Make a save for the game to be put to disk.
     fn make_save(&self) -> Option<GameSave>;
 

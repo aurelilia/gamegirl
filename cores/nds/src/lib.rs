@@ -128,7 +128,7 @@ pub struct Nds {
 
 impl Core for Nds {
     common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [240, 160 * 2]);
-    produce_samples_buffered!();
+    produce_samples_buffered!(48000);
 
     fn advance(&mut self) {
         // Run an instruction on the ARM9, then keep running the ARM7

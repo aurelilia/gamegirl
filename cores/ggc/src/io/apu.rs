@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{components::scheduler::Scheduler, SAMPLE_RATE};
+use common::components::scheduler::Scheduler;
 use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     GameGirl, T_CLOCK_HZ,
 };
 
-pub const SAMPLE_EVERY_N_CLOCKS: f64 = T_CLOCK_HZ as f64 / SAMPLE_RATE as f64;
+pub const SAMPLE_EVERY_N_CLOCKS: f64 = T_CLOCK_HZ as f64 / 48000.;
 
 /// APU variant used by DMG/CGB.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]

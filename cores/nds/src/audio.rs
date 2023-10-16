@@ -4,11 +4,9 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::SAMPLE_RATE;
-
 use crate::{cpu::NDS9_CLOCK, scheduling::ApuEvent, Nds};
 
-pub const SAMPLE_EVERY_N_CLOCKS: i32 = (NDS9_CLOCK / SAMPLE_RATE) as i32;
+pub const SAMPLE_EVERY_N_CLOCKS: i32 = (NDS9_CLOCK / 48000) as i32;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]

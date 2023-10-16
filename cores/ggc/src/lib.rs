@@ -79,7 +79,7 @@ pub struct GameGirl {
 
 impl Core for GameGirl {
     common_functions!(T_CLOCK_HZ, GGEvent::PauseEmulation, [160, 144]);
-    produce_samples_buffered!();
+    produce_samples_buffered!(48000);
 
     fn advance(&mut self) {
         Cpu::exec_next_inst(self);
