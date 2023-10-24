@@ -6,7 +6,7 @@
 
 //! This crate contains common structures shared by all systems.
 
-use std::{os::unix::prelude::OsStrExt, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 pub use common::{self, Core};
 use common::{
@@ -39,8 +39,8 @@ pub fn load_cart(
     cart: Vec<u8>,
     path: Option<PathBuf>,
     config: &SystemConfig,
-    ogl_ctx: Option<Arc<Context>>,
-    ogl_tex_id: u32,
+    _ogl_ctx: Option<Arc<Context>>,
+    _ogl_tex_id: u32,
 ) -> Box<dyn Core> {
     // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
     // that is present on every cartridge.
@@ -50,6 +50,9 @@ pub fn load_cart(
     // We detect NDS carts by a zero-filled header region
     let _is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
     // We detect PSX games by being ISOs
+    #[cfg(feature = "psx")]
+    use std::os::unix::prelude::OsStrExt;
+    #[cfg(feature = "psx")]
     let _is_psx = path.as_ref().unwrap().extension().unwrap().as_bytes() == b"iso";
 
     let mut sys: Box<dyn Core> = match () {
@@ -60,7 +63,7 @@ pub fn load_cart(
         #[cfg(feature = "nds")]
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
         #[cfg(feature = "psx")]
-        _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, ogl_ctx, ogl_tex_id),
+        _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, _ogl_ctx, _ogl_tex_id),
 
         #[cfg(feature = "gga")]
         _ => {
