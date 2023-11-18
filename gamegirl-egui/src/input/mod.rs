@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use common::misc::{self, Button::*};
 use eframe::egui::Key;
@@ -19,32 +19,32 @@ pub use hotkeys::HOTKEYS;
 /// Input configuration struct.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Input {
-    mappings: HashMap<Key, InputAction>,
+    mappings: HashMap<InputSource, InputAction>,
     #[serde(skip)]
     #[serde(default)]
     pub(crate) pending: Option<InputAction>,
 }
 
 impl Input {
-    /// Get a key's mapping.
-    pub fn get_key(&self, key: Key) -> Option<InputAction> {
-        self.mappings.get(&key).copied()
+    /// Get a mapping.
+    pub fn get(&self, src: InputSource) -> Option<InputAction> {
+        self.mappings.get(&src).copied()
     }
 
-    /// Set a key's mapping.
-    pub fn set_key(&mut self, key: Key, value: InputAction) {
-        if key == Key::Escape {
+    /// Set a mapping.
+    pub fn set(&mut self, src: InputSource, value: InputAction) {
+        if src == InputSource::Key(Key::Escape) {
             // ESC: unset all mappings
             for k in self.key_for(value).collect::<Vec<_>>() {
                 self.mappings.remove(&k);
             }
         } else {
-            self.mappings.insert(key, value);
+            self.mappings.insert(src, value);
         }
     }
 
     /// Get the key for a certain action.
-    pub fn key_for(&mut self, action: InputAction) -> impl Iterator<Item = Key> + '_ {
+    pub fn key_for(&mut self, action: InputAction) -> impl Iterator<Item = InputSource> + '_ {
         self.mappings
             .iter()
             .filter(move |(_, v)| **v == action)
@@ -54,7 +54,7 @@ impl Input {
     /// Get the key for a certain action, formatted to a string.
     pub fn key_for_fmt(&mut self, action: InputAction) -> String {
         self.key_for(action)
-            .map(|k| format!("{:?}", k))
+            .map(|k| format!("{k}"))
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -62,17 +62,17 @@ impl Input {
     pub fn new() -> Self {
         Self {
             mappings: HashMap::from([
-                (Key::X, Button(A)),
-                (Key::Z, Button(B)),
-                (Key::Enter, Button(Start)),
-                (Key::Space, Button(Select)),
-                (Key::ArrowDown, Button(Down)),
-                (Key::ArrowUp, Button(Up)),
-                (Key::ArrowLeft, Button(Left)),
-                (Key::ArrowRight, Button(Right)),
-                (Key::A, Button(L)),
-                (Key::S, Button(R)),
-                (Key::R, Hotkey(4)),
+                (InputSource::Key(Key::X), Button(A)),
+                (InputSource::Key(Key::Z), Button(B)),
+                (InputSource::Key(Key::Enter), Button(Start)),
+                (InputSource::Key(Key::Space), Button(Select)),
+                (InputSource::Key(Key::ArrowDown), Button(Down)),
+                (InputSource::Key(Key::ArrowUp), Button(Up)),
+                (InputSource::Key(Key::ArrowLeft), Button(Left)),
+                (InputSource::Key(Key::ArrowRight), Button(Right)),
+                (InputSource::Key(Key::A), Button(L)),
+                (InputSource::Key(Key::S), Button(R)),
+                (InputSource::Key(Key::R), Hotkey(4)),
             ]),
             pending: None,
         }
@@ -82,6 +82,27 @@ impl Input {
 impl Default for Input {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// An action that is to be performed when the user hits a key.
+/// Can be a button or a hotkey, the latter is stored
+/// as an index into an array of functions.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+pub enum InputSource {
+    Key(Key),
+    Button(gilrs::Button),
+    Axis { axis: gilrs::Axis, is_neg: bool },
+}
+
+impl Display for InputSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InputSource::Key(k) => write!(f, "{k:?}"),
+            InputSource::Button(b) => write!(f, "{b:?}"),
+            InputSource::Axis { axis, is_neg } if *is_neg => write!(f, "{axis:?}-"),
+            InputSource::Axis { axis, is_neg } => write!(f, "{axis:?}+"),
+        }
     }
 }
 

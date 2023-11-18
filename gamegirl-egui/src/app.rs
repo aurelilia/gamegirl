@@ -19,10 +19,11 @@ use eframe::{
     glow::{self},
     CreationContext, Frame, Storage,
 };
+use gilrs::{EventType, Gilrs};
 
 use crate::{
     gui::{self, APP_WINDOW_COUNT},
-    input::{self, File, Input, InputAction},
+    input::{self, File, Input, InputAction, InputSource},
     rewind::Rewinder,
     Colour,
 };
@@ -41,6 +42,8 @@ pub struct App {
 
     /// Texture(s) for the core's graphics output.
     pub textures: Vec<TextureId>,
+    /// Game controller state
+    pub gil: Gilrs,
     /// Message channel for reacting to some async events, see [Message].
     pub message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
     /// Frame times.
@@ -95,20 +98,18 @@ impl App {
         let delta = ctx.input(|i| {
             for event in &i.events {
                 if let Event::Key { key, pressed, .. } = event {
-                    if let Some(action) = self.state.options.input.pending.take() {
-                        self.state.options.input.set_key(*key, action);
-                        continue;
+                    self.handle_evt(InputSource::Key(*key), *pressed);
+                }
+            }
+            while let Some(gilrs::Event { event, .. }) = self.gil.next_event() {
+                match event {
+                    EventType::ButtonPressed(b, _) => self.handle_evt(InputSource::Button(b), true),
+                    EventType::ButtonReleased(b, _) => {
+                        self.handle_evt(InputSource::Button(b), false)
                     }
-
-                    match self.state.options.input.get_key(*key) {
-                        Some(InputAction::Button(btn)) => {
-                            self.core.lock().unwrap().set_button(btn, *pressed)
-                        }
-                        Some(InputAction::Hotkey(idx)) => {
-                            input::HOTKEYS[idx as usize].1(self, *pressed)
-                        }
-                        None => (),
-                    }
+                    EventType::ButtonChanged(_, _, _) => todo!(),
+                    EventType::AxisChanged(_, _, _) => todo!(),
+                    _ => (),
                 }
             }
             i.stable_dt.min(0.016).max(0.001) - 0.0009
@@ -136,6 +137,19 @@ impl App {
                 self.rewinder.rewind_buffer.push(state);
             }
             (frame, size)
+        }
+    }
+
+    fn handle_evt(&mut self, src: InputSource, pressed: bool) {
+        if let Some(action) = self.state.options.input.pending.take() {
+            self.state.options.input.set(src, action);
+            return;
+        }
+
+        match self.state.options.input.get(src) {
+            Some(InputAction::Button(btn)) => self.core.lock().unwrap().set_button(btn, pressed),
+            Some(InputAction::Hotkey(idx)) => input::HOTKEYS[idx as usize].1(self, pressed),
+            None => (),
         }
     }
 
@@ -198,6 +212,7 @@ impl App {
             debugger_window_states: Vec::from([false; 10]),
 
             textures,
+            gil: Gilrs::new().unwrap(),
             message_channel: mpsc::channel(),
             frame_times: History::new(0..120, 2.0),
             audio_stream: None,
