@@ -272,6 +272,9 @@ impl Default for Options {
             enable_rewind: true,
             rewind_buffer_size: 10,
             tex_filter: TextureOptions::NEAREST,
+            #[cfg(target_arch = "wasm32")]
+            gui_style: GuiStyle::SingleWindow,
+            #[cfg(not(target_arch = "wasm32"))]
             gui_style: GuiStyle::MultiWindow,
         }
     }
