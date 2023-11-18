@@ -101,7 +101,7 @@ impl Display for InputSource {
             InputSource::Key(k) => write!(f, "{k:?}"),
             InputSource::Button(b) => write!(f, "{b:?}"),
             InputSource::Axis { axis, is_neg } if *is_neg => write!(f, "{axis:?}-"),
-            InputSource::Axis { axis, is_neg } => write!(f, "{axis:?}+"),
+            InputSource::Axis { axis, .. } => write!(f, "{axis:?}+"),
         }
     }
 }
