@@ -11,7 +11,7 @@ use eframe::{
 };
 
 use crate::{
-    app::{App, Options},
+    app::{App, Options, GuiStyle},
     input::{InputAction, HOTKEYS},
 };
 
@@ -64,7 +64,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         }
     });
 
-    CollapsingHeader::new("Graphics").show(ui, |ui| {
+    CollapsingHeader::new("GUI").show(ui, |ui| {
         ComboBox::from_label("Texture filter")
             .selected_text(format!("{:?}", opt.tex_filter.magnification))
             .show_ui(ui, |ui| {
@@ -72,10 +72,12 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 ui.selectable_value(&mut opt.tex_filter, TextureOptions::LINEAR, "Linear");
             });
 
-        ui.horizontal(|ui| {
-            ui.add(Slider::new(&mut opt.display_scale, 1..=10));
-            ui.label("Screen scale");
-        });
+        ComboBox::from_label("GUI Style")
+            .selected_text(format!("{:?}", opt.gui_style))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut opt.gui_style, GuiStyle::SingleWindow, "SingleWindow");
+                ui.selectable_value(&mut opt.gui_style, GuiStyle::MultiWindow, "MultiWindow");
+            });
 
         CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
     });

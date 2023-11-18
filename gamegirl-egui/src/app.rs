@@ -256,10 +256,10 @@ pub struct Options {
     /// Rewind buffer size (if enabled), in seconds.
     pub rewind_buffer_size: usize,
 
-    /// Scale of the GG display.
-    pub display_scale: usize,
     /// Texture filter applied to the display.
     pub tex_filter: TextureOptions,
+    /// GUI mode.
+    pub gui_style: GuiStyle,
 }
 
 impl Default for Options {
@@ -271,8 +271,14 @@ impl Default for Options {
             fast_forward_toggle_speed: 2,
             enable_rewind: true,
             rewind_buffer_size: 10,
-            display_scale: 2,
             tex_filter: TextureOptions::NEAREST,
+            gui_style: GuiStyle::MultiWindow,
         }
     }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
+pub enum GuiStyle {
+    SingleWindow,
+    MultiWindow,
 }

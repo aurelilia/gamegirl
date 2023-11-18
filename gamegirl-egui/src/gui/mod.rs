@@ -16,7 +16,7 @@ use eframe::{
 use file_dialog::File;
 
 use crate::{
-    app::{App, Message},
+    app::{App, GuiStyle, Message},
     debug,
     input::file_dialog,
 };
@@ -31,18 +31,7 @@ const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] =
 
 pub fn draw(app: &mut App, ctx: &Context, frame: &mut Frame, size: [usize; 2]) {
     navbar(app, ctx, frame);
-
-    egui::Window::new("GameGirl")
-        .resizable(true)
-        .show(ctx, |ui| {
-            ui.image(Into::<SizedTexture>::into((
-                app.textures[0],
-                vec2(
-                    (size[0] * app.state.options.display_scale) as f32,
-                    (size[1] * app.state.options.display_scale) as f32,
-                ),
-            )));
-        });
+    game_screen(app, ctx, size);
 
     let mut states = app.app_window_states;
     for ((name, runner), state) in APP_WINDOWS.iter().zip(states.iter_mut()) {
@@ -166,4 +155,20 @@ fn navbar_content(app: &mut App, now: f64, frame: &mut Frame, ui: &mut Ui) {
         ));
         ui.label("Frame time: ");
     });
+}
+
+fn game_screen(app: &App, ctx: &Context, size: [usize; 2]) {
+    let screen = egui::Image::new(Into::<SizedTexture>::into((
+        app.textures[0],
+        vec2(size[0] as f32, size[1] as f32),
+    )))
+    .shrink_to_fit();
+    match app.state.options.gui_style {
+        GuiStyle::SingleWindow => {
+            egui::Window::new("Screen").show(ctx, |ui| ui.add(screen));
+        }
+        GuiStyle::MultiWindow => {
+            egui::CentralPanel::default().show(ctx, |ui| ui.add(screen));
+        }
+    }
 }
