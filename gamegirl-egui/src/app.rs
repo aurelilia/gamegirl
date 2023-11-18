@@ -278,7 +278,7 @@ impl Default for Options {
             #[cfg(target_arch = "wasm32")]
             gui_style: GuiStyle::SingleWindow,
             #[cfg(not(target_arch = "wasm32"))]
-            gui_style: GuiStyle::MultiWindow,
+            gui_style: GuiStyle::SingleWindow,
         }
     }
 }
