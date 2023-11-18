@@ -35,9 +35,7 @@ pub fn draw(app: &mut App, ctx: &Context, frame: &mut Frame, size: [usize; 2]) {
 
     let mut states = app.app_window_states;
     for ((name, runner), state) in APP_WINDOWS.iter().zip(states.iter_mut()) {
-        egui::Window::new(*name)
-            .open(state)
-            .show(ctx, |ui| runner(app, ctx, ui));
+        make_window(app, ctx, name, state, *runner);
     }
     app.app_window_states = states;
 
@@ -136,11 +134,11 @@ fn navbar_content(app: &mut App, now: f64, frame: &mut Frame, ui: &mut Ui) {
 
     ui.menu_button("Options", |ui| {
         if ui.button("Options").clicked() {
-            app.app_window_states[0] = true;
+            app.app_window_states[0] ^= true;
             ui.close_menu();
         }
         if ui.button("About").clicked() {
-            app.app_window_states[1] = true;
+            app.app_window_states[1] ^= true;
             ui.close_menu();
         }
     });
@@ -169,6 +167,28 @@ fn game_screen(app: &App, ctx: &Context, size: [usize; 2]) {
         }
         GuiStyle::MultiWindow => {
             egui::CentralPanel::default().show(ctx, |ui| ui.add(screen));
+        }
+    }
+}
+
+fn make_window(app: &mut App, ctx: &Context, title: &str, open: &mut bool, content: AppFn) {
+    match app.state.options.gui_style {
+        GuiStyle::SingleWindow => {
+            egui::Window::new(title)
+                .open(open)
+                .show(ctx, |ui| content(app, ctx, ui));
+        }
+        GuiStyle::MultiWindow => {
+            if *open {
+                ctx.show_viewport_immediate(
+                    egui::ViewportId::from_hash_of(title),
+                    egui::ViewportBuilder::default().with_title(title),
+                    |ctx, _| {
+                        egui::CentralPanel::default().show(ctx, |ui| content(app, ctx, ui));
+                        *open &= !ctx.input(|i| i.raw.viewport.close_requested);
+                    },
+                )
+            }
         }
     }
 }

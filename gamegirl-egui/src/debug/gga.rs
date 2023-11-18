@@ -12,12 +12,12 @@ use super::Windows;
 use crate::{App, Colour};
 
 pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
-    app.debugger_window_states[0] |= ui.button("Debugger").clicked();
-    app.debugger_window_states[1] |= ui.button("Breakpoints").clicked();
-    app.debugger_window_states[2] |= ui.button("Cartridge Viewer").clicked();
+    app.debugger_window_states[0] ^= ui.button("Debugger").clicked();
+    app.debugger_window_states[1] ^= ui.button("Breakpoints").clicked();
+    app.debugger_window_states[2] ^= ui.button("Cartridge Viewer").clicked();
 
     if cfg!(all(feature = "remote-debugger", target_family = "unix")) {
-        app.debugger_window_states[3] |= ui.button("Remote Debugger").clicked();
+        app.debugger_window_states[3] ^= ui.button("Remote Debugger").clicked();
     }
 }
 

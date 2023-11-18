@@ -15,9 +15,10 @@ use common::Core;
 use eframe::egui::{self, Context, Ui};
 use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
 
-use crate::app::App;
+use crate::app::{App, GuiStyle};
 
-type Windows<T> = &'static [(&'static str, fn(&mut T, &mut Ui, &mut App, &Context))];
+type DbgFn<T> = fn(&mut T, &mut Ui, &mut App, &Context);
+type Windows<T> = &'static [(&'static str, DbgFn<T>)];
 
 pub fn menu(app: &mut App, ui: &mut Ui) {
     let lock = app.core.clone();
@@ -46,9 +47,7 @@ pub fn render(app: &mut App, ctx: &Context) {
 fn render_inner<T: Core>(windows: Windows<T>, core: &mut T, app: &mut App, ctx: &Context) {
     let mut states = app.debugger_window_states.clone();
     for ((name, runner), state) in windows.iter().zip(states.iter_mut()) {
-        egui::Window::new(*name)
-            .open(state)
-            .show(ctx, |ui| runner(core, ui, app, ctx));
+        make_window(app, ctx, name, state, core, *runner);
     }
     app.debugger_window_states = states;
 }
@@ -56,5 +55,34 @@ fn render_inner<T: Core>(windows: Windows<T>, core: &mut T, app: &mut App, ctx: 
 fn maybe_system<T: Core + 'static>(core: &mut dyn Any, mut apply: impl FnMut(&mut T)) {
     if let Some(sys) = core.downcast_mut() {
         apply(sys)
+    }
+}
+
+fn make_window<T>(
+    app: &mut App,
+    ctx: &Context,
+    title: &str,
+    open: &mut bool,
+    core: &mut T,
+    content: DbgFn<T>,
+) {
+    match app.state.options.gui_style {
+        GuiStyle::SingleWindow => {
+            egui::Window::new(title)
+                .open(open)
+                .show(ctx, |ui| content(core, ui, app, ctx));
+        }
+        GuiStyle::MultiWindow => {
+            if *open {
+                ctx.show_viewport_immediate(
+                    egui::ViewportId::from_hash_of(title),
+                    egui::ViewportBuilder::default().with_title(title),
+                    |ctx, _| {
+                        egui::CentralPanel::default().show(ctx, |ui| content(core, ui, app, ctx));
+                        *open &= !ctx.input(|i| i.raw.viewport.close_requested);
+                    },
+                )
+            }
+        }
     }
 }
