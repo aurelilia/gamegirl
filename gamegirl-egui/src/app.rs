@@ -258,6 +258,8 @@ pub struct Options {
 
     /// Texture filter applied to the display.
     pub tex_filter: TextureOptions,
+    /// Require pixel perfect scaling.
+    pub pixel_perfect: bool,
     /// GUI mode.
     pub gui_style: GuiStyle,
 }
@@ -272,6 +274,7 @@ impl Default for Options {
             enable_rewind: true,
             rewind_buffer_size: 10,
             tex_filter: TextureOptions::NEAREST,
+            pixel_perfect: false,
             #[cfg(target_arch = "wasm32")]
             gui_style: GuiStyle::SingleWindow,
             #[cfg(not(target_arch = "wasm32"))]

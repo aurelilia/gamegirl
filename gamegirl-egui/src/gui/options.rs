@@ -79,6 +79,9 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 ui.selectable_value(&mut opt.gui_style, GuiStyle::MultiWindow, "MultiWindow");
             });
 
+        ui.checkbox(&mut opt.pixel_perfect, "Pixel perfect scaling")
+            .on_hover_text("Will only scale the screen to integer multiples, preventing some scaling artifacts at the cost of screen size.\nMainly applicable with 'Nearest' filtering.");
+
         CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
     });
 

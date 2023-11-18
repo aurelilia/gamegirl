@@ -9,8 +9,9 @@ mod options;
 use std::fs;
 
 use eframe::{
-    egui::{self, load::SizedTexture, vec2, widgets, Context, Layout, Ui},
+    egui::{self, load::SizedTexture, vec2, widgets, Context, Image, Layout, Ui},
     emath::Align,
+    epaint::Vec2,
     Frame,
 };
 use file_dialog::File;
@@ -156,18 +157,37 @@ fn navbar_content(app: &mut App, now: f64, frame: &mut Frame, ui: &mut Ui) {
 }
 
 fn game_screen(app: &App, ctx: &Context, size: [usize; 2]) {
-    let screen = egui::Image::new(Into::<SizedTexture>::into((
-        app.textures[0],
-        vec2(size[0] as f32, size[1] as f32),
-    )))
-    .shrink_to_fit();
     match app.state.options.gui_style {
         GuiStyle::SingleWindow => {
-            egui::Window::new("Screen").show(ctx, |ui| ui.add(screen));
+            egui::Window::new("Screen").show(ctx, |ui| {
+                ui.add(make_screen_ui(app, size, ui.available_size()))
+            });
         }
         GuiStyle::MultiWindow => {
-            egui::CentralPanel::default().show(ctx, |ui| ui.add(screen));
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.add(make_screen_ui(app, size, ui.available_size()))
+            });
         }
+    }
+}
+
+fn make_screen_ui(app: &App, size: [usize; 2], avail_size: Vec2) -> Image {
+    if app.state.options.pixel_perfect {
+        // Find the biggest multiple of the screen size that still fits
+        let orig_size = Vec2::new(size[0] as f32, size[1] as f32);
+        let mut size = orig_size + orig_size;
+        while size.x < avail_size.x && size.y < avail_size.y {
+            size += orig_size;
+        }
+        size -= orig_size;
+
+        egui::Image::new(Into::<SizedTexture>::into((app.textures[0], size)))
+    } else {
+        egui::Image::new(Into::<SizedTexture>::into((
+            app.textures[0],
+            vec2(size[0] as f32, size[1] as f32),
+        )))
+        .shrink_to_fit()
     }
 }
 
