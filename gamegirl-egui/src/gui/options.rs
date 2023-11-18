@@ -128,10 +128,11 @@ fn input_section(
     CollapsingHeader::new(name).show(ui, |ui| {
         for (name, action) in iter {
             let active = Some(action) == opt.input.pending;
-            let text = if active {
-                "...".to_string()
-            } else {
-                opt.input.key_for_fmt(action)
+            let text = opt.input.key_for_fmt(action);
+            let text = match active {
+                true if !text.is_empty() => format!("{text}, ..."),
+                true => "...".to_string(),
+                false => text
             };
 
             ui.horizontal(|ui| {

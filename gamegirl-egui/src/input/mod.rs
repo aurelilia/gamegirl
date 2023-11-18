@@ -33,26 +33,30 @@ impl Input {
 
     /// Set a key's mapping.
     pub fn set_key(&mut self, key: Key, value: InputAction) {
-        if let Some(prev) = self.key_for(value) {
-            self.mappings.remove(&prev);
+        if key == Key::Escape {
+            // ESC: unset all mappings
+            for k in self.key_for(value).collect::<Vec<_>>() {
+                self.mappings.remove(&k);
+            }
+        } else {
+            self.mappings.insert(key, value);
         }
-        self.mappings.insert(key, value);
     }
 
     /// Get the key for a certain action.
-    pub fn key_for(&mut self, action: InputAction) -> Option<Key> {
+    pub fn key_for(&mut self, action: InputAction) -> impl Iterator<Item = Key> + '_ {
         self.mappings
             .iter()
-            .find(|(_, v)| **v == action)
+            .filter(move |(_, v)| **v == action)
             .map(|(k, _)| *k)
     }
 
     /// Get the key for a certain action, formatted to a string.
     pub fn key_for_fmt(&mut self, action: InputAction) -> String {
-        match self.key_for(action) {
-            Some(key) => format!("{:?}", key),
-            None => "<None>".to_string(),
-        }
+        self.key_for(action)
+            .map(|k| format!("{:?}", k))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     pub fn new() -> Self {
