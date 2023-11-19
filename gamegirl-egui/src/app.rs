@@ -112,7 +112,7 @@ impl App {
                     _ => (),
                 }
             }
-            i.stable_dt.min(0.016).max(0.001) - 0.0009
+            i.unstable_dt.min(0.016).max(0.001) - 0.0009
         });
 
         let mut core = self.core.lock().unwrap();
