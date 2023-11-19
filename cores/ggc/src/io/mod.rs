@@ -240,7 +240,7 @@ impl GameGirl {
             CgbMode::Never => cart.requires_cgb(),
         };
         self.ppu.configure(self.cgb, conf.cgb_colour_correction);
-        self.apu = Apu::new(self.cgb);
+        self.apu = Apu::new(!self.cgb);
         self.cart = cart;
         MemoryMapper::init_pages(self);
         self.init_high();

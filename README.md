@@ -154,10 +154,7 @@ cargo run -p tests --release -- --gg
 ```
 
 ### GG/GGC
-- [x] Blargg 
-  - [ ] Sound tests (some wave RAM issues)
-  - [ ] `oam_bug` (untested)
-  - [x] Everything else
+- [x] All Blargg tests (`oam_bug` untested)
 - [ ] Mooneye
   - [ ] `acceptance`: 41/70 (Some tests for DMG/MGB/SGB-specific behavior disabled)
   - [x] `emulator-only`: 27/28 (MBC1M, not supported)
