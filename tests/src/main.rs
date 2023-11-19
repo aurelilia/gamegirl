@@ -101,15 +101,16 @@ fn main() {
                 gb::mooneye("emulator-only");
                 println!("\nExecuting acid2 tests");
                 gb::acid2();
+            } else {
+                println!("\nExecuting jsmolka's gba-tests");
+                gba::exec_jsmolka();
+                println!("\nExecuting FuzzARM");
+                gba::exec_fuzzarm();
+                println!("\nExecuting ladystarbreeze's tests");
+                gba::exec_ladystarbreeze();
+                println!("\nExecuting destoer's tests");
+                gba::exec_destoer();
             }
-            println!("\nExecuting jsmolka's gba-tests");
-            gba::exec_jsmolka();
-            println!("\nExecuting FuzzARM");
-            gba::exec_fuzzarm();
-            println!("\nExecuting ladystarbreeze's tests");
-            gba::exec_ladystarbreeze();
-            println!("\nExecuting destoer's tests");
-            gba::exec_destoer();
         })
         .run(args);
 }
