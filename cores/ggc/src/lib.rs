@@ -15,7 +15,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
-    numutil::NumExt,
+    numutil::{NumExt, U16Ext},
     produce_samples_buffered, Colour, Core,
 };
 
@@ -119,6 +119,10 @@ impl GameGirl {
         self.scheduler.advance((m_cycles << self.t_shift).u32());
         while let Some(event) = self.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
+        }
+
+        for _ in 0..m_cycles {
+            self.apu.clock(self.speed != 1, Timer::div(self).high())
         }
     }
 

@@ -1020,9 +1020,9 @@ dependencies = [
 name = "ggc"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.4.1",
  "common",
  "log",
- "psg-apu",
  "serde",
  "serde_arrays",
 ]

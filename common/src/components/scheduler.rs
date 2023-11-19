@@ -74,7 +74,7 @@ impl<E: Kind> Scheduler<E> {
             let idx = self.events.len() - 1;
             let event = self.events[idx];
             unsafe { self.events.set_len(idx) };
-            self.next = self.events.last().unwrap().execute_at;
+            self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
             Some(Event {
                 kind: event.kind,
                 late_by: (self.time - event.execute_at) as i32,

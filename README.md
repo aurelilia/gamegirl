@@ -118,7 +118,6 @@ minor graphical glitches.
 ### Planned Features
 - [ ] Controller support
 - [ ] Save export on Web/WASM
-- [ ] Fix savestates/rewinding on WASM
 
 
 ## Goals
@@ -160,7 +159,7 @@ cargo run -p tests --release -- --gg
   - [ ] `oam_bug` (untested)
   - [x] Everything else
 - [ ] Mooneye
-  - [ ] `acceptance`: 42/70 (Some tests for DMG/MGB/SGB-specific behavior disabled)
+  - [ ] `acceptance`: 41/70 (Some tests for DMG/MGB/SGB-specific behavior disabled)
   - [x] `emulator-only`: 27/28 (MBC1M, not supported)
 - [x] Acid2
   - [x] dmg-acid2

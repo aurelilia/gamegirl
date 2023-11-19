@@ -163,9 +163,9 @@ impl GameGirl {
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
 
-            NR10..=WAV_END => Apu::read_register(&self.apu.inner, HIGH_START + addr),
-            0x76 if self.cgb => Apu::read_pcm12(&self.apu.inner),
-            0x77 if self.cgb => Apu::read_pcm34(&self.apu.inner),
+            NR10..=WAV_END => self.apu.read_register_gg(HIGH_START + addr),
+            0x76 if self.cgb => self.apu.read_pcm12(),
+            0x77 if self.cgb => self.apu.read_pcm34(),
 
             VRAM_SELECT if self.cgb => self.mem.vram_bank | 0xFE,
             WRAM_SELECT if self.cgb => self.mem.wram_bank | 0xF8,
@@ -211,7 +211,7 @@ impl GameGirl {
             STAT => self[STAT] = value | 0x80, // Bit 7 unavailable
             DMA => dma::dma_written(self, value),
             BCPS..=OPRI => self.ppu.write_high(addr, value),
-            NR10..=WAV_END => Apu::write(self, HIGH_START + addr, value),
+            NR10..=WAV_END => self.apu.write_register_gg(HIGH_START + addr, value),
 
             SB => self.debugger.serial_output.push(value as char),
 
@@ -274,7 +274,6 @@ impl GameGirl {
     fn init_scheduler(&mut self) {
         self.scheduler
             .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
-        Apu::init_scheduler(self);
     }
 
     // Unsafe corner!

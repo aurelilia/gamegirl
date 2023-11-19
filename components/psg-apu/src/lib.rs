@@ -4,6 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+//! This audio implementation is slightly abridged from mizu:
+//! https://github.com/Amjad50/mizu/tree/master/mizu-core/src/apu
+//! Thank you to it's authors!
+
 #![feature(trait_alias)]
 
 use bitflags::bitflags;

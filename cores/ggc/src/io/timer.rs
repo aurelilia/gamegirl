@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::numutil::NumExt;
+use common::numutil::{NumExt, U16Ext};
 
 use crate::{
     cpu::Interrupt,
@@ -56,7 +56,7 @@ impl Timer {
 
     pub fn read(gg: &GameGirl, addr: u16) -> u8 {
         match addr {
-            DIV => (Self::div(gg) >> 8).u8(),
+            DIV => Self::div(gg).high(),
             TAC => gg.timer.control | 0xF8,
             TIMA => Self::get_tima(gg),
             _ => 0xFF,
@@ -123,7 +123,7 @@ impl Timer {
     }
 
     /// Calculate the current value of DIV.
-    fn div(gg: &GameGirl) -> u16 {
+    pub fn div(gg: &GameGirl) -> u16 {
         (gg.scheduler.now() - gg.timer.div_start).u16()
     }
 

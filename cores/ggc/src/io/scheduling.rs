@@ -5,11 +5,10 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::components::scheduler::Kind;
-use psg_apu::GenApuEvent;
 use GGEvent::*;
 
 use crate::{
-    io::{apu::Apu, dma, dma::Hdma, ppu::Ppu, timer::Timer},
+    io::{dma, dma::Hdma, ppu::Ppu, timer::Timer},
     GameGirl,
 };
 
@@ -24,8 +23,6 @@ pub enum GGEvent {
     PauseEmulation,
     /// An event handled by the PPU.
     PpuEvent(PpuEvent),
-    /// An event handled by the APU.
-    ApuEvent(ApuEvent),
     /// A DMA transfer completion.
     DMAFinish,
     /// Advance HDMA transfer.
@@ -45,7 +42,6 @@ impl GGEvent {
         match self {
             PauseEmulation => gg.ticking = false,
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
-            ApuEvent(evt) => Apu::handle_event(gg, *evt, late_by),
             DMAFinish => dma::do_oam_dma(gg),
             HdmaTransferStep => Hdma::handle_hdma(gg),
             GdmaTransfer => Hdma::handle_gdma(gg),
@@ -92,6 +88,4 @@ pub enum ApuEvent {
     PushSample,
     /// Tick the sequencer.
     TickSequencer,
-    /// Event from the inner generic APU.
-    Gen(GenApuEvent),
 }
