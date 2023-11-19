@@ -45,7 +45,7 @@ pub fn setup_cpal(sys: Arc<Mutex<Box<dyn Core>>>) -> Option<Stream> {
             &StreamConfig {
                 channels: 2,
                 sample_rate: SampleRate(sr),
-                buffer_size: BufferSize::Default,
+                buffer_size: BufferSize::Fixed(sr / 30),
             },
             move |data: &mut [f32], _| {
                 let mut core = sys.lock().unwrap();

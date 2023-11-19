@@ -115,7 +115,7 @@ macro_rules! produce_samples_buffered {
                 for sample in buffer.drain(target..) {
                     self.apu.buffer.push(sample);
                 }
-                if self.apu.buffer.len() > 1_000 {
+                if self.apu.buffer.len() > $rate as usize / 2 {
                     log::warn!("Audio samples are backing up! Truncating");
                     self.apu.buffer.truncate(100);
                 }
