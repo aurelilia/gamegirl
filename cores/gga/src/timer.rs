@@ -14,7 +14,7 @@ use crate::{
     GameGirlAdv,
 };
 
-const DIVS: [u16; 4] = [1, 64, 256, 1024];
+pub const DIVS: [u16; 4] = [1, 64, 256, 1024];
 
 /// Timers on the GGA.
 /// They run on the scheduler when in regular counting mode.
@@ -52,7 +52,7 @@ impl Timers {
         if is_scheduled {
             // Is on scheduler, calculate current value
             let scaler = DIVS[(ctrl & 3).us()].u32();
-            let elapsed = gg.scheduler.now() - gg.timers.scheduled_at[TIM];
+            let elapsed = gg.scheduler.now() - (gg.timers.scheduled_at[TIM] - 2);
             gg.timers.counters[TIM].wrapping_add((elapsed / scaler).u16())
         } else {
             // Either off or inc on overflow, just return current counter

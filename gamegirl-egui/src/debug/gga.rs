@@ -12,7 +12,8 @@ use eframe::{
     epaint::{vec2, ColorImage, ImageData, ImageDelta, TextureId},
 };
 use gamegirl::gga::{
-    addr::{BG0CNT, DISPCNT, IME},
+    addr::{BG0CNT, DISPCNT, IE, IF, IME, TM0CNT_H},
+    timer::{self, Timers},
     GameGirlAdv,
 };
 
@@ -29,6 +30,8 @@ pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
     ui.separator();
     app.debugger_window_states[4] ^= ui.button("BG Tileset Viewer").clicked();
     app.debugger_window_states[5] ^= ui.button("OBJ Tileset Viewer").clicked();
+    ui.separator();
+    app.debugger_window_states[6] ^= ui.button("Timer Status").clicked();
 }
 
 pub fn get_windows() -> Windows<GameGirlAdv> {
@@ -39,6 +42,7 @@ pub fn get_windows() -> Windows<GameGirlAdv> {
         ("Remote Debugger", remote_debugger),
         ("BG Tileset Viewer", bg_tileset_viewer),
         ("OBJ Tileset Viewer", obj_tileset_viewer),
+        ("Timer Status", timer_status),
     ]
 }
 
@@ -52,7 +56,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
 
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
-            ui.set_min_width(200.0);
+            ui.set_min_width(300.0);
             // Account for prefetch
             let mut pc = gg.cpu.pc().wrapping_sub(gg.cpu.inst_size());
             ui.add(
@@ -106,9 +110,19 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     });
     ui.separator();
 
-    ui.monospace("       NZCO                    IFT");
-    ui.monospace(format!("CPSR = {:032b}", gg.cpu.cpsr));
-    ui.monospace(format!("SPSR = {:032b}", gg.cpu.spsr()));
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.monospace("       NZCO                    IFT");
+            ui.monospace(format!("CPSR = {:032b}", gg.cpu.cpsr));
+            ui.monospace(format!("SPSR = {:032b}", gg.cpu.spsr()));
+        });
+        ui.separator();
+        ui.vertical(|ui| {
+            ui.monospace("       GKDDDDSTTTTCHV");
+            ui.monospace(format!("IF = {:016b}", gg[IF]));
+            ui.monospace(format!("IE = {:016b}", gg[IE]));
+        });
+    });
     ui.separator();
 
     ui.horizontal(|ui| {
@@ -411,4 +425,33 @@ fn get_or_make_texture(ctx: &Context, app: &mut App, id: usize) -> TextureId {
         ));
     }
     app.textures[id]
+}
+
+fn timer_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
+    for timer in 0..4 {
+        ui.heading(format!("Timer {timer}"));
+        let current = match timer {
+            0 => Timers::time_read::<0>(gg),
+            1 => Timers::time_read::<1>(gg),
+            2 => Timers::time_read::<2>(gg),
+            _ => Timers::time_read::<3>(gg),
+        };
+        ui.label(format!("Current Value: 0x{current:04X}"));
+
+        let ctrl = gg[TM0CNT_H + ((timer as u32) << 2)];
+        ui.label(format!(
+            "Scaler: F/{} ({})",
+            timer::DIVS[(ctrl & 3).us()],
+            ctrl & 3
+        ));
+
+        ui.label(format!("Enabled: {:?}", ctrl.is_bit(7)));
+        ui.label(format!("IRQ Enabled: {:?}", ctrl.is_bit(6)));
+        if timer != 0 {
+            ui.label(format!("Count-Up Mode: {:?}", ctrl.is_bit(2)));
+        }
+        if timer != 3 {
+            ui.separator();
+        }
+    }
 }
