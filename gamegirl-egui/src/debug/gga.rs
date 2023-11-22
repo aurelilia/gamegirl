@@ -130,6 +130,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
             gg.advance();
         }
         ui.checkbox(&mut gg.options.running, "Running");
+        ui.checkbox(&mut gg.cpu.is_halted, "CPU Halted");
 
         if gg[IME].is_bit(0) {
             ui.label("(IME on)");
