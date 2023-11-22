@@ -199,7 +199,7 @@ cargo run -p tests --release -- --gg
   - [x] `ppu` (All of them)
   - [x] `nes`
   - [x] `bios`
-- [ ] destoer's gba_tests
+- [x] destoer's gba_tests?
   - [x] `cond_invalid`
   - [x] `hello_world`
   - [x] `if_ack`
