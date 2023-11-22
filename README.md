@@ -166,8 +166,8 @@ cargo run -p tests --release -- --gg
 ### GGA
 - [ ] mgba's suite
   - [x] Memory: 1552/1552
-  - [x] I/O read: 123/123
-  - [ ] Timing: 1272/2020
+  - [x] I/O read: 130/130
+  - [ ] Timing: 1266/2020
   - [ ] Timer count-up: Freezes...
   - [ ] Timer IRQ: 65/90
   - [x] Shifter: 140/140
