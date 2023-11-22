@@ -71,7 +71,8 @@ impl Timers {
 
         if was_scheduled {
             // Need to cancel current scheduled event
-            gg.scheduler.cancel(AdvEvent::TimerOverflow(TIM.u8()));
+            gg.scheduler
+                .cancel_single(AdvEvent::TimerOverflow(TIM.u8()));
         }
         if is_scheduled {
             if !was_scheduled {

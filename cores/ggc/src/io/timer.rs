@@ -129,7 +129,7 @@ impl Timer {
 
     /// Reschedule the timer overflow event.
     fn reschedule(gg: &mut GameGirl) {
-        gg.scheduler.cancel(GGEvent::TimerOverflow);
+        gg.scheduler.cancel_single(GGEvent::TimerOverflow);
         if gg.timer.counter_running {
             gg.timer.scheduled_at =
                 gg.scheduler.now() - (Self::div(gg) & (gg.timer.counter_divider - 1)).u32();

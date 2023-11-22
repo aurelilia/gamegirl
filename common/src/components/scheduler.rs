@@ -109,10 +109,11 @@ impl<E: Kind> Scheduler<E> {
         self.next = self.events.last().unwrap().execute_at;
     }
 
-    /// Cancel all events that match a predicate.
-    /// Somewhat expensive.
-    pub fn cancel_pred(&mut self, mut evt: impl FnMut(E) -> bool) {
-        self.events.retain(|e| !evt(e.kind));
+    /// Cancel an event of a given type.
+    /// Somewhat less expensive than `cancel`.
+    pub fn cancel_single(&mut self, evt: E) {
+        let idx = self.events.iter().position(|e| e.kind == evt).unwrap();
+        self.events.remove(idx);
         self.next = self.events.last().unwrap().execute_at;
     }
 
@@ -135,6 +136,7 @@ impl<E: Kind> Scheduler<E> {
     fn check_time(&mut self) {
         if self.time > 0xF000_0000 {
             self.time -= 0xF000_0000;
+            self.next -= 0xF000_0000;
             for event in &mut self.events {
                 event.execute_at -= 0xF000_0000;
             }

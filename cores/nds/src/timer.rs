@@ -76,7 +76,7 @@ impl Timers {
 
         if was_scheduled {
             // Need to cancel current scheduled event
-            ds.scheduler.cancel(NdsEvent::TimerOverflow {
+            ds.scheduler.cancel_single(NdsEvent::TimerOverflow {
                 timer: TIM.u8(),
                 is_arm9: DS::I == 1,
             });

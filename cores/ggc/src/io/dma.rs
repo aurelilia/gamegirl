@@ -19,8 +19,7 @@ use crate::{
 pub fn dma_written(gg: &mut GameGirl, value: u8) {
     gg.dma = value;
     let time = 648 / gg.speed as i32;
-    gg.scheduler
-        .cancel_pred(|e| matches!(e, GGEvent::DMAFinish));
+    gg.scheduler.cancel_single(GGEvent::DMAFinish);
     gg.scheduler.schedule(GGEvent::DMAFinish, time);
     gg.mem.pending_dma = true;
 }
@@ -73,7 +72,7 @@ impl Hdma {
         if gg.hdma.hblank_transferring && !value.is_bit(7) {
             gg.hdma.hblank_transferring = false;
             gg.hdma.transfer_left |= 0x80;
-            gg.scheduler.cancel(GGEvent::HdmaTransferStep);
+            gg.scheduler.cancel_single(GGEvent::HdmaTransferStep);
         } else {
             gg.hdma.transfer_left = value as i16 & 0x7F;
             gg.hdma.hblank_transferring = value.is_bit(7);
