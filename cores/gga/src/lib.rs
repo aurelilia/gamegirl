@@ -28,7 +28,7 @@ use gga_ppu::{scheduling::PpuEvent, threading::GgaPpu};
 use memory::Memory;
 
 use crate::{
-    addr::{KEYINPUT, SOUNDBIAS},
+    addr::{IE, IF, KEYINPUT, SOUNDBIAS},
     dma::Dmas,
     scheduling::{AdvEvent, ApuEvent},
     timer::Timers,
@@ -43,7 +43,7 @@ pub mod graphics;
 mod input;
 mod memory;
 mod scheduling;
-mod timer;
+pub mod timer;
 
 pub type GGADebugger = Debugger<u32>;
 
@@ -76,7 +76,14 @@ impl Core for GameGirlAdv {
     produce_samples_buffered!(2u32.pow(16));
 
     fn advance(&mut self) {
-        Cpu::continue_running(self);
+        if self.cpu.is_halted {
+            // We're halted, emulate peripherals until an interrupt is pending
+            let evt = self.scheduler.pop();
+            evt.kind.dispatch(self, evt.late_by);
+            self.cpu.is_halted = (self[IE] & self[IF]) == 0;
+        } else {
+            Cpu::continue_running(self);
+        }
     }
 
     fn reset(&mut self) {

@@ -46,6 +46,7 @@ pub struct Cpu<S: ArmSystem + 'static> {
     pub registers: [u32; 16],
     pipeline: [u32; 2],
     pub access_type: Access,
+    pub is_halted: bool,
 
     block_ended: bool,
     pipeline_valid: bool,
@@ -349,6 +350,7 @@ impl<S: ArmSystem> Default for Cpu<S> {
             registers: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
             pipeline: [0; 2],
             access_type: Access::NonSeq,
+            is_halted: false,
             block_ended: false,
             pipeline_valid: false,
             cache: Cache::default(),

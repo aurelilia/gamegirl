@@ -159,10 +159,11 @@ impl GameGirlAdv {
             | 0xA0..=0xAF
             | 0xE0..=0xFF
             | 0x110..=0x12F
-            | 0x134..=0x1FF
-            | 0x206
-            | 0x20A
-            | 0x302..=0x3FE => self.invalid_read::<false>(addr).u16(),
+            | 0x134
+            | 0x138..=0x140
+            | 0x144..=0x158
+            | 0x15C..=0x1FF
+            | 0x304..=0x3FE => self.invalid_read::<false>(addr).u16(),
 
             _ => self[a],
         }
@@ -227,11 +228,7 @@ impl GameGirlAdv {
 
             // HALTCNT
             0x0400_0301 => {
-                // We're halted, emulate peripherals until an interrupt is pending
-                while (self[IE] & self[IF]) == 0 {
-                    let evt = self.scheduler.pop();
-                    evt.kind.dispatch(self, evt.late_by);
-                }
+                self.cpu.is_halted = true;
             }
 
             // Old sound
@@ -397,7 +394,7 @@ impl GameGirlAdv {
             }
 
             // RO registers
-            VCOUNT | KEYINPUT => (),
+            VCOUNT | KEYINPUT | 0x136 | 0x142 | 0x15A | 0x206 | 0x20A | 0x302 => (),
 
             // Serial
             // TODO this is not how serial actually works but it tricks some tests...
