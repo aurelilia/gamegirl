@@ -117,7 +117,7 @@ where
         }
     }
 
-    pub(crate) fn vram(&self, addr: usize) -> u8 {
+    pub fn vram(&self, addr: usize) -> u8 {
         if addr <= 0x17FFF {
             self.vram[addr]
         } else {
