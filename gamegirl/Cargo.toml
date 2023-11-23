@@ -11,6 +11,7 @@ ggc = { path = "../cores/ggc", optional = true }
 gga = { path = "../cores/gga", optional = true }
 nds = { path = "../cores/nds", optional = true }
 psx = { path = "../cores/psx", optional = true }
+nes = { path = "../cores/nes", optional = true }
 log = "0.4.20"
 
 gdbstub = { version = "0.6.6", optional = true }
@@ -28,5 +29,5 @@ gga = { path = "../cores/gga", optional = true }
 nds = { path = "../cores/nds", optional = true }
 
 [features]
-serde = ["common/serde", "ggc/serde", "gga/serde", "nds/serde"]
+serde = ["common/serde", "ggc/serde", "gga/serde", "nds/serde", "nes/serde"]
 remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch"]

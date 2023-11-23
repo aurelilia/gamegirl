@@ -888,6 +888,7 @@ dependencies = [
  "glow",
  "log",
  "nds",
+ "nes",
  "psx",
  "web-sys",
  "zstd",
@@ -1637,6 +1638,17 @@ dependencies = [
  "common",
  "gga-ppu",
  "log",
+ "serde",
+ "serde_arrays",
+]
+
+[[package]]
+name = "nes"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "log",
+ "modular-bitfield",
  "serde",
  "serde_arrays",
 ]

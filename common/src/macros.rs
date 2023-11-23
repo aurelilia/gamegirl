@@ -25,7 +25,7 @@ macro_rules! common_functions {
             }
         }
 
-        fn produce_frame(&mut self) -> Option<Vec<Colour>> {
+        fn produce_frame(&mut self) -> Option<Vec<::common::Colour>> {
             while self.options.running && self.ppu.last_frame == None {
                 self.advance();
             }
@@ -53,7 +53,7 @@ macro_rules! common_functions {
             self.restore_from(old_self);
         }
 
-        fn last_frame(&mut self) -> Option<Vec<Colour>> {
+        fn last_frame(&mut self) -> Option<Vec<::common::Colour>> {
             self.ppu.last_frame.take()
         }
 
