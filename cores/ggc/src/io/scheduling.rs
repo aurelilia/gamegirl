@@ -78,14 +78,3 @@ impl PpuEvent {
         }
     }
 }
-
-/// Events the APU generates.
-#[derive(Copy, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[repr(u16)]
-pub enum ApuEvent {
-    /// Push a sample to the output.
-    PushSample,
-    /// Tick the sequencer.
-    TickSequencer,
-}
