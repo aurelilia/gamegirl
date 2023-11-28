@@ -49,6 +49,8 @@ pub fn load_cart(
     let _is_gga = cart.iter().skip(0xB5).take(6).all(|b| *b == 0);
     // We detect NDS carts by a zero-filled header region
     let _is_nds = cart.iter().skip(0x15).take(6).all(|b| *b == 0);
+    // We detect iNES files by the header
+    let _is_nes = cart[0] == b'N' && cart[1] == b'E' && cart[2] == b'S';
     // We detect PSX games by being ISOs
     #[cfg(feature = "psx")]
     use std::os::unix::prelude::OsStrExt;
@@ -64,6 +66,8 @@ pub fn load_cart(
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
         #[cfg(feature = "psx")]
         _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, _ogl_ctx, _ogl_tex_id),
+        #[cfg(feature = "nes")]
+        _ if _is_nes => nes::Nes::with_cart(cart, path, config),
 
         #[cfg(feature = "gga")]
         _ => {

@@ -4,19 +4,16 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::ptr;
+use common::numutil::{hword, NumExt};
 
-use common::{
-    components::memory::{MemoryMappedSystem, MemoryMapper},
-    numutil::{hword, NumExt},
-};
+use crate::{cartridge::Cartridge, cpu::Reg::*, Nes};
 
-use crate::{cpu::Reg::*, Nes};
-
-#[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    mapper: MemoryMapper<256>,
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
+    iram: [u8; 0x800],
+    ppu_regs: [u8; 0x8],
+    other_regs: [u8; 0x15],
 }
 
 impl Nes {
@@ -50,39 +47,35 @@ impl Nes {
         self.read(hword(0x01, stack))
     }
 
-    pub fn get<T: NumExt>(&mut self, addr: u16) -> T {
-        T::from_u16(addr)
+    pub fn get(&mut self, addr: u16) -> u8 {
+        match addr {
+            0x0000..=0x1FFF => self.mem.iram[addr.us() & 0x7FF],
+            0x2000..=0x3FFF => self.mem.ppu_regs[addr.us() & 0x8],
+            0x4000..=0x4015 => self.mem.other_regs[addr.us() - 0x4000],
+            0x4016 => self.joypad.read() | 0x40,
+            0x4020..=0xFFFF => Cartridge::read(self, addr),
+            _ => 0xFF,
+        }
     }
 
-    pub fn set(&mut self, addr: u16, value: u8) {}
+    pub fn set(&mut self, addr: u16, value: u8) {
+        match addr {
+            0x0000..=0x1FFF => self.mem.iram[addr.us() & 0x7FF] = value,
+            0x2000..=0x3FFF => self.mem.ppu_regs[addr.us() & 0x8] = value,
+            0x4000..=0x4015 => self.mem.other_regs[addr.us() - 0x4000] = value,
+            0x4016 => self.joypad.write(value),
+            0x4020..=0xFFFF => Cartridge::write(self, addr, value),
+            _ => (),
+        }
+    }
 }
 
-impl MemoryMappedSystem<256> for Nes {
-    type Usize = u16;
-    const ADDR_MASK: &'static [usize] = &[0xFF];
-    const PAGE_POW: usize = 8;
-    const MASK_POW: usize = 0;
-
-    fn get_mapper(&self) -> &MemoryMapper<256> {
-        &self.mem.mapper
-    }
-
-    fn get_mapper_mut(&mut self) -> &mut MemoryMapper<256> {
-        &mut self.mem.mapper
-    }
-
-    unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
-        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
-            let ptr = reg.as_ptr() as *mut u8;
-            ptr.add(offs)
-        }
-
-        if !R {
-            return ptr::null::<u8>() as *mut u8;
-        }
-
-        match a {
-            _ => ptr::null::<u8>() as *mut u8,
+impl Default for Memory {
+    fn default() -> Self {
+        Self {
+            iram: [0; 0x800],
+            ppu_regs: [0; 0x8],
+            other_regs: [0; 0x15],
         }
     }
 }

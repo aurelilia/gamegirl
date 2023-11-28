@@ -5,24 +5,26 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 mod apu;
+mod cartridge;
 mod cpu;
+mod joypad;
 mod memory;
 mod ppu;
 mod scheduling;
 
-use std::mem;
+use std::{mem, path::PathBuf};
 
 use apu::Apu;
+use cartridge::Cartridge;
 use common::{
     common_functions,
-    components::{
-        debugger::Debugger, memory::MemoryMapper, scheduler::Scheduler, storage::GameSave,
-    },
+    components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
     produce_samples_buffered, Core,
 };
 use cpu::Cpu;
+use joypad::Joypad;
 use memory::Memory;
 use ppu::Ppu;
 use scheduling::NesEvent;
@@ -39,6 +41,8 @@ pub struct Nes {
     pub mem: Memory,
     pub ppu: Ppu,
     pub apu: Apu,
+    pub cart: Cartridge,
+    pub joypad: Joypad,
 
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -56,7 +60,7 @@ pub struct Nes {
 }
 
 impl Core for Nes {
-    common_functions!(CLOCK_HZ, NesEvent::PauseEmulation, [640, 480]);
+    common_functions!(CLOCK_HZ, NesEvent::PauseEmulation, [256, 240]);
     produce_samples_buffered!(48000);
 
     fn advance(&mut self) {
@@ -69,7 +73,6 @@ impl Core for Nes {
         self.options = old_self.options;
         self.config = old_self.config;
         self.debugger = old_self.debugger;
-        MemoryMapper::init_pages(self);
     }
 
     fn skip_bootrom(&mut self) {}
@@ -96,7 +99,13 @@ impl Nes {
         self.options = old_self.options;
         self.config = old_self.config;
         self.debugger = old_self.debugger;
-        MemoryMapper::init_pages(self);
+    }
+
+    /// Create a system with a cart already loaded.
+    pub fn with_cart(cart: Vec<u8>, _: Option<PathBuf>, _: &SystemConfig) -> Box<Self> {
+        let mut nes = Box::<Self>::default();
+        nes.cart = Cartridge::from_rom(cart);
+        nes
     }
 }
 
@@ -107,6 +116,8 @@ impl Default for Nes {
             mem: Memory::default(),
             ppu: Ppu::default(),
             apu: Apu::default(),
+            cart: Cartridge::default(),
+            joypad: Joypad::default(),
             debugger: Default::default(),
             scheduler: Default::default(),
 

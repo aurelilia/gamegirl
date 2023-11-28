@@ -7,7 +7,7 @@
 use common::components::scheduler::Kind;
 use NesEvent::*;
 
-use crate::Nes;
+use crate::{apu::Apu, Nes};
 
 /// All scheduler events on the NES.
 #[derive(Copy, Clone, Eq, PartialEq, Default)]
@@ -18,6 +18,7 @@ pub enum NesEvent {
     /// amount.
     #[default]
     PauseEmulation,
+    ApuEvent(ApuEvent),
 }
 
 impl NesEvent {
@@ -25,8 +26,18 @@ impl NesEvent {
     pub fn dispatch(&self, nes: &mut Nes, late_by: i32) {
         match self {
             PauseEmulation => nes.ticking = false,
+            ApuEvent(event) => Apu::handle_event(nes, *event, late_by),
         }
     }
 }
 
 impl Kind for NesEvent {}
+
+/// Events the APU generates.
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[repr(u16)]
+pub enum ApuEvent {
+    // Push a sample to the output.
+    PushSample,
+}

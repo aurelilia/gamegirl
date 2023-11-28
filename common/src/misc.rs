@@ -81,16 +81,16 @@ pub enum CgbMode {
 #[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
 #[repr(C)]
 pub enum Button {
-    A,
-    B,
-    Select,
-    Start,
-    Right,
-    Left,
-    Up,
-    Down,
-    R,
-    L,
+    A = 0,
+    B = 1,
+    Select = 2,
+    Start = 3,
+    Right = 4,
+    Left = 5,
+    Up = 6,
+    Down = 7,
+    R = 8,
+    L = 9,
 }
 
 impl Button {
