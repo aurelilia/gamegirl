@@ -7,6 +7,7 @@
 use std::{
     mem,
     path::PathBuf,
+    rc::Rc,
     sync::{mpsc, Arc, Mutex},
 };
 
@@ -154,7 +155,7 @@ impl App {
     }
 
     /// Process all async messages that came in during this frame.
-    fn process_messages(&mut self, gl: Option<&Arc<glow::Context>>) {
+    fn process_messages(&mut self, gl: Option<&Rc<glow::Context>>) {
         while let Ok(Message::FileOpen(file)) = self.message_channel.1.try_recv() {
             self.save_game();
 

@@ -119,13 +119,13 @@ impl SingleThreadBase for SyncSys {
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &mut [u8],
-    ) -> TargetResult<(), Self> {
+    ) -> TargetResult<usize, Self> {
         let mut gg = self.lock();
         let gg = gg.as_any().downcast_mut::<GameGirlAdv>().unwrap();
         for (offs, data) in data.iter_mut().enumerate() {
             *data = gg.get_byte(start_addr + offs.u32());
         }
-        Ok(())
+        Ok(data.len())
     }
 
     fn write_addrs(

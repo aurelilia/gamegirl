@@ -16,7 +16,7 @@ use common::{
     },
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::{NumExt, U16Ext},
-    produce_samples_buffered, Colour, Core,
+    produce_samples_buffered, Core,
 };
 
 use crate::{

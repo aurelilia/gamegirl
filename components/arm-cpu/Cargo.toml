@@ -7,10 +7,10 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../../common" }
-bitmatch = "0.1.1"
-log = "0.4.20"
 
-serde = { version = "1.0.188", features = ["derive", "rc"], optional = true }
+log.workspace = true
+serde = { workspace = true, optional = true }
+bitmatch.workspace = true
 
 [features]
 serde = ["dep:serde"]

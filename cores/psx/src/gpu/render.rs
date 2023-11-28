@@ -29,7 +29,7 @@ impl Color {
 }
 
 pub struct GlRender {
-    gl: Arc<Context>,
+    // gl: Arc<Context>,
     tex: NativeTexture,
     fbo: NativeFramebuffer,
 
@@ -67,21 +67,22 @@ impl GlRender {
 
     pub fn draw(&mut self) {
         unsafe {
-            self.gl.use_program(Some(self.program));
-            self.gl.bind_framebuffer(glow::FRAMEBUFFER, Some(self.fbo));
-            self.gl.bind_vertex_array(Some(self.vao));
-            self.gl.viewport(0, 0, 1024, 512);
-            self.gl.enable(glow::BLEND);
-            self.gl.blend_equation(glow::FUNC_ADD);
-            self.gl.blend_func(glow::ONE, glow::ZERO);
-
-            self.gl
-                .memory_barrier(glow::CLIENT_MAPPED_BUFFER_BARRIER_BIT);
-            self.gl.draw_arrays(glow::TRIANGLES, 0, self.count as i32);
-
-            self.gl.use_program(None);
-            self.gl.bind_framebuffer(glow::FRAMEBUFFER, None);
-            self.gl.bind_vertex_array(None);
+            // TODO wait for next egui release that fixes sync of gl
+            // self.gl.use_program(Some(self.program));
+            // self.gl.bind_framebuffer(glow::FRAMEBUFFER, Some(self.fbo));
+            // self.gl.bind_vertex_array(Some(self.vao));
+            // self.gl.viewport(0, 0, 1024, 512);
+            // self.gl.enable(glow::BLEND);
+            // self.gl.blend_equation(glow::FUNC_ADD);
+            // self.gl.blend_func(glow::ONE, glow::ZERO);
+            //
+            // self.gl
+            //    .memory_barrier(glow::CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+            // self.gl.draw_arrays(glow::TRIANGLES, 0, self.count as i32);
+            //
+            // self.gl.use_program(None);
+            // self.gl.bind_framebuffer(glow::FRAMEBUFFER, None);
+            // self.gl.bind_vertex_array(None);
         }
         self.count = 0;
     }
@@ -161,7 +162,7 @@ impl GlRender {
             gl.bind_vertex_array(None);
             gl.bind_texture(glow::TEXTURE_2D, None);
             Self {
-                gl,
+                // gl,
                 tex,
                 fbo,
                 program,
@@ -179,17 +180,17 @@ impl GlRender {
 impl Drop for GlRender {
     fn drop(&mut self) {
         unsafe {
-            self.gl.delete_vertex_array(self.vao);
-            self.gl.delete_framebuffer(self.fbo);
-            self.gl.delete_shader(self.vertex);
-            self.gl.delete_shader(self.fragment);
-            self.gl.delete_program(self.program);
+            // self.gl.delete_vertex_array(self.vao);
+            // self.gl.delete_framebuffer(self.fbo);
+            // self.gl.delete_shader(self.vertex);
+            // self.gl.delete_shader(self.fragment);
+            // self.gl.delete_program(self.program);
         }
     }
 }
 
 struct Buffer<T: 'static> {
-    ctx: Arc<Context>,
+    // ctx: Arc<Context>,
     gl: NativeBuffer,
     content: &'static mut [T],
 }
@@ -213,7 +214,7 @@ impl<T> Buffer<T> {
 
             let content = slice::from_raw_parts_mut(mem as *mut T, size as usize);
             Self {
-                ctx: gl.clone(),
+                // ctx: gl.clone(),
                 gl: buffer,
                 content,
             }
@@ -224,9 +225,9 @@ impl<T> Buffer<T> {
 impl<T> Drop for Buffer<T> {
     fn drop(&mut self) {
         unsafe {
-            self.ctx.bind_buffer(glow::ARRAY_BUFFER, Some(self.gl));
-            self.ctx.unmap_buffer(glow::ARRAY_BUFFER);
-            self.ctx.delete_buffer(self.gl);
+            // self.ctx.bind_buffer(glow::ARRAY_BUFFER, Some(self.gl));
+            // self.ctx.unmap_buffer(glow::ARRAY_BUFFER);
+            // self.ctx.delete_buffer(self.gl);
         }
     }
 }

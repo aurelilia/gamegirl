@@ -20,7 +20,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
-    produce_samples_buffered, Colour, Core,
+    produce_samples_buffered, Core,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};

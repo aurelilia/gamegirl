@@ -33,6 +33,9 @@ use crate::{
     },
 };
 
+#[cfg(feature = "instruction-tracing")]
+type Tracer<S> = Box<dyn Fn(&S, u32) + Sync + Send + 'static>;
+
 /// Represents the CPU of the console - an ARM7TDMI.
 /// It is generic over the system used; see `interface.rs`.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -59,7 +62,7 @@ pub struct Cpu<S: ArmSystem + 'static> {
     #[cfg(feature = "instruction-tracing")]
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg(feature = "instruction-tracing")]
-    pub instruction_tracer: Option<Box<dyn Fn(&S, u32) + Sync + Send + 'static>>,
+    pub instruction_tracer: Option<Tracer<S>>,
 }
 
 impl<S: ArmSystem> Cpu<S> {

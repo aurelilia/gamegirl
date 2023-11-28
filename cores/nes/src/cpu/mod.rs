@@ -15,7 +15,7 @@ use crate::Nes;
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-struct CpuStatus {
+pub struct CpuStatus {
     carry: bool,
     zero: bool,
     interrupt_disable: bool,
@@ -23,7 +23,7 @@ struct CpuStatus {
     break_cmd: bool,
     overflow: bool,
     negative: bool,
-    _unused: bool,
+    eight: bool,
 }
 
 impl CpuStatus {

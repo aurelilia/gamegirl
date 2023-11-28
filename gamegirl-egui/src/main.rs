@@ -9,9 +9,11 @@ use gamegirl_egui::App;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    use eframe::egui::ViewportBuilder;
+
     env_logger::init();
     let options = eframe::NativeOptions {
-        transparent: true,
+        viewport: ViewportBuilder::default().with_transparent(true),
         default_theme: Theme::Dark,
         ..Default::default()
     };

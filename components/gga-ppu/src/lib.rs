@@ -505,6 +505,7 @@ where
         let bg_x1 = Self::get_affine_offs(gg[BG3PA + 0x8], gg[BG3PA + 0xA]);
         let bg_y1 = Self::get_affine_offs(gg[BG3PA + 0xC], gg[BG3PA + 0xE]);
 
+        #[allow(unused_mut)]
         let mut ppu = {
             #[cfg(feature = "threaded")]
             {

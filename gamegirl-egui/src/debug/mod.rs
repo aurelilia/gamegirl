@@ -79,7 +79,7 @@ fn make_window<T>(
                     egui::ViewportBuilder::default().with_title(title),
                     |ctx, _| {
                         egui::CentralPanel::default().show(ctx, |ui| content(core, ui, app, ctx));
-                        *open &= !ctx.input(|i| i.raw.viewport.close_requested);
+                        *open &= !ctx.input(|i| i.viewport().close_requested());
                     },
                 )
             }

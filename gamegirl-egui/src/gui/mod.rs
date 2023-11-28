@@ -9,7 +9,7 @@ mod options;
 use std::fs;
 
 use eframe::{
-    egui::{self, load::SizedTexture, vec2, widgets, Context, Image, Layout, Ui},
+    egui::{self, load::SizedTexture, vec2, widgets, Context, Image, Layout, Ui, ViewportCommand},
     emath::Align,
     epaint::Vec2,
     Frame,
@@ -30,7 +30,7 @@ pub const APP_WINDOW_COUNT: usize = 2;
 const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] =
     [("Options", options::options), ("About", options::about)];
 
-pub fn draw(app: &mut App, ctx: &Context, frame: &mut Frame, size: [usize; 2]) {
+pub fn draw(app: &mut App, ctx: &Context, frame: &Frame, size: [usize; 2]) {
     navbar(app, ctx, frame);
     game_screen(app, ctx, size);
 
@@ -43,17 +43,17 @@ pub fn draw(app: &mut App, ctx: &Context, frame: &mut Frame, size: [usize; 2]) {
     debug::render(app, ctx);
 }
 
-fn navbar(app: &mut App, ctx: &Context, frame: &mut Frame) {
+fn navbar(app: &mut App, ctx: &Context, frame: &Frame) {
     egui::TopBottomPanel::top("navbar").show(ctx, |ui| {
         ui.horizontal_wrapped(|ui| {
             ui.visuals_mut().button_frame = false;
             let now = { ctx.input(|i| i.time) };
-            navbar_content(app, now, frame, ui);
+            navbar_content(app, now, frame, ctx, ui);
         });
     });
 }
 
-fn navbar_content(app: &mut App, now: f64, frame: &mut Frame, ui: &mut Ui) {
+fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mut Ui) {
     widgets::global_dark_light_mode_switch(ui);
     ui.separator();
 
@@ -101,7 +101,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &mut Frame, ui: &mut Ui) {
         {
             ui.separator();
             if ui.button("Exit").clicked() {
-                frame.close();
+                ctx.send_viewport_cmd(ViewportCommand::Close)
             }
         }
     });
@@ -205,7 +205,7 @@ fn make_window(app: &mut App, ctx: &Context, title: &str, open: &mut bool, conte
                     egui::ViewportBuilder::default().with_title(title),
                     |ctx, _| {
                         egui::CentralPanel::default().show(ctx, |ui| content(app, ctx, ui));
-                        *open &= !ctx.input(|i| i.raw.viewport.close_requested);
+                        *open &= !ctx.input(|i| i.viewport().close_requested());
                     },
                 )
             }
