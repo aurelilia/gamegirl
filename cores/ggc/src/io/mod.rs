@@ -72,7 +72,7 @@ impl GameGirl {
     }
 
     pub fn write8(&mut self, addr: u16, value: u8) {
-        self.options.running &= self.debugger.write_occurred(addr);
+        self.debugger.write_occurred(addr);
         self.advance_clock(1);
         self.set(addr, value);
     }

@@ -115,8 +115,11 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
             gg.advance();
         }
 
-        ui.checkbox(&mut gg.options.running, "Running");
+        ui.checkbox(&mut gg.debugger.running, "Running");
     });
+
+    ui.separator();
+    super::inst_dump(ui, &mut gg.debugger);
 }
 
 /// Window for configuring active breakpoints.

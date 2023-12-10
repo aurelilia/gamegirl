@@ -71,7 +71,7 @@ impl PlayStation {
 
     pub fn set<T: NumExt>(&mut self, addr: u32, value: T) {
         let phys = Self::phys_addr(addr);
-        self.options.running &= self.debugger.write_occurred(addr);
+        self.debugger.write_occurred(addr);
         match phys {
             0x0000_0000..=0x007F_FFFF => {
                 Self::raw_write(&mut self.memory.ram, phys & 0x1F_FFFF, value)

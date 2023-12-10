@@ -12,7 +12,7 @@
 macro_rules! common_functions {
     ($clock:expr, $pause_event:expr, $size:expr) => {
         fn advance_delta(&mut self, delta: f32) {
-            if !self.options.running {
+            if !self.debugger.running {
                 return;
             }
 
@@ -20,23 +20,27 @@ macro_rules! common_functions {
             self.scheduler.schedule($pause_event, target);
 
             self.ticking = true;
-            while self.options.running && self.ticking {
+            while self.debugger.running && self.ticking {
                 self.advance();
             }
         }
 
         fn produce_frame(&mut self) -> Option<Vec<::common::Colour>> {
-            while self.options.running && self.ppu.last_frame == None {
+            while self.debugger.running && self.ppu.last_frame == None {
                 self.advance();
             }
             self.ppu.last_frame = None;
 
             // Do it twice: Color buffer will be empty after a save state load,
             // we need to render one frame in full
-            while self.options.running && self.ppu.last_frame == None {
+            while self.debugger.running && self.ppu.last_frame == None {
                 self.advance();
             }
             self.ppu.last_frame.take()
+        }
+
+        fn is_running(&mut self) -> &mut bool {
+            &mut self.debugger.running
         }
 
         #[cfg(feature = "serde")]
@@ -85,14 +89,14 @@ macro_rules! common_functions {
 macro_rules! produce_samples_buffered {
     ($rate:expr) => {
         fn produce_samples(&mut self, samples: &mut [f32]) {
-            if !self.options.running {
+            if !self.debugger.running {
                 samples.fill(0.0);
                 return;
             }
 
             let target = samples.len() * self.options.speed_multiplier;
             while self.apu.buffer.len() < target {
-                if !self.options.running {
+                if !self.debugger.running {
                     samples.fill(0.0);
                     return;
                 }

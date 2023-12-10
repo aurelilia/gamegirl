@@ -129,13 +129,16 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         if ui.button("Advance").clicked() {
             gg.advance();
         }
-        ui.checkbox(&mut gg.options.running, "Running");
+        ui.checkbox(&mut gg.debugger.running, "Running");
         ui.checkbox(&mut gg.cpu.is_halted, "CPU Halted");
 
         if gg[IME].is_bit(0) {
             ui.label("(IME on)");
         }
     });
+
+    ui.separator();
+    super::inst_dump(ui, &mut gg.debugger);
 }
 
 /// Window for configuring active breakpoints.

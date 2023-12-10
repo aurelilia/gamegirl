@@ -9,7 +9,7 @@ use arm_cpu::{
     registers::Flag::IrqDisable,
     Access, Cpu, Exception,
 };
-use common::numutil::NumExt;
+use common::{numutil::NumExt, components::debugger::Debugger};
 
 use crate::{
     addr,
@@ -86,9 +86,8 @@ impl ArmSystem for GameGirlAdv {
         self.wait_time::<T>(addr, access)
     }
 
-    fn check_debugger(&mut self) -> bool {
-        self.options.running &= self.debugger.should_execute(self.cpu.pc());
-        self.options.running
+    fn debugger(&mut self) -> &mut Debugger<u32> {
+        &mut self.debugger
     }
 
     fn can_cache_at(pc: u32) -> bool {

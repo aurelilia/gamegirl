@@ -69,7 +69,8 @@ impl<S: ArmSystem> Cpu<S> {
     /// Advance emulation.
     #[inline]
     pub fn continue_running(gg: &mut S) {
-        if !gg.check_debugger() {
+        let pc = gg.cpur().pc();
+        if !gg.debugger().should_execute(pc) {
             return;
         }
 
@@ -77,7 +78,6 @@ impl<S: ArmSystem> Cpu<S> {
             inner: gg as *mut S,
         };
         if gg.cpu().cache.enabled {
-            let pc = gg.cpu().pc();
             if let Some(cache) = gg.cpu().cache.get(pc) {
                 Cpu::run_cache(&mut wrapper, cache);
                 return;
@@ -225,14 +225,15 @@ impl<S: ArmSystem> Cpu<S> {
     }
 
     fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32) {
-        if common::TRACING {
+        let pc = gg.cpu().pc();
+        gg.debugger().add_traced_instruction(|| {
             let mnem = if TY::WIDTH == 2 {
                 Self::get_mnemonic_thumb(inst.u16())
             } else {
                 Self::get_mnemonic_arm(inst)
             };
-            eprintln!("0x{:08X} {}", gg.cpu().pc(), mnem);
-        }
+            format!("0x{:08X} {}", pc, mnem)
+        });
 
         #[cfg(feature = "instruction-tracing")]
         if let Some(tracer) = &gg.cpur().instruction_tracer {

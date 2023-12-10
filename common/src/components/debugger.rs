@@ -12,12 +12,16 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     /// Contains the serial output that was written to IO register SB.
     /// Currently only on GG.
     pub serial_output: String,
+    /// If the system is running. If false, any calls to functions advancing
+    /// the system based on outside sources (time, sound) will do nothing.
+    pub running: bool,
     /// A list of breakpoints the system should stop on.
     pub breakpoints: Vec<Breakpoint<Ptr>>,
-    /// If a breakpoint was hit.
-    pub is_breakpoint_hit: bool,
     /// The hit breakpoint.
     pub breakpoint_hit: Option<Breakpoint<Ptr>>,
+    /// If instructions should be traced and printed to a file, this contains
+    /// the instructions to be printed / file contents.
+    pub traced_instructions: Option<String>,
 }
 
 impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
@@ -34,10 +38,10 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
             .find(|bp| bp.value == Some(addr) && bp.write);
         if let Some(bp) = bp {
             self.breakpoint_hit = Some(bp.clone());
-            self.is_breakpoint_hit = true;
+            self.running = false;
         }
 
-        !self.is_breakpoint_hit
+        self.running
     }
 
     /// Called before an instruction is executed, which might trigger a BP.
@@ -53,9 +57,18 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
             .find(|bp| bp.value == Some(pc) && bp.pc);
         if let Some(bp) = bp {
             self.breakpoint_hit = Some(bp.clone());
-            self.is_breakpoint_hit = true;
+            self.running = false;
         }
-        !self.is_breakpoint_hit
+        self.running
+    }
+
+    /// Add another instruction to trace.
+    pub fn add_traced_instruction(&mut self, writer: impl FnOnce() -> String) {
+        if let Some(instr) = self.traced_instructions.as_mut() {
+            let text = writer();
+            instr.push('\n');
+            instr.push_str(&text);
+        }
     }
 }
 

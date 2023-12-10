@@ -39,6 +39,18 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
     });
 
     CollapsingHeader::new("Features").show(ui, |ui| {
+        ui.checkbox(
+            &mut opt.sys.run_on_open,
+            "Start running on ROM load",
+        )
+        .on_hover_text("Immediately start running the emulation as soon as a ROM is loaded.");
+        ui.checkbox(
+            &mut opt.sys.skip_bootrom,
+            "Skip System ROM / BIOS",
+        )
+        .on_hover_text("Skip any kind of intro the system would usually play (e.g. 'GameBoy' logo splash) and run the game immediately.");
+        ui.separator();
+
         ui.horizontal(|ui| {
             ui.add(Slider::new(&mut opt.fast_forward_hold_speed, 2..=10));
             ui.label("Fast forward speed (Hold)");

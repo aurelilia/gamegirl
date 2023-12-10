@@ -6,7 +6,7 @@
 
 use std::ops::{Deref, DerefMut, IndexMut};
 
-use common::numutil::NumExt;
+use common::{numutil::NumExt, components::debugger::Debugger};
 
 use super::Exception;
 use crate::{inst_arm::ArmLut, inst_thumb::ThumbLut, Access, Cpu};
@@ -88,9 +88,8 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
         panic!("CP15 unsupported!");
     }
 
-    /// Check with the system debugger if the current instruction is to be
-    /// executed. If this returns false, the CPU aborts execution.
-    fn check_debugger(&mut self) -> bool;
+    /// Get the debugger for this system.
+    fn debugger(&mut self) -> &mut Debugger<u32>;
     /// Check if the current instruction can be used to start creating an
     /// instruction cache block.
     fn can_cache_at(addr: u32) -> bool;

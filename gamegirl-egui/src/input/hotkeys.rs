@@ -18,7 +18,7 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
     ("Pause", |a, p| {
         pressed(a, p, |app| {
             let mut core = app.core.lock().unwrap();
-            core.options().running = !core.options().running && core.options().rom_loaded;
+            *core.is_running() = !*core.is_running() && core.options().rom_loaded;
         })
     }),
     ("Save", |a, p| pressed(a, p, |app| app.save_game())),

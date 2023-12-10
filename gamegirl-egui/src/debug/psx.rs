@@ -81,6 +81,9 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
         }
         ui.checkbox(&mut ps.options.running, "Running");
     });
+
+    ui.separator();
+    super::inst_dump(ui, &mut ps.debugger);
 }
 
 /// Window for configuring active breakpoints.

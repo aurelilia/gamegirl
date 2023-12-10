@@ -89,7 +89,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
         }
         if ui.button("Pause").clicked() {
             let mut core = app.core.lock().unwrap();
-            core.options().running = !core.options().running && core.options().rom_loaded;
+            *core.is_running() = !*core.is_running() && core.options().rom_loaded;
             ui.close_menu();
         }
         if ui.button("Reset").clicked() {

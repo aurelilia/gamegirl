@@ -7,7 +7,7 @@
 use std::ops::BitAnd;
 
 /// Trait for common number operations.
-pub trait NumExt: BitAnd<Output = Self> + Copy {
+pub trait NumExt: BitAnd<Output = Self> + Copy + PartialEq {
     const WIDTH: u32;
 
     /// Get the state of the given bit. Returns 0/1.

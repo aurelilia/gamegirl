@@ -95,20 +95,18 @@ pub(crate) fn get_next(gg: &mut GameGirl) -> Inst {
         _ => Inst(first, 0),
     };
 
-    if common::TRACING {
-        let spv = gg.get::<u16>(gg.cpu.sp);
-        println!(
-            "PC={:04X}, SP={:04X}, SPV={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, I={}",
+    gg.debugger.add_traced_instruction(|| {
+        format!(
+            "PC={:04X}, SP={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, I={}",
             gg.cpu.pc,
             gg.cpu.sp,
-            spv,
             gg.cpu.dreg(AF),
             gg.cpu.dreg(BC),
             gg.cpu.dreg(DE),
             gg.cpu.dreg(HL),
             NAMES[inst.0.us()]
-        );
-    }
+        )
+    });
 
     inst
 }

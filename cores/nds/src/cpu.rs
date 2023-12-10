@@ -16,7 +16,7 @@ use arm_cpu::{
     registers::Flag::IrqDisable,
     Access, Cpu, Exception,
 };
-use common::{components::memory::MemoryMapper, numutil::NumExt};
+use common::{components::{memory::MemoryMapper, debugger::Debugger}, numutil::NumExt};
 
 use crate::{
     addr::{IE_H, IE_L, IF_H, IF_L, IME},
@@ -67,8 +67,8 @@ impl ArmSystem for Nds7 {
         1
     }
 
-    fn check_debugger(&mut self) -> bool {
-        true
+    fn debugger(&mut self) -> &mut Debugger<u32> {
+        &mut self.debugger
     }
 
     fn can_cache_at(_addr: u32) -> bool {
@@ -124,10 +124,10 @@ impl ArmSystem for Nds9 {
         1
     }
 
-    fn check_debugger(&mut self) -> bool {
-        true
+    fn debugger(&mut self) -> &mut Debugger<u32> {
+        &mut self.debugger
     }
-
+    
     fn can_cache_at(_addr: u32) -> bool {
         false
     }

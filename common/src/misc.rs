@@ -8,9 +8,6 @@
 /// These can be changed at runtime.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct EmulateOptions {
-    /// If the system is running. If false, any calls to [advance_delta] and
-    /// [produce_samples] do nothing.
-    pub running: bool,
     /// If there is a ROM loaded / cartridge inserted.
     pub rom_loaded: bool,
     /// If the audio samples produced by [produce_samples] should be in reversed
@@ -25,7 +22,6 @@ pub struct EmulateOptions {
 impl Default for EmulateOptions {
     fn default() -> Self {
         Self {
-            running: false,
             rom_loaded: false,
             invert_audio_samples: false,
             speed_multiplier: 1,
@@ -44,6 +40,10 @@ pub struct SystemConfig {
     pub compress_savestates: bool,
     /// If CGB colours should be corrected.
     pub cgb_colour_correction: bool,
+    /// If the 'bootrom' or BIOS should be skipped, where applicable.
+    pub skip_bootrom: bool,
+    /// If the system should start running immediately when loading a ROM.
+    pub run_on_open: bool,
     /// Audio volume multiplier
     pub volume: f32,
     /// If the interpreter should cache
@@ -56,6 +56,8 @@ impl Default for SystemConfig {
             mode: CgbMode::Prefer,
             compress_savestates: false,
             cgb_colour_correction: false,
+            skip_bootrom: false,
+            run_on_open: true,
             volume: 0.5,
             cached_interpreter: true,
         }

@@ -195,7 +195,7 @@ impl SingleRegisterAccess<()> for SyncSys {
 
 impl SingleThreadResume for SyncSys {
     fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
-        self.0.lock().unwrap().options().running = true;
+        *self.0.lock().unwrap().is_running() = true;
         Ok(())
     }
 
@@ -337,7 +337,7 @@ impl BlockingEventLoop for EventLoop {
             <Self::Connection as Connection>::Error,
         >,
     > {
-        let hit_bp = target.0.lock().unwrap().options().running;
+        let hit_bp = *target.0.lock().unwrap().is_running();
         match () {
             _ if hit_bp => Ok(Event::TargetStopped(SingleThreadStopReason::SwBreak(()))),
             _ if target.1 => {

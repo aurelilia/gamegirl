@@ -35,7 +35,6 @@ pub struct Cpu {
 impl Cpu {
     pub fn execute_next(ps: &mut PlayStation) {
         if !ps.debugger.should_execute(ps.cpu.pc) {
-            ps.options.running = false; // Pause emulation, we hit a BP
             return;
         }
 

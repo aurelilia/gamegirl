@@ -15,9 +15,6 @@ pub mod misc;
 pub mod macros;
 pub mod numutil;
 
-/// For debugging: If instruction-level tracing output should be printed.
-pub const TRACING: bool = false;
-
 /// Colour type used by the system's PPUs for image data.
 /// This type is analogus to egui's `Color32`, which allows the GUI to
 /// simply `mem::transmute` it without having to perform any explicit
@@ -49,6 +46,8 @@ pub trait Core: Send + Sync {
     fn advance(&mut self);
     /// Reset the console, while keeping the current cartridge inserted.
     fn reset(&mut self);
+    /// Get the running status of the console, and allow modifying it.
+    fn is_running(&mut self) -> &mut bool;
     /// Skip BIOS, bootroms, or similar; immediately boot inserted game.
     fn skip_bootrom(&mut self);
 

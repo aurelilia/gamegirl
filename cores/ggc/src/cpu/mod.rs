@@ -30,7 +30,6 @@ impl Cpu {
     /// Execute the next instruction, moving the entire system forward.
     pub(super) fn exec_next_inst(gg: &mut GameGirl) {
         if !gg.debugger.should_execute(gg.cpu.pc) {
-            gg.options.running = false; // Pause emulation, we hit a BP
             return;
         }
         let ime = gg.cpu.ime;

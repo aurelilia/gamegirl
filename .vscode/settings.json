@@ -1,0 +1,5 @@
+{
+    "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
+    "editor.formatOnSave": true,
+    "rust-analyzer.showUnlinkedFileNotification": false
+}

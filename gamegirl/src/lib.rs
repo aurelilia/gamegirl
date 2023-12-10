@@ -79,10 +79,9 @@ pub fn load_cart(
         _ => panic!("Failed to detect cart and no GGA core available!."),
     };
 
-    sys.options().running = true;
+    *sys.is_running() = config.run_on_open;
     sys.options().rom_loaded = true;
-    if common::TRACING {
-        sys.options().running = false;
+    if config.skip_bootrom {
         sys.skip_bootrom();
     }
     sys
@@ -96,6 +95,7 @@ pub fn dummy_core() -> Box<dyn Core> {
 struct Dummy {
     options: EmulateOptions,
     config: SystemConfig,
+    running: bool,
 }
 
 impl Core for Dummy {
@@ -118,6 +118,10 @@ impl Core for Dummy {
     fn advance(&mut self) {}
 
     fn reset(&mut self) {}
+
+    fn is_running(&mut self) -> &mut bool {
+        &mut self.running
+    }
 
     fn skip_bootrom(&mut self) {}
 

@@ -11,7 +11,7 @@ mod psx;
 
 use std::any::Any;
 
-use common::Core;
+use common::{components::debugger::Debugger, numutil::NumExt, Core};
 use eframe::egui::{self, Context, Ui};
 use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
 
@@ -85,4 +85,22 @@ fn make_window<T>(
             }
         }
     }
+}
+
+fn inst_dump<T: NumExt>(ui: &mut Ui, debugger: &mut Debugger<T>) {
+    ui.horizontal(|ui| {
+        if ui.button("Start logging instructions").clicked() {
+            debugger.traced_instructions = Some(String::with_capacity(10_000_000));
+        }
+        if let Some(string) = debugger.traced_instructions.as_ref() {
+            ui.label(format!(
+                "Current buffer size: {:000}MB",
+                string.len() / 1_000_000
+            ));
+            if ui.button("Dump").clicked() {
+                std::fs::write("instruction-dump", string.as_bytes()).unwrap();
+                debugger.traced_instructions = None;
+            }
+        }
+    });
 }
