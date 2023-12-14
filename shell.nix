@@ -1,10 +1,12 @@
 let 
-  pkgs = import <nixpkgs> {};
+  moz_overlay = import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz);
+  pkgs = import <nixpkgs> { overlays = [ moz_overlay ]; };
   packages = with pkgs; [
     pkg-config
     udev
     alsa-lib
     gtk3
+    (rustChannelOf { rustToolchain = ./rust-toolchain.toml; }).rust
   ];
 in
   pkgs.mkShell {

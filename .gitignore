@@ -3,6 +3,7 @@
 /gamegirl-egui/dist
 *.sav
 bench.gb
+.direnv
 
 bios7.bin
 bios9.bin
