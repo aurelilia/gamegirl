@@ -6,7 +6,8 @@ let
     udev
     alsa-lib
     gtk3
-    (rustChannelOf { rustToolchain = ./rust-toolchain.toml; }).rust
+    ((rustChannelOf { rustToolchain = ./rust-toolchain.toml; }).rust.override (old:
+      { extensions = ["rust-src" "rust-analysis"]; }))
   ];
 in
   pkgs.mkShell {
