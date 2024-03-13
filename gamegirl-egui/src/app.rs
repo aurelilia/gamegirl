@@ -5,6 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use std::{
+    collections::HashMap,
     mem,
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
@@ -19,7 +20,7 @@ use eframe::{
     glow::{self},
     CreationContext, Frame, Storage,
 };
-use gilrs::{EventType, Gilrs};
+use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
     gui::{self, APP_WINDOW_COUNT},
@@ -27,6 +28,23 @@ use crate::{
     rewind::Rewinder,
     Colour,
 };
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum AxisState {
+    Negative,
+    Neutral,
+    Positive,
+}
+
+impl AxisState {
+    fn new(value: f32) -> Self {
+        match value {
+            ..=-0.5 => Self::Negative,
+            0.5.. => Self::Positive,
+            _ => Self::Neutral,
+        }
+    }
+}
 
 /// The main app struct used by the GUI.
 pub struct App {
@@ -44,6 +62,8 @@ pub struct App {
     pub textures: Vec<TextureId>,
     /// Game controller state
     pub gil: Gilrs,
+    /// States for controller axes
+    controller_axes: HashMap<Axis, AxisState>,
     /// Message channel for reacting to some async events, see [Message].
     pub message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
     /// Frame times.
@@ -107,8 +127,23 @@ impl App {
                     EventType::ButtonReleased(b, _) => {
                         self.handle_evt(InputSource::Button(b), false)
                     }
-                    EventType::ButtonChanged(_, _, _) => todo!(),
-                    EventType::AxisChanged(_, _, _) => todo!(),
+                    EventType::AxisChanged(axis, value, _) => {
+                        let prev = self
+                            .controller_axes
+                            .get(&axis)
+                            .unwrap_or(&AxisState::Neutral);
+                        let curr = AxisState::new(value);
+                        if *prev != curr {
+                            self.handle_evt(
+                                InputSource::Axis {
+                                    axis,
+                                    is_neg: value < 0.0,
+                                },
+                                value.abs() > 0.5,
+                            );
+                        }
+                        self.controller_axes.insert(axis, curr);
+                    }
                     _ => (),
                 }
             }
@@ -215,6 +250,7 @@ impl App {
 
             textures,
             gil: Gilrs::new().unwrap(),
+            controller_axes: HashMap::with_capacity(6),
             message_channel: mpsc::channel(),
             frame_times: History::new(0..120, 2.0),
             audio_stream: None,

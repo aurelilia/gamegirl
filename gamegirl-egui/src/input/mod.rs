@@ -53,10 +53,12 @@ impl Input {
 
     /// Get the key for a certain action, formatted to a string.
     pub fn key_for_fmt(&mut self, action: InputAction) -> String {
-        self.key_for(action)
+        let mut keys = self
+            .key_for(action)
             .map(|k| format!("{k}"))
-            .collect::<Vec<_>>()
-            .join(", ")
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys.join(", ")
     }
 
     pub fn new() -> Self {
