@@ -20,6 +20,7 @@ use eframe::{
     glow::{self},
     CreationContext, Frame, Storage,
 };
+use gamegirl::input_replay::{Input as RInput, InputReplay};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
@@ -55,6 +56,8 @@ pub struct App {
 
     /// Rewinder state.
     pub rewinder: Rewinder,
+    /// Input replay state.
+    pub replay: Option<InputReplay>,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     pub fast_forward_toggled: bool,
 
@@ -117,7 +120,13 @@ impl App {
     fn get_frame(&mut self, ctx: &Context) -> (Option<Vec<Colour>>, [usize; 2]) {
         let delta = ctx.input(|i| {
             for event in &i.events {
-                if let Event::Key { key, pressed, .. } = event {
+                if let Event::Key {
+                    key,
+                    pressed,
+                    repeat: false,
+                    ..
+                } = event
+                {
                     self.handle_evt(InputSource::Key(*key), *pressed);
                 }
             }
@@ -146,6 +155,9 @@ impl App {
                     }
                     _ => (),
                 }
+            }
+            if let Some(replay) = self.replay.as_mut() {
+                replay.current += i.unstable_dt as f64;
             }
             i.unstable_dt.min(0.016).max(0.001) - 0.0009
         });
@@ -182,7 +194,16 @@ impl App {
         }
 
         match self.state.options.input.get(src) {
-            Some(InputAction::Button(btn)) => self.core.lock().unwrap().set_button(btn, pressed),
+            Some(InputAction::Button(btn)) => {
+                self.core.lock().unwrap().set_button(btn, pressed);
+                if let Some(replay) = self.replay.as_mut() {
+                    replay.add_input(RInput {
+                        button: btn,
+                        state: pressed,
+                        time: replay.current,
+                    })
+                }
+            }
             Some(InputAction::Hotkey(idx)) => input::HOTKEYS[idx as usize].1(self, pressed),
             None => (),
         }
@@ -244,6 +265,7 @@ impl App {
             current_rom_path: None,
 
             rewinder: Rewinder::new(state.options.rewind_buffer_size),
+            replay: None,
             fast_forward_toggled: false,
             app_window_states: [false; APP_WINDOW_COUNT],
             debugger_window_states: Vec::from([false; 10]),

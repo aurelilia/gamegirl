@@ -35,6 +35,20 @@ pub fn open(sender: mpsc::Sender<Message>) {
     });
 }
 
+/// Open a file save dialog. This operation is async and returns immediately.
+pub fn save(content: String) {
+    let task = rfd::AsyncFileDialog::new()
+        .add_filter("GameGirl replays", &["rpl"])
+        .save_file();
+
+    execute(async move {
+        let file = task.await;
+        if let Some(file) = file {
+            file.write(content.as_bytes()).await.unwrap();
+        }
+    });
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn path(f: &FileHandle) -> Option<PathBuf> {
     Some(f.path().to_path_buf())

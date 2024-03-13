@@ -15,6 +15,7 @@ use eframe::{
     Frame,
 };
 use file_dialog::File;
+use gamegirl::input_replay::InputReplay;
 
 use crate::{
     app::{App, GuiStyle, Message},
@@ -25,10 +26,13 @@ use crate::{
 /// Function signature for an app window
 type AppFn = fn(&mut App, &Context, &mut Ui);
 /// Count of GUI windows that take the App as a parameter.
-pub const APP_WINDOW_COUNT: usize = 2;
+pub const APP_WINDOW_COUNT: usize = 3;
 /// GUI windows that take the App as a parameter.
-const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] =
-    [("Options", options::options), ("About", options::about)];
+const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] = [
+    ("Options", options::options),
+    ("About", options::about),
+    ("Replays", replays),
+];
 
 pub fn draw(app: &mut App, ctx: &Context, frame: &Frame, size: [usize; 2]) {
     navbar(app, ctx, frame);
@@ -96,6 +100,10 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             app.core.lock().unwrap().reset();
             ui.close_menu();
         }
+        if ui.button("Replays").clicked() {
+            app.app_window_states[2] ^= true;
+            ui.close_menu();
+        }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -154,6 +162,30 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
         ));
         ui.label("Frame time: ");
     });
+}
+
+fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
+    if let Some(replay) = app.replay.as_ref() {
+        ui.label("Status: Recording replay");
+        ui.label(&format!("Recorded {} inputs!", replay.inputs.len()));
+        if ui.button("End & Save Replay").clicked() {
+            file_dialog::save(replay.to_string());
+            app.replay = None;
+        }
+    } else if let Some(file) = app.current_rom_path.clone() {
+        ui.label("Status: Not currently recording replay");
+        if ui.button("Restart system and start recording").clicked() {
+            app.replay = Some(InputReplay {
+                file,
+                inputs: vec![],
+                current: 0.0,
+            });
+            app.core.lock().unwrap().reset();
+        }
+    } else {
+        ui.label("Status: Not currently recording replay");
+        ui.label("Load a ROM first.");
+    }
 }
 
 fn game_screen(app: &App, ctx: &Context, size: [usize; 2]) {
