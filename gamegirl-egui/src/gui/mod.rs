@@ -8,6 +8,7 @@ mod options;
 
 use std::fs;
 
+use common::components::input_replay::InputReplay;
 use eframe::{
     egui::{self, load::SizedTexture, vec2, widgets, Context, Image, Layout, Ui, ViewportCommand},
     emath::Align,
@@ -15,7 +16,6 @@ use eframe::{
     Frame,
 };
 use file_dialog::File;
-use gamegirl::input_replay::InputReplay;
 
 use crate::{
     app::{App, GuiStyle, Message},
@@ -63,7 +63,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
 
     ui.menu_button("File", |ui| {
         if ui.button("Open ROM").clicked() {
-            file_dialog::open(app.message_channel.0.clone());
+            file_dialog::open_rom(app.message_channel.0.clone());
             ui.close_menu();
         }
         if !app.state.last_opened.is_empty() {
@@ -75,7 +75,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
                     {
                         app.message_channel
                             .0
-                            .send(Message::FileOpen(File {
+                            .send(Message::RomOpen(File {
                                 content: fs::read(path).unwrap(),
                                 path: Some(path.clone()),
                             }))
@@ -179,8 +179,12 @@ fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
                 file,
                 inputs: vec![],
                 current: 0.0,
+                current_input: 0,
             });
             app.core.lock().unwrap().reset();
+        }
+        if ui.button("Load recording and restart").clicked() {
+            file_dialog::open_replay(app.message_channel.0.clone());
         }
     } else {
         ui.label("Status: Not currently recording replay");

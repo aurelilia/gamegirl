@@ -4,6 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use crate::components::input_replay::InputReplay;
+
 /// Options that are used by the GUI and shared between all systems.
 /// These can be changed at runtime.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -17,6 +19,8 @@ pub struct EmulateOptions {
     /// ex. 1x is regular speed, 2x is double speed.
     /// Affects [advance_delta] and sound sample output.
     pub speed_multiplier: usize,
+    /// Currently playing replay, if any.
+    pub replay: Option<InputReplay>,
 }
 
 impl Default for EmulateOptions {
@@ -25,6 +29,7 @@ impl Default for EmulateOptions {
             rom_loaded: false,
             invert_audio_samples: false,
             speed_multiplier: 1,
+            replay: None,
         }
     }
 }

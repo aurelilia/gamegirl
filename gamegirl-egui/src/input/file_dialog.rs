@@ -20,7 +20,7 @@ pub struct File {
 
 /// Open a file dialog. This operation is async and returns immediately,
 /// sending a [Message] once the user has picked a file.
-pub fn open(sender: mpsc::Sender<Message>) {
+pub fn open_rom(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
         .add_filter("GameGirl games", &["gb", "gbc", "gba", "elf", "iso"])
         .pick_file();
@@ -30,7 +30,26 @@ pub fn open(sender: mpsc::Sender<Message>) {
         if let Some(file) = file {
             let path = path(&file);
             let content = file.read().await;
-            sender.send(Message::FileOpen(File { content, path })).ok();
+            sender.send(Message::RomOpen(File { content, path })).ok();
+        }
+    });
+}
+
+/// Open a file dialog. This operation is async and returns immediately,
+/// sending a [Message] once the user has picked a file.
+pub fn open_replay(sender: mpsc::Sender<Message>) {
+    let task = rfd::AsyncFileDialog::new()
+        .add_filter("GameGirl replays", &["rpl"])
+        .pick_file();
+
+    execute(async move {
+        let file = task.await;
+        if let Some(file) = file {
+            let path = path(&file);
+            let content = file.read().await;
+            sender
+                .send(Message::ReplayOpen(File { content, path }))
+                .ok();
         }
     });
 }

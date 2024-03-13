@@ -11,7 +11,11 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 
-use common::{misc::SystemConfig, Core};
+use common::{
+    components::input_replay::{Input as RInput, InputReplay},
+    misc::SystemConfig,
+    Core,
+};
 use cpal::Stream;
 use eframe::{
     egui::{Context, Event, TextureOptions},
@@ -20,7 +24,6 @@ use eframe::{
     glow::{self},
     CreationContext, Frame, Storage,
 };
-use gamegirl::input_replay::{Input as RInput, InputReplay};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
@@ -118,7 +121,7 @@ impl App {
     /// Process keyboard inputs and return the GG's next frame, if one was
     /// produced.
     fn get_frame(&mut self, ctx: &Context) -> (Option<Vec<Colour>>, [usize; 2]) {
-        let delta = ctx.input(|i| {
+        let raw_delta = ctx.input(|i| {
             for event in &i.events {
                 if let Event::Key {
                     key,
@@ -161,9 +164,16 @@ impl App {
             }
             i.unstable_dt.min(0.016).max(0.001) - 0.0009
         });
+        let delta = raw_delta.min(0.016).max(0.001) - 0.0009;
 
         let mut core = self.core.lock().unwrap();
         let size = core.screen_size();
+
+        if let Some(replay) = core.options().replay.as_mut() {
+            if let Some(input) = replay.advance(raw_delta as f64) {
+                core.set_button(input.button, input.state);
+            }
+        }
 
         if self.rewinder.rewinding {
             let frame = if let Some(state) = self.rewinder.rewind_buffer.pop() {
@@ -211,31 +221,45 @@ impl App {
 
     /// Process all async messages that came in during this frame.
     fn process_messages(&mut self, gl: Option<&Arc<glow::Context>>) {
-        while let Ok(Message::FileOpen(file)) = self.message_channel.1.try_recv() {
-            self.save_game();
+        while let Ok(msg) = self.message_channel.1.try_recv() {
+            match msg {
+                Message::RomOpen(file) => {
+                    self.save_game();
 
-            let tex = match self.textures[0] {
-                TextureId::Managed(m) => m,
-                _ => panic!(),
-            };
+                    let tex = match self.textures[0] {
+                        TextureId::Managed(m) => m,
+                        _ => panic!(),
+                    };
 
-            *self.core.lock().unwrap() = gamegirl::load_cart(
-                file.content,
-                file.path.clone(),
-                &self.state.options.sys,
-                gl.cloned(),
-                tex as u32,
-            );
+                    *self.core.lock().unwrap() = gamegirl::load_cart(
+                        file.content,
+                        file.path.clone(),
+                        &self.state.options.sys,
+                        gl.cloned(),
+                        tex as u32,
+                    );
 
-            self.audio_stream = crate::setup_cpal(self.core.clone());
+                    self.audio_stream = crate::setup_cpal(self.core.clone());
 
-            self.current_rom_path = file.path.clone();
-            if let Some(path) = file.path {
-                if let Some(existing) = self.state.last_opened.iter().position(|p| *p == path) {
-                    self.state.last_opened.swap(0, existing);
-                } else {
-                    self.state.last_opened.insert(0, path);
-                    self.state.last_opened.truncate(10);
+                    self.current_rom_path = file.path.clone();
+                    if let Some(path) = file.path {
+                        if let Some(existing) =
+                            self.state.last_opened.iter().position(|p| *p == path)
+                        {
+                            self.state.last_opened.swap(0, existing);
+                        } else {
+                            self.state.last_opened.insert(0, path);
+                            self.state.last_opened.truncate(10);
+                        }
+                    }
+                }
+
+                Message::ReplayOpen(file) => {
+                    self.save_game();
+                    let mut core = self.core.lock().unwrap();
+                    core.reset();
+                    core.options().replay =
+                        Some(InputReplay::new(String::from_utf8(file.content).unwrap()));
                 }
             }
         }
@@ -311,7 +335,9 @@ pub struct State {
 pub enum Message {
     /// A file picked by the user to be opend as a ROM, from the "Open ROM" file
     /// picker dialog.
-    FileOpen(File),
+    RomOpen(File),
+    /// A file picked by the user to be opened as a replay.
+    ReplayOpen(File),
 }
 
 /// User-configurable options.

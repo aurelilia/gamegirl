@@ -23,7 +23,6 @@ pub use nds;
 #[cfg(feature = "psx")]
 pub use psx;
 
-pub mod input_replay;
 #[cfg(all(feature = "remote-debugger", target_family = "unix"))]
 pub mod remote_debugger;
 

@@ -10,7 +10,9 @@ use crate::app::App;
 type HotkeyFn = fn(&mut App, bool);
 pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
     ("Open ROM", |a, p| {
-        pressed(a, p, |app| file_dialog::open(app.message_channel.0.clone()))
+        pressed(a, p, |app| {
+            file_dialog::open_rom(app.message_channel.0.clone())
+        })
     }),
     ("Reset", |a, p| {
         pressed(a, p, |app| app.core.lock().unwrap().reset())
