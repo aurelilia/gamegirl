@@ -9,7 +9,7 @@ use std::iter;
 use common::numutil::NumExt;
 use modular_bitfield::{
     bitfield,
-    specifiers::{B2, B4, B7},
+    specifiers::{B2, B4},
 };
 
 use crate::Nes;

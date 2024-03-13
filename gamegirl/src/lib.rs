@@ -6,7 +6,7 @@
 
 //! This crate contains common structures shared by all systems.
 
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, sync::Arc};
 
 pub use common::{self, Core};
 use common::{
@@ -39,7 +39,7 @@ pub fn load_cart(
     cart: Vec<u8>,
     path: Option<PathBuf>,
     config: &SystemConfig,
-    _ogl_ctx: Option<Rc<Context>>,
+    _ogl_ctx: Option<Arc<Context>>,
     _ogl_tex_id: u32,
 ) -> Box<dyn Core> {
     // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header

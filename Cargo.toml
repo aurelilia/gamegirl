@@ -19,11 +19,11 @@ panic = "abort"
 opt-level = 1
 
 [workspace.dependencies]
-log = "0.4.20"
-serde = { version = "1.0.193", features = ["derive", "rc"] }
+log = "0.4.21"
+serde = { version = "1.0.197", features = ["derive", "rc"] }
 serde_arrays = "0.1.0"
 arrayvec = "0.7.4"
-bitflags = "2.4.1"
+bitflags = "2.4.2"
 modular-bitfield = "0.11"
 bitmatch = "0.1.1"
-glow = "0.12"
+glow = "0.13"

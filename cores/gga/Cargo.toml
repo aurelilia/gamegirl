@@ -17,7 +17,7 @@ serde_arrays = { workspace = true, optional = true }
 arrayvec.workspace = true
 
 elf_rs = "0.3.1"
-rubato = "0.14.1"
+rubato = "0.15.0"
 
 
 [features]

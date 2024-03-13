@@ -4,6 +4,9 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+//! Core massively incomplete so far, so:
+#![allow(warnings)]
+
 mod apu;
 mod cartridge;
 mod cpu;
