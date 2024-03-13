@@ -112,9 +112,11 @@ impl<E: Kind> Scheduler<E> {
     /// Cancel an event of a given type.
     /// Somewhat less expensive than `cancel`.
     pub fn cancel_single(&mut self, evt: E) {
-        let idx = self.events.iter().position(|e| e.kind == evt).unwrap();
-        self.events.remove(idx);
-        self.next = self.events.last().unwrap().execute_at;
+        let idx = self.events.iter().position(|e| e.kind == evt);
+        if let Some(idx) = idx {
+            self.events.remove(idx);
+            self.next = self.events.last().unwrap().execute_at;
+        }
     }
 
     /// Cancel a single (!) matching event and return it's remaining time.
