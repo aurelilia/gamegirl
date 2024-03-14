@@ -6,7 +6,7 @@
 
 use std::ops::{Deref, DerefMut, IndexMut};
 
-use common::{numutil::NumExt, components::debugger::Debugger};
+use common::{components::debugger::Debugger, numutil::NumExt};
 
 use super::Exception;
 use crate::{inst_arm::ArmLut, inst_thumb::ThumbLut, Access, Cpu};

@@ -9,7 +9,7 @@ use arm_cpu::{
     registers::Flag::IrqDisable,
     Access, Cpu, Exception,
 };
-use common::{numutil::NumExt, components::debugger::Debugger};
+use common::{components::debugger::Debugger, numutil::NumExt};
 
 use crate::{
     addr,

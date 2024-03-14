@@ -11,7 +11,7 @@ use eframe::{
 };
 
 use crate::{
-    app::{App, Options, GuiStyle},
+    app::{App, GuiStyle, Options},
     input::{InputAction, HOTKEYS},
 };
 
@@ -32,7 +32,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 "Enable GBC colour correction",
             )
             .on_hover_text("Adjust colours to be more accurate to a real GBC screen.");
-        
+
         ui.heading("Gameboy Advance");
         ui.checkbox(&mut opt.sys.cached_interpreter, "Enable Cached Interpreter")
             .on_hover_text("Enables caching in the interpreter. Speeds up emulation at the cost of RAM usage. Also breaks breakpoints.");
@@ -144,7 +144,7 @@ fn input_section(
             let text = match active {
                 true if !text.is_empty() => format!("{text}, ..."),
                 true => "...".to_string(),
-                false => text
+                false => text,
             };
 
             ui.horizontal(|ui| {
