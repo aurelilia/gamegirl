@@ -5,6 +5,7 @@ members = [
     "cores/*",
     "gamegirl",
     "gamegirl-egui",
+    "testing/*",
     "tests",
     "tests/tracing",
 ]

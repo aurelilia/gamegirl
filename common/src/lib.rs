@@ -65,6 +65,19 @@ pub trait Core: Send + Sync {
     /// Make a save for the game to be put to disk.
     fn make_save(&self) -> Option<GameSave>;
 
+    /// Get the value at the given memory address.
+    fn get_memory(&self, _addr: usize) -> u8 {
+        unimplemented!("Not implemented for this core")
+    }
+    /// Get the value of all registers. Exact meaning is platform-specific.
+    fn get_registers(&self) -> Vec<usize> {
+        unimplemented!("Not implemented for this core")
+    }
+    /// Get values written to serial. Exact meaning is platform-specific.
+    fn get_serial(&self) -> Vec<u8> {
+        unimplemented!("Not implemented for this core")
+    }
+
     fn as_any(&mut self) -> &mut dyn Any;
 }
 

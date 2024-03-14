@@ -4,6 +4,7 @@
 *.sav
 bench.gb
 .direnv
+dyn-cores
 
 bios7.bin
 bios9.bin
