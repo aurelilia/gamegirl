@@ -106,15 +106,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -286,7 +277,7 @@ dependencies = [
  "polling",
  "rustix",
  "slab",
- "tracing 0.1.40",
+ "tracing",
  "windows-sys 0.52.0",
 ]
 
@@ -512,7 +503,7 @@ dependencies = [
  "futures-io",
  "futures-lite",
  "piper",
- "tracing 0.1.40",
+ "tracing",
 ]
 
 [[package]]
@@ -819,6 +810,7 @@ dependencies = [
  "libloading",
  "notify",
  "rfd",
+ "walkdir",
 ]
 
 [[package]]
@@ -2427,7 +2419,7 @@ dependencies = [
  "concurrent-queue",
  "pin-project-lite",
  "rustix",
- "tracing 0.1.40",
+ "tracing",
  "windows-sys 0.52.0",
 ]
 
@@ -2722,12 +2714,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "seahorse"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d25679a62f678e7485f21abdea76f91a15322a0fe51efea791fd9d124f1c473c"
-
-[[package]]
 name = "serde"
 version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2924,16 +2910,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tests"
-version = "0.1.0"
-dependencies = [
- "ansi_term",
- "gamegirl",
- "png",
- "seahorse",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2997,16 +2973,6 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.0"
-dependencies = [
- "arm-cpu",
- "common",
- "env_logger",
- "gga",
-]
-
-[[package]]
-name = "tracing"
 version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
@@ -3053,7 +3019,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
 dependencies = [
- "tracing 0.1.40",
+ "tracing",
  "tracing-subscriber",
  "wasm-bindgen",
 ]
@@ -3806,7 +3772,7 @@ dependencies = [
  "serde_repr",
  "sha1",
  "static_assertions",
- "tracing 0.1.40",
+ "tracing",
  "uds_windows",
  "windows-sys 0.52.0",
  "xdg-home",

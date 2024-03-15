@@ -74,7 +74,7 @@ pub trait Core: Send + Sync {
         unimplemented!("Not implemented for this core")
     }
     /// Get values written to serial. Exact meaning is platform-specific.
-    fn get_serial(&self) -> Vec<u8> {
+    fn get_serial(&self) -> &[u8] {
         unimplemented!("Not implemented for this core")
     }
 

@@ -111,6 +111,18 @@ impl Core for GameGirl {
     fn make_save(&self) -> Option<GameSave> {
         self.cart.make_save()
     }
+
+    fn get_memory(&self, addr: usize) -> u8 {
+        self.get(addr as u16)
+    }
+
+    fn get_registers(&self) -> Vec<usize> {
+        self.cpu.regs.iter().map(|r| *r as usize).collect()
+    }
+
+    fn get_serial(&self) -> &[u8] {
+        self.debugger.serial_output.as_bytes()
+    }
 }
 
 impl GameGirl {

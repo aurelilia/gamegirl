@@ -15,7 +15,13 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 common = { path = "../common", features = ["serde_config", "serde"] }
-gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nds", "serde"] }
+gamegirl = { path = "../gamegirl", features = [
+    "ggc",
+    "gga",
+    "nds",
+    "psx",
+    "serde",
+] }
 
 eframe = { version = "0.26.2", default-features = false, features = [
     "default_fonts",

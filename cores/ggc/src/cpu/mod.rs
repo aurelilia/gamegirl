@@ -22,8 +22,8 @@ pub struct Cpu {
     pub pc: u16,
     pub sp: u16,
     pub ime: bool,
+    pub regs: [u8; 8],
     halt_bug: bool,
-    regs: [u8; 8],
 }
 
 impl Cpu {

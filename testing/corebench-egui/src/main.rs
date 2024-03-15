@@ -6,17 +6,22 @@
 
 mod app;
 mod gui;
+mod tests;
+mod testsuite;
 
 use std::path::PathBuf;
 
-use dynacore::DynCore;
+use dynacore::{common::Core, gamegirl::dummy_core, NewCoreFn};
 use eframe::{egui::ViewportBuilder, Theme};
 use libloading::{Library, Symbol};
+use testsuite::TestSuiteResult;
 
 use crate::app::App;
 
 pub struct DCore {
-    c: DynCore,
+    c: Box<dyn Core>,
+    suites: Vec<TestSuiteResult>,
+    loader: NewCoreFn,
     _library: Option<Library>,
     name: String,
 }
@@ -39,9 +44,11 @@ fn main() {
 fn load_core(path: PathBuf) -> Result<DCore, libloading::Error> {
     unsafe {
         let lib = Library::new(&path)?;
-        let fun: Symbol<extern "C" fn() -> DynCore> = lib.get(b"init")?;
+        let fun: Symbol<NewCoreFn> = lib.get(b"new_core")?;
         Ok(DCore {
-            c: fun(),
+            c: dummy_core(),
+            suites: vec![],
+            loader: *fun,
             _library: Some(lib),
             name: path.file_name().unwrap().to_string_lossy().to_string(),
         })

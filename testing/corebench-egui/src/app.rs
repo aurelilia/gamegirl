@@ -7,10 +7,10 @@
 use std::{
     fs, mem,
     path::{Path, PathBuf},
-    sync::mpsc,
+    sync::{mpsc, Arc},
 };
 
-use dynacore::common::components::input_replay::InputReplay;
+use dynacore::{common::components::input_replay::InputReplay, gamegirl::dummy_core};
 use eframe::{
     egui::{Color32, Context, TextureOptions},
     epaint::{ColorImage, ImageData, ImageDelta, TextureId},
@@ -22,7 +22,8 @@ use notify::{
 };
 
 use crate::{
-    gui::{self, file_dialog::File},
+    gui::{self, file_dialog::File, APP_WINDOW_COUNT},
+    testsuite::TestSuite,
     DCore,
 };
 
@@ -34,10 +35,15 @@ pub struct App {
     pub replay: Option<InputReplay>,
     /// ROM currently loaded into the workbench.
     pub rom: Option<Vec<u8>>,
+    /// Test suites currently loaded into the workbench.
+    pub suites: Vec<Arc<TestSuite>>,
+
     /// Texture(s) for the core's graphics output.
     pub textures: Vec<TextureId>,
     /// Message channel for reacting to some async events, see [Message].
     pub message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
+    /// App window states.
+    pub app_window_states: [bool; APP_WINDOW_COUNT],
     /// Needs to be kept alive
     _watcher: INotifyWatcher,
 }
@@ -56,10 +62,10 @@ impl eframe::App for App {
 
 impl App {
     fn update_frames(&mut self, ctx: &Context) -> [usize; 2] {
-        let size = (self.cores[0].c.screen_size)();
-        for (i, core) in self.cores.iter().enumerate() {
-            (core.c.advance_delta)(0.2);
-            let frame = (core.c.last_frame)().map(|p| unsafe { mem::transmute(p) });
+        let size = self.cores[0].c.screen_size();
+        for (i, core) in self.cores.iter_mut().enumerate() {
+            core.c.advance_delta(0.2);
+            let frame = core.c.last_frame().map(|p| unsafe { mem::transmute(p) });
             if let Some(pixels) = frame {
                 let img = ImageDelta::full(
                     ImageData::Color(ColorImage { size, pixels }.into()),
@@ -77,8 +83,8 @@ impl App {
         while let Ok(msg) = self.message_channel.1.try_recv() {
             match msg {
                 Message::RomOpen(file) => {
-                    for core in &self.cores {
-                        (core.c.load)(file.content.clone());
+                    for core in &mut self.cores {
+                        core.c = (core.loader)(file.content.clone());
                     }
                     self.rom = Some(file.content.clone());
                 }
@@ -95,12 +101,22 @@ impl App {
                         ));
 
                         if let Some(rom) = self.rom.as_ref() {
-                            for core in &self.cores {
-                                (core.c.load)(rom.clone());
+                            for core in &mut self.cores {
+                                core.c = (core.loader)(rom.clone());
                             }
                         }
+                        self.update_test_suites();
                     }
                 }
+            }
+        }
+    }
+
+    pub fn update_test_suites(&mut self) {
+        for core in &mut self.cores {
+            for suite in self.suites.iter().skip(core.suites.len()) {
+                core.suites
+                    .push(Arc::clone(&suite).run_on_core(core.loader))
             }
         }
     }
@@ -140,15 +156,18 @@ impl App {
 
         Box::new(App {
             cores: vec![DCore {
-                c: dynacore::init(),
+                c: dummy_core(),
+                suites: vec![],
+                loader: dynacore::new_core,
                 _library: None,
                 name: "Built-in".to_string(),
             }],
-
             replay: None,
             rom: None,
+            suites: vec![],
 
             textures,
+            app_window_states: [false; APP_WINDOW_COUNT],
             message_channel,
             _watcher,
         })

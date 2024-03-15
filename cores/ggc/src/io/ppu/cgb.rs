@@ -60,9 +60,9 @@ pub struct CgbColour {
 
 impl CgbColour {
     fn recalculate(&mut self, colour_correction: bool) {
-        self.colour[0] = self.raw_low & 0x1F;
-        self.colour[1] = ((self.raw_high & 3) << 3) | self.raw_low >> 5;
-        self.colour[2] = (self.raw_high >> 2) & 0x1F;
+        self.colour[1] = self.raw_low & 0x1F;
+        self.colour[2] = ((self.raw_high & 3) << 3) | self.raw_low >> 5;
+        self.colour[0] = (self.raw_high >> 2) & 0x1F;
         self.colour[3] = 255;
 
         if colour_correction {

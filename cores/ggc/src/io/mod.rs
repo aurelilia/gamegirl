@@ -111,7 +111,7 @@ impl GameGirl {
         self.write16(self.cpu.sp, value);
     }
 
-    pub fn get<T: NumExt>(&mut self, addr: u16) -> T {
+    pub fn get<T: NumExt>(&self, addr: u16) -> T {
         if T::WIDTH == 2 {
             let low = self.get::<u8>(addr);
             let high = self.get::<u8>(addr.wrapping_add(1));
