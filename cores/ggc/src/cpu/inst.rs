@@ -305,7 +305,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         0x76 => {
             // HALT: Advance until IF != 0
             while gg[IF] & 0x1F == 0 {
-                gg.advance_clock(4);
+                gg.advance_clock(1);
             }
         }
         0x40..=0x7F => {
