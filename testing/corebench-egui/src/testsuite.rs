@@ -89,7 +89,7 @@ impl TestSuite {
 pub type TestSuiteResult = Arc<Mutex<Vec<TestResult>>>;
 
 pub struct Test {
-    rom: Vec<u8>,
+    pub rom: Vec<u8>,
     pub name: String,
 }
 

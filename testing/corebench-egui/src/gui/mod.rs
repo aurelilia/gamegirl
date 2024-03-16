@@ -15,7 +15,11 @@ use eframe::{
     glow::COLOR,
 };
 
-use crate::{app::App, testsuite::TestStatus};
+use self::file_dialog::File;
+use crate::{
+    app::{App, Message},
+    testsuite::TestStatus,
+};
 
 /// Function signature for an app window
 type AppFn = fn(&mut App, &Context, &mut Ui);
@@ -82,13 +86,17 @@ fn game_screens(app: &App, ctx: &Context, size: [usize; 2]) {
             ui.heading("Test Suites");
             for (i, suite) in app.suites.iter().enumerate() {
                 ui.label(&suite.name);
+                let tests = c.suites[i].lock().unwrap();
+                let mut pass = 0;
                 ui.horizontal_wrapped(|ui| {
-                    let tests = c.suites[i].lock().unwrap();
                     for test in tests.iter() {
                         let text = match test.result {
                             TestStatus::Waiting => "😽",
                             TestStatus::Running => "😼",
-                            TestStatus::Success => "😻",
+                            TestStatus::Success => {
+                                pass += 1;
+                                "😻"
+                            }
                             _ => "😿",
                         };
                         let color = match test.result {
@@ -97,10 +105,22 @@ fn game_screens(app: &App, ctx: &Context, size: [usize; 2]) {
                             TestStatus::Success => Color32::GREEN,
                             _ => Color32::RED,
                         };
-                        ui.label(egui::RichText::new(text).color(color).size(15.0))
-                            .on_hover_text(&test.test.name);
+                        if ui
+                            .label(egui::RichText::new(text).color(color).size(15.0))
+                            .on_hover_text(&test.test.name)
+                            .clicked()
+                        {
+                            app.message_channel
+                                .0
+                                .send(Message::RomOpen(File {
+                                    content: test.test.rom.clone(),
+                                    path: None,
+                                }))
+                                .unwrap();
+                        }
                     }
                 });
+                ui.label(format!("Passed: ({pass}/{})", tests.len()));
             }
         });
     }
