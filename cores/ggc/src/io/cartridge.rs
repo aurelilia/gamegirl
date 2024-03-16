@@ -137,7 +137,7 @@ impl Cartridge {
             }
 
             // MBC3
-            (MBC3, 0x2000..=0x3FFF) => {
+            (MBC3 | MBC3RTC { .. }, 0x2000..=0x3FFF) => {
                 self.rom1_bank = value.max(1).u16() % self.rom_bank_count();
             }
 
@@ -219,7 +219,15 @@ impl Cartridge {
                     bank2: 0,
                 },
                 0x05..=0x06 => MBC2,
-                0x0F..=0x13 => MBC3, // TODO Broken RTC...
+                0x0F..=0x10 => MBC3RTC {
+                    rtc: Rtc {
+                        start: 0,
+                        latched_at: None,
+                    },
+                    rtc_reg: None,
+                    latch_prepare: false,
+                },
+                0x11..=0x13 => MBC3,
                 0x19..=0x1E => MBC5,
                 _ => NoMBC,
             },
@@ -298,7 +306,11 @@ impl Rtc {
     }
 
     fn get(&self, idx: u8) -> u16 {
-        ((self.diff() / RTC_DIVIDERS[idx.us()]) % RTC_MODULO[idx.us()]) as u16
+        if idx == 4 {
+            0
+        } else {
+            ((self.diff() / RTC_DIVIDERS[idx.us()]) % RTC_MODULO[idx.us()]) as u16
+        }
     }
 
     fn set(&mut self, _idx: u8, _value: u8) {
