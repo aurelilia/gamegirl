@@ -18,6 +18,7 @@ use common::{
     numutil::{NumExt, U16Ext},
     produce_samples_buffered, Core,
 };
+use io::addr::DIV;
 
 use crate::{
     cpu::{Cpu, Interrupt},
@@ -133,8 +134,9 @@ impl GameGirl {
             event.kind.dispatch(self, event.late_by);
         }
 
+        Timer::step(self, m_cycles);
         for _ in 0..m_cycles {
-            self.apu.clock(self.t_shift == 1, Timer::div(self).high())
+            self.apu.clock(self.t_shift == 1, Timer::read(self, DIV))
         }
     }
 

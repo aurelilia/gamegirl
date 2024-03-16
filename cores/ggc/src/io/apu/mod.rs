@@ -358,7 +358,6 @@ impl Apu {
         self.sample_counter += 1.;
         if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
             self.push_output();
-
             self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
 

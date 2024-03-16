@@ -165,7 +165,7 @@ impl GameGirl {
         match addr {
             DMA => self.dma,
             JOYP => self.joypad.read(self[JOYP]),
-            DIV..=TAC => Timer::read(self, addr),
+            DIV => Timer::read(self, addr),
 
             LY if !self[LCDC].is_bit(7) => 0,
             BCPS..=OCPD => self.ppu.read_high(addr),
