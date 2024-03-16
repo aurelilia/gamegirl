@@ -10,6 +10,8 @@ pub const SUITES: &[(&str, fn() -> TestSuite)] = &[
     ("Blargg", blargg),
     ("Blargg-Sound", blargg_sound),
     ("Mooneye Acceptance", || mooneye("acceptance")),
+    ("Mooneye EmuOnly", || mooneye("emulator-only")),
+    ("Mooneye Misc", || mooneye("misc")),
 ];
 
 pub fn blargg() -> TestSuite {
@@ -38,8 +40,7 @@ pub fn blargg_sound() -> TestSuite {
 pub fn mooneye(subdir: &str) -> TestSuite {
     TestSuite::new(&format!("mooneye/{subdir}"), |gg| {
         let regs = gg.get_registers();
-        if regs[0] == 0
-            && regs[1] == 0x03
+        if regs[1] == 0x03
             && regs[2] == 0x05
             && regs[3] == 0x08
             && regs[4] == 0x0D
@@ -47,6 +48,8 @@ pub fn mooneye(subdir: &str) -> TestSuite {
             && regs[7] == 0x22
         {
             TestStatus::Success
+        } else if regs[1] == 0x42 && regs[2] == 0x42 && regs[3] == 0x42 {
+            TestStatus::Failed
         } else {
             TestStatus::Running
         }
