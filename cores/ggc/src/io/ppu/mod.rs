@@ -353,6 +353,7 @@ impl Ppu {
             _ => 0x1800,
         } + idx;
         Self::bg_tile_data_addr(gg, gg.mem.vram[addr.us()])
+            + ((gg.mem.vram[0x2000 + addr.us()]).bit(3).u16() * 0x2000)
     }
 
     fn bg_tile_data_addr(gg: &GameGirl, idx: u8) -> u16 {

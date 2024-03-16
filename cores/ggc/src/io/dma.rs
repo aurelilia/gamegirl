@@ -21,7 +21,7 @@ pub fn dma_written(gg: &mut GameGirl, value: u8) {
     let time = 648 / gg.speed as i32;
     gg.scheduler.cancel_single(GGEvent::DMAFinish);
     gg.scheduler.schedule(GGEvent::DMAFinish, time);
-    gg.mem.pending_dma = true;
+    gg.mem.pending_dma = Some(gg.scheduler.now());
 }
 
 /// OAM DMA transfer available on DMG and CGB.
@@ -34,7 +34,7 @@ pub fn do_oam_dma(gg: &mut GameGirl) {
         gg.mem.oam[dest] = gg.get(src);
         src += 1;
     }
-    gg.mem.pending_dma = false;
+    gg.mem.pending_dma = None;
 }
 
 /// HDMA VRAM transfer available only on CGB.

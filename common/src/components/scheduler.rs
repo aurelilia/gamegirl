@@ -52,7 +52,7 @@ impl<E: Kind> Scheduler<E> {
         }
         // The loop exited without finding a bigger element, this new one is the biggest
         self.events[0] = event;
-        self.next = self.events.last().unwrap().execute_at;
+        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
 
         // We run this here since it is probably the least-run function.
         // We want to check the time as little as possible to save perf.
@@ -95,7 +95,7 @@ impl<E: Kind> Scheduler<E> {
     pub fn pop(&mut self) -> Event<E> {
         let event = self.events.pop().unwrap();
         self.time = event.execute_at;
-        self.next = self.events.last().unwrap().execute_at;
+        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
         Event {
             kind: event.kind,
             late_by: 0,
@@ -106,7 +106,7 @@ impl<E: Kind> Scheduler<E> {
     /// Somewhat expensive.
     pub fn cancel(&mut self, evt: E) {
         self.events.retain(|e| e.kind != evt);
-        self.next = self.events.last().unwrap().execute_at;
+        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
     }
 
     /// Cancel an event of a given type.
@@ -115,7 +115,7 @@ impl<E: Kind> Scheduler<E> {
         let idx = self.events.iter().position(|e| e.kind == evt);
         if let Some(idx) = idx {
             self.events.remove(idx);
-            self.next = self.events.last().unwrap().execute_at;
+            self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
         }
     }
 
@@ -123,7 +123,7 @@ impl<E: Kind> Scheduler<E> {
     pub fn cancel_with_remaining(&mut self, mut evt: impl FnMut(E) -> bool) -> (u32, E) {
         let idx = self.events.iter().position(|e| evt(e.kind)).unwrap();
         let evt = self.events.remove(idx);
-        self.next = self.events.last().unwrap().execute_at;
+        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
         (evt.execute_at - self.time, evt.kind)
     }
 

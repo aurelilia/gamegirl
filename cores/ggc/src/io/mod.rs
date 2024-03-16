@@ -50,13 +50,11 @@ pub struct Memory {
     oam: [u8; 160],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     high: [u8; 256],
-    pending_dma: bool,
+    pending_dma: Option<u32>,
 
     mapper: MemoryMapper<256>,
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     page_offsets: [u32; 16],
-
-    key1: u8,
 
     pub(super) bootrom_enable: bool,
 }
@@ -118,11 +116,20 @@ impl GameGirl {
             return T::from_u16(hword(low, high));
         }
 
-        T::from_u8(self.get_inner(addr, |this, addr| match addr {
-            0xA000..=0xBFFF => this.cart.read(addr),
-            0xFE00..=0xFE9F if !this.mem.pending_dma => this.mem.oam[addr.us() & 0xFF],
-            0xFF00..=0xFFFF => this.get_high(addr & 0x00FF),
-            _ => 0xFF,
+        T::from_u8(self.get_inner(addr, |this, addr| {
+            match addr {
+                0xA000..=0xBFFF => this.cart.read(addr),
+                0xFE00..=0xFE9F
+                    if !this
+                        .mem
+                        .pending_dma
+                        .is_some_and(|t| t != this.scheduler.now()) =>
+                {
+                    this.mem.oam[addr.us() & 0xFF]
+                }
+                0xFF00..=0xFFFF => this.get_high(addr & 0x00FF),
+                _ => 0xFF,
+            }
         }))
     }
 
@@ -169,7 +176,6 @@ impl GameGirl {
 
             VRAM_SELECT if self.cgb => self.mem.vram_bank | 0xFE,
             WRAM_SELECT if self.cgb => self.mem.wram_bank | 0xF8,
-            KEY1 if self.cgb => self.mem.key1,
             HDMA_SRC_HIGH..=HDMA_START if self.cgb => self.hdma.get(addr),
 
             _ => self[addr],
@@ -224,11 +230,11 @@ impl GameGirl {
                 self.mem.wram_bank = u8::max(1, value & 7);
                 self.mem.page_offsets[0xD] = self.mem.wram_bank.u32() * 0x1000;
             }
-            KEY1 if self.cgb => self.mem.key1 = (value & 1) | self.mem.key1 & 0x80,
+            KEY1 if self.cgb => self[KEY1] = (value & 1) | (self[KEY1] & 0x80),
             HDMA_SRC_HIGH..=HDMA_START if self.cgb => Hdma::set(self, addr, value),
 
             // Last 3 are unmapped regions.
-            LY | SC | 0x03 | 0x08..=0x0E | 0x4C..=0x7F => (),
+            KEY1 | LY | SC | 0x03 | 0x08..=0x0E | 0x4C..=0x7F => (),
             _ => self[addr] = value,
         }
     }
@@ -304,10 +310,8 @@ impl Memory {
             wram: [0; 32768],
             wram_bank: 1,
             oam: [0; 160],
-            pending_dma: false,
+            pending_dma: None,
             high: [0xFF; 256],
-
-            key1: 0,
 
             mapper: MemoryMapper::default(),
             page_offsets: [

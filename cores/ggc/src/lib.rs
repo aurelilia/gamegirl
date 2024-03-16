@@ -134,7 +134,7 @@ impl GameGirl {
         }
 
         for _ in 0..m_cycles {
-            self.apu.clock(self.speed != 1, Timer::div(self).high())
+            self.apu.clock(self.t_shift == 1, Timer::div(self).high())
         }
     }
 
@@ -142,10 +142,10 @@ impl GameGirl {
     fn switch_speed(&mut self) {
         self.t_shift = if self.t_shift == 2 { 1 } else { 2 };
         self.speed = if self.t_shift == 1 { 2 } else { 1 };
-        self[KEY1] = (self.t_shift & 1) << 7;
+        self[KEY1] = (self.speed - 1) << 7;
 
-        for _ in 0..16 {
-            self.advance_clock(2048 / 16);
+        for _ in 0..64 {
+            self.advance_clock(2048 / 64);
         }
     }
 
