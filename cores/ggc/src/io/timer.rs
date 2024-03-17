@@ -4,31 +4,28 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::numutil::{NumExt, U16Ext};
+use common::numutil::NumExt;
 
-use crate::{
-    cpu::Interrupt,
-    io::{addr::*, scheduling::GGEvent},
-    GameGirl,
-};
+use crate::{cpu::Interrupt, io::addr::*, GameGirl};
 
 /// Timer available on DMG and CGB.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Timer {
     system_counter: u16,
-    tima_just_overflowed: Option<u8>,
+    tima_just_overflowed: bool,
+    tima_just_written: bool,
 }
 
 impl Timer {
-    pub fn step(gg: &mut GameGirl, m_cycles: u16) {
-        if let Some(reload) = gg.timer.tima_just_overflowed.take() {
+    pub fn step(gg: &mut GameGirl) {
+        if gg.timer.tima_just_overflowed {
             gg.request_interrupt(Interrupt::Timer);
-            gg[TIMA] = reload;
+            gg[TIMA] = gg[TMA];
         }
+        gg.timer.tima_just_overflowed = false;
 
-        for _ in 0..m_cycles {
-            Self::change_counter(gg, gg.timer.system_counter.wrapping_add(1));
-        }
+        Self::change_counter(gg, gg.timer.system_counter.wrapping_add(1));
+        gg.timer.tima_just_written = false;
     }
 
     fn change_counter(gg: &mut GameGirl, new: u16) {
@@ -55,9 +52,8 @@ impl Timer {
         if gg[TAC].is_bit(2) {
             let old = gg[TIMA];
             gg[TIMA] = gg[TIMA].wrapping_add(1);
-            if Self::did_edge_fall(old, gg[TIMA], 7) {
-                gg.timer.tima_just_overflowed = Some(gg[TMA]);
-            }
+            gg.timer.tima_just_overflowed =
+                Self::did_edge_fall(old, gg[TIMA], 7) && !gg.timer.tima_just_written;
         }
     }
 
@@ -71,7 +67,10 @@ impl Timer {
     pub fn write(gg: &mut GameGirl, addr: u16, value: u8) {
         match addr {
             DIV => Self::change_counter(gg, 0),
-            TIMA => gg[TIMA] = value,
+            TIMA => {
+                gg.timer.tima_just_written = true;
+                gg[TIMA] = value;
+            }
             TMA => gg[TMA] = value,
             TAC => {
                 let bit = Self::get_tac_bit(gg);
@@ -89,7 +88,8 @@ impl Default for Timer {
     fn default() -> Self {
         Self {
             system_counter: 0,
-            tima_just_overflowed: None,
+            tima_just_overflowed: false,
+            tima_just_written: false,
         }
     }
 }

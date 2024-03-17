@@ -15,7 +15,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
-    numutil::{NumExt, U16Ext},
+    numutil::NumExt,
     produce_samples_buffered, Core,
 };
 use io::addr::DIV;
@@ -134,8 +134,8 @@ impl GameGirl {
             event.kind.dispatch(self, event.late_by);
         }
 
-        Timer::step(self, m_cycles);
         for _ in 0..m_cycles {
+            Timer::step(self);
             self.apu.clock(self.t_shift == 1, Timer::read(self, DIV))
         }
     }
