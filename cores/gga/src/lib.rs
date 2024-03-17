@@ -9,7 +9,7 @@
 
 use std::{iter, mem, path::PathBuf};
 
-use arm_cpu::{registers::Flag, Cpu};
+use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu};
 use audio::Apu;
 use cartridge::Cartridge;
 use common::{
@@ -20,6 +20,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
+    numutil::NumExt,
     produce_samples_buffered, Core,
 };
 use cpu::CPU_CLOCK;
@@ -105,6 +106,18 @@ impl Core for GameGirlAdv {
 
     fn make_save(&self) -> Option<GameSave> {
         self.cart.make_save()
+    }
+
+    fn get_memory(&self, addr: usize) -> u8 {
+        self.get_byte(addr as u32)
+    }
+
+    fn get_registers(&self) -> Vec<usize> {
+        self.cpu.registers.into_iter().map(NumExt::us).collect()
+    }
+
+    fn get_serial(&self) -> &[u8] {
+        unimplemented!("Not implemented for this core")
     }
 }
 
