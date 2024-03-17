@@ -19,7 +19,7 @@ use crate::{
 pub fn dma_written(gg: &mut GameGirl, value: u8) {
     gg.dma = value;
     let time = 648 / gg.speed as i32;
-    gg.scheduler.cancel_single(GGEvent::DMAFinish);
+    gg.mem.dma_restarted = gg.scheduler.cancel_single(GGEvent::DMAFinish);
     gg.scheduler.schedule(GGEvent::DMAFinish, time);
     gg.mem.pending_dma = Some(gg.scheduler.now());
 }
@@ -35,6 +35,7 @@ pub fn do_oam_dma(gg: &mut GameGirl) {
         src += 1;
     }
     gg.mem.pending_dma = None;
+    gg.mem.dma_restarted = false;
 }
 
 /// HDMA VRAM transfer available only on CGB.

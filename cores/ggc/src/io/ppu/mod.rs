@@ -70,7 +70,7 @@ impl Ppu {
         }
 
         let (next_mode, time) = match evt {
-            PpuEvent::OamScanEnd => (PpuEvent::UploadEnd, 172),
+            PpuEvent::OamScanEnd => (PpuEvent::UploadEnd, 176),
 
             PpuEvent::UploadEnd => {
                 Self::render_line(gg);
@@ -79,7 +79,7 @@ impl Ppu {
                     gg.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
                 }
                 Self::stat_interrupt(gg, 3);
-                (PpuEvent::HblankEnd, 204)
+                (PpuEvent::HblankEnd, 200)
             }
 
             PpuEvent::HblankEnd => {

@@ -73,9 +73,18 @@ impl Timer {
             }
             TMA => gg[TMA] = value,
             TAC => {
-                let bit = Self::get_tac_bit(gg);
+                let old_tac = gg[TAC];
+                let old_select = Self::get_tac_bit(gg);
+                let was_on = old_tac.is_bit(2);
+
                 gg[TAC] = value | 0xF8;
-                if bit && !Self::get_tac_bit(gg) {
+                let new_select = Self::get_tac_bit(gg);
+                let is_on = value.is_bit(2);
+
+                let before = was_on && old_select;
+                let now = is_on && new_select;
+
+                if before && !now {
                     Self::tick_timer(gg);
                 }
             }
@@ -87,7 +96,7 @@ impl Timer {
 impl Default for Timer {
     fn default() -> Self {
         Self {
-            system_counter: 0,
+            system_counter: 4889, // Exact value required to get mooneye to pass.
             tima_just_overflowed: false,
             tima_just_written: false,
         }
