@@ -51,6 +51,7 @@ pub trait Core: Send + Sync {
     /// Skip BIOS, bootroms, or similar; immediately boot inserted game.
     fn skip_bootrom(&mut self);
 
+    // Take the last frame output by the graphics hardware.
     fn last_frame(&mut self) -> Option<Vec<Colour>>;
     fn options(&mut self) -> &mut EmulateOptions;
     fn config(&self) -> &SystemConfig;

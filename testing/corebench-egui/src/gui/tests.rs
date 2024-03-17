@@ -11,19 +11,19 @@ use eframe::egui::{Context, Ui};
 use crate::{app::App, tests::SUITES};
 
 pub(super) fn suites(app: &mut App, _ctx: &Context, ui: &mut Ui) {
-    ui.label("Currently loaded suites:");
-    for suite in &app.suites {
-        ui.horizontal(|ui| {
-            ui.label(&suite.name);
-        });
-    }
-
-    ui.separator();
     ui.label("Add suites:");
     for suite in SUITES {
         if ui.button(suite.0).clicked() {
             app.suites.push(Arc::new(suite.1()));
             app.update_test_suites();
         }
+    }
+
+    ui.separator();
+    ui.label("Currently loaded suites:");
+    for suite in &app.suites {
+        ui.horizontal(|ui| {
+            ui.label(&suite.name);
+        });
     }
 }

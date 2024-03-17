@@ -1,6 +1,7 @@
 /target
 .idea
 /gamegirl-egui/dist
+/testing/tests/c-sp
 *.sav
 bench.gb
 .direnv

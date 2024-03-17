@@ -6,6 +6,7 @@
 
 use std::{
     fs,
+    hash::{DefaultHasher, Hasher},
     os::unix::ffi::OsStrExt,
     sync::{Arc, Mutex},
     thread,
@@ -14,17 +15,18 @@ use std::{
 use dynacore::{common::Core, NewCoreFn};
 use walkdir::WalkDir;
 
-pub type TestInspector = Box<dyn Fn(&Box<dyn Core>) -> TestStatus + Send + Sync>;
+pub type TestInspector = Box<dyn Fn(&mut Box<dyn Core>) -> TestStatus + Send + Sync>;
 
 pub struct TestSuite {
     pub name: String,
     tests: Vec<Arc<Test>>,
     inspector: TestInspector,
+    time: usize,
 }
 
 impl TestSuite {
     pub fn run_on_core(self: Arc<Self>, loader: NewCoreFn) -> TestSuiteResult {
-        let result = Arc::new(Mutex::new(
+        let result = Arc::new(Mutex::new((
             self.tests
                 .iter()
                 .map(|t| TestResult {
@@ -32,33 +34,50 @@ impl TestSuite {
                     result: TestStatus::Waiting,
                 })
                 .collect::<Vec<_>>(),
-        ));
+            0,
+        )));
         let res = result.clone();
 
         thread::spawn(move || {
             'outer: for (i, test) in self.tests.iter().enumerate() {
                 {
-                    result.lock().unwrap()[i].result = TestStatus::Running
+                    result.lock().unwrap().0[i].result = TestStatus::Running
                 }
                 let mut core = loader(test.rom.clone());
-                for _ in 0..30 {
+                for _ in 0..self.time {
                     core.advance_delta(1.0);
-                    let status = (self.inspector)(&core);
+                    let status = (self.inspector)(&mut core);
                     if status != TestStatus::Running {
-                        result.lock().unwrap()[i].result = status;
+                        let mut res = result.lock().unwrap();
+                        res.1 += (status == TestStatus::Success) as usize;
+                        res.0[i].result = status;
                         continue 'outer;
                     }
                 }
-                result.lock().unwrap()[i].result = TestStatus::FailedTimeout
+                result.lock().unwrap().0[i].result = TestStatus::FailedTimeout
             }
         });
 
         res
     }
 
+    pub fn screen_hash(gg: &mut Box<dyn Core>) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        if let Some(frame) = gg.last_frame() {
+            hasher.write(
+                &frame
+                    .into_iter()
+                    .flat_map(|t| t.into_iter())
+                    .collect::<Vec<_>>(),
+            )
+        }
+        hasher.finish()
+    }
+
     pub fn new(
         path: &str,
-        inspector: impl Fn(&Box<dyn Core>) -> TestStatus + Send + Sync + 'static,
+        time: usize,
+        inspector: impl Fn(&mut Box<dyn Core>) -> TestStatus + Send + Sync + 'static,
     ) -> Self {
         let tests = WalkDir::new(format!("testing/tests/{path}"))
             .sort_by_file_name()
@@ -75,18 +94,25 @@ impl TestSuite {
             .filter_map(|e| {
                 Some(Arc::new(Test {
                     rom: fs::read(e.path()).ok()?,
-                    name: e.path().display().to_string(),
+                    name: e
+                        .path()
+                        .display()
+                        .to_string()
+                        .strip_prefix("testing/tests/")
+                        .unwrap()
+                        .to_string(),
                 }))
             });
         Self {
             name: path.to_string(),
             tests: tests.collect(),
             inspector: Box::new(inspector),
+            time,
         }
     }
 }
 
-pub type TestSuiteResult = Arc<Mutex<Vec<TestResult>>>;
+pub type TestSuiteResult = Arc<Mutex<(Vec<TestResult>, usize)>>;
 
 pub struct Test {
     pub rom: Vec<u8>,

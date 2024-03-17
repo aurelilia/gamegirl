@@ -50,8 +50,8 @@ pub struct App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        let size = self.update_frames(ctx);
         self.process_messages(ctx);
+        let size = self.update_frames(ctx);
         gui::draw(self, ctx, size);
 
         // Immediately repaint, since the GG will have a new frame.
@@ -69,7 +69,7 @@ impl App {
             if let Some(pixels) = frame {
                 let img = ImageDelta::full(
                     ImageData::Color(ColorImage { size, pixels }.into()),
-                    TextureOptions::LINEAR,
+                    TextureOptions::NEAREST,
                 );
                 let manager = ctx.tex_manager();
                 manager.write().set(self.textures[i], img);
@@ -97,7 +97,7 @@ impl App {
                         self.textures.push(App::make_screen_texture(
                             &ctx,
                             [160, 144],
-                            TextureOptions::LINEAR,
+                            TextureOptions::NEAREST,
                         ));
 
                         if let Some(rom) = self.rom.as_ref() {
@@ -107,6 +107,12 @@ impl App {
                         }
                         self.update_test_suites();
                     }
+                }
+
+                Message::CopyHashToClipboard(core) => {
+                    self.cores[core].c.advance_delta(0.2);
+                    let hash = TestSuite::screen_hash(&mut self.cores[core].c);
+                    ctx.output_mut(|o| o.copied_text = format!("0x{hash:X}"));
                 }
             }
         }
@@ -125,7 +131,7 @@ impl App {
         let textures = vec![App::make_screen_texture(
             &ctx.egui_ctx,
             [160, 144],
-            TextureOptions::LINEAR,
+            TextureOptions::NEAREST,
         )];
         let message_channel = mpsc::channel();
 
@@ -198,4 +204,6 @@ pub enum Message {
     ReplayOpen(File),
     /// A file picked by the user to be opened as a core.
     CoreOpen(PathBuf),
+    /// Copy the hash of a core's screen to the clipboard.
+    CopyHashToClipboard(usize),
 }

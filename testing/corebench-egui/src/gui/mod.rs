@@ -7,18 +7,18 @@
 pub mod file_dialog;
 mod tests;
 
-use eframe::{
-    egui::{
-        self, load::SizedTexture, vec2, widgets, Color32, Context, Image, Label, Ui,
-        ViewportCommand,
-    },
-    glow::COLOR,
+use std::fs;
+
+use eframe::egui::{
+    self, load::SizedTexture, vec2, widgets, CollapsingHeader, Color32, Context, Image, RichText,
+    Ui, ViewportCommand,
 };
 
 use self::file_dialog::File;
 use crate::{
     app::{App, Message},
     testsuite::TestStatus,
+    DCore,
 };
 
 /// Function signature for an app window
@@ -77,52 +77,74 @@ fn navbar_content(app: &mut App, ctx: &Context, ui: &mut Ui) {
     }
 }
 
-fn game_screens(app: &App, ctx: &Context, size: [usize; 2]) {
+fn game_screens(app: &mut App, ctx: &Context, size: [usize; 2]) {
+    let mut remove = None;
     for (i, c) in app.cores.iter().enumerate() {
-        egui::Window::new(&format!("Core: {}", c.name)).show(ctx, |ui| {
-            ui.add(make_screen_ui(app, size, i));
+        let mut keep = true;
+        egui::Window::new(&format!("Core: {}", c.name))
+            .open(&mut keep)
+            .show(ctx, |ui| {
+                ui.add(make_screen_ui(app, size, i));
 
-            ui.separator();
-            ui.heading("Test Suites");
-            for (i, suite) in app.suites.iter().enumerate() {
-                ui.label(&suite.name);
-                let tests = c.suites[i].lock().unwrap();
-                let mut pass = 0;
-                ui.horizontal_wrapped(|ui| {
-                    for test in tests.iter() {
-                        let text = match test.result {
-                            TestStatus::Waiting => "😽",
-                            TestStatus::Running => "😼",
-                            TestStatus::Success => {
-                                pass += 1;
-                                "😻"
-                            }
-                            _ => "😿",
-                        };
-                        let color = match test.result {
-                            TestStatus::Waiting => Color32::WHITE,
-                            TestStatus::Running => Color32::YELLOW,
-                            TestStatus::Success => Color32::GREEN,
-                            _ => Color32::RED,
-                        };
-                        if ui
-                            .label(egui::RichText::new(text).color(color).size(15.0))
-                            .on_hover_text(&test.test.name)
-                            .clicked()
-                        {
-                            app.message_channel
-                                .0
-                                .send(Message::RomOpen(File {
-                                    content: test.test.rom.clone(),
-                                    path: None,
-                                }))
-                                .unwrap();
-                        }
-                    }
-                });
-                ui.label(format!("Passed: ({pass}/{})", tests.len()));
-            }
-        });
+                if ui.button("Copy Screen Hash").clicked() {
+                    app.message_channel
+                        .0
+                        .send(Message::CopyHashToClipboard(i))
+                        .unwrap();
+                }
+
+                ui.separator();
+                ui.heading("Test Suites");
+                for (i, suite) in app.suites.iter().enumerate() {
+                    let tests = c.suites[i].lock().unwrap();
+                    CollapsingHeader::new(RichText::new(&suite.name).strong())
+                        .default_open(true)
+                        .show_unindented(ui, |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                for test in tests.0.iter() {
+                                    let text = match test.result {
+                                        TestStatus::Waiting => "😽",
+                                        TestStatus::Running => "😼",
+                                        TestStatus::Success => "😻",
+                                        _ => "😿",
+                                    };
+                                    let color = match test.result {
+                                        TestStatus::Waiting => Color32::WHITE,
+                                        TestStatus::Running => Color32::YELLOW,
+                                        TestStatus::Success => Color32::GREEN,
+                                        _ => Color32::RED,
+                                    };
+                                    if ui
+                                        .label(RichText::new(text).color(color).size(15.0))
+                                        .on_hover_text(&test.test.name)
+                                        .clicked()
+                                    {
+                                        app.message_channel
+                                            .0
+                                            .send(Message::RomOpen(File {
+                                                content: test.test.rom.clone(),
+                                                path: None,
+                                            }))
+                                            .unwrap();
+                                    }
+                                }
+                            });
+                        });
+                    ui.label(
+                        RichText::new(format!("Passed: ({}/{})", tests.1, tests.0.len())).italics(),
+                    );
+                    ui.separator();
+                }
+            });
+        if !keep {
+            remove = Some(i);
+        }
+    }
+
+    if let Some(core) = remove {
+        let DCore { _library, name, .. } = app.cores.remove(core);
+        drop(_library);
+        fs::remove_file(format!("dyn-cores/{name}")).unwrap();
     }
 }
 
