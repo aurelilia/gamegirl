@@ -88,6 +88,7 @@ impl Hdma {
     }
 
     pub fn handle_hdma(gg: &mut GameGirl) {
+        gg.advance_clock(1);
         Self::advance_transfer(gg);
         if gg.hdma.transfer_left < 0 {
             gg.hdma.hblank_transferring = false;
@@ -100,6 +101,7 @@ impl Hdma {
     }
 
     pub fn handle_gdma(gg: &mut GameGirl) {
+        gg.advance_clock(1);
         while gg.hdma.transfer_left >= 0 {
             Self::advance_transfer(gg);
         }
@@ -113,8 +115,10 @@ impl Hdma {
             gg.hdma.dest = gg.hdma.dest.wrapping_add(1);
         }
         // 8 at once is 1 too much, split it
-        gg.advance_clock(4);
-        gg.advance_clock(4);
+        gg.advance_clock(2);
+        gg.advance_clock(2);
+        gg.advance_clock(2);
+        gg.advance_clock(2);
         gg.hdma.transfer_left -= 1;
     }
 }

@@ -26,7 +26,9 @@ impl Timer {
             gg[TIMA] = reload;
         }
 
-        Self::change_counter(gg, gg.timer.system_counter.wrapping_add(m_cycles));
+        for _ in 0..m_cycles {
+            Self::change_counter(gg, gg.timer.system_counter.wrapping_add(1));
+        }
     }
 
     fn change_counter(gg: &mut GameGirl, new: u16) {
@@ -70,6 +72,7 @@ impl Timer {
         match addr {
             DIV => Self::change_counter(gg, 0),
             TIMA => gg[TIMA] = value,
+            TMA => gg[TMA] = value,
             TAC => {
                 let bit = Self::get_tac_bit(gg);
                 gg[TAC] = value | 0xF8;

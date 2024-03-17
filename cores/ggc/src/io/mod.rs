@@ -311,7 +311,7 @@ impl Memory {
             wram_bank: 1,
             oam: [0; 160],
             pending_dma: None,
-            high: [0xFF; 256],
+            high: [0x8F; 256],
 
             mapper: MemoryMapper::default(),
             page_offsets: [
