@@ -6,9 +6,9 @@
 
 use std::iter;
 
-use common::{components::debugger::Breakpoint, numutil::NumExt, Core};
+use common::{numutil::NumExt, Core};
 use eframe::{
-    egui::{load::SizedTexture, Context, Label, RichText, TextEdit, TextureOptions, Ui},
+    egui::{load::SizedTexture, Context, Label, RichText, TextureOptions, Ui},
     epaint::{vec2, ColorImage, ImageData, ImageDelta, TextureId},
 };
 use gamegirl::gga::{
@@ -22,22 +22,20 @@ use crate::{App, Colour};
 
 pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
     app.debugger_window_states[0] ^= ui.button("Debugger").clicked();
-    app.debugger_window_states[1] ^= ui.button("Breakpoints").clicked();
-    app.debugger_window_states[2] ^= ui.button("Cartridge Viewer").clicked();
+    app.debugger_window_states[1] ^= ui.button("Cartridge Viewer").clicked();
     if cfg!(all(feature = "remote-debugger", target_family = "unix")) {
-        app.debugger_window_states[3] ^= ui.button("Remote Debugger").clicked();
+        app.debugger_window_states[2] ^= ui.button("Remote Debugger").clicked();
     }
     ui.separator();
-    app.debugger_window_states[4] ^= ui.button("BG Tileset Viewer").clicked();
-    app.debugger_window_states[5] ^= ui.button("OBJ Tileset Viewer").clicked();
+    app.debugger_window_states[3] ^= ui.button("BG Tileset Viewer").clicked();
+    app.debugger_window_states[4] ^= ui.button("OBJ Tileset Viewer").clicked();
     ui.separator();
-    app.debugger_window_states[6] ^= ui.button("Timer Status").clicked();
+    app.debugger_window_states[5] ^= ui.button("Timer Status").clicked();
 }
 
 pub fn get_windows() -> Windows<GameGirlAdv> {
     &[
         ("Debugger", debugger),
-        ("Breakpoints", breakpoints),
         ("Cartridge", cart_info),
         ("Remote Debugger", remote_debugger),
         ("BG Tileset Viewer", bg_tileset_viewer),
@@ -137,34 +135,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         }
     });
 
-    ui.separator();
-    super::inst_dump(ui, &mut gg.debugger);
-}
-
-/// Window for configuring active breakpoints.
-pub fn breakpoints(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
-    for bp in gg.debugger.breakpoints.iter_mut() {
-        ui.horizontal(|ui| {
-            ui.label("0x");
-            if ui
-                .add(TextEdit::singleline(&mut bp.value_text).desired_width(80.0))
-                .changed()
-            {
-                bp.value = u32::from_str_radix(&bp.value_text, 16).ok();
-            }
-            ui.checkbox(&mut bp.pc, "PC");
-            ui.checkbox(&mut bp.write, "Write");
-        });
-    }
-
-    ui.horizontal(|ui| {
-        if ui.button("Add").clicked() {
-            gg.debugger.breakpoints.push(Breakpoint::default());
-        }
-        if ui.button("Clear").clicked() {
-            gg.debugger.breakpoints.clear();
-        }
-    });
+    super::debugger_footer(&mut gg.debugger, ui);
 }
 
 /// Window showing information about the loaded ROM/cart.

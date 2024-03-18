@@ -11,8 +11,14 @@ mod psx;
 
 use std::any::Any;
 
-use common::{components::debugger::Debugger, numutil::NumExt, Core};
-use eframe::egui::{self, Context, Ui};
+use common::{
+    components::debugger::{Breakpoint, Debugger},
+    numutil::NumExt,
+    Core,
+};
+use eframe::egui::{
+    self, Align, CollapsingHeader, Color32, Context, Layout, RichText, TextEdit, Ui,
+};
 use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
 
 use crate::app::{App, GuiStyle};
@@ -87,20 +93,78 @@ fn make_window<T>(
     }
 }
 
+fn debugger_footer<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
+    ui.add_space(10.0);
+    inst_dump(ui, dbg);
+    ui.add_space(10.0);
+    breakpoints(dbg, ui);
+}
+
 fn inst_dump<T: NumExt>(ui: &mut Ui, debugger: &mut Debugger<T>) {
     ui.horizontal(|ui| {
-        if ui.button("Start logging instructions").clicked() {
-            debugger.traced_instructions = Some(String::with_capacity(10_000_000));
-        }
+        ui.heading("CPU Logging");
         if let Some(string) = debugger.traced_instructions.as_ref() {
-            ui.label(format!(
-                "Current buffer size: {:000}MB",
-                string.len() / 1_000_000
-            ));
-            if ui.button("Dump").clicked() {
-                std::fs::write("instruction-dump", string.as_bytes()).unwrap();
+            ui.label(format!("Buffer: {:03}MB", string.len() / 1_000_000));
+        }
+
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if ui.button("Dump").clicked() && debugger.traced_instructions.is_some() {
+                std::fs::write(
+                    "instruction-dump",
+                    debugger.traced_instructions.as_ref().unwrap().as_bytes(),
+                )
+                .unwrap();
                 debugger.traced_instructions = None;
             }
+            if ui.button("Start").clicked() {
+                debugger.traced_instructions = Some(String::with_capacity(10_000_000));
+            }
+        });
+    });
+}
+
+fn breakpoints<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
+    let bps = &mut dbg.breakpoints;
+    ui.horizontal(|ui| {
+        ui.heading("Breakpoints");
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if ui.button("Clear").clicked() {
+                bps.clear();
+            }
+            if ui.button("Add").clicked() {
+                bps.push(Breakpoint::default());
+            }
+        });
+    });
+    ui.indent(2412, |ui| {
+        let mut del = None;
+        for (i, bp) in bps.iter_mut().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label("0x");
+                if ui
+                    .add(TextEdit::singleline(&mut bp.value_text).desired_width(40.0))
+                    .changed()
+                {
+                    let value = u32::from_str_radix(&bp.value_text, 16).ok();
+                    bp.value = value.map(T::from_u32);
+                }
+                ui.checkbox(&mut bp.pc, "PC");
+                ui.checkbox(&mut bp.write, "Write");
+
+                if Some(i) == dbg.breakpoint_hit {
+                    ui.colored_label(Color32::RED, "Hit!");
+                }
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.button("Delete").clicked() {
+                        del = Some(i);
+                    }
+                });
+            });
+        }
+
+        if let Some(i) = del {
+            bps.remove(i);
         }
     });
 }

@@ -49,7 +49,7 @@ pub struct GameGirl {
     pub cpu: Cpu,
     pub mem: Memory,
 
-    cgb: bool,
+    pub cgb: bool,
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub debugger: GGDebugger,

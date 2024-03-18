@@ -17,8 +17,8 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     pub running: bool,
     /// A list of breakpoints the system should stop on.
     pub breakpoints: Vec<Breakpoint<Ptr>>,
-    /// The hit breakpoint.
-    pub breakpoint_hit: Option<Breakpoint<Ptr>>,
+    /// The hit breakpoint's index.
+    pub breakpoint_hit: Option<usize>,
     /// If instructions should be traced and printed to a file, this contains
     /// the instructions to be printed / file contents.
     pub traced_instructions: Option<String>,
@@ -27,21 +27,15 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
 impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
     /// Called before a memory write is executed, which might trigger a BP.
     /// Returns if emulation should continue.
-    pub fn write_occurred(&mut self, addr: Ptr) -> bool {
-        if self.breakpoints.is_empty() {
-            return true;
+    pub fn write_occurred(&mut self, addr: Ptr) {
+        if !self.breakpoints.is_empty() {
+            let bp = self
+                .breakpoints
+                .iter()
+                .position(|bp| bp.value == Some(addr) && bp.write);
+            self.breakpoint_hit = bp;
+            self.running &= bp.is_none();
         }
-
-        let bp = self
-            .breakpoints
-            .iter()
-            .find(|bp| bp.value == Some(addr) && bp.write);
-        if let Some(bp) = bp {
-            self.breakpoint_hit = Some(bp.clone());
-            self.running = false;
-        }
-
-        self.running
     }
 
     /// Called before an instruction is executed, which might trigger a BP.
@@ -51,15 +45,18 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
             return true;
         }
 
+        if self.breakpoint_hit.take().is_some() {
+            // We hit a breakpoint already. Continue
+            return true;
+        }
+
         let bp = self
             .breakpoints
             .iter()
-            .find(|bp| bp.value == Some(pc) && bp.pc);
-        if let Some(bp) = bp {
-            self.breakpoint_hit = Some(bp.clone());
-            self.running = false;
-        }
-        self.running
+            .position(|bp| bp.value == Some(pc) && bp.pc);
+        self.breakpoint_hit = bp;
+        self.running &= bp.is_none();
+        bp.is_none()
     }
 
     /// Add another instruction to trace.

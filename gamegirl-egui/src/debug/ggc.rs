@@ -6,7 +6,7 @@
 
 use std::{fmt::Write, iter};
 
-use common::{components::debugger::Breakpoint, numutil::NumExt, Core};
+use common::{numutil::NumExt, Core};
 use eframe::{
     egui::{
         load::SizedTexture, vec2, Align, ColorImage, Context, ImageData, Label, RichText,
@@ -16,7 +16,10 @@ use eframe::{
 };
 use gamegirl::ggc::{
     cpu::{inst, DReg},
-    io::{ppu, ppu::Ppu},
+    io::{
+        addr::{IE, IF, VRAM_SELECT, WRAM_SELECT},
+        ppu::{self, Ppu},
+    },
     GameGirl,
 };
 
@@ -25,18 +28,16 @@ use crate::{app::App, Colour};
 
 pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
     app.debugger_window_states[0] ^= ui.button("Debugger").clicked();
-    app.debugger_window_states[1] ^= ui.button("Breakpoints").clicked();
-    app.debugger_window_states[2] ^= ui.button("Memory Viewer").clicked();
-    app.debugger_window_states[3] ^= ui.button("Cartridge Viewer").clicked();
+    app.debugger_window_states[1] ^= ui.button("Memory Viewer").clicked();
+    app.debugger_window_states[2] ^= ui.button("Cartridge Viewer").clicked();
     ui.separator();
-    app.debugger_window_states[4] ^= ui.button("VRAM Viewer").clicked();
-    app.debugger_window_states[5] ^= ui.button("Background Map Viewer").clicked();
+    app.debugger_window_states[3] ^= ui.button("VRAM Viewer").clicked();
+    app.debugger_window_states[4] ^= ui.button("Background Map Viewer").clicked();
 }
 
 pub fn get_windows() -> Windows<GameGirl> {
     &[
         ("Debugger", debugger),
-        ("Breakpoints", breakpoints),
         ("Memory", memory),
         ("Cartridge", cart_info),
         ("VRAM Viewer", vram_viewer),
@@ -103,9 +104,20 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
             }
             ui.monospace(format!("PC = {:04X}", gg.cpu.pc));
             ui.monospace(format!("SP = {:04X}", gg.cpu.sp));
+
+            ui.separator();
             ui.add(
-                Label::new(RichText::new(format!("IME = {}", gg.cpu.ime)).monospace()).wrap(false),
+                Label::new(RichText::new(format!("IME = {}", gg.cpu.ime as u8)).monospace())
+                    .wrap(false),
             );
+            ui.monospace(format!("IF = {:05b}", gg[IF] & 0x1F));
+            ui.monospace(format!("IE = {:05b}", gg[IE] & 0x1F));
+
+            if gg.cgb {
+                ui.separator();
+                ui.monospace(format!("VRAM = {}", gg[VRAM_SELECT] & 0x1));
+                ui.monospace(format!("WRAM = {}", gg[WRAM_SELECT] & 0x7));
+            }
         });
     });
     ui.separator();
@@ -118,51 +130,15 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
         ui.checkbox(&mut gg.debugger.running, "Running");
     });
 
-    ui.separator();
-    super::inst_dump(ui, &mut gg.debugger);
-}
-
-/// Window for configuring active breakpoints.
-fn breakpoints(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
-    let bps = &mut gg.debugger.breakpoints;
-    for bp in bps.iter_mut() {
-        ui.horizontal(|ui| {
-            ui.label("0x");
-            if ui
-                .add(TextEdit::singleline(&mut bp.value_text).desired_width(40.0))
-                .changed()
-            {
-                bp.value = u16::from_str_radix(&bp.value_text, 16).ok();
-            }
-            ui.checkbox(&mut bp.pc, "PC");
-            ui.checkbox(&mut bp.write, "Write");
-        });
-    }
-
-    ui.horizontal(|ui| {
-        if ui.button("Add").clicked() {
-            bps.push(Breakpoint::default());
-        }
-        if ui.button("Clear").clicked() {
-            bps.clear();
-        }
-    });
+    super::debugger_footer(&mut gg.debugger, ui);
 }
 
 /// Memory viewer showing the entire GG's address space.
 fn memory(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
-    let mut buf = String::new();
     let mut position = None;
 
     ui.horizontal(|ui| {
-        ui.label("Jump to ");
-        if ui
-            .add(TextEdit::singleline(&mut buf).desired_width(40.0))
-            .changed()
-        {
-            position = u16::from_str_radix(&buf, 16).map(|a| a & 0xFF00).ok()
-        }
-
+        ui.label("Jump to:");
         const POS: &[(&str, u16)] = &[
             ("Cart", 0),
             ("VRAM", 0x8000),
@@ -170,6 +146,7 @@ fn memory(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
             ("WRAM", 0xC000),
             ("OAM", 0xFE00),
             ("I/O", 0xFF00),
+            ("ZRAM", 0xFF80),
         ];
         for (name, pos) in POS.iter() {
             if ui.button(*name).clicked() {
@@ -179,6 +156,10 @@ fn memory(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
     });
     ui.separator();
 
+    ui.horizontal(|ui| {
+        ui.label("   "); // Padding
+        ui.monospace("     0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F");
+    });
     ScrollArea::vertical().show(ui, |ui| {
         if !gg.options.rom_loaded {
             ui.label("No ROM loaded yet!");

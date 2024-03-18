@@ -173,7 +173,7 @@ impl App {
             suites: vec![],
 
             textures,
-            app_window_states: [false; APP_WINDOW_COUNT],
+            app_window_states: [true; APP_WINDOW_COUNT],
             message_channel,
             _watcher,
         })

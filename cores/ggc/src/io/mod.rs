@@ -25,7 +25,7 @@ use crate::io::{
     timer::Timer,
 };
 
-pub(super) mod addr;
+pub mod addr;
 pub mod apu;
 pub mod cartridge;
 pub mod dma;
