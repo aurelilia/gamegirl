@@ -1445,6 +1445,7 @@ dependencies = [
  "gamegirl",
  "gga",
  "gilrs",
+ "hqx",
  "log",
  "nds",
  "once_cell",
@@ -1695,6 +1696,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
 dependencies = [
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "hqx"
+version = "0.1.0"
+source = "git+https://github.com/CryZe/wasmboy-rs?tag=v0.1.3#d7cbae67906796928c8e451b186f3c653924beb8"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]

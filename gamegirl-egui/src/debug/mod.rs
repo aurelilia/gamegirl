@@ -16,9 +16,7 @@ use common::{
     numutil::NumExt,
     Core,
 };
-use eframe::egui::{
-    self, Align, CollapsingHeader, Color32, Context, Layout, RichText, TextEdit, Ui,
-};
+use eframe::egui::{self, Align, Color32, Context, Layout, TextEdit, Ui};
 use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
 
 use crate::app::{App, GuiStyle};

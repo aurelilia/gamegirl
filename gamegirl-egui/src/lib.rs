@@ -8,6 +8,7 @@
 
 mod app;
 mod debug;
+mod filter;
 mod gui;
 mod input;
 mod rewind;

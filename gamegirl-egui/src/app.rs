@@ -6,7 +6,6 @@
 
 use std::{
     collections::HashMap,
-    mem,
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
 };
@@ -14,7 +13,7 @@ use std::{
 use common::{
     components::input_replay::{Input as RInput, InputReplay},
     misc::SystemConfig,
-    Core,
+    Colour as RColour, Core,
 };
 use cpal::Stream;
 use eframe::{
@@ -27,6 +26,7 @@ use eframe::{
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
+    filter::{self, Filter},
     gui::{self, APP_WINDOW_COUNT},
     input::{self, File, Input, InputAction, InputSource},
     rewind::Rewinder,
@@ -108,9 +108,11 @@ impl App {
     fn update_gg(&mut self, ctx: &Context) -> [usize; 2] {
         let (frame, size) = self.get_frame(ctx);
         if let Some(pixels) = frame {
+            let (pixels, size, filter) =
+                filter::apply_filter(pixels, size, self.state.options.tex_filter);
             let img = ImageDelta::full(
                 ImageData::Color(ColorImage { size, pixels }.into()), // todo meh
-                self.state.options.tex_filter,
+                filter,
             );
             let manager = ctx.tex_manager();
             manager.write().set(self.textures[0], img);
@@ -120,7 +122,7 @@ impl App {
 
     /// Process keyboard inputs and return the GG's next frame, if one was
     /// produced.
-    fn get_frame(&mut self, ctx: &Context) -> (Option<Vec<Colour>>, [usize; 2]) {
+    fn get_frame(&mut self, ctx: &Context) -> (Option<Vec<RColour>>, [usize; 2]) {
         let raw_delta = ctx.input(|i| {
             for event in &i.events {
                 if let Event::Key {
@@ -185,10 +187,10 @@ impl App {
                 core.options().invert_audio_samples = false;
                 core.last_frame()
             };
-            (frame.map(|p| unsafe { mem::transmute(p) }), size)
+            (frame, size)
         } else {
             core.advance_delta(delta);
-            let frame = core.last_frame().map(|p| unsafe { mem::transmute(p) });
+            let frame = core.last_frame();
             if frame.is_some() {
                 let state = core.save_state();
                 self.rewinder.rewind_buffer.push(state);
@@ -280,7 +282,7 @@ impl App {
         let textures = vec![App::make_screen_texture(
             &ctx.egui_ctx,
             [160, 144],
-            state.options.tex_filter,
+            TextureOptions::NEAREST,
         )];
 
         catppuccin_egui::set_theme(&ctx.egui_ctx, catppuccin_egui::MOCHA);
@@ -358,7 +360,7 @@ pub struct Options {
     pub rewind_buffer_size: usize,
 
     /// Texture filter applied to the display.
-    pub tex_filter: TextureOptions,
+    pub tex_filter: Filter,
     /// Require pixel perfect scaling.
     pub pixel_perfect: bool,
     /// GUI mode.
@@ -374,7 +376,7 @@ impl Default for Options {
             fast_forward_toggle_speed: 2,
             enable_rewind: true,
             rewind_buffer_size: 10,
-            tex_filter: TextureOptions::NEAREST,
+            tex_filter: Filter::Nearest,
             pixel_perfect: false,
             #[cfg(target_arch = "wasm32")]
             gui_style: GuiStyle::SingleWindow,

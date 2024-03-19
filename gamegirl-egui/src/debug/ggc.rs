@@ -10,7 +10,7 @@ use common::{numutil::NumExt, Core};
 use eframe::{
     egui::{
         load::SizedTexture, vec2, Align, ColorImage, Context, ImageData, Label, RichText,
-        ScrollArea, TextEdit, TextureId, TextureOptions, Ui,
+        ScrollArea, TextureId, TextureOptions, Ui,
     },
     epaint::ImageDelta,
 };
@@ -48,11 +48,6 @@ pub fn get_windows() -> Windows<GameGirl> {
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.
 fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
-    }
-
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.set_min_width(150.0);
@@ -185,11 +180,6 @@ fn memory(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
 
 /// Window showing information about the loaded ROM/cart.
 fn cart_info(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
-    }
-
     ui.label(format!("Reported Title: {}", gg.cart.title(false)));
     ui.label(format!(
         "Reported Title (extended): {}",
@@ -219,11 +209,6 @@ const WIN_TEX: usize = 3;
 
 /// Window showing current VRAM contents rendered as tiles.
 fn vram_viewer(gg: &mut GameGirl, ui: &mut Ui, app: &mut App, ctx: &Context) {
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
-    }
-
     let mut buf = make_buffer(32, 24);
     for tile in (0..0x1800).step_by(0x10) {
         let tile_idx = tile / 0x10;

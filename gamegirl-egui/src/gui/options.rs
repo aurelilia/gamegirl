@@ -7,11 +7,12 @@
 use common::misc::{Button, CgbMode};
 use eframe::{
     egui,
-    egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, TextureOptions, Ui},
+    egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, Ui},
 };
 
 use crate::{
     app::{App, GuiStyle, Options},
+    filter::Filter,
     input::{InputAction, HOTKEYS},
 };
 
@@ -78,10 +79,13 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
 
     CollapsingHeader::new("GUI").show(ui, |ui| {
         ComboBox::from_label("Texture filter")
-            .selected_text(format!("{:?}", opt.tex_filter.magnification))
+            .selected_text(format!("{:?}", opt.tex_filter))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut opt.tex_filter, TextureOptions::NEAREST, "Nearest");
-                ui.selectable_value(&mut opt.tex_filter, TextureOptions::LINEAR, "Linear");
+                ui.selectable_value(&mut opt.tex_filter, Filter::Nearest, "Nearest");
+                ui.selectable_value(&mut opt.tex_filter, Filter::Linear, "Linear");
+                ui.selectable_value(&mut opt.tex_filter, Filter::Hq2x, "hq2x");
+                ui.selectable_value(&mut opt.tex_filter, Filter::Hq3x, "hq3x");
+                ui.selectable_value(&mut opt.tex_filter, Filter::Hq4x, "hq4x");
             });
 
         ComboBox::from_label("GUI Style")

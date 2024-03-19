@@ -40,6 +40,7 @@ log.workspace = true
 serde.workspace = true
 
 once_cell = { version = "*", optional = true }
+hqx = { git = "https://github.com/CryZe/wasmboy-rs", tag = "v0.1.3", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
@@ -52,5 +53,6 @@ gga = { path = "../cores/gga", default-features = false }
 nds = { path = "../cores/nds", default-features = false }
 
 [features]
-default = ["remote-debugger"]
+default = ["remote-debugger", "filters"]
 remote-debugger = ["gamegirl/remote-debugger", "once_cell"]
+filters = ["hqx"]
