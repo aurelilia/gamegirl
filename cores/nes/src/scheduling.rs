@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::components::scheduler::Kind;
+use common::{components::scheduler::Kind, TimeS};
 use NesEvent::*;
 
 use crate::{apu::Apu, Nes};
@@ -23,7 +23,7 @@ pub enum NesEvent {
 
 impl NesEvent {
     /// Handle the event by delegating to the appropriate handler.
-    pub fn dispatch(&self, nes: &mut Nes, late_by: i32) {
+    pub fn dispatch(&self, nes: &mut Nes, late_by: TimeS) {
         match self {
             PauseEmulation => nes.ticking = false,
             ApuEvent(event) => Apu::handle_event(nes, *event, late_by),

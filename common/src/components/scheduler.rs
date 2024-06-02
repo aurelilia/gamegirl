@@ -6,16 +6,18 @@
 
 use arrayvec::ArrayVec;
 
+pub type Time = u64;
+pub type TimeS = i64;
+
 /// A scheduler used by the emulation cores to schedule peripherals.
-/// It is generic over the possible events and uses a binary heap
-/// in combination with a circular u32 timer.
+/// It is generic over the possible events and uses a binary heap.
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Scheduler<E: Kind> {
     /// Current time of the scheduler.
-    time: u32,
+    time: Time,
     /// Time of the next event.
-    next: u32,
+    next: Time,
     /// Events currently awaiting execution.
     #[cfg_attr(feature = "serde", serde(bound = ""))]
     events: ArrayVec<ScheduledEvent<E>, 16>,
@@ -28,7 +30,7 @@ impl<E: Kind> Scheduler<E> {
     /// they were quite a bit late and the followup event also needed to happen
     /// already.
     #[inline]
-    pub fn schedule(&mut self, kind: E, after: i32) {
+    pub fn schedule(&mut self, kind: E, after: TimeS) {
         let time = self.time.saturating_add_signed(after);
         let event = ScheduledEvent {
             kind,
@@ -52,16 +54,16 @@ impl<E: Kind> Scheduler<E> {
         }
         // The loop exited without finding a bigger element, this new one is the biggest
         self.events[0] = event;
-        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
-
-        // We run this here since it is probably the least-run function.
-        // We want to check the time as little as possible to save perf.
-        self.check_time();
+        self.next = self
+            .events
+            .last()
+            .map(|e| e.execute_at)
+            .unwrap_or(Time::MAX);
     }
 
     /// Advance the timer by the given amount of ticks.
     #[inline]
-    pub fn advance(&mut self, by: u32) {
+    pub fn advance(&mut self, by: Time) {
         self.time += by;
     }
 
@@ -74,10 +76,14 @@ impl<E: Kind> Scheduler<E> {
             let idx = self.events.len() - 1;
             let event = self.events[idx];
             unsafe { self.events.set_len(idx) };
-            self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
+            self.next = self
+                .events
+                .last()
+                .map(|e| e.execute_at)
+                .unwrap_or(Time::MAX);
             Some(Event {
                 kind: event.kind,
-                late_by: (self.time - event.execute_at) as i32,
+                late_by: (self.time - event.execute_at) as TimeS,
             })
         } else {
             None
@@ -95,7 +101,11 @@ impl<E: Kind> Scheduler<E> {
     pub fn pop(&mut self) -> Event<E> {
         let event = self.events.pop().unwrap();
         self.time = event.execute_at;
-        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
+        self.next = self
+            .events
+            .last()
+            .map(|e| e.execute_at)
+            .unwrap_or(Time::MAX);
         Event {
             kind: event.kind,
             late_by: 0,
@@ -106,7 +116,11 @@ impl<E: Kind> Scheduler<E> {
     /// Somewhat expensive.
     pub fn cancel(&mut self, evt: E) {
         self.events.retain(|e| e.kind != evt);
-        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
+        self.next = self
+            .events
+            .last()
+            .map(|e| e.execute_at)
+            .unwrap_or(Time::MAX);
     }
 
     /// Cancel an event of a given type.
@@ -115,35 +129,30 @@ impl<E: Kind> Scheduler<E> {
         let idx = self.events.iter().position(|e| e.kind == evt);
         if let Some(idx) = idx {
             self.events.remove(idx);
-            self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
+            self.next = self
+                .events
+                .last()
+                .map(|e| e.execute_at)
+                .unwrap_or(Time::MAX);
         }
         idx.is_some()
     }
 
     /// Cancel a single (!) matching event and return it's remaining time.
-    pub fn cancel_with_remaining(&mut self, mut evt: impl FnMut(E) -> bool) -> (u32, E) {
+    pub fn cancel_with_remaining(&mut self, mut evt: impl FnMut(E) -> bool) -> (Time, E) {
         let idx = self.events.iter().position(|e| evt(e.kind)).unwrap();
         let evt = self.events.remove(idx);
-        self.next = self.events.last().map(|e| e.execute_at).unwrap_or(u32::MAX);
+        self.next = self
+            .events
+            .last()
+            .map(|e| e.execute_at)
+            .unwrap_or(Time::MAX);
         (evt.execute_at - self.time, evt.kind)
     }
 
     #[inline]
-    pub fn now(&self) -> u32 {
+    pub fn now(&self) -> Time {
         self.time
-    }
-
-    /// Checks to make sure the timer will not overflow by
-    /// decrementing all times before that happens.
-    #[inline]
-    fn check_time(&mut self) {
-        if self.time > 0xF000_0000 {
-            self.time -= 0xF000_0000;
-            self.next -= 0xF000_0000;
-            for event in &mut self.events {
-                event.execute_at -= 0xF000_0000;
-            }
-        }
     }
 }
 
@@ -155,7 +164,7 @@ struct ScheduledEvent<E: Kind> {
     #[cfg_attr(feature = "serde", serde(bound = ""))]
     kind: E,
     /// Time of the scheduler to execute it at
-    execute_at: u32,
+    execute_at: Time,
 }
 
 /// Trait for event kinds.
@@ -176,5 +185,5 @@ pub struct Event<E: Kind> {
     /// - Event was scheduled to be executed at tick 1000
     /// - Scheduler ran until 1010 before the event got handled
     /// - `late_by` will be 1010 - 1000 = 10.
-    pub late_by: i32,
+    pub late_by: TimeS,
 }

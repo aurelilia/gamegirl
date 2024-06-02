@@ -25,7 +25,7 @@ mod tile;
 
 use common::{
     numutil::{NumExt, U16Ext},
-    Colour,
+    Colour, TimeS,
 };
 
 use crate::{
@@ -128,14 +128,14 @@ where
     [(); S::W * S::H]:,
 {
     /// Handle a scheduler event.
-    pub fn handle_event(gg: &mut S, event: PpuEvent, late_by: i32) {
+    pub fn handle_event(gg: &mut S, event: PpuEvent, late_by: TimeS) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 Self::render_line_maybe_threaded(gg);
                 Self::maybe_interrupt(gg, PpuInterrupt::HBlank, HBLANK_IRQ);
                 gg.notify_dma(PpuDmaReason::HBlank);
 
-                (PpuEvent::SetHblank, 46i32)
+                (PpuEvent::SetHblank, 46)
             }
 
             PpuEvent::SetHblank => {

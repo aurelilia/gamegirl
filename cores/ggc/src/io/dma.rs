@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::numutil::NumExt;
+use common::{numutil::NumExt, TimeS};
 
 use super::addr::HDMA_START;
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
 
 pub fn dma_written(gg: &mut GameGirl, value: u8) {
     gg.dma = value;
-    let time = 648 / gg.speed as i32;
+    let time = 648 / gg.speed as TimeS;
     gg.mem.dma_restarted = gg.scheduler.cancel_single(GGEvent::DMAFinish);
     gg.scheduler.schedule(GGEvent::DMAFinish, time);
     gg.mem.pending_dma = Some(gg.scheduler.now());

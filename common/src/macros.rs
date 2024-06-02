@@ -16,7 +16,8 @@ macro_rules! common_functions {
                 return;
             }
 
-            let target = ($clock as f32 * delta * self.options.speed_multiplier as f32) as i32;
+            let target =
+                ($clock as f32 * delta * self.options.speed_multiplier as f32) as ::common::TimeS;
             self.scheduler.schedule($pause_event, target);
 
             self.ticking = true;

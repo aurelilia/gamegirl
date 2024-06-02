@@ -6,6 +6,8 @@
 
 use std::ops::IndexMut;
 
+use common::TimeS;
+
 use crate::{
     threading::{GgaPpu, PpuMmio},
     PpuEvent,
@@ -37,7 +39,7 @@ pub trait PpuSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     /// Notify the DMAs about a certain event.
     fn notify_dma(&mut self, reason: PpuDmaReason);
     /// Schedule an event on the scheduler,
-    fn schedule(&mut self, evt: PpuEvent, at: i32);
+    fn schedule(&mut self, evt: PpuEvent, at: TimeS);
 }
 
 /// Interrupts the PPU can raise.

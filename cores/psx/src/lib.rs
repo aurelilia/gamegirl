@@ -21,7 +21,7 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{Button, EmulateOptions, SystemConfig},
-    produce_samples_buffered, Colour, Core,
+    produce_samples_buffered, Colour, Core, Time, TimeS,
 };
 use glow::Context;
 use iso::Iso;
@@ -39,8 +39,8 @@ mod scheduling;
 
 const CPU_CLOCK: usize = 33868800;
 const GPU_CLOCK: usize = 53222400;
-const FRAME_CLOCK: i32 = 571212;
-const SAMPLE_CLOCK: i32 = 768;
+const FRAME_CLOCK: TimeS = 571212;
+const SAMPLE_CLOCK: TimeS = 768;
 
 pub type PsxDebugger = Debugger<u32>;
 
@@ -94,7 +94,7 @@ impl Core for PlayStation {
 impl PlayStation {
     /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, cycles: u32) {
-        self.scheduler.advance(cycles);
+        self.scheduler.advance(cycles as Time);
         while let Some(event) = self.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
         }

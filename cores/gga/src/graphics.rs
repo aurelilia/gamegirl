@@ -5,6 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use arm_cpu::Cpu;
+use common::TimeS;
 use gga_ppu::{
     interface::{PpuDmaReason, PpuInterrupt, PpuSystem},
     scheduling::PpuEvent,
@@ -50,7 +51,7 @@ impl PpuSystem for GameGirlAdv {
         Dmas::update_all(self, reason);
     }
 
-    fn schedule(&mut self, evt: PpuEvent, at: i32) {
+    fn schedule(&mut self, evt: PpuEvent, at: TimeS) {
         self.scheduler.schedule(AdvEvent::PpuEvent(evt), at);
     }
 }

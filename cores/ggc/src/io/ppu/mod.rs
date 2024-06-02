@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{numutil::NumExt, Colour};
+use common::{numutil::NumExt, Colour, Time, TimeS};
 pub use dmg::COLOURS;
 
 use crate::{
@@ -60,11 +60,11 @@ pub struct Ppu {
     /// Info about what event to schedule in case of LCDC bit 7 being
     /// unset, disabling the PPU.
     /// When bit 7 is set again, this event is to be scheduled.
-    pub resume_data: Option<(u32, GGEvent)>,
+    pub resume_data: Option<(Time, GGEvent)>,
 }
 
 impl Ppu {
-    pub(super) fn handle_event(gg: &mut GameGirl, evt: PpuEvent, late_by: i32) {
+    pub(super) fn handle_event(gg: &mut GameGirl, evt: PpuEvent, late_by: TimeS) {
         if gg.ppu.resume_data.is_some() {
             return;
         }

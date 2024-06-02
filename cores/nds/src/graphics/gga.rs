@@ -12,7 +12,7 @@
 //! a hack.
 
 use arm_cpu::Cpu;
-use common::misc::EmulateOptions;
+use common::{misc::EmulateOptions, TimeS};
 use gga_ppu::{
     interface::{PpuDmaReason, PpuInterrupt, PpuSystem},
     scheduling::PpuEvent,
@@ -58,7 +58,7 @@ impl PpuSystem for Nds7 {
         Dmas::update_all(self, reason);
     }
 
-    fn schedule(&mut self, evt: PpuEvent, at: i32) {
+    fn schedule(&mut self, evt: PpuEvent, at: TimeS) {
         self.scheduler.schedule(NdsEvent::PpuEvent(evt), at);
     }
 }
@@ -99,7 +99,7 @@ impl PpuSystem for Nds9 {
         // Do nothing, let PPU A notify the DMAs
     }
 
-    fn schedule(&mut self, _evt: PpuEvent, _at: i32) {
+    fn schedule(&mut self, _evt: PpuEvent, _at: TimeS) {
         // Do nothing, let PPU A schedule
     }
 }

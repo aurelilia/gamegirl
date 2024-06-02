@@ -16,7 +16,7 @@ use common::{
     },
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    produce_samples_buffered, Core,
+    produce_samples_buffered, Core, Time,
 };
 use io::addr::DIV;
 
@@ -129,7 +129,7 @@ impl Core for GameGirl {
 impl GameGirl {
     /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, m_cycles: u16) {
-        self.scheduler.advance((m_cycles << self.t_shift).u32());
+        self.scheduler.advance((m_cycles << self.t_shift) as Time);
         while let Some(event) = self.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
         }

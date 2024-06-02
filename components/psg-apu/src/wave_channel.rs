@@ -5,7 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use super::{Channel, ScheduleFn};
-use crate::GenApuEvent;
+use crate::{GenApuEvent, TimeS};
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
@@ -103,7 +103,7 @@ impl Channel for WaveChannel {
         // in other emulators
         sched(
             GenApuEvent::WaveReload,
-            ((0x7FF - self.frequency + 3) as i32) << 2,
+            ((0x7FF - self.frequency + 3) as TimeS) << 2,
         );
     }
 

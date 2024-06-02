@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::components::scheduler::Kind;
+use common::{components::scheduler::Kind, TimeS};
 use gga_ppu::{scheduling::PpuEvent, Ppu};
 use NdsEvent::*;
 
@@ -26,7 +26,7 @@ pub enum NdsEvent {
 }
 
 impl NdsEvent {
-    pub fn dispatch(self, ds: &mut Nds, late_by: i32) {
+    pub fn dispatch(self, ds: &mut Nds, late_by: TimeS) {
         match self {
             PauseEmulation => ds.ticking = false,
             PpuEvent(evt) => {

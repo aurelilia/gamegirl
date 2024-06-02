@@ -4,12 +4,14 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use common::TimeS;
+
 use crate::{
     scheduling::{ApuEvent, NesEvent},
     Nes, CLOCK_HZ,
 };
 
-const SAMPLE_EVERY_N_CLOCKS: i32 = CLOCK_HZ as i32 / 48000;
+const SAMPLE_EVERY_N_CLOCKS: TimeS = CLOCK_HZ as TimeS / 48000;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -18,7 +20,7 @@ pub struct Apu {
 }
 
 impl Apu {
-    pub fn handle_event(nes: &mut Nes, event: ApuEvent, late_by: i32) {
+    pub fn handle_event(nes: &mut Nes, event: ApuEvent, late_by: TimeS) {
         match event {
             ApuEvent::PushSample => {
                 nes.apu.buffer.push(0.0);

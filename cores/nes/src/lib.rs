@@ -24,7 +24,7 @@ use common::{
     components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    produce_samples_buffered, Core,
+    produce_samples_buffered, Core, Time,
 };
 use cpu::Cpu;
 use joypad::Joypad;
@@ -90,7 +90,7 @@ impl Core for Nes {
 impl Nes {
     /// Advance the scheduler, which controls everything except the CPU.
     fn advance_clock(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles.u32());
+        self.scheduler.advance(cycles as Time);
         while let Some(event) = self.scheduler.get_next_pending() {
             event.kind.dispatch(self, event.late_by);
         }

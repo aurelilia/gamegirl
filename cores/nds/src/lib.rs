@@ -30,7 +30,7 @@ use common::{
     components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
     misc::{Button, EmulateOptions, SystemConfig},
     numutil::NumExt,
-    produce_samples_buffered, Colour, Core,
+    produce_samples_buffered, Colour, Core, Time,
 };
 
 use crate::{
@@ -116,7 +116,7 @@ pub struct Nds {
     timers: CpuDevice<Timers>,
 
     scheduler: Scheduler<NdsEvent>,
-    time_7: u32,
+    time_7: Time,
 
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]

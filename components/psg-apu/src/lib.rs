@@ -9,6 +9,7 @@
 //! Thank you to it's authors!
 
 #![feature(trait_alias)]
+type TimeS = i64;
 
 use bitflags::bitflags;
 pub use channel::Channel;
@@ -285,7 +286,7 @@ impl Default for GenericApu {
     }
 }
 
-pub trait ScheduleFn = FnMut(GenApuEvent, i32);
+pub trait ScheduleFn = FnMut(GenApuEvent, TimeS);
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -298,7 +299,7 @@ pub enum GenApuEvent {
 
 impl GenApuEvent {
     #[inline]
-    pub fn dispatch(&self, apu: &mut GenericApu) -> i32 {
+    pub fn dispatch(&self, apu: &mut GenericApu) -> TimeS {
         if !apu.power {
             // Just wait a while.
             return 0xFF;
@@ -310,6 +311,6 @@ impl GenApuEvent {
             Self::WaveReload => apu.wave.channel_mut().clock(),
             Self::NoiseReload => apu.noise.channel_mut().clock(),
         }
-        .max(1) as i32
+        .max(1) as TimeS
     }
 }

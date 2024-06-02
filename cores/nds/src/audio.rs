@@ -4,9 +4,11 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use common::TimeS;
+
 use crate::{cpu::NDS9_CLOCK, scheduling::ApuEvent, Nds};
 
-pub const SAMPLE_EVERY_N_CLOCKS: i32 = (NDS9_CLOCK / 48000) as i32;
+pub const SAMPLE_EVERY_N_CLOCKS: TimeS = (NDS9_CLOCK / 48000) as TimeS;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -17,7 +19,7 @@ pub struct Apu {
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this
     /// function returns the time after which the event should repeat.
-    pub fn handle_event(ds: &mut Nds, event: ApuEvent, late_by: i32) -> i32 {
+    pub fn handle_event(ds: &mut Nds, event: ApuEvent, late_by: TimeS) -> TimeS {
         match event {
             ApuEvent::PushSample => {
                 ds.apu.buffer.push(0.0);

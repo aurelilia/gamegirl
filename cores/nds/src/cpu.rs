@@ -19,6 +19,7 @@ use arm_cpu::{
 use common::{
     components::{debugger::Debugger, memory::MemoryMapper},
     numutil::NumExt,
+    Time,
 };
 
 use crate::{
@@ -43,11 +44,11 @@ impl ArmSystem for Nds7 {
     fn advance_clock(&mut self) {}
 
     fn add_sn_cycles(&mut self, cycles: u16) {
-        self.time_7 += cycles.u32() << 1;
+        self.time_7 += (cycles as Time) << 1;
     }
 
     fn add_i_cycles(&mut self, cycles: u16) {
-        self.time_7 += cycles.u32() << 1;
+        self.time_7 += (cycles as Time) << 1;
     }
 
     fn is_irq_pending(&self) -> bool {
@@ -100,11 +101,11 @@ impl ArmSystem for Nds9 {
     }
 
     fn add_sn_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles.u32());
+        self.scheduler.advance(cycles as Time);
     }
 
     fn add_i_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles.u32());
+        self.scheduler.advance(cycles as Time);
     }
 
     fn is_irq_pending(&self) -> bool {

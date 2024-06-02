@@ -13,6 +13,7 @@ use common::{
     components::memory::{MemoryMappedSystem, MemoryMapper},
     misc::{CgbMode, SystemConfig},
     numutil::{hword, NumExt},
+    TimeS,
 };
 
 use super::GameGirl;
@@ -50,7 +51,7 @@ pub struct Memory {
     oam: [u8; 160],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     high: [u8; 256],
-    pending_dma: Option<u32>,
+    pending_dma: Option<u64>,
     dma_restarted: bool,
 
     mapper: MemoryMapper<256>,
@@ -218,7 +219,7 @@ impl GameGirl {
                 if !was_on && is_on {
                     let data = self.ppu.resume_data.take();
                     if let Some(data) = data {
-                        self.scheduler.schedule(data.1, data.0 as i32);
+                        self.scheduler.schedule(data.1, data.0 as TimeS);
                     }
                 }
             }

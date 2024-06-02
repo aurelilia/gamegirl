@@ -5,7 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use arm_cpu::{Cpu, Interrupt};
-use common::numutil::NumExt;
+use common::{numutil::NumExt, Time, TimeS};
 
 use crate::{addr::TM0CNT_H, scheduling::NdsEvent, NdsCpu};
 
@@ -27,18 +27,18 @@ pub struct Timers {
     /// will be the reload value (actual counter is calculated on read)
     counters: [u16; 4],
     /// The time the timer was scheduled, if it is on the scheduler.
-    scheduled_at: [u32; 4],
+    scheduled_at: [Time; 4],
 }
 
 impl Timers {
     /// Handle overflow of a scheduled timer.
-    pub fn handle_overflow_event<DS: NdsCpu>(ds: &mut DS, idx: u8, late_by: i32) {
+    pub fn handle_overflow_event<DS: NdsCpu>(ds: &mut DS, idx: u8, late_by: TimeS) {
         // Handle overflow
-        let until_ov = Self::overflow(ds, idx) as i32;
+        let until_ov = Self::overflow(ds, idx) as TimeS;
         // Reschedule event
         // Edge case: with high reload and fast timers, sometimes (late_by > until_ov).
         // In this case, we simply schedule the next overflow event to be immediately.
-        ds.timers[DS::I].scheduled_at[idx.us()] = ds.scheduler.now() - late_by as u32 + 2;
+        ds.timers[DS::I].scheduled_at[idx.us()] = ds.scheduler.now() - late_by as Time + 2;
         ds.scheduler.schedule(
             NdsEvent::TimerOverflow {
                 timer: idx,
@@ -56,7 +56,7 @@ impl Timers {
 
         if is_scheduled {
             // Is on scheduler, calculate current value
-            let scaler = DIVS[(ctrl & 3).us()].u32();
+            let scaler = DIVS[(ctrl & 3).us()] as Time;
             let elapsed = ds.scheduler.now() - ds.timers[DS::I].scheduled_at[TIM];
             ds.timers[DS::I].counters[TIM].wrapping_add((elapsed / scaler).u16())
         } else {
@@ -95,7 +95,7 @@ impl Timers {
                     timer: TIM.u8(),
                     is_arm9: DS::I == 1,
                 },
-                until_ov as i32,
+                until_ov as TimeS,
             );
         }
 

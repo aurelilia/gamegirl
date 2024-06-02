@@ -12,6 +12,7 @@ use std::collections::VecDeque;
 use common::{
     components::scheduler::Scheduler,
     numutil::{NumExt, U16Ext},
+    TimeS,
 };
 use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
@@ -23,8 +24,8 @@ use crate::{
     GameGirlAdv, CPU_CLOCK,
 };
 
-const SAMPLE_EVERY_N_CLOCKS: i32 = CPU_CLOCK as i32 / 2i32.pow(16);
-const GG_OFFS: i32 = 4;
+const SAMPLE_EVERY_N_CLOCKS: TimeS = CPU_CLOCK as TimeS / 2i64.pow(16);
+const GG_OFFS: TimeS = 4;
 
 /// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
 #[derive(Default)]
@@ -42,7 +43,7 @@ pub struct Apu {
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this
     /// function returns the time after which the event should repeat.
-    pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: i32) -> i32 {
+    pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: TimeS) -> TimeS {
         match event {
             // We multiply the time by 4 since the generic APU expects GG t-cycles,
             // which are 1/4th of GGA CPU clock

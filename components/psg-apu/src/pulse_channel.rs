@@ -5,6 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use super::{envelope::EnvelopGenerator, Channel, GenApuEvent, ScheduleFn};
+use crate::TimeS;
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -189,7 +190,7 @@ impl<const T: bool> Channel for PulseChannel<T> {
         } else {
             GenApuEvent::Pulse1Reload
         };
-        sched(evt, ((0x7FF - self.frequency) as i32) << 2);
+        sched(evt, ((0x7FF - self.frequency) as TimeS) << 2);
         self.envelope.trigger();
         self.sweep_trigger();
     }

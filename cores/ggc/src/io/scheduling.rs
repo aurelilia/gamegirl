@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::components::scheduler::Kind;
+use common::{components::scheduler::Kind, TimeS};
 use GGEvent::*;
 
 use crate::{
@@ -33,7 +33,7 @@ pub enum GGEvent {
 
 impl GGEvent {
     /// Handle the event by delegating to the appropriate handler.
-    pub fn dispatch(&self, gg: &mut GameGirl, late_by: i32) {
+    pub fn dispatch(&self, gg: &mut GameGirl, late_by: TimeS) {
         match self {
             PauseEmulation => gg.ticking = false,
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),

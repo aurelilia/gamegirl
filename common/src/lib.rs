@@ -6,6 +6,7 @@
 
 use std::any::Any;
 
+pub use components::scheduler::{Time, TimeS};
 use components::storage::GameSave;
 use misc::{Button, EmulateOptions, SystemConfig};
 

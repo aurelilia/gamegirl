@@ -9,7 +9,7 @@ use arm_cpu::{
     registers::Flag::IrqDisable,
     Access, Cpu, Exception,
 };
-use common::{components::debugger::Debugger, numutil::NumExt};
+use common::{components::debugger::Debugger, numutil::NumExt, Time};
 
 use crate::{
     addr,
@@ -36,11 +36,11 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn add_sn_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles.u32());
+        self.scheduler.advance(cycles as Time);
     }
 
     fn add_i_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles.u32());
+        self.scheduler.advance(cycles as Time);
         if self.cpu.pc() > 0x800_0000 {
             if self[WAITCNT].is_bit(14) {
                 self.memory.prefetch_len += 1;

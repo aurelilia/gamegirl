@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::components::scheduler::Kind;
+use common::{components::scheduler::Kind, TimeS};
 
 use crate::{PlayStation, FRAME_CLOCK, SAMPLE_CLOCK};
 
@@ -17,7 +17,7 @@ pub enum PsxEvent {
 }
 
 impl PsxEvent {
-    pub fn dispatch(self, ps: &mut PlayStation, _late_by: i32) {
+    pub fn dispatch(self, ps: &mut PlayStation, _late_by: TimeS) {
         match self {
             PsxEvent::PauseEmulation => ps.ticking = false,
             PsxEvent::OutputFrame => {
