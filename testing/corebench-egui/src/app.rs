@@ -7,12 +7,14 @@
 use std::{
     fs, mem,
     path::{Path, PathBuf},
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
+    time::Instant,
 };
 
 use dynacore::{common::components::input_replay::InputReplay, gamegirl::dummy_core};
 use eframe::{
     egui::{Color32, Context, TextureOptions},
+    emath::History,
     epaint::{ColorImage, ImageData, ImageDelta, TextureId},
     CreationContext, Frame,
 };
@@ -37,6 +39,8 @@ pub struct App {
     pub rom: Option<Vec<u8>>,
     /// Test suites currently loaded into the workbench.
     pub suites: Vec<Arc<TestSuite>>,
+    /// Toggle for benchmark graph.
+    pub bench_iso: bool,
 
     /// Texture(s) for the core's graphics output.
     pub textures: Vec<TextureId>,
@@ -62,9 +66,14 @@ impl eframe::App for App {
 
 impl App {
     fn update_frames(&mut self, ctx: &Context) -> [usize; 2] {
+        let now = ctx.input(|i| i.time);
         let size = self.cores[0].c.screen_size();
         for (i, core) in self.cores.iter_mut().enumerate() {
-            core.c.advance_delta(0.2);
+            let time = Instant::now();
+            core.c.advance_delta(0.05);
+            let elapsed = time.elapsed().as_micros() as f64;
+            core.bench.add(now, elapsed / 1000.0);
+
             let frame = core.c.last_frame().map(|p| unsafe { mem::transmute(p) });
             if let Some(pixels) = frame {
                 let img = ImageDelta::full(
@@ -164,13 +173,16 @@ impl App {
             cores: vec![DCore {
                 c: dummy_core(),
                 suites: vec![],
+                bench: History::new(10..5000, 30.0),
+                bench_iso: Arc::new(Mutex::new(History::new(10..5000, 100.0))),
                 loader: dynacore::new_core,
                 _library: None,
-                name: "Built-in".to_string(),
+                name: "Baseline".to_string(),
             }],
             replay: None,
             rom: None,
             suites: vec![],
+            bench_iso: false,
 
             textures,
             app_window_states: [true; APP_WINDOW_COUNT],

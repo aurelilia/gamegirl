@@ -24,9 +24,10 @@ use crate::{
 /// Function signature for an app window
 type AppFn = fn(&mut App, &Context, &mut Ui);
 /// Count of GUI windows that take the App as a parameter.
-pub const APP_WINDOW_COUNT: usize = 1;
+pub const APP_WINDOW_COUNT: usize = 2;
 /// GUI windows that take the App as a parameter.
-const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] = [("Test Suites", tests::suites)];
+const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] =
+    [("Test Suites", tests::suites), ("Benchmark", tests::bench)];
 
 pub fn draw(app: &mut App, ctx: &Context, size: [usize; 2]) {
     navbar(app, ctx);

@@ -805,6 +805,7 @@ version = "0.1.0"
 dependencies = [
  "dynacore",
  "eframe",
+ "egui_plot",
  "env_logger",
  "futures-executor",
  "libloading",
@@ -1063,6 +1064,15 @@ dependencies = [
  "memoffset",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "egui_plot"
+version = "0.26.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "803bfcb1ad294dd7f106e26ac9199730d16051496ddb66b10fdb6529eb43df58"
+dependencies = [
+ "egui",
 ]
 
 [[package]]

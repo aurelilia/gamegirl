@@ -10,6 +10,7 @@ eframe = { version = "0.26.2", default-features = false, features = [
     "glow",
     "persistence",
 ] }
+egui_plot = "0.26"
 libloading = "0.8"
 env_logger = "0.11.3"
 rfd = "0.14.0"

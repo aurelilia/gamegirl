@@ -15,7 +15,7 @@ use std::{
 use dynacore::{common::Core, NewCoreFn};
 use walkdir::WalkDir;
 
-pub type TestInspector = Box<dyn Fn(&mut Box<dyn Core>, &Test) -> TestStatus + Send + Sync>;
+pub type TestInspector = Box<dyn Fn(&mut Box<dyn Core>) -> TestStatus + Send + Sync>;
 
 pub struct TestSuite {
     pub name: String,

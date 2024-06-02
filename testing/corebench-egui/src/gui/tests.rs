@@ -4,9 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::{sync::Arc, thread, time::Instant};
 
 use eframe::egui::{Context, Ui};
+use egui_plot::{Legend, Line, Plot, PlotPoints};
 
 use crate::{app::App, tests::SUITES};
 
@@ -25,5 +26,69 @@ pub(super) fn suites(app: &mut App, _ctx: &Context, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.label(&suite.name);
         });
+    }
+}
+
+pub(super) fn bench(app: &mut App, _ctx: &Context, ui: &mut Ui) {
+    if ui.button("Start isolated benchmark").clicked() {
+        let cores = app
+            .cores
+            .iter()
+            .map(|c| {
+                c.bench_iso.lock().unwrap().clear();
+                ((c.loader)(app.rom.clone().unwrap()), c.bench_iso.clone())
+            })
+            .collect::<Vec<_>>();
+        thread::spawn(|| {
+            for (mut core, bench) in cores {
+                for time in 0..500 {
+                    let delta = time as f64 / 5.0;
+                    let time = Instant::now();
+                    core.advance_delta(0.2);
+                    let elapsed = time.elapsed().as_micros() as f64;
+                    bench.lock().unwrap().add(delta, elapsed / 1000.0);
+                }
+            }
+        });
+    }
+
+    ui.checkbox(&mut app.bench_iso, "Graph: Show Isolated Benchmark");
+
+    if app.bench_iso {
+        Plot::new("benchmark")
+            .legend(Legend::default())
+            .allow_scroll(false)
+            .allow_drag(false)
+            .include_x(100.0)
+            .x_axis_label("Emulated Time")
+            .y_axis_label("Time to emulate 0.2s in ms")
+            .show(ui, |ui| {
+                for core in app.cores.iter() {
+                    ui.line(
+                        Line::new(PlotPoints::from_iter(
+                            core.bench_iso.lock().unwrap().iter().map(|(t, s)| [t, s]),
+                        ))
+                        .name(&core.name),
+                    );
+                }
+            });
+    } else {
+        Plot::new("benchmark")
+            .legend(Legend::default())
+            .allow_scroll(false)
+            .allow_drag(false)
+            .include_x(30.0)
+            .x_axis_label("Real Time")
+            .y_axis_label("Time to emulate 0.2s in ms")
+            .show(ui, |ui| {
+                for core in app.cores.iter() {
+                    ui.line(
+                        Line::new(PlotPoints::from_iter(
+                            core.bench.iter().map(|(t, s)| [t, s]),
+                        ))
+                        .name(&core.name),
+                    );
+                }
+            });
     }
 }
