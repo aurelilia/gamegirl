@@ -79,7 +79,7 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
         if ui.button("Advance").clicked() {
             ps.advance();
         }
-        ui.checkbox(&mut ps.options.running, "Running");
+        ui.checkbox(&mut ps.debugger.running, "Running");
     });
 
     ui.separator();

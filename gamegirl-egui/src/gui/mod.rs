@@ -8,7 +8,7 @@ mod options;
 
 use std::fs;
 
-use common::components::input_replay::InputReplay;
+use common::components::input::{InputReplay, ReplayState};
 use eframe::{
     egui::{self, load::SizedTexture, vec2, widgets, Context, Image, Layout, Ui, ViewportCommand},
     emath::Align,
@@ -165,30 +165,39 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
 }
 
 fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
-    if let Some(replay) = app.replay.as_ref() {
-        ui.label("Status: Recording replay");
-        ui.label(&format!("Recorded {} inputs!", replay.inputs.len()));
-        if ui.button("End & Save Replay").clicked() {
-            file_dialog::save(replay.to_string());
-            app.replay = None;
+    let mut core = app.core.lock().unwrap();
+    match (&core.options().input.replay, app.current_rom_path.clone()) {
+        (ReplayState::None, None) => {
+            ui.label("Status: Not currently recording replay");
+            ui.label("Hint: Load a ROM first.");
         }
-    } else if let Some(file) = app.current_rom_path.clone() {
-        ui.label("Status: Not currently recording replay");
-        if ui.button("Restart system and start recording").clicked() {
-            app.replay = Some(InputReplay {
-                file,
-                inputs: vec![],
-                current: 0.0,
-                current_input: 0,
-            });
-            app.core.lock().unwrap().reset();
+
+        (ReplayState::None, Some(file)) => {
+            ui.label("Status: Not currently recording replay");
+            if ui.button("Restart system and start recording").clicked() {
+                core.options().input.replay = ReplayState::Recording(InputReplay::empty(file));
+                core.reset();
+            }
+            if ui.button("Load recording and restart").clicked() {
+                file_dialog::open_replay(app.message_channel.0.clone());
+            }
         }
-        if ui.button("Load recording and restart").clicked() {
-            file_dialog::open_replay(app.message_channel.0.clone());
+
+        (ReplayState::Recording(ir), _) => {
+            ui.label("Status: Recording replay");
+            ui.label(&format!("Recorded {} states!", ir.states.len()));
+            if ui.button("End & Save Replay").clicked() {
+                file_dialog::save(ir.to_string());
+                core.options().input.replay = ReplayState::None;
+            }
         }
-    } else {
-        ui.label("Status: Not currently recording replay");
-        ui.label("Load a ROM first.");
+
+        (ReplayState::Playback(_), _) => {
+            ui.label("Status: Playing back replay");
+            if ui.button("End Playback").clicked() {
+                core.options().input.replay = ReplayState::None;
+            }
+        }
     }
 }
 

@@ -5,7 +5,7 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 pub mod debugger;
-pub mod input_replay;
+pub mod input;
 pub mod memory;
 pub mod scheduler;
 pub mod storage;

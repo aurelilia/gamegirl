@@ -14,7 +14,7 @@ use common::{
         scheduler::Scheduler,
         storage::{GameSave, Storage},
     },
-    misc::{Button, EmulateOptions, SystemConfig},
+    misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
     produce_samples_buffered, Core, Time,
 };
@@ -103,10 +103,6 @@ impl Core for GameGirl {
     fn skip_bootrom(&mut self) {
         self.cpu.pc = 0x100;
         self.set(BOOTROM_DISABLE, 1u8);
-    }
-
-    fn set_button(&mut self, btn: Button, pressed: bool) {
-        Joypad::set(self, btn, pressed);
     }
 
     fn make_save(&self) -> Option<GameSave> {

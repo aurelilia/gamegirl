@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::misc::{Button, CgbMode};
+use common::{components::input::Button, misc::CgbMode};
 use eframe::{
     egui,
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, Ui},

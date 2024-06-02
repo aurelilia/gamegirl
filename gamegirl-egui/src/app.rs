@@ -10,11 +10,7 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 
-use common::{
-    components::input_replay::{Input as RInput, InputReplay},
-    misc::SystemConfig,
-    Colour as RColour, Core,
-};
+use common::{misc::SystemConfig, Colour as RColour, Core};
 use cpal::Stream;
 use eframe::{
     egui::{Context, Event, TextureOptions},
@@ -59,8 +55,6 @@ pub struct App {
 
     /// Rewinder state.
     pub rewinder: Rewinder,
-    /// Input replay state.
-    pub replay: Option<InputReplay>,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     pub fast_forward_toggled: bool,
 
@@ -161,21 +155,12 @@ impl App {
                     _ => (),
                 }
             }
-            if let Some(replay) = self.replay.as_mut() {
-                replay.current += i.unstable_dt as f64;
-            }
             i.unstable_dt.min(0.016).max(0.001) - 0.0009
         });
         let delta = raw_delta.min(0.016).max(0.001) - 0.0009;
 
         let mut core = self.core.lock().unwrap();
         let size = core.screen_size();
-
-        if let Some(replay) = core.options().replay.as_mut() {
-            if let Some(input) = replay.advance(raw_delta as f64) {
-                core.set_button(input.button, input.state);
-            }
-        }
 
         if self.rewinder.rewinding {
             let frame = if let Some(state) = self.rewinder.rewind_buffer.pop() {
@@ -207,14 +192,9 @@ impl App {
 
         match self.state.options.input.get(src) {
             Some(InputAction::Button(btn)) => {
-                self.core.lock().unwrap().set_button(btn, pressed);
-                if let Some(replay) = self.replay.as_mut() {
-                    replay.add_input(RInput {
-                        button: btn,
-                        state: pressed,
-                        time: replay.current,
-                    })
-                }
+                let mut core = self.core.lock().unwrap();
+                let time = core.get_time();
+                core.options().input.set(time, btn, pressed);
             }
             Some(InputAction::Hotkey(idx)) => input::HOTKEYS[idx as usize].1(self, pressed),
             None => (),
@@ -260,8 +240,7 @@ impl App {
                     self.save_game();
                     let mut core = self.core.lock().unwrap();
                     core.reset();
-                    core.options().replay =
-                        Some(InputReplay::new(String::from_utf8(file.content).unwrap()));
+                    core.options().input.load_replay(file.content);
                 }
             }
         }
@@ -291,7 +270,6 @@ impl App {
             current_rom_path: None,
 
             rewinder: Rewinder::new(state.options.rewind_buffer_size),
-            replay: None,
             fast_forward_toggled: false,
             app_window_states: [false; APP_WINDOW_COUNT],
             debugger_window_states: Vec::from([false; 10]),

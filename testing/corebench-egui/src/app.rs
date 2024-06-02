@@ -11,7 +11,7 @@ use std::{
     time::Instant,
 };
 
-use dynacore::{common::components::input_replay::InputReplay, gamegirl::dummy_core};
+use dynacore::{common::components::input::InputReplay, gamegirl::dummy_core};
 use eframe::{
     egui::{Color32, Context, TextureOptions},
     emath::History,

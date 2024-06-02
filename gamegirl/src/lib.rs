@@ -12,6 +12,7 @@ pub use common::{self, Core};
 use common::{
     components::storage::Storage,
     misc::{EmulateOptions, SystemConfig},
+    Time,
 };
 #[cfg(feature = "gga")]
 pub use gga;
@@ -141,7 +142,9 @@ impl Core for Dummy {
         &mut self.config
     }
 
-    fn set_button(&mut self, _: common::misc::Button, _: bool) {}
+    fn get_time(&self) -> Time {
+        0
+    }
 
     fn screen_size(&self) -> [usize; 2] {
         [160, 144]

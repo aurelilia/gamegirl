@@ -74,6 +74,10 @@ macro_rules! common_functions {
             &mut self.config
         }
 
+        fn get_time(&self) -> ::common::Time {
+            self.scheduler.now()
+        }
+
         fn screen_size(&self) -> [usize; 2] {
             $size
         }

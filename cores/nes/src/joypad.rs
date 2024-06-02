@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::{misc::Button, numutil::NumExt};
+use common::{components::input::Button, numutil::NumExt};
 
 use crate::Nes;
 

@@ -4,15 +4,16 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use common::misc::Button;
+use common::{numutil::NumExt, TimeS};
 
-use crate::{cpu::Interrupt, io::addr::JOYP, GameGirl};
+use super::scheduling::GGEvent;
+use crate::{cpu::Interrupt, io::addr::JOYP, GameGirl, T_CLOCK_HZ};
 
 /// Joypad of the console.
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Joypad {
-    key_states: [bool; 8],
+    key_states: u8,
 }
 
 impl Joypad {
@@ -23,19 +24,18 @@ impl Joypad {
             _ => return 0xCF,
         };
         let mut res = 0;
-        for key in self.key_states.iter().skip(row_start).take(4).rev() {
+        for key in (0..8).skip(row_start).take(4).rev() {
+            let key = self.key_states.is_bit(key);
             res <<= 1;
             res += (!key) as u8;
         }
         res | (joyp & 0x30) | 0b1100_0000
     }
 
-    /// To be called by GUI code; sets the state of a given button.
-    pub fn set(gg: &mut GameGirl, button: Button, state: bool) {
-        if button as usize >= 8 {
-            return; // GGA buttons
-        }
-        gg.joypad.key_states[button as usize] = state;
+    pub fn update(gg: &mut GameGirl) {
+        gg.joypad.key_states = gg.options.input.state(gg.scheduler.now()).0 as u8;
+        gg.scheduler
+            .schedule(GGEvent::UpdateKeypad, (T_CLOCK_HZ / 120) as TimeS);
         let read = gg.joypad.read(gg[JOYP]);
         if read & 0x0F != 0x0F {
             gg.request_interrupt(Interrupt::Joypad);

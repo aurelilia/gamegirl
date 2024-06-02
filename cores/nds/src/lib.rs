@@ -28,7 +28,7 @@ use arm_cpu::{interface::ArmSystem, Cpu};
 use common::{
     common_functions,
     components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
-    misc::{Button, EmulateOptions, SystemConfig},
+    misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
     produce_samples_buffered, Colour, Core, Time,
 };
@@ -151,10 +151,6 @@ impl Core for Nds {
             self.nds9()
                 .set(0x27FFE00 + addr as u32, self.cart.rom[addr])
         }
-    }
-
-    fn set_button(&mut self, btn: Button, pressed: bool) {
-        todo!();
     }
 
     fn make_save(&self) -> Option<GameSave> {

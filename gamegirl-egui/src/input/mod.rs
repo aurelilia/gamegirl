@@ -6,7 +6,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use common::misc::{self, Button::*};
+use common::components::input::{self, Button::*};
 use eframe::egui::Key;
 pub use file_dialog::File;
 use InputAction::*;
@@ -113,6 +113,6 @@ impl Display for InputSource {
 /// as an index into an array of functions.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub enum InputAction {
-    Button(misc::Button),
+    Button(input::Button),
     Hotkey(u8),
 }

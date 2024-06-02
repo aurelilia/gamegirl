@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::components::input_replay::InputReplay;
+use crate::components::input::Input;
 
 /// Options that are used by the GUI and shared between all systems.
 /// These can be changed at runtime.
@@ -19,8 +19,8 @@ pub struct EmulateOptions {
     /// ex. 1x is regular speed, 2x is double speed.
     /// Affects [advance_delta] and sound sample output.
     pub speed_multiplier: usize,
-    /// Currently playing replay, if any.
-    pub replay: Option<InputReplay>,
+    /// Input subsystem to use.
+    pub input: Input,
 }
 
 impl Default for EmulateOptions {
@@ -29,7 +29,7 @@ impl Default for EmulateOptions {
             rom_loaded: false,
             invert_audio_samples: false,
             speed_multiplier: 1,
-            replay: None,
+            input: Input::new(),
         }
     }
 }
@@ -81,38 +81,6 @@ pub enum CgbMode {
     Prefer,
     /// Never run the cart in CGB mode unless it requires it.
     Never,
-}
-
-/// Buttons on a system. Not all are used for all systems.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
-#[repr(C)]
-pub enum Button {
-    A = 0,
-    B = 1,
-    Select = 2,
-    Start = 3,
-    Right = 4,
-    Left = 5,
-    Up = 6,
-    Down = 7,
-    R = 8,
-    L = 9,
-}
-
-impl Button {
-    pub const BUTTONS: [Self; 10] = [
-        Self::A,
-        Self::B,
-        Self::Select,
-        Self::Start,
-        Self::Right,
-        Self::Left,
-        Self::Up,
-        Self::Down,
-        Self::R,
-        Self::L,
-    ];
 }
 
 /// Serialize an object that can be loaded with [deserialize].

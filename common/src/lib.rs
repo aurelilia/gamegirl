@@ -4,11 +4,13 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+#![feature(btree_cursors)]
+
 use std::any::Any;
 
 pub use components::scheduler::{Time, TimeS};
 use components::storage::GameSave;
-use misc::{Button, EmulateOptions, SystemConfig};
+use misc::{EmulateOptions, SystemConfig};
 
 pub mod components;
 pub mod misc;
@@ -58,8 +60,8 @@ pub trait Core: Send + Sync {
     fn config(&self) -> &SystemConfig;
     fn config_mut(&mut self) -> &mut SystemConfig;
 
-    /// Set a button on the joypad.
-    fn set_button(&mut self, btn: Button, pressed: bool);
+    /// Get the current system time.
+    fn get_time(&self) -> Time;
     /// Returns the screen size for the current system.
     fn screen_size(&self) -> [usize; 2];
     /// Returns the output audio sample rate for the current system.

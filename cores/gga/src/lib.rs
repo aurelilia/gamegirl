@@ -9,7 +9,7 @@
 
 use std::{iter, mem, path::PathBuf};
 
-use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu};
+use arm_cpu::{registers::Flag, Cpu};
 use audio::Apu;
 use cartridge::Cartridge;
 use common::{
@@ -19,9 +19,9 @@ use common::{
         scheduler::Scheduler,
         storage::{GameSave, Storage},
     },
-    misc::{Button, EmulateOptions, SystemConfig},
+    misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
-    produce_samples_buffered, Core,
+    produce_samples_buffered, Core, TimeS,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
@@ -98,10 +98,6 @@ impl Core for GameGirlAdv {
         self.cpu.sp[1] = 0x0300_7F00;
         self.cpu.sp[3] = 0x0300_7F00;
         self.cpu.sp[5] = 0x0300_7F00;
-    }
-
-    fn set_button(&mut self, btn: Button, pressed: bool) {
-        self.set_button(btn, pressed);
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -233,6 +229,8 @@ impl Default for GameGirlAdv {
         Apu::init_scheduler(&mut gg);
         gg.scheduler
             .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
+        gg.scheduler
+            .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
 
         // Initialize DMA
         gg.dma.running = 99;

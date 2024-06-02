@@ -8,7 +8,7 @@
 //! Luckily, GGA input is dead simple compared to even GG.
 
 use arm_cpu::{Cpu, Interrupt};
-use common::{misc::Button, numutil::NumExt};
+use common::numutil::NumExt;
 
 use crate::{
     addr::{KEYCNT, KEYINPUT},
@@ -16,11 +16,6 @@ use crate::{
 };
 
 impl GameGirlAdv {
-    pub fn set_button(&mut self, btn: Button, state: bool) {
-        self[KEYINPUT] = self[KEYINPUT].set_bit(btn as u16, !state);
-        self.check_keycnt();
-    }
-
     /// Check if KEYCNT should cause a joypad IRQ.
     pub fn check_keycnt(&mut self) {
         let input = self[KEYINPUT];

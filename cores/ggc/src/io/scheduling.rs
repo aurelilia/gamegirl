@@ -7,6 +7,7 @@
 use common::{components::scheduler::Kind, TimeS};
 use GGEvent::*;
 
+use super::joypad::Joypad;
 use crate::{
     io::{dma, dma::Hdma, ppu::Ppu},
     GameGirl,
@@ -21,6 +22,8 @@ pub enum GGEvent {
     /// amount.
     #[default]
     PauseEmulation,
+    /// Update button inputs.
+    UpdateKeypad,
     /// An event handled by the PPU.
     PpuEvent(PpuEvent),
     /// A DMA transfer completion.
@@ -36,6 +39,7 @@ impl GGEvent {
     pub fn dispatch(&self, gg: &mut GameGirl, late_by: TimeS) {
         match self {
             PauseEmulation => gg.ticking = false,
+            UpdateKeypad => Joypad::update(gg),
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
             DMAFinish => dma::do_oam_dma(gg),
             HdmaTransferStep => Hdma::handle_hdma(gg),

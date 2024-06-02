@@ -17,13 +17,16 @@ use common::{
 };
 
 use super::GameGirl;
-use crate::io::{
-    addr::*,
-    apu::Apu,
-    cartridge::Cartridge,
-    dma::Hdma,
-    scheduling::{GGEvent, PpuEvent},
-    timer::Timer,
+use crate::{
+    io::{
+        addr::*,
+        apu::Apu,
+        cartridge::Cartridge,
+        dma::Hdma,
+        scheduling::{GGEvent, PpuEvent},
+        timer::Timer,
+    },
+    T_CLOCK_HZ,
 };
 
 pub mod addr;
@@ -292,6 +295,8 @@ impl GameGirl {
     fn init_scheduler(&mut self) {
         self.scheduler
             .schedule(GGEvent::PpuEvent(PpuEvent::OamScanEnd), 80);
+        self.scheduler
+            .schedule(GGEvent::UpdateKeypad, (T_CLOCK_HZ / 120) as TimeS);
     }
 
     // Unsafe corner!

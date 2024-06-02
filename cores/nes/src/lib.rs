@@ -22,7 +22,7 @@ use cartridge::Cartridge;
 use common::{
     common_functions,
     components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
-    misc::{Button, EmulateOptions, SystemConfig},
+    misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
     produce_samples_buffered, Core, Time,
 };
@@ -79,8 +79,6 @@ impl Core for Nes {
     }
 
     fn skip_bootrom(&mut self) {}
-
-    fn set_button(&mut self, btn: Button, pressed: bool) {}
 
     fn make_save(&self) -> Option<GameSave> {
         todo!();

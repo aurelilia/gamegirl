@@ -9,7 +9,7 @@ use gga_ppu::{scheduling::PpuEvent, Ppu};
 use psg_apu::GenApuEvent;
 use AdvEvent::*;
 
-use crate::{audio::Apu, timer::Timers, GameGirlAdv};
+use crate::{addr::KEYINPUT, audio::Apu, cpu::CPU_CLOCK, timer::Timers, GameGirlAdv};
 
 /// All scheduler events on the GGA.
 #[derive(Copy, Clone, Eq, PartialEq, Default)]
@@ -20,6 +20,8 @@ pub enum AdvEvent {
     /// amount.
     #[default]
     PauseEmulation,
+    /// Update button inputs.
+    UpdateKeypad,
     /// An event handled by the PPU.
     PpuEvent(PpuEvent),
     /// An event handled by the APU.
@@ -33,6 +35,13 @@ impl AdvEvent {
     pub fn dispatch(self, gg: &mut GameGirlAdv, late_by: TimeS) {
         match self {
             PauseEmulation => gg.ticking = false,
+            UpdateKeypad => {
+                // GGA input is active low
+                gg[KEYINPUT] = 0x3FF ^ gg.options.input.state(gg.scheduler.now()).0;
+                gg.check_keycnt();
+                gg.scheduler
+                    .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
+            }
             PpuEvent(evt) => Ppu::handle_event(gg, evt, late_by),
             ApuEvent(evt) => {
                 let time = Apu::handle_event(gg, evt, late_by);

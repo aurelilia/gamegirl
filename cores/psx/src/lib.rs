@@ -20,7 +20,7 @@ use common::{
         scheduler::Scheduler,
         storage::{GameSave, Storage},
     },
-    misc::{Button, EmulateOptions, SystemConfig},
+    misc::{EmulateOptions, SystemConfig},
     produce_samples_buffered, Colour, Core, Time, TimeS,
 };
 use glow::Context;
@@ -79,10 +79,6 @@ impl Core for PlayStation {
 
     fn skip_bootrom(&mut self) {
         log::error!("PSX does not support skipping bootrom yet");
-    }
-
-    fn set_button(&mut self, btn: Button, pressed: bool) {
-        log::error!("PSX does not support buttons yet");
     }
 
     fn make_save(&self) -> Option<GameSave> {
