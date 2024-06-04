@@ -138,14 +138,16 @@ impl GameGirlAdv {
             // PPU
             DISPCNT..BLDALPHA if let Some(val) = self.ppu.read_mmio(a) => val,
 
+            // Sound
             // Old sound
             0x60..=0x80 | 0x84 | 0x86 | 0x8A | 0x90..=0x9F => {
                 let low = Apu::read_register_psg(&self.apu.cgb_chans, a.u16());
                 let high = Apu::read_register_psg(&self.apu.cgb_chans, a.u16() + 1);
                 hword(low, high)
             }
-            // Sound register with some write-only bits
-            SOUNDCNT_H => self[a] & 0x770F,
+            SOUNDCNT_H => Into::<u16>::into(self.apu.cnt) & 0x770F,
+            SOUNDBIAS_L => self.apu.bias.into(),
+
             // Zero registers (DMA)
             0xB8 | 0xC4 | 0xD0 | 0xDC => 0,
 
@@ -357,15 +359,21 @@ impl GameGirlAdv {
             // DMA Audio
             FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
             FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
+            SOUNDCNT_H => self.apu.cnt = value.into(),
+            SOUNDBIAS_L => self.apu.bias = value.into(),
 
             // PPU
             DISPCNT..=BLDY => self.ppu.write_mmio(a, value),
 
             // Timers
-            TM0CNT_H => Timers::hi_write::<0>(self, a, value),
-            TM1CNT_H => Timers::hi_write::<1>(self, a, value),
-            TM2CNT_H => Timers::hi_write::<2>(self, a, value),
-            TM3CNT_H => Timers::hi_write::<3>(self, a, value),
+            TM0CNT_L => self.timers.reload[0] = value,
+            TM1CNT_L => self.timers.reload[1] = value,
+            TM2CNT_L => self.timers.reload[2] = value,
+            TM3CNT_L => self.timers.reload[3] = value,
+            TM0CNT_H => Timers::hi_write::<0>(self, value),
+            TM1CNT_H => Timers::hi_write::<1>(self, value),
+            TM2CNT_H => Timers::hi_write::<2>(self, value),
+            TM3CNT_H => Timers::hi_write::<3>(self, value),
 
             // DMAs
             0xBA => Dmas::ctrl_write(self, 0, value),

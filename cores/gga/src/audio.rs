@@ -14,23 +14,57 @@ use common::{
     numutil::{NumExt, U16Ext},
     TimeS,
 };
+use modular_bitfield::{bitfield, specifiers::*};
 use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use super::scheduling::AdvEvent;
-use crate::{
-    addr::{FIFO_A_L, SOUNDBIAS, SOUNDCNT_H},
-    dma::Dmas,
-    scheduling::ApuEvent,
-    GameGirlAdv, CPU_CLOCK,
-};
+use crate::{addr::FIFO_A_L, dma::Dmas, scheduling::ApuEvent, GameGirlAdv, CPU_CLOCK};
 
 const SAMPLE_EVERY_N_CLOCKS: TimeS = CPU_CLOCK as TimeS / 2i64.pow(16);
 const GG_OFFS: TimeS = 4;
+
+#[bitfield]
+#[repr(u16)]
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct SoundControl {
+    cgb_vol: B2,
+    a_vol: B1,
+    b_vol: B1,
+    #[skip]
+    __: B4,
+    a_right_en: bool,
+    a_left_en: bool,
+    pub a_timer: B1,
+    #[skip]
+    a_reset_fifo: bool,
+    b_right_en: bool,
+    b_left_en: bool,
+    pub b_timer: B1,
+    #[skip]
+    b_reset_fifo: bool,
+}
+
+#[bitfield]
+#[repr(u16)]
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct SoundBias {
+    bias: B10,
+    #[skip]
+    __: B4,
+    #[skip]
+    amplitude: B2,
+}
 
 /// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Apu {
+    // Registers
+    pub cnt: SoundControl,
+    pub bias: SoundBias,
+
     // 4 channels found on GG(C)
     pub(crate) cgb_chans: GenericApu,
     // DMA channels
@@ -55,7 +89,7 @@ impl Apu {
             }
 
             ApuEvent::PushSample => {
-                Self::push_output(gg);
+                gg.apu.push_output();
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
@@ -69,37 +103,37 @@ impl Apu {
         );
     }
 
-    fn push_output(gg: &mut GameGirlAdv) {
-        if !gg.apu.cgb_chans.power {
+    fn push_output(&mut self) {
+        if !self.cgb_chans.power {
             // Master enable, also applies to DMA channels
-            gg.apu.buffer.push(0.);
-            gg.apu.buffer.push(0.);
+            self.buffer.push(0.);
+            self.buffer.push(0.);
             return;
         }
         let mut left = 0;
         let mut right = 0;
 
-        let cnt = gg[SOUNDCNT_H];
-        let a_vol_mul = 1 + cnt.bit(2) as i16;
-        let b_vol_mul = 1 + cnt.bit(3) as i16;
-        let a = gg.apu.current_samples[0] as i16 * a_vol_mul * 2;
-        let b = gg.apu.current_samples[1] as i16 * b_vol_mul * 2;
+        let cnt = self.cnt;
+        let a_vol_mul = 1 + cnt.a_vol() as i16;
+        let b_vol_mul = 1 + cnt.b_vol() as i16;
+        let a = self.current_samples[0] as i16 * a_vol_mul * 2;
+        let b = self.current_samples[1] as i16 * b_vol_mul * 2;
 
-        if cnt.is_bit(8) {
+        if cnt.a_right_en() {
             right += a;
         }
-        if cnt.is_bit(9) {
+        if cnt.a_left_en() {
             left += a;
         }
-        if cnt.is_bit(12) {
+        if cnt.b_right_en() {
             right += b;
         }
-        if cnt.is_bit(13) {
+        if cnt.b_left_en() {
             left += b;
         }
 
-        let cgb_sample = gg.apu.cgb_chans.make_sample();
-        let cgb_mul = match cnt & 3 {
+        let cgb_sample = self.cgb_chans.make_sample();
+        let cgb_mul = match cnt.cgb_vol() {
             0 => 512.,  // 25%
             1 => 1024., // 50%
             2 => 2048., // 100%
@@ -108,9 +142,9 @@ impl Apu {
         right += (cgb_sample[0] * cgb_mul * 0.8) as i16;
         left += (cgb_sample[1] * cgb_mul * 0.8) as i16;
 
-        let bias = gg[SOUNDBIAS].bits(0, 10) as i16;
-        gg.apu.buffer.push(Self::bias(right, bias) as f32 / 1024.0);
-        gg.apu.buffer.push(Self::bias(left, bias) as f32 / 1024.0);
+        let bias = self.bias.bias() as i16;
+        self.buffer.push(Self::bias(right, bias) as f32 / 1024.0);
+        self.buffer.push(Self::bias(left, bias) as f32 / 1024.0);
     }
 
     fn bias(mut sample: i16, bias: i16) -> i16 {

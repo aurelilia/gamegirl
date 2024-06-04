@@ -31,7 +31,7 @@ use ppu::Ppu;
 use scheduling::PpuEvent;
 
 use crate::{
-    addr::{IE, IF, KEYINPUT, SOUNDBIAS},
+    addr::{IE, IF, KEYINPUT},
     dma::Dmas,
     scheduling::{AdvEvent, ApuEvent},
     timer::Timers,
@@ -224,7 +224,7 @@ impl Default for GameGirlAdv {
 
         // Initialize various IO registers
         gg[KEYINPUT] = 0x3FF;
-        gg[SOUNDBIAS] = 0x200;
+        gg.apu.bias = 0x200.into();
 
         // Initialize scheduler events
         gg.scheduler

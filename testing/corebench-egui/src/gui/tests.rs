@@ -44,7 +44,7 @@ pub(super) fn bench(app: &mut App, _ctx: &Context, ui: &mut Ui) {
                 for time in 0..500 {
                     let delta = time as f64 / 5.0;
                     let time = Instant::now();
-                    core.advance_delta(0.2);
+                    core.advance_delta(0.1);
                     let elapsed = time.elapsed().as_micros() as f64;
                     bench.lock().unwrap().add(delta, elapsed / 1000.0);
                 }

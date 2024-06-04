@@ -51,7 +51,7 @@ pub const TM3CNT_H: u32 = 0x10E;
 
 // Audio
 pub const SOUNDCNT_H: u32 = 0x82;
-pub const SOUNDBIAS: u32 = 0x88;
+pub const SOUNDBIAS_L: u32 = 0x88;
 pub const FIFO_A_L: u32 = 0xA0;
 pub const FIFO_A_H: u32 = 0xA2;
 pub const FIFO_B_L: u32 = 0xA4;

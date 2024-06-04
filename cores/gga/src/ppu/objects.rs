@@ -205,7 +205,7 @@ impl Ppu {
 
 #[bitfield]
 #[repr(u64)]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct Object {
     y: B8,
     kind: ObjectKind,
