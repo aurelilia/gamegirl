@@ -85,7 +85,7 @@ impl Dmas {
             && match ctrl.bits(12, 2) {
                 0 => reason == Reason::CtrlWrite,
                 1 => reason == Reason::VBlank,
-                2 => reason == Reason::HBlank && gg[VCOUNT] < 160,
+                2 => reason == Reason::HBlank && gg.ppu.vcount < 160,
                 _ => fifo || vid_capture,
             };
         if !on {

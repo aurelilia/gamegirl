@@ -68,7 +68,7 @@ pub struct Ppu {
     pub dispcnt: DisplayControl,
     greepswap: GreenSwap,
     dispstat: DisplayStatus,
-    vcount: u16,
+    pub(crate) vcount: u16,
     bg_cnt: [BgControl; 4],
     bg_offsets: [u16; 8],
     bg_scale: [BgRotScal; 2],
