@@ -274,7 +274,7 @@ impl Object {
         let mut pos = line.u8().wrapping_sub(self.y);
         // Consider VFlip and Mosaic
         if self.attr0.is_bit(4) {
-            pos &= (mosaic.bits(12, 4) - 1).u8();
+            pos &= (mosaic.bits(12, 4) + 1).u8();
         }
         if self.attr1.is_bit(5) {
             pos = self.size().1.u8() - pos - 1;

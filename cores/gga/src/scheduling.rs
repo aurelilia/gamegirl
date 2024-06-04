@@ -5,11 +5,10 @@
 // obtain one at https://mozilla.org/MPL/2.0/.
 
 use common::{components::scheduler::Kind, TimeS};
-use gga_ppu::{scheduling::PpuEvent, Ppu};
 use psg_apu::GenApuEvent;
 use AdvEvent::*;
 
-use crate::{addr::KEYINPUT, audio::Apu, cpu::CPU_CLOCK, timer::Timers, GameGirlAdv};
+use crate::{addr::KEYINPUT, audio::Apu, cpu::CPU_CLOCK, ppu::Ppu, timer::Timers, GameGirlAdv};
 
 /// All scheduler events on the GGA.
 #[derive(Copy, Clone, Eq, PartialEq, Default)]
@@ -65,4 +64,17 @@ pub enum ApuEvent {
     Sequencer,
     /// Push a sample to the output.
     PushSample,
+}
+
+/// Events the PPU generates.
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[repr(u16)]
+pub enum PpuEvent {
+    /// Start of HBlank.
+    HblankStart,
+    /// Set HBlank flag in DISPSTAT (this is delayed by 46 cycles)
+    SetHblank,
+    /// End of HBlank, which is the start of the next scanline.
+    HblankEnd,
 }

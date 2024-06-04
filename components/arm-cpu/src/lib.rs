@@ -369,6 +369,7 @@ impl<S: ArmSystem> Default for Cpu<S> {
 /// These are the same between GGA and NDS, so
 /// putting them here is OK.
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum Interrupt {
     VBlank,
     HBlank,

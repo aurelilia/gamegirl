@@ -6,6 +6,7 @@
 
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
+#![feature(if_let_guard)]
 
 use std::{iter, mem, path::PathBuf};
 
@@ -25,8 +26,9 @@ use common::{
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
-use gga_ppu::{scheduling::PpuEvent, threading::GgaPpu};
 use memory::Memory;
+use ppu::Ppu;
+use scheduling::PpuEvent;
 
 use crate::{
     addr::{IE, IF, KEYINPUT, SOUNDBIAS},
@@ -40,9 +42,10 @@ mod audio;
 mod cartridge;
 mod cpu;
 mod dma;
-pub mod graphics;
+// pub mod graphics;
 mod input;
 mod memory;
+mod ppu;
 mod scheduling;
 pub mod timer;
 
@@ -54,7 +57,7 @@ pub type GGADebugger = Debugger<u32>;
 pub struct GameGirlAdv {
     pub cpu: Cpu<Self>,
     pub memory: Memory,
-    pub ppu: GgaPpu<Self>,
+    pub ppu: Ppu,
     pub apu: Apu,
     pub dma: Dmas,
     pub timers: Timers,
@@ -206,7 +209,7 @@ impl Default for GameGirlAdv {
         let mut gg = Self {
             cpu: Cpu::default(),
             memory: Memory::default(),
-            ppu: gga_ppu::threading::new_ppu(),
+            ppu: Ppu::default(),
             apu: Apu::default(),
             dma: Dmas::default(),
             timers: Timers::default(),

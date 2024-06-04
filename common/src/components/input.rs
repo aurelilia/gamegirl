@@ -96,6 +96,7 @@ pub enum ReplayState {
     Playback(InputReplay),
 }
 
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct InputReplay {
     pub file: PathBuf,

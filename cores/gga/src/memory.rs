@@ -135,6 +135,9 @@ impl GameGirlAdv {
             TM2CNT_L => Timers::time_read::<2>(self),
             TM3CNT_L => Timers::time_read::<3>(self),
 
+            // PPU
+            DISPCNT..BLDALPHA if let Some(val) = self.ppu.read_mmio(a) => val,
+
             // Old sound
             0x60..=0x80 | 0x84 | 0x86 | 0x8A | 0x90..=0x9F => {
                 let low = Apu::read_register_psg(&self.apu.cgb_chans, a.u16());
@@ -356,12 +359,7 @@ impl GameGirlAdv {
             FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
 
             // PPU
-            DISPSTAT => self[DISPSTAT] = (self[DISPSTAT] & 0b111) | (value & !0b1100_0111),
-            BG0CNT | BG1CNT => self[a] = value & 0xDFFF,
-            BG0HOFS..=BG3VOFS => self[a] = value & 0x1FF,
-            WININ | WINOUT => self[a] = value & 0x3F3F,
-            BLDCNT => self[a] = value & 0x3FFF,
-            BLDALPHA => self[a] = value & 0x1F1F,
+            DISPCNT..=BLDY => self.ppu.write_mmio(a, value),
 
             // Timers
             TM0CNT_H => Timers::hi_write::<0>(self, a, value),
@@ -394,7 +392,7 @@ impl GameGirlAdv {
             }
 
             // RO registers
-            VCOUNT | KEYINPUT | 0x136 | 0x142 | 0x15A | 0x206 | 0x20A | 0x302 => (),
+            KEYINPUT | 0x136 | 0x142 | 0x15A | 0x206 | 0x20A | 0x302 => (),
 
             // Serial
             // TODO this is not how serial actually works but it tricks some tests...
@@ -562,9 +560,9 @@ impl MemoryMappedSystem<8192> for GameGirlAdv {
         match a {
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_nomut().palette, a - 0x500_0000),
-            0x0600_0000..=0x0601_7FFF => offs(&self.ppu_nomut().vram, a - 0x600_0000),
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_nomut().oam, a - 0x700_0000),
+            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
+            0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
+            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
             0x0800_0000..=0x09FF_FFFF if R && self.cart.rom.len() >= (a - 0x800_0000) => {
                 offs(&self.cart.rom, a - 0x800_0000)
             }
@@ -577,7 +575,7 @@ impl MemoryMappedSystem<8192> for GameGirlAdv {
             }
 
             // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => offs(&self.ppu_nomut().vram, 0x1_0000 + (a - 0x600_0000)),
+            0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
             0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),
             _ => ptr::null::<u8>() as *mut u8,
         }

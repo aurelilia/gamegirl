@@ -1530,6 +1530,7 @@ dependencies = [
  "elf_rs",
  "gga-ppu",
  "log",
+ "modular-bitfield",
  "psg-apu",
  "rubato",
  "serde",

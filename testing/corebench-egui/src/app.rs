@@ -11,7 +11,10 @@ use std::{
     time::Instant,
 };
 
-use dynacore::{common::components::input::InputReplay, gamegirl::dummy_core};
+use dynacore::{
+    common::components::input::{InputReplay, ReplayState},
+    gamegirl::dummy_core,
+};
 use eframe::{
     egui::{Color32, Context, TextureOptions},
     emath::History,
@@ -98,7 +101,13 @@ impl App {
                     self.rom = Some(file.content.clone());
                 }
 
-                Message::ReplayOpen(_) => {}
+                Message::ReplayOpen(file) => {
+                    let replay = InputReplay::load(String::from_utf8(file.content).unwrap());
+                    self.replay = Some(replay.clone());
+                    for core in &mut self.cores {
+                        core.c.options().input.replay = ReplayState::Playback(replay.clone());
+                    }
+                }
 
                 Message::CoreOpen(path) => {
                     if let Ok(core) = crate::load_core(path) {
@@ -112,6 +121,12 @@ impl App {
                         if let Some(rom) = self.rom.as_ref() {
                             for core in &mut self.cores {
                                 core.c = (core.loader)(rom.clone());
+                            }
+                        }
+                        if let Some(replay) = self.replay.as_ref() {
+                            for core in &mut self.cores {
+                                core.c.options().input.replay =
+                                    ReplayState::Playback(replay.clone());
                             }
                         }
                         self.update_test_suites();

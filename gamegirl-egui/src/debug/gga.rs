@@ -248,20 +248,20 @@ fn bg_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Con
         return;
     }
 
-    let mode = gg[DISPCNT] & 7;
-    ui.heading(format!("Current PPU mode: {mode}"));
-    if mode < 3 {
+    let mode = gg.ppu.dispcnt.bg_mode();
+    ui.label(format!("Current PPU mode: {mode:?}"));
+    if (mode as usize) < 3 {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 draw_bg_layer(gg, 0, ui, app, ctx);
                 ui.separator();
                 draw_bg_layer(gg, 1, ui, app, ctx);
             });
-            if mode < 2 {
+            if (mode as usize) < 2 {
                 ui.separator();
                 ui.horizontal(|ui| {
                     draw_bg_layer(gg, 2, ui, app, ctx);
-                    if mode == 0 {
+                    if (mode as usize) == 0 {
                         ui.separator();
                         draw_bg_layer(gg, 3, ui, app, ctx);
                     }
@@ -321,14 +321,14 @@ fn obj_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Co
         return;
     }
 
-    let mode = gg[DISPCNT] & 7;
-    ui.label(format!("Current PPU mode: {mode}"));
+    let mode = gg.ppu.dispcnt.bg_mode();
+    ui.label(format!("Current PPU mode: {mode:?}"));
     ui.separator();
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
-            draw_set_layer(gg, mode < 3, false, ui, app, ctx);
+            draw_set_layer(gg, (mode as usize) < 3, false, ui, app, ctx);
             ui.separator();
-            draw_set_layer(gg, mode < 3, true, ui, app, ctx);
+            draw_set_layer(gg, (mode as usize) < 3, true, ui, app, ctx);
         });
     });
 }
@@ -369,19 +369,19 @@ fn upload_texture(
 /// Draw a full 8x8 tile to the given buffer. The pointer is in VRAM; X/Y is in
 /// tiles.
 fn draw_tile(gg: &GameGirlAdv, buf: &mut [Colour], x: u8, y: u8, tile_ptr: u32, is_8bpp: bool) {
-    let ppu = gg.ppu_nomut();
+    let ppu = &gg.ppu;
     for line in 0..8 {
         if is_8bpp {
             let base_addr = tile_ptr + (line * 8);
             for pixel in 0..8 {
                 let idx = ((x.us() * 8) + pixel.us()) + (((y.us() * 8) + line.us()) * 256);
-                let l = ppu.vram((base_addr + pixel).us());
+                let l = ppu.vram[(base_addr + pixel).us()];
                 buf[idx] = Colour::from_rgb((l & 0xF) << 4, ((l >> 2) & 0xF) << 4, (l >> 4) << 4);
             }
         } else {
             let base_addr = tile_ptr + (line * 4);
             for idx in 0..4 {
-                let byte = ppu.vram((base_addr + idx).us());
+                let byte = ppu.vram[(base_addr + idx).us()];
                 let idx = ((x.us() * 8) + idx.us() * 2) + (((y.us() * 8) + line.us()) * 256);
                 buf[idx] = Colour::from_gray((byte & 0xF) << 4);
                 buf[idx + 1] = Colour::from_gray(byte & 0xF0);
