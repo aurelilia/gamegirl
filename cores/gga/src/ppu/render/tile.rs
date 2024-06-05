@@ -6,23 +6,24 @@
 
 use common::numutil::{hword, NumExt};
 
-use super::{OverflowMode, PaletteMode, Point, Ppu, WIDTH};
+use super::{super::Point, PpuRender, WIDTH};
+use crate::ppu::{OverflowMode, PaletteMode};
 
-impl Ppu {
+impl PpuRender {
     pub(super) fn render_bg_text(&mut self, bg: u16) {
-        if !self.bg_enabled(bg) {
+        if !self.r.bg_enabled(bg) {
             return;
         }
 
         let (hofs, vofs) = (
-            self.bg_offsets[bg.us() * 2] as i16,
-            self.bg_offsets[(bg.us() * 2) + 1],
+            self.r.bg_offsets[bg.us() * 2] as i16,
+            self.r.bg_offsets[(bg.us() * 2) + 1],
         );
-        let cnt = self.bg_cnt[bg.us()];
+        let cnt = self.r.bg_cnt[bg.us()];
         let screen_block_base = cnt.screen_base_block().us() * 0x800;
         let char_block_base = cnt.character_base_block().us() * 0x4000;
         let size = cnt.screen_size();
-        let bg_y = self.vcount.wrapping_add(vofs);
+        let bg_y = self.r.vcount.wrapping_add(vofs);
 
         for tile in -1..31 {
             let bg_x = (tile << 3) + hofs;
@@ -88,15 +89,15 @@ impl Ppu {
         }
     }
     pub(super) fn render_bg_affine(&mut self, bg: u16) {
-        if !self.bg_enabled(bg) {
+        if !self.r.bg_enabled(bg) {
             return;
         }
 
-        let cnt = self.bg_cnt[bg.us()];
+        let cnt = self.r.bg_cnt[bg.us()];
         let screen_block_base = cnt.screen_base_block().us() * 0x800;
         let char_block_base = cnt.character_base_block().us() * 0x4000;
         let size = [128, 256, 512, 1024][cnt.screen_size().us()];
-        let scal = self.bg_scale[bg.us() - 2];
+        let scal = self.r.bg_scale[bg.us() - 2];
 
         let Point(bg_x, bg_y) = scal.latched;
         for pixel_x in 0..(WIDTH as i32) {

@@ -12,7 +12,11 @@ use common::{
 };
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use super::{xy2dw, CharacterMappingMode, PaletteMode, Point, Ppu, HEIGHT, TRANS, WIDTH};
+use super::{
+    super::{registers::PaletteMode, Point},
+    xy2dw, PpuRender, HEIGHT, TRANS, WIDTH,
+};
+use crate::ppu::CharacterMappingMode;
 
 const OBJ_X_SIZE: [u16; 16] = [8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32, 8, 8, 8, 8];
 const OBJ_Y_SIZE: [u16; 16] = [8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64, 8, 8, 8, 8];
@@ -37,7 +41,7 @@ impl Default for ObjPixel {
     }
 }
 
-impl Ppu {
+impl PpuRender {
     pub(super) fn render_objs(&mut self) {
         for idx in 0..128 {
             let addr = idx << 3;
@@ -54,16 +58,16 @@ impl Ppu {
     }
 
     fn render_obj_normal(&mut self, obj: Object) {
-        let line = self.vcount as i32;
+        let line = self.r.vcount as i32;
         let position = obj.position();
         let (width, height) = obj.size();
 
-        if !obj.draw_on(self.vcount, position.1, height as u8) {
+        if !obj.draw_on(self.r.vcount, position.1, height as u8) {
             return; // Not on this line or invalid
         }
 
         let base_addr = 0x1_0000 + (0x20 * obj.tilenum().u32());
-        let tile_width = obj.tile_width(self.dispcnt.character_mapping_mode(), width);
+        let tile_width = obj.tile_width(self.r.dispcnt.character_mapping_mode(), width);
         let tile_size = obj.tile_size();
 
         let sprite_y = line - position.1;
@@ -111,7 +115,7 @@ impl Ppu {
     }
 
     fn render_obj_affine(&mut self, obj: Object, double: bool) {
-        let line = self.vcount as i32;
+        let line = self.r.vcount as i32;
         let position = obj.position();
         let (width, height) = obj.size();
         let (width, height) = (width as i32, height as i32);
@@ -121,12 +125,12 @@ impl Ppu {
             (width, height)
         };
 
-        if !obj.draw_on(self.vcount, position.1, bounds_h as u8) {
+        if !obj.draw_on(self.r.vcount, position.1, bounds_h as u8) {
             return; // Not on this line or invalid
         }
 
         let base_addr = 0x1_0000 + (0x20 * obj.tilenum().u32());
-        let tile_width = obj.tile_width(self.dispcnt.character_mapping_mode(), width as u16);
+        let tile_width = obj.tile_width(self.r.dispcnt.character_mapping_mode(), width as u16);
         let tile_size = obj.tile_size();
 
         let rotscal = self.get_rotscal(obj.rotscal());

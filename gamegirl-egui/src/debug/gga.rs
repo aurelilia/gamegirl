@@ -205,7 +205,7 @@ const OBJ_VRAM_TEX: [usize; 2] = [4, 5];
 fn bg_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
     fn draw_bg_layer(gg: &GameGirlAdv, bg: u32, ui: &mut Ui, app: &mut App, ctx: &Context) {
         let mut buf = make_buffer(32, 32);
-        let cnt = gg.ppu.bg_cnt[bg.us()];
+        let cnt = gg.ppu.regs.bg_cnt[bg.us()];
         let tile_base_addr = cnt.character_base_block().us() * 0x4000;
         let bpp8 = cnt.palette_mode() as u32 == 1;
 
@@ -247,7 +247,7 @@ fn bg_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Con
         return;
     }
 
-    let mode = gg.ppu.dispcnt.bg_mode();
+    let mode = gg.ppu.regs.dispcnt.bg_mode();
     ui.label(format!("Current PPU mode: {mode:?}"));
     if (mode as usize) < 3 {
         ui.vertical(|ui| {
@@ -320,7 +320,7 @@ fn obj_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Co
         return;
     }
 
-    let mode = gg.ppu.dispcnt.bg_mode();
+    let mode = gg.ppu.regs.dispcnt.bg_mode();
     ui.label(format!("Current PPU mode: {mode:?}"));
     ui.separator();
     ui.vertical(|ui| {

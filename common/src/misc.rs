@@ -53,6 +53,8 @@ pub struct SystemConfig {
     pub volume: f32,
     /// If the interpreter should cache
     pub cached_interpreter: bool,
+    /// If the PPU should run on a sepearate thread.
+    pub threaded_ppu: bool,
 }
 
 impl Default for SystemConfig {
@@ -65,6 +67,8 @@ impl Default for SystemConfig {
             run_on_open: true,
             volume: 0.5,
             cached_interpreter: true,
+            // WASM doesn't do threads
+            threaded_ppu: !cfg!(target_arch = "wasm32"),
         }
     }
 }

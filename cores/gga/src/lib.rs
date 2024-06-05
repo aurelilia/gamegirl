@@ -152,6 +152,7 @@ impl GameGirlAdv {
         self.config = old_self.config;
         self.debugger = old_self.debugger;
         self.init_memory();
+        Ppu::init_render(self);
     }
 
     pub fn with_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
@@ -172,6 +173,7 @@ impl GameGirlAdv {
             gga.cart.load_save(save);
         }
         gga.init_memory();
+        Ppu::init_render(&mut gga);
 
         if is_elf {
             gga.skip_bootrom();
@@ -230,7 +232,7 @@ impl Default for GameGirlAdv {
         gg.scheduler
             .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
 
-        // Initialize various IO registers
+        // Initialize various IO devices
         gg.dma.running = 99;
         gg.apu.bias = 0x200.into();
 

@@ -9,7 +9,8 @@ use std::{cmp, mem, ops::RangeInclusive};
 use arrayvec::ArrayVec;
 use common::{numutil::NumExt, Colour};
 
-use super::{xy2d, Point, Ppu, SpecialEffect, WindowCtrl, BLACK, WHITE, WIDTH};
+use super::{super::Point, xy2d, PpuRender, WIDTH};
+use crate::ppu::{SpecialEffect, WindowCtrl, BLACK, WHITE};
 
 fn blend(a: Colour, b: Colour, a_weight: u16, b_weight: u16) -> Colour {
     let r = cmp::min(31, (a[0].u16() * a_weight + b[0].u16() * b_weight) >> 4).u8();
@@ -31,7 +32,7 @@ pub(super) fn affine_transform_point(ref_point: Point, screen_x: i32, pa: i32, p
     Point((ref_x + screen_x * pa) >> 8, (ref_y + screen_x * pc) >> 8)
 }
 
-impl Ppu {
+impl PpuRender {
     /// Composes the render layers into a final scanline while applying needed
     /// special effects, and render it to the frame buffer
     pub(super) fn finalize_scanline(&mut self, bgs: RangeInclusive<usize>) {
@@ -44,12 +45,14 @@ impl Ppu {
 
         // filter out disabled backgrounds and sort by priority
         // the backgrounds are sorted once for the entire scanline
-        let mut sorted_backgrounds: ArrayVec<usize, 4> =
-            bgs.clone().filter(|bg| self.bg_enabled(bg.u16())).collect();
-        sorted_backgrounds.sort_by_key(|bg| (self.bg_cnt[*bg].priority(), *bg));
+        let mut sorted_backgrounds: ArrayVec<usize, 4> = bgs
+            .clone()
+            .filter(|bg| self.r.bg_enabled(bg.u16()))
+            .collect();
+        sorted_backgrounds.sort_by_key(|bg| (self.r.bg_cnt[*bg].priority(), *bg));
 
-        let y = self.vcount.us();
-        if !self.dispcnt.win_enabled() {
+        let y = self.r.vcount.us();
+        if !self.r.dispcnt.win_enabled() {
             for x in 0..WIDTH {
                 let win = WindowInfo::new(WindowCtrl::from_bytes([255]));
                 self.finalize_pixel(x, y, &win, &sorted_backgrounds, backdrop_color);
@@ -57,14 +60,14 @@ impl Ppu {
         } else {
             let mut occupied = [false; WIDTH];
             let mut occupied_count = 0;
-            if self.dispcnt.win0_en() && self.windows[0].contains_y(y) {
-                let win = WindowInfo::new(self.windows[0].control);
+            if self.r.dispcnt.win0_en() && self.r.windows[0].contains_y(y) {
+                let win = WindowInfo::new(self.r.windows[0].control);
                 let backgrounds = filter_active_window_bgs(&sorted_backgrounds, win.ctrl);
                 for (x, is_occupid) in occupied
                     .iter_mut()
                     .enumerate()
-                    .take(self.windows[0].right())
-                    .skip(self.windows[0].left())
+                    .take(self.r.windows[0].right())
+                    .skip(self.r.windows[0].left())
                 {
                     self.finalize_pixel(x, y, &win, &backgrounds, backdrop_color);
                     *is_occupid = true;
@@ -74,14 +77,14 @@ impl Ppu {
             if occupied_count == WIDTH {
                 return;
             }
-            if self.dispcnt.win1_en() && self.windows[1].contains_y(y) {
-                let win = WindowInfo::new(self.windows[1].control);
+            if self.r.dispcnt.win1_en() && self.r.windows[1].contains_y(y) {
+                let win = WindowInfo::new(self.r.windows[1].control);
                 let backgrounds = filter_active_window_bgs(&sorted_backgrounds, win.ctrl);
                 for (x, is_occupid) in occupied
                     .iter_mut()
                     .enumerate()
-                    .take(self.windows[1].right())
-                    .skip(self.windows[1].left())
+                    .take(self.r.windows[1].right())
+                    .skip(self.r.windows[1].left())
                 {
                     if *is_occupid {
                         continue;
@@ -94,10 +97,10 @@ impl Ppu {
             if occupied_count == WIDTH {
                 return;
             }
-            let win_out = WindowInfo::new(self.win_out);
+            let win_out = WindowInfo::new(self.r.win_out);
             let win_out_backgrounds = filter_active_window_bgs(&sorted_backgrounds, win_out.ctrl);
-            if self.dispcnt.winobj_en() {
-                let win_obj = WindowInfo::new(self.win_obj);
+            if self.r.dispcnt.winobj_en() {
+                let win_obj = WindowInfo::new(self.r.win_obj);
                 let win_obj_backgrounds =
                     filter_active_window_bgs(&sorted_backgrounds, win_obj.ctrl);
                 for (x, is_occupid) in occupied.iter().enumerate().take(WIDTH) {
@@ -142,10 +145,10 @@ impl Ppu {
             .filter(|i| self.bg_layers[**i][x][3] != 0)
             .take(2);
         let mut top_layer = it.next().map_or(backdrop_layer, |bg| {
-            RenderLayer::background(*bg, self.bg_layers[*bg][x], self.bg_cnt[*bg].priority())
+            RenderLayer::background(*bg, self.bg_layers[*bg][x], self.r.bg_cnt[*bg].priority())
         });
         let mut bot_layer = it.next().map_or(backdrop_layer, |bg| {
-            RenderLayer::background(*bg, self.bg_layers[*bg][x], self.bg_cnt[*bg].priority())
+            RenderLayer::background(*bg, self.bg_layers[*bg][x], self.r.bg_cnt[*bg].priority())
         });
         drop(it);
 
@@ -164,10 +167,11 @@ impl Ppu {
         }
 
         let obj_alpha_blend = top_layer.is_object() && obj_entry.is_alpha;
-        let top_flags = self.bldcnt.first_target();
-        let bot_flags = self.bldcnt.second_target();
+        let top_flags = self.r.bldcnt.first_target();
+        let bot_flags = self.r.bldcnt.second_target();
 
-        let sfx_enabled = (self.bldcnt.special_effect() != SpecialEffect::None || obj_alpha_blend)
+        let sfx_enabled = (self.r.bldcnt.special_effect() != SpecialEffect::None
+            || obj_alpha_blend)
             && (top_flags & top_layer.kind as u8) != 0; // sfx must at least have a first target configured
 
         let mut pixel = if win.ctrl.special_en() && sfx_enabled {
@@ -176,7 +180,7 @@ impl Ppu {
             } else {
                 let (top_layer, bot_layer) = (top_layer, bot_layer);
 
-                match self.bldcnt.special_effect() {
+                match self.r.bldcnt.special_effect() {
                     // Only alphablend with a second target.
                     SpecialEffect::AlphaBlend if (bot_flags & bot_layer.kind as u8) != 0 => {
                         self.do_alpha(top_layer.pixel, bot_layer.pixel)
@@ -199,20 +203,20 @@ impl Ppu {
 
     #[inline]
     fn do_alpha(&self, upper: Colour, lower: Colour) -> Colour {
-        let eva = self.bldalpha.eva().into();
-        let evb = self.bldalpha.evb().into();
+        let eva = self.r.bldalpha.eva().into();
+        let evb = self.r.bldalpha.evb().into();
         blend(upper, lower, eva, evb)
     }
 
     #[inline]
     fn do_brighten(&self, c: Colour) -> Colour {
-        let evy = self.bldy;
+        let evy = self.r.bldy;
         blend(c, WHITE, 16 - evy, evy)
     }
 
     #[inline]
     fn do_darken(&self, c: Colour) -> Colour {
-        let evy = self.bldy;
+        let evy = self.r.bldy;
         blend(c, BLACK, 16 - evy, evy)
     }
 }

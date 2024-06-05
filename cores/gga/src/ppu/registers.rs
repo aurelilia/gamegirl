@@ -7,10 +7,31 @@
 use common::numutil::{hword, word, NumExt, U16Ext};
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use super::{Point, Ppu, WIDTH};
+use super::{Point, WIDTH};
 use crate::addr::*;
 
-impl Ppu {
+#[derive(Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct PpuRegisters {
+    pub dispcnt: DisplayControl,
+    pub(super) greepswap: GreenSwap,
+    pub(super) dispstat: DisplayStatus,
+    pub(crate) vcount: u16,
+    pub bg_cnt: [BgControl; 4],
+    pub(super) bg_offsets: [u16; 8],
+    pub(super) bg_scale: [BgRotScal; 2],
+
+    pub(super) windows: [Window; 2],
+    pub(super) win_obj: WindowCtrl,
+    pub(super) win_out: WindowCtrl,
+
+    pub(super) mosaic: Mosaic,
+    pub(super) bldcnt: BlendControl,
+    pub(super) bldalpha: BlendAlpha,
+    pub(super) bldy: u16,
+}
+
+impl PpuRegisters {
     pub(super) fn bg_enabled(&self, bg: u16) -> bool {
         self.dispcnt.bg_en().is_bit(bg)
     }

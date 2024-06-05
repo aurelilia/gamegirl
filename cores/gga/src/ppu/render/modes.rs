@@ -4,9 +4,10 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use super::{render::affine_transform_point, xy2d, OverflowMode, Ppu, HEIGHT, WIDTH};
+use super::{pixels::affine_transform_point, xy2d, PpuRender, HEIGHT, WIDTH};
+use crate::ppu::OverflowMode;
 
-impl Ppu {
+impl PpuRender {
     pub fn render_mode0(&mut self) {
         for bg in 0..4 {
             self.render_bg_text(bg);
@@ -28,17 +29,17 @@ impl Ppu {
     }
 
     pub fn render_mode3(&mut self) {
-        if !self.bg_enabled(2) {
+        if !self.r.bg_enabled(2) {
             return;
         }
 
-        let wrap = self.bg_cnt[2].overflow_mode() == OverflowMode::Wraparound;
+        let wrap = self.r.bg_cnt[2].overflow_mode() == OverflowMode::Wraparound;
         for x in 0..WIDTH {
             let mut point = affine_transform_point(
-                self.bg_scale[0].latched,
+                self.r.bg_scale[0].latched,
                 x as i32,
-                self.bg_scale[0].pa as i32,
-                self.bg_scale[0].pc as i32,
+                self.r.bg_scale[0].pa as i32,
+                self.r.bg_scale[0].pc as i32,
             );
 
             if !point.inbounds(WIDTH, HEIGHT) {
@@ -58,18 +59,18 @@ impl Ppu {
     }
 
     pub fn render_mode4(&mut self) {
-        if !self.bg_enabled(2) {
+        if !self.r.bg_enabled(2) {
             return;
         }
 
         let start_addr = self.bitmap_start_addr();
-        let wrap = self.bg_cnt[2].overflow_mode() == OverflowMode::Wraparound;
+        let wrap = self.r.bg_cnt[2].overflow_mode() == OverflowMode::Wraparound;
         for x in 0..WIDTH {
             let mut point = affine_transform_point(
-                self.bg_scale[0].latched,
+                self.r.bg_scale[0].latched,
                 x as i32,
-                self.bg_scale[0].pa as i32,
-                self.bg_scale[0].pc as i32,
+                self.r.bg_scale[0].pa as i32,
+                self.r.bg_scale[0].pc as i32,
             );
 
             if !point.inbounds(WIDTH, HEIGHT) {
@@ -92,17 +93,17 @@ impl Ppu {
     }
 
     pub fn render_mode5(&mut self) {
-        if self.vcount > 127 || !self.bg_enabled(2) {
+        if self.r.vcount > 127 || !self.r.bg_enabled(2) {
             return;
         }
 
-        let wrap = self.bg_cnt[2].overflow_mode() == OverflowMode::Wraparound;
+        let wrap = self.r.bg_cnt[2].overflow_mode() == OverflowMode::Wraparound;
         for x in 0..WIDTH {
             let mut point = affine_transform_point(
-                self.bg_scale[0].latched,
+                self.r.bg_scale[0].latched,
                 x as i32,
-                self.bg_scale[0].pa as i32,
-                self.bg_scale[0].pc as i32,
+                self.r.bg_scale[0].pa as i32,
+                self.r.bg_scale[0].pc as i32,
             );
 
             if !point.inbounds(160, 127) {
@@ -122,7 +123,7 @@ impl Ppu {
     }
 
     fn bitmap_start_addr(&self) -> usize {
-        if self.dispcnt.frame_select() {
+        if self.r.dispcnt.frame_select() {
             0xA000
         } else {
             0x0

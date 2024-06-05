@@ -86,14 +86,14 @@ impl Dmas {
 
         let is_fifo = reason == Reason::Fifo;
         let is_vid_capture = idx == 3
-            && (2..162).contains(&gg.ppu.vcount)
+            && (2..162).contains(&gg.ppu.regs.vcount)
             && reason == Reason::HBlank
             && ctrl.timing() == Timing::Special;
         let is_on = ctrl.dma_en()
             && match ctrl.timing() {
                 Timing::Now => reason == Reason::CtrlWrite,
                 Timing::VBlank => reason == Reason::VBlank,
-                Timing::HBlank => reason == Reason::HBlank && gg.ppu.vcount < 160,
+                Timing::HBlank => reason == Reason::HBlank && gg.ppu.regs.vcount < 160,
                 Timing::Special => is_fifo || is_vid_capture,
             };
         if !is_on {
@@ -142,7 +142,7 @@ impl Dmas {
 
         if !ctrl.repeat_en()
             || ctrl.timing() == Timing::Now
-            || (is_vid_capture && gg.ppu.vcount == 161)
+            || (is_vid_capture && gg.ppu.regs.vcount == 161)
         {
             // Disable if reload is not enabled, it's an immediate transfer, or end of video
             // capture

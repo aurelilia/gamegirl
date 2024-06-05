@@ -9,9 +9,10 @@ use common::{
     Colour,
 };
 
-use super::{xy2dw, PaletteMode, Ppu};
+use super::{xy2dw, PpuRender};
+use crate::ppu::PaletteMode;
 
-impl Ppu {
+impl PpuRender {
     /// Given a tile address and tile pixel, get the palette.
     pub(super) fn get_palette(
         &self,

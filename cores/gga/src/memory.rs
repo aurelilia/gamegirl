@@ -139,7 +139,7 @@ impl GameGirlAdv {
             TM3CNT_H => self.timers.control[3].into(),
 
             // PPU
-            DISPCNT..=BLDALPHA if let Some(val) = self.ppu.read_mmio(a) => val,
+            DISPCNT..=BLDALPHA if let Some(val) = self.ppu.regs.read_mmio(a) => val,
 
             // Sound
             0x60..=0x80 | 0x84 | 0x86 | 0x8A | 0x90..=0x9F => {
@@ -386,7 +386,7 @@ impl GameGirlAdv {
             SOUNDBIAS_L => self.apu.bias = value.into(),
 
             // PPU
-            DISPCNT..=BLDY => self.ppu.write_mmio(a, value),
+            DISPCNT..=BLDY => self.ppu.regs.write_mmio(a, value),
 
             // Timers
             TM0CNT_L => self.timers.reload[0] = value,

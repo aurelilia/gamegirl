@@ -37,6 +37,10 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         ui.heading("Gameboy Advance");
         ui.checkbox(&mut opt.sys.cached_interpreter, "Enable Cached Interpreter")
             .on_hover_text("Enables caching in the interpreter. Speeds up emulation at the cost of RAM usage. Also breaks breakpoints.");
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        ui.checkbox(&mut opt.sys.threaded_ppu, "Enable Threaded Graphics")
+            .on_hover_text("Enables running the GGA PPU in a separate thread. Speeds up emulation a lot, but uses slightly more CPU and RAM and might cause some subtle graphical glitches.");
     });
 
     CollapsingHeader::new("Features").show(ui, |ui| {
