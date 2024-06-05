@@ -8,9 +8,10 @@
 //! Luckily, GGA input is dead simple compared to even GG.
 
 use arm_cpu::{Cpu, Interrupt};
+use common::TimeS;
 use modular_bitfield::{bitfield, specifiers::B14};
 
-use crate::GameGirlAdv;
+use crate::{cpu::CPU_CLOCK, scheduling::AdvEvent, GameGirlAdv};
 
 #[bitfield]
 #[repr(u16)]
@@ -42,6 +43,9 @@ impl GameGirlAdv {
             if fire {
                 Cpu::request_interrupt(self, Interrupt::Joypad);
             }
+
+            self.scheduler
+                .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
         }
     }
 }

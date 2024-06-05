@@ -4,10 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{
-    ops::{Index, IndexMut},
-    ptr,
-};
+use std::ptr;
 
 use arm_cpu::{
     registers::Flag,

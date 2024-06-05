@@ -8,7 +8,7 @@ use common::{components::scheduler::Kind, TimeS};
 use psg_apu::GenApuEvent;
 use AdvEvent::*;
 
-use crate::{addr::KEYINPUT, audio::Apu, cpu::CPU_CLOCK, ppu::Ppu, timer::Timers, GameGirlAdv};
+use crate::{audio::Apu, ppu::Ppu, timer::Timers, GameGirlAdv};
 
 /// All scheduler events on the GGA.
 #[derive(Copy, Clone, Eq, PartialEq, Default)]
@@ -34,11 +34,7 @@ impl AdvEvent {
     pub fn dispatch(self, gg: &mut GameGirlAdv, late_by: TimeS) {
         match self {
             PauseEmulation => gg.ticking = false,
-            UpdateKeypad => {
-                gg.check_keycnt();
-                gg.scheduler
-                    .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
-            }
+            UpdateKeypad => gg.check_keycnt(),
             PpuEvent(evt) => Ppu::handle_event(gg, evt, late_by),
             ApuEvent(evt) => {
                 let time = Apu::handle_event(gg, evt, late_by);

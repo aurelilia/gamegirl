@@ -1277,6 +1277,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "flamegraph"
+version = "0.1.0"
+dependencies = [
+ "dynacore",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"

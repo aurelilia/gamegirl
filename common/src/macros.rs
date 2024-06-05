@@ -24,6 +24,10 @@ macro_rules! common_functions {
             while self.debugger.running && self.ticking {
                 self.advance();
             }
+
+            if self.apu.buffer.len() > 100_000 {
+                self.apu.buffer.truncate(100);
+            }
         }
 
         fn produce_frame(&mut self) -> Option<Vec<::common::Colour>> {

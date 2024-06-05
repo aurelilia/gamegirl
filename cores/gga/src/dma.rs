@@ -228,11 +228,6 @@ impl Dmas {
             _ => 0,
         }
     }
-
-    /// Get the base address for a DMA (First register: SRC low)
-    fn base_addr(idx: u16) -> u32 {
-        0xB0 + (idx.u32() * 0xC)
-    }
 }
 
 /// Reason for why a DMA transfer attempt was initiated.
