@@ -9,6 +9,8 @@
 //! TODO: Resampling is not actually being used properly.
 //! for the time being: broken!
 
+pub mod mplayer;
+
 use std::collections::VecDeque;
 
 use common::{

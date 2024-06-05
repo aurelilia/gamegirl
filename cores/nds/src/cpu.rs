@@ -19,7 +19,10 @@ use arm_cpu::{
     Access, Cpu, Exception,
 };
 use common::{
-    components::{debugger::Debugger, memory::MemoryMapper},
+    components::{
+        debugger::Debugger,
+        memory::{MemoryMappedSystem, MemoryMapper},
+    },
     numutil::NumExt,
     Time,
 };
@@ -58,11 +61,15 @@ impl ArmSystem for Nds7 {
     fn pipeline_stalled(&mut self) {}
 
     fn get<T: RwType>(&mut self, addr: u32) -> T {
-        MemoryMapper::get(self, addr, T::WIDTH - 1, Self::get_slow)
+        self.memory.mapper[0]
+            .get::<Self, _>(addr)
+            .unwrap_or_else(|| self.get_slow(addr))
     }
 
     fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        MemoryMapper::set(self, addr, value, Self::set_slow);
+        if !self.memory.mapper[0].set::<Self, _>(addr, value) {
+            self.set_slow(addr, value)
+        }
     }
 
     fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {
@@ -111,11 +118,15 @@ impl ArmSystem for Nds9 {
     fn pipeline_stalled(&mut self) {}
 
     fn get<T: RwType>(&mut self, addr: u32) -> T {
-        MemoryMapper::get(self, addr, T::WIDTH - 1, Self::get_slow)
+        self.memory.mapper[1]
+            .get::<Self, _>(addr)
+            .unwrap_or_else(|| self.get_slow(addr))
     }
 
     fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        MemoryMapper::set(self, addr, value, Self::set_slow);
+        if !self.memory.mapper[1].set::<Self, _>(addr, value) {
+            self.set_slow(addr, value)
+        }
     }
 
     fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {

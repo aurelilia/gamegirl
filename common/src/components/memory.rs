@@ -48,39 +48,26 @@ pub struct MemoryMapper<const SIZE: usize> {
 }
 
 impl<const SIZE: usize> MemoryMapper<SIZE> {
-    /// Get a value in the mapper. Will try to do a fast read from page tables,
-    /// falls back to given closure if no page table is mapped at that address.
+    /// Get a value in the mapper. Assumes address to be aligned.
     #[inline]
-    pub fn get<Sys: MemoryMappedSystem<SIZE>, T>(
-        this: &Sys,
-        addr: Sys::Usize,
-        align: Sys::Usize,
-        slow: impl FnOnce(&Sys, Sys::Usize) -> T,
-    ) -> T {
-        let aligned = addr & align;
-        let ptr = this.get_mapper().page::<Sys, false>(aligned);
+    pub fn get<Sys: MemoryMappedSystem<SIZE>, T>(&self, addr: Sys::Usize) -> Option<T> {
+        let ptr = self.page::<Sys, false>(addr);
         if ptr as usize > (1 << Sys::PAGE_POW) {
-            unsafe { (ptr as *const T).read() }
+            Some(unsafe { (ptr as *const T).read() })
         } else {
-            slow(this, addr)
+            None
         }
     }
 
-    /// Sets a value in the mapper. Will try to do a fast write with page
-    /// tables, falls back to given closure if no page table is mapped at
-    /// that address.
+    /// Sets a value in the mapper. Returns success.
     #[inline]
-    pub fn set<Sys: MemoryMappedSystem<SIZE>, T>(
-        this: &mut Sys,
-        addr: Sys::Usize,
-        value: T,
-        slow: impl FnOnce(&mut Sys, Sys::Usize, T),
-    ) {
-        let ptr = this.get_mapper().page::<Sys, true>(addr);
+    pub fn set<Sys: MemoryMappedSystem<SIZE>, T>(&mut self, addr: Sys::Usize, value: T) -> bool {
+        let ptr = self.page::<Sys, true>(addr);
         if ptr as usize > (1 << Sys::PAGE_POW) {
             unsafe { ptr::write(ptr.cast(), value) }
+            true
         } else {
-            slow(this, addr, value);
+            false
         }
     }
 

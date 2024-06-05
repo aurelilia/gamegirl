@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Leela Aurelia, git@elia.garden
 //
-// Unless otherwise noted, this file is released and thus subject to the
+// Unless otherwise noted, self file is released and thus subject to the
 // terms of the Mozilla Public License Version 2.0 (MPL-2.0) or the
 // GNU General Public License Version 3 (GPL-3).
-// If a copy of these licenses was not distributed with this file, you can
+// If a copy of these licenses was not distributed with self file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use std::ptr;
@@ -52,20 +52,22 @@ impl GameGirlAdv {
     /// the value.
     #[inline]
     pub fn get_byte(&self, addr: u32) -> u8 {
-        MemoryMapper::get(self, addr, !0, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
-            0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u8(),
+        self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
+            match addr {
+                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
+                0x0000_0000..=0x0000_3FFF => self.memory.bios_value.u8(),
 
-            0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => this.get_mmio(addr).high(),
-            0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr).low(),
+                0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => self.get_mmio(addr).high(),
+                0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr).low(),
 
-            0x0E00_0000..=0x0FFF_FFFF => this.cart.read_ram_byte(addr.us() & 0xFFFF),
-            // Account for unmapped last page due to EEPROM
-            0x0DFF_8000..=0x0DFF_FFFF if this.cart.rom.len() >= (addr.us() - 0x800_0000) => {
-                this.cart.rom[addr.us() - 0x800_0000]
+                0x0E00_0000..=0x0FFF_FFFF => self.cart.read_ram_byte(addr.us() & 0xFFFF),
+                // Account for unmapped last page due to EEPROM
+                0x0DFF_8000..=0x0DFF_FFFF if self.cart.rom.len() >= (addr.us() - 0x800_0000) => {
+                    self.cart.rom[addr.us() - 0x800_0000]
+                }
+
+                _ => self.invalid_read::<false>(addr).u8(),
             }
-
-            _ => this.invalid_read::<false>(addr).u8(),
         })
     }
 
@@ -73,25 +75,30 @@ impl GameGirlAdv {
     /// simply fetches the value.
     #[inline]
     pub(super) fn get_hword(&self, addr: u32) -> u16 {
-        MemoryMapper::get(self, addr, !1, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
-            0x0000_0000..=0x0000_3FFF => this.memory.bios_value.u16(),
+        let addr = addr & !1;
+        self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
+            match addr {
+                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
+                0x0000_0000..=0x0000_3FFF => self.memory.bios_value.u16(),
 
-            0x0400_0000..=0x04FF_FFFF => this.get_mmio(addr),
+                0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr),
 
-            // If EEPROM, use that...
-            0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => this.cart.read_ram_hword(),
-            // If not, account for unmapped last page due to EEPROM
-            0x0DFF_8000..=0x0DFF_FFFF => hword(this.get_byte(addr), this.get_byte(addr + 1)),
+                // If EEPROM, use that...
+                0x0D00_0000..=0x0DFF_FFFF if self.cart.is_eeprom_at(addr) => {
+                    self.cart.read_ram_hword()
+                }
+                // If not, account for unmapped last page due to EEPROM
+                0x0DFF_8000..=0x0DFF_FFFF => hword(self.get_byte(addr), self.get_byte(addr + 1)),
 
-            // Other saves
-            0x0E00_0000..=0x0FFF_FFFF => {
-                // Reading halfwords causes the byte to be repeated
-                let byte = this.cart.read_ram_byte(addr.us() & 0xFFFF);
-                hword(byte, byte)
+                // Other saves
+                0x0E00_0000..=0x0FFF_FFFF => {
+                    // Reading halfwords causes the byte to be repeated
+                    let byte = self.cart.read_ram_byte(addr.us() & 0xFFFF);
+                    hword(byte, byte)
+                }
+
+                _ => self.invalid_read::<false>(addr).u16(),
             }
-
-            _ => this.invalid_read::<false>(addr).u16(),
         })
     }
 
@@ -99,26 +106,29 @@ impl GameGirlAdv {
     /// fetches the value. Also does not handle unaligned reads.
     #[inline]
     pub fn get_word(&self, addr: u32) -> u32 {
-        MemoryMapper::get(self, addr, !3, |this, addr| match addr {
-            0x0000_0000..=0x0000_3FFF if this.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
-            0x0000_0000..=0x0000_3FFF => this.memory.bios_value,
+        let addr = addr & !3;
+        self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
+            match addr {
+                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
+                0x0000_0000..=0x0000_3FFF => self.memory.bios_value,
 
-            0x0400_0000..=0x04FF_FFFF => {
-                word(this.get_mmio(addr), this.get_mmio(addr.wrapping_add(2)))
+                0x0400_0000..=0x04FF_FFFF => {
+                    word(self.get_mmio(addr), self.get_mmio(addr.wrapping_add(2)))
+                }
+
+                // Account for unmapped last page due to EEPROM
+                0x0DFF_8000..=0x0DFF_FFFF => word(self.get_hword(addr), self.get_hword(addr + 2)),
+
+                // Other saves
+                0x0E00_0000..=0x0FFF_FFFF => {
+                    // Reading words causes the byte to be repeated
+                    let byte = self.cart.read_ram_byte(addr.us() & 0xFFFF);
+                    let hword = hword(byte, byte);
+                    word(hword, hword)
+                }
+
+                _ => self.invalid_read::<true>(addr),
             }
-
-            // Account for unmapped last page due to EEPROM
-            0x0DFF_8000..=0x0DFF_FFFF => word(this.get_hword(addr), this.get_hword(addr + 2)),
-
-            // Other saves
-            0x0E00_0000..=0x0FFF_FFFF => {
-                // Reading words causes the byte to be repeated
-                let byte = this.cart.read_ram_byte(addr.us() & 0xFFFF);
-                let hword = hword(byte, byte);
-                word(hword, hword)
-            }
-
-            _ => this.invalid_read::<true>(addr),
         })
     }
 
@@ -288,7 +298,9 @@ impl GameGirlAdv {
             }
             0x0601_0000..=0x07FF_FFFF => (), // Ignored
 
-            _ => MemoryMapper::set(self, addr, value, |_this, _addr, _value| ()),
+            _ => {
+                self.memory.mapper.set::<Self, _>(addr, value);
+            }
         }
         self.cpu.cache.write(addr);
     }
@@ -297,27 +309,30 @@ impl GameGirlAdv {
     /// simply sets the value.
     pub(super) fn set_hword(&mut self, addr_unaligned: u32, value: u16) {
         let addr = addr_unaligned & !1; // Forcibly align: All write instructions do this
-        MemoryMapper::set(self, addr, value, |this, addr, value| match addr {
-            0x0400_0000..=0x0400_0300 => this.set_mmio(addr, value),
+        let success = self.memory.mapper.set::<Self, _>(addr, value);
+        if !success {
+            match addr {
+                0x0400_0000..=0x0400_0300 => self.set_mmio(addr, value),
 
-            // Maybe write EEPROM
-            0x0D00_0000..=0x0DFF_FFFF if this.cart.is_eeprom_at(addr) => {
-                this.cart.write_ram_hword(value);
+                // Maybe write EEPROM
+                0x0D00_0000..=0x0DFF_FFFF if self.cart.is_eeprom_at(addr) => {
+                    self.cart.write_ram_hword(value);
+                }
+
+                // Other saves
+                0x0E00_0000..=0x0FFF_FFFF => {
+                    // Writing halfwords causes a byte from it to be written
+                    let byte = if addr_unaligned.is_bit(0) {
+                        value.high()
+                    } else {
+                        value.low()
+                    };
+                    self.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
+                }
+
+                _ => (),
             }
-
-            // Other saves
-            0x0E00_0000..=0x0FFF_FFFF => {
-                // Writing halfwords causes a byte from it to be written
-                let byte = if addr_unaligned.is_bit(0) {
-                    value.high()
-                } else {
-                    value.low()
-                };
-                this.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
-            }
-
-            _ => (),
-        });
+        }
         self.cpu.cache.write(addr);
     }
 
@@ -325,23 +340,26 @@ impl GameGirlAdv {
     /// sets the value.
     pub(super) fn set_word(&mut self, addr_unaligned: u32, value: u32) {
         let addr = addr_unaligned & !3; // Forcibly align: All write instructions do this
-        MemoryMapper::set(self, addr, value, |this, addr, value| match addr {
-            0x0400_0000..=0x0400_0300 => {
-                this.set_mmio(addr, value.low());
-                this.set_mmio(addr.wrapping_add(2), value.high());
-            }
+        let success = self.memory.mapper.set::<Self, _>(addr, value);
+        if !success {
+            match addr {
+                0x0400_0000..=0x0400_0300 => {
+                    self.set_mmio(addr, value.low());
+                    self.set_mmio(addr.wrapping_add(2), value.high());
+                }
 
-            // Saves
-            0x0E00_0000..=0x0FFF_FFFF => {
-                // Writing words causes a byte from it to be written
-                let byte_shift = (addr_unaligned & 3) * 8;
-                let byte = (value >> byte_shift) & 0xFF;
-                this.cart
-                    .write_ram_byte(addr_unaligned.us() & 0xFFFF, byte.u8());
-            }
+                // Saves
+                0x0E00_0000..=0x0FFF_FFFF => {
+                    // Writing words causes a byte from it to be written
+                    let byte_shift = (addr_unaligned & 3) * 8;
+                    let byte = (value >> byte_shift) & 0xFF;
+                    self.cart
+                        .write_ram_byte(addr_unaligned.us() & 0xFFFF, byte.u8());
+                }
 
-            _ => (),
-        });
+                _ => (),
+            };
+        }
         self.cpu.cache.write(addr);
     }
 

@@ -44,7 +44,7 @@ pub struct Memory {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     data_tcm: [u8; 16 * KB],
 
-    mapper: CpuDevice<MemoryMapper<8192>>,
+    pub mapper: CpuDevice<MemoryMapper<8192>>,
     wait_word: CpuDevice<[u16; 32]>,
     wait_other: CpuDevice<[u16; 32]>,
 }
