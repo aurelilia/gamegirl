@@ -153,7 +153,7 @@ impl Ppu {
         // object pixel that takes priority of one of the layers
         let obj_entry = self.obj_pixel(x);
 
-        if win.ctrl.obj_en() && self.dispcnt.obj_en() && obj_entry.colour[3] != 0 {
+        if win.ctrl.obj_en() && obj_entry.colour[3] != 0 {
             let obj_layer = RenderLayer::objects(obj_entry.colour, obj_entry.priority);
             if obj_layer.priority <= top_layer.priority {
                 bot_layer = top_layer;

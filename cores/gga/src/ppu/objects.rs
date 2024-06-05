@@ -4,6 +4,8 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
+use std::cmp;
+
 use common::{
     numutil::{hword, NumExt},
     Colour,
@@ -43,7 +45,7 @@ impl Ppu {
             let obj = Object::from_bytes(bytes.try_into().unwrap());
 
             match obj.kind() {
-                ObjectKind::Normal => self.render_obj_normal(obj, idx),
+                ObjectKind::Normal => self.render_obj_normal(obj),
                 ObjectKind::Affine => self.render_obj_affine(obj, false),
                 ObjectKind::AffineDouble => self.render_obj_affine(obj, true),
                 ObjectKind::Disable => (),
@@ -51,12 +53,12 @@ impl Ppu {
         }
     }
 
-    fn render_obj_normal(&mut self, obj: Object, idx: usize) {
+    fn render_obj_normal(&mut self, obj: Object) {
         let line = self.vcount as i32;
         let position = obj.position();
         let (width, height) = obj.size();
 
-        if !obj.draw_on(self.vcount, height as u8) {
+        if !obj.draw_on(self.vcount, position.1, height as u8) {
             return; // Not on this line or invalid
         }
 
@@ -71,9 +73,9 @@ impl Ppu {
             sprite_y
         };
 
-        for screen_x in
-            (position.0..(position.0 + width as i32)).filter(|x| *x > 0 && *x < WIDTH as i32)
-        {
+        let start = cmp::max(position.0, 0);
+        let end = cmp::min(position.0 + width as i32, WIDTH as i32);
+        for screen_x in start..end {
             let current = self.obj_pixel(screen_x as usize);
             if current.priority <= obj.priority() && obj.mode() != ObjectMode::ObjWindow {
                 continue;
@@ -119,7 +121,7 @@ impl Ppu {
             (width, height)
         };
 
-        if !obj.draw_on(self.vcount, bounds_h as u8) {
+        if !obj.draw_on(self.vcount, position.1, bounds_h as u8) {
             return; // Not on this line or invalid
         }
 
@@ -256,9 +258,8 @@ impl Object {
         }
     }
 
-    fn draw_on(self, line: u16, size_y: u8) -> bool {
-        let y = self.position().1;
-        self.valid() && (line as i32 >= y) && (line < (y as u16 + size_y as u16))
+    fn draw_on(self, line: u16, self_y: i32, size_y: u8) -> bool {
+        self.valid() && (line as i32 >= self_y) && (line < (self_y as u16 + size_y as u16))
     }
 
     fn valid(self) -> bool {

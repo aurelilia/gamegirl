@@ -56,7 +56,10 @@ pub fn load_cart(
     #[cfg(feature = "psx")]
     use std::os::unix::prelude::OsStrExt;
     #[cfg(feature = "psx")]
-    let _is_psx = path.as_ref().unwrap().extension().unwrap().as_bytes() == b"iso";
+    let _is_psx = path
+        .as_ref()
+        .map(|e| e.extension().unwrap().as_bytes() == b"iso")
+        .unwrap_or(false);
 
     let mut sys: Box<dyn Core> = match () {
         #[cfg(feature = "ggc")]

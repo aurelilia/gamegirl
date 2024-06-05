@@ -33,9 +33,6 @@ use crate::{
     },
 };
 
-#[cfg(feature = "instruction-tracing")]
-type Tracer<S> = Box<dyn Fn(&S, u32) + Sync + Send + 'static>;
-
 /// Represents the CPU of the console - an ARM7TDMI.
 /// It is generic over the system used; see `interface.rs`.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -60,13 +57,6 @@ pub struct Cpu<S: ArmSystem + 'static> {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "serde", serde(skip))]
     pub cache: Cache<S>,
-
-    #[cfg(feature = "instruction-tracing")]
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg(feature = "instruction-tracing")]
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg(feature = "instruction-tracing")]
-    pub instruction_tracer: Option<Tracer<S>>,
 }
 
 impl<S: ArmSystem> Cpu<S> {
@@ -229,19 +219,16 @@ impl<S: ArmSystem> Cpu<S> {
     }
 
     fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32) {
-        let pc = gg.cpu().pc();
-        gg.debugger().add_traced_instruction(|| {
-            let mnem = if TY::WIDTH == 2 {
-                Self::get_mnemonic_thumb(inst.u16())
-            } else {
-                Self::get_mnemonic_arm(inst)
-            };
-            format!("0x{:08X} {}", pc, mnem)
-        });
-
-        #[cfg(feature = "instruction-tracing")]
-        if let Some(tracer) = &gg.cpur().instruction_tracer {
-            tracer(gg, inst);
+        if gg.debugger().tracing() {
+            let pc = gg.cpu().pc();
+            gg.debugger().add_traced_instruction(|| {
+                let mnem = if TY::WIDTH == 2 {
+                    Self::get_mnemonic_thumb(inst.u16())
+                } else {
+                    Self::get_mnemonic_arm(inst)
+                };
+                format!("0x{:08X} {}", pc, mnem)
+            });
         }
     }
 
@@ -367,9 +354,6 @@ impl<S: ArmSystem> Default for Cpu<S> {
             ime: false,
             ie: 0,
             if_: 0,
-
-            #[cfg(feature = "instruction-tracing")]
-            instruction_tracer: None,
         }
     }
 }

@@ -10,6 +10,7 @@ let
     libGL
     trunk
     cargo-edit
+    cargo-flamegraph
   ];
 in
   pkgs.mkShell {

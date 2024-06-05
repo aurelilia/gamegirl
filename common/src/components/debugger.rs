@@ -59,6 +59,11 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
         bp.is_none()
     }
 
+    #[inline]
+    pub fn tracing(&self) -> bool {
+        self.traced_instructions.is_some()
+    }
+
     /// Add another instruction to trace.
     pub fn add_traced_instruction(&mut self, writer: impl FnOnce() -> String) {
         if let Some(instr) = self.traced_instructions.as_mut() {

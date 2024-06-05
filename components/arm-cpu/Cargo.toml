@@ -14,4 +14,3 @@ bitmatch.workspace = true
 
 [features]
 serde = ["dep:serde"]
-instruction-tracing = []
