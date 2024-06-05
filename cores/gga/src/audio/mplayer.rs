@@ -9,14 +9,19 @@
 // of fleroviux and her emulator NBA:
 // https://github.com/nba-emu/NanoBoyAdvance/blob/master/src/nba/src/hw/apu/hle
 // Thank you!
+// It's currently effetively a function-by-function rewrite in Rust.
 
-use std::ptr;
+use core::slice;
+use std::{cmp, mem, ptr};
 
 use common::components::memory::MemoryMapper;
 
 use crate::GameGirlAdv;
 
 const MAX_CH: usize = 12;
+const TOTAL_FRAME_COUNT: u32 = 7;
+const SAMPLE_RATE: u32 = 65536;
+const SAMPLES_PER_FRAME: u32 = SAMPLE_RATE / 60 + 1;
 const CHANNEL_START: u8 = 0x80;
 const CHANNEL_STOP: u8 = 0x40;
 const CHANNEL_LOOP: u8 = 0x10;
@@ -30,6 +35,10 @@ const CHANNEL_ON: u8 = CHANNEL_START | CHANNEL_STOP | CHANNEL_ECHO | CHANNEL_ENV
 
 fn u8_to_float(value: u8) -> f32 {
     value as f32 / 256.
+}
+
+const fn i8_to_float(value: i8) -> f32 {
+    value as f32 / 127.
 }
 
 pub fn find_mp2k(rom: &[u8]) -> Option<u32> {
@@ -244,6 +253,230 @@ impl MusicPlayer {
             }
         }
     }
+
+    fn render_frame(&mut self, bus: MemoryMapper<8192>) {
+        const DIFFERENTIAL_LUT: &[f32] = &[
+            i8_to_float(0x00u8 as i8),
+            i8_to_float(0x01u8 as i8),
+            i8_to_float(0x04u8 as i8),
+            i8_to_float(0x09u8 as i8),
+            i8_to_float(0x10u8 as i8),
+            i8_to_float(0x19u8 as i8),
+            i8_to_float(0x24u8 as i8),
+            i8_to_float(0x31u8 as i8),
+            i8_to_float(0xC0u8 as i8),
+            i8_to_float(0xCFu8 as i8),
+            i8_to_float(0xDCu8 as i8),
+            i8_to_float(0xE7u8 as i8),
+            i8_to_float(0xF0u8 as i8),
+            i8_to_float(0xF7u8 as i8),
+            i8_to_float(0xFCu8 as i8),
+            i8_to_float(0xFFu8 as i8),
+        ];
+
+        self.current_frame = (self.current_frame + 1) % TOTAL_FRAME_COUNT;
+
+        let reverb_strength = if self.force_reverb {
+            cmp::max(self.sound_info.reverb, 48)
+        } else {
+            self.sound_info.reverb
+        };
+        let max_channels = cmp::min(self.sound_info.max_channels as usize, MAX_CH);
+        let destination = (self.current_frame * SAMPLES_PER_FRAME * 2) as usize;
+
+        if reverb_strength > 0 {
+            self.render_reverb(destination, reverb_strength);
+        } else {
+            self.buffer[destination..(destination + (SAMPLES_PER_FRAME as usize * 8))].fill(0.);
+        }
+
+        for i in 0..max_channels {
+            let channel = &mut self.sound_info.channels[i];
+            let sampler = &mut self.samplers[i];
+            let envelope = &mut self.envelopes[i];
+
+            if (channel.status & CHANNEL_ON) == 0 {
+                continue;
+            }
+
+            let angular_step = if (channel.type_ & 8) != 0 {
+                self.sound_info.pcm_sample_rate as f32 / SAMPLE_RATE as f32
+            } else {
+                channel.frequency as f32 / SAMPLE_RATE as f32
+            };
+
+            let compressed = (channel.type_ & 32) != 0;
+            let sample_history = &mut sampler.sample_history;
+            let wave_info = &sampler.wave_info;
+
+            let mut wave_size = wave_info.number_of_samples;
+            if sampler.compressed != compressed || !sampler.wave_data.is_null() {
+                if compressed {
+                    wave_size *= 33;
+                    wave_size = (wave_size + 63) / 64;
+                }
+                let wave_data_begin = channel.wave_address + mem::size_of::<WaveInfo>() as u32;
+                sampler.wave_data = bus.page::<GameGirlAdv, false>(wave_data_begin);
+                if (sampler.wave_data as usize) < 0x10_000 {
+                    log::warn!(
+                        "Mplayer: Channel {i} had invalid wave address 0x{:08X}",
+                        channel.wave_address
+                    );
+                    channel.status = 0; // Disable channel, there is no good way to deal with this.
+                    continue;
+                }
+                sampler.compressed = compressed;
+            }
+
+            let wave_data =
+                unsafe { slice::from_raw_parts_mut(sampler.wave_data, wave_size as usize) };
+            for j in 0..SAMPLES_PER_FRAME {
+                let t = j as f32 / SAMPLES_PER_FRAME as f32;
+
+                let volume_l = envelope.volume_l[0] * (1. - t) + envelope.volume_l[1] * t;
+                let volume_r = envelope.volume_r[0] * (1. - t) + envelope.volume_r[1] * t;
+
+                if sampler.should_fetch_sample {
+                    let mut sample;
+
+                    if compressed {
+                        let block_offset = sampler.current_position & 63;
+                        let block_address = (sampler.current_position >> 6) * 33;
+
+                        if block_offset == 0 {
+                            sample = i8_to_float(wave_data[block_address as usize] as i8);
+                        } else {
+                            sample = sample_history[0];
+                        }
+
+                        let address = block_address + (block_offset >> 1) + 1;
+                        let mut lut_index = wave_data[address as usize];
+
+                        if (block_offset & 1) != 0 {
+                            lut_index &= 15;
+                        } else {
+                            lut_index >>= 4;
+                        }
+
+                        sample += DIFFERENTIAL_LUT[lut_index as usize];
+                    } else {
+                        sample = i8_to_float(wave_data[sampler.current_position as usize] as i8);
+                    }
+
+                    if self.use_cubic_filter {
+                        sample_history[3] = sample_history[2];
+                        sample_history[2] = sample_history[1];
+                    }
+                    sample_history[1] = sample_history[0];
+                    sample_history[0] = sample;
+
+                    sampler.should_fetch_sample = false;
+                }
+
+                let sample;
+                let mu = sampler.resample_phase;
+
+                if self.use_cubic_filter {
+                    // http://paulbourke.net/miscellaneous/interpolation/
+                    let mu2 = mu * mu;
+                    let a0 = sample_history[0] - sample_history[1] - sample_history[3]
+                        + sample_history[2];
+                    let a1 = sample_history[3] - sample_history[2] - a0;
+                    let a2 = sample_history[1] - sample_history[3];
+                    let a3 = sample_history[2];
+                    sample = a0 * mu * mu2 + a1 * mu2 + a2 * mu + a3;
+                } else {
+                    sample = sample_history[0] * mu + sample_history[1] * (1.0 - mu);
+                }
+
+                self.buffer[destination + (j * 2 + 0) as usize] += sample * volume_r;
+                self.buffer[destination + (j * 2 + 1) as usize] += sample * volume_l;
+
+                sampler.resample_phase += angular_step;
+
+                if sampler.resample_phase >= 1.0 {
+                    let n = sampler.resample_phase as u32;
+                    sampler.resample_phase -= n as f32;
+                    sampler.current_position += n;
+                    sampler.should_fetch_sample = true;
+
+                    if sampler.current_position >= wave_info.number_of_samples {
+                        if (channel.status & CHANNEL_LOOP) != 0 {
+                            sampler.current_position = wave_info.loop_position + n - 1;
+                        } else {
+                            sampler.current_position = wave_info.number_of_samples;
+                            sampler.should_fetch_sample = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn render_reverb(&mut self, destination: usize, strength: u8) {
+        const EARLY_COEFFICIENT: f32 = 0.0015;
+        const LATE_COEFFICIENTS: [[f32; 2]; 3] = [[1.0, 0.1], [0.6, 0.25], [0.35, 0.35]];
+        const NORMALIZE_COEFFICIENTS: f32 = {
+            let mut sum = 0.0;
+            sum += LATE_COEFFICIENTS[0][0];
+            sum += LATE_COEFFICIENTS[0][1];
+            sum += LATE_COEFFICIENTS[1][0];
+            sum += LATE_COEFFICIENTS[1][1];
+            sum += LATE_COEFFICIENTS[2][0];
+            sum += LATE_COEFFICIENTS[2][1];
+            1.0 / sum
+        };
+
+        let early_buffer = (((self.current_frame + TOTAL_FRAME_COUNT - 1) % TOTAL_FRAME_COUNT)
+            * SAMPLES_PER_FRAME
+            * 2) as usize;
+        let late_buffers = [
+            (((self.current_frame + 2) % TOTAL_FRAME_COUNT) * SAMPLES_PER_FRAME * 2) as usize,
+            (((self.current_frame + 1) % TOTAL_FRAME_COUNT) * SAMPLES_PER_FRAME * 2) as usize,
+            destination,
+        ];
+
+        let factor = strength as f32 / 128.0;
+        for l in (0..SAMPLES_PER_FRAME * 2).step_by(2) {
+            let r = l + 1;
+            let early_reflection_l = self.buffer[early_buffer + l as usize] * EARLY_COEFFICIENT;
+            let early_reflection_r = self.buffer[early_buffer + r as usize] * EARLY_COEFFICIENT;
+            let mut late_reflection_l = 0.0;
+            let mut late_reflection_r = 0.0;
+
+            for j in 0..3 {
+                let sample_l = self.buffer[late_buffers[j] + l as usize];
+                let sample_r = self.buffer[late_buffers[j] + r as usize];
+                late_reflection_l +=
+                    sample_l * LATE_COEFFICIENTS[j][0] + sample_r * LATE_COEFFICIENTS[j][1];
+                late_reflection_r +=
+                    sample_l * LATE_COEFFICIENTS[j][1] + sample_r * LATE_COEFFICIENTS[j][0];
+            }
+
+            late_reflection_l *= NORMALIZE_COEFFICIENTS;
+            late_reflection_r *= NORMALIZE_COEFFICIENTS;
+            self.buffer[destination + l as usize] =
+                (early_reflection_l + late_reflection_l) * factor;
+            self.buffer[destination + r as usize] =
+                (early_reflection_r + late_reflection_r) * factor;
+        }
+    }
+
+    fn read_sample(&mut self, bus: MemoryMapper<8192>) -> [f32; 2] {
+        if self.buffer_read_index == 0 {
+            self.render_frame(bus);
+        }
+
+        let sample = &self.buffer[((self.current_frame * SAMPLES_PER_FRAME
+            + self.buffer_read_index as u32)
+            * 2) as usize..];
+        self.buffer_read_index += 1;
+        if self.buffer_read_index == SAMPLES_PER_FRAME as usize {
+            self.buffer_read_index = 0;
+        }
+
+        return [sample[0], sample[1]];
+    }
 }
 
 #[repr(C)]
@@ -286,11 +519,11 @@ struct SoundChannel {
 struct Sampler {
     compressed: bool,
     should_fetch_sample: bool,
-    current_pos: u32,
+    current_position: u32,
     resample_phase: f32,
     sample_history: [f32; 4],
     wave_info: WaveInfo,
-    wave_data: *const u8,
+    wave_data: *mut u8,
 }
 
 impl Default for Sampler {
@@ -298,11 +531,11 @@ impl Default for Sampler {
         Self {
             compressed: Default::default(),
             should_fetch_sample: true,
-            current_pos: Default::default(),
+            current_position: Default::default(),
             resample_phase: Default::default(),
             sample_history: Default::default(),
             wave_info: Default::default(),
-            wave_data: ptr::null(),
+            wave_data: ptr::null::<u8>() as *mut u8,
         }
     }
 }
