@@ -12,7 +12,6 @@ use eframe::{
     epaint::{vec2, ColorImage, ImageData, ImageDelta, TextureId},
 };
 use gamegirl::gga::{
-    addr::{BG0CNT, DISPCNT, IE, IF, IME, TM0CNT_H},
     timer::{self, Timers},
     GameGirlAdv,
 };
@@ -117,8 +116,8 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         ui.separator();
         ui.vertical(|ui| {
             ui.monospace("       GKDDDDSTTTTCHV");
-            ui.monospace(format!("IF = {:016b}", gg[IF]));
-            ui.monospace(format!("IE = {:016b}", gg[IE]));
+            ui.monospace(format!("IF = {:016b}", gg.cpu.if_));
+            ui.monospace(format!("IE = {:016b}", gg.cpu.ie));
         });
     });
     ui.separator();
@@ -130,7 +129,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         ui.checkbox(&mut gg.debugger.running, "Running");
         ui.checkbox(&mut gg.cpu.is_halted, "CPU Halted");
 
-        if gg[IME].is_bit(0) {
+        if gg.cpu.ime {
             ui.label("(IME on)");
         }
     });
@@ -206,9 +205,9 @@ const OBJ_VRAM_TEX: [usize; 2] = [4, 5];
 fn bg_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
     fn draw_bg_layer(gg: &GameGirlAdv, bg: u32, ui: &mut Ui, app: &mut App, ctx: &Context) {
         let mut buf = make_buffer(32, 32);
-        let cnt = gg[BG0CNT + bg * 2];
-        let tile_base_addr = cnt.bits(2, 2).us() * 0x4000;
-        let bpp8 = cnt.is_bit(7);
+        let cnt = gg.ppu.bg_cnt[bg.us()];
+        let tile_base_addr = cnt.character_base_block().us() * 0x4000;
+        let bpp8 = cnt.palette_mode() as u32 == 1;
 
         for tile_idx_addr in 0..(32 * 32) {
             let data_addr = tile_base_addr + (tile_idx_addr * if bpp8 { 8 * 8 } else { 8 * 4 });
@@ -413,17 +412,17 @@ fn timer_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         };
         ui.label(format!("Current Value: 0x{current:04X}"));
 
-        let ctrl = gg[TM0CNT_H + ((timer as u32) << 2)];
+        let ctrl = gg.timers.control[timer];
         ui.label(format!(
             "Scaler: F/{} ({})",
-            timer::DIVS[(ctrl & 3).us()],
-            ctrl & 3
+            timer::DIVS[ctrl.prescaler().us()],
+            ctrl.prescaler()
         ));
 
-        ui.label(format!("Enabled: {:?}", ctrl.is_bit(7)));
-        ui.label(format!("IRQ Enabled: {:?}", ctrl.is_bit(6)));
+        ui.label(format!("Enabled: {:?}", ctrl.enable()));
+        ui.label(format!("IRQ Enabled: {:?}", ctrl.irq_en()));
         if timer != 0 {
-            ui.label(format!("Count-Up Mode: {:?}", ctrl.is_bit(2)));
+            ui.label(format!("Count-Up Mode: {:?}", ctrl.count_up()));
         }
         if timer != 3 {
             ui.separator();

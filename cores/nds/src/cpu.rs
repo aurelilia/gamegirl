@@ -51,10 +51,6 @@ impl ArmSystem for Nds7 {
         self.time_7 += (cycles as Time) << 1;
     }
 
-    fn is_irq_pending(&self) -> bool {
-        is_irq_pending(self)
-    }
-
     fn exception_happened(&mut self, _kind: Exception) {}
 
     fn pipeline_stalled(&mut self) {}
@@ -108,10 +104,6 @@ impl ArmSystem for Nds9 {
         self.scheduler.advance(cycles as Time);
     }
 
-    fn is_irq_pending(&self) -> bool {
-        is_irq_pending(self)
-    }
-
     fn exception_happened(&mut self, _kind: Exception) {}
 
     fn pipeline_stalled(&mut self) {}
@@ -135,10 +127,4 @@ impl ArmSystem for Nds9 {
     fn can_cache_at(_addr: u32) -> bool {
         false
     }
-}
-
-fn is_irq_pending<DS: NdsCpu>(ds: &DS) -> bool {
-    (ds[IME] == 1)
-        && !ds.cpur().flag(IrqDisable)
-        && (((ds[IE_L] & ds[IF_L]) != 0) || ((ds[IE_H] & ds[IF_H]) != 0))
 }

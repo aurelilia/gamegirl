@@ -219,7 +219,8 @@ struct Object {
     tilenum: B10,
     priority: B2,
     palette: B4,
-    pad: B16,
+    #[skip]
+    __: B16,
 }
 
 impl Object {

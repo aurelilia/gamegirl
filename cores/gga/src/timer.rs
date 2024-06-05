@@ -17,12 +17,12 @@ pub const DIVS: [u16; 4] = [1, 64, 256, 1024];
 #[derive(Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct TimerCtrl {
-    prescaler: B2,
-    count_up: bool,
+    pub prescaler: B2,
+    pub count_up: bool,
     #[skip]
     __: B3,
-    irq_en: bool,
-    enable: bool,
+    pub irq_en: bool,
+    pub enable: bool,
     #[skip]
     __: B8,
 }

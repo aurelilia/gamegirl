@@ -95,7 +95,8 @@ minor graphical glitches.
     - [x] Affine BGs/objects
     - [x] Windows
     - [x] Window blending
-    - [ ] Semi-transparent OBJs
+    - [x] Semi-transparent OBJs
+    - [ ] Mosaic
   - [x] APU
     - [x] CGB sound channels
     - [x] DMA sound channels
@@ -175,7 +176,7 @@ cargo run -p tests --release -- --gg
   - [x] Multiply long: 52/72 (cosidered complete; carry is still not researched in general)
   - [x] BIOS math: 625/625
   - [ ] DMA tests: 1248/1256
-    - "0 Imm H/W R+0x10" tests fail (DMA0 with ROM?)
+    - "0 Imm H/W R+0x10/+{IW,EW}RAM" tests fail (DMA0 with ROM?)
   - [ ] Misc. edge case tests: 7/10
   - [ ] Video Tests
     - [x] Basic Mode 3

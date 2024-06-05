@@ -225,7 +225,7 @@ impl Default for Nds {
 /// I = 0 for the ARM7, I = 1 for the ARM9;
 /// things separated by CPU generally use CpuDevice for easy
 /// access with I.
-pub trait NdsCpu: ArmSystem + DerefMut<Target = Nds> {
+pub trait NdsCpu: ArmSystem + IndexMut<u32, Output = u16> + DerefMut<Target = Nds> {
     const I: usize;
 }
 

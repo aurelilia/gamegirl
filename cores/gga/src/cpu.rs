@@ -6,16 +6,11 @@
 
 use arm_cpu::{
     interface::{ArmSystem, RwType},
-    registers::Flag::IrqDisable,
     Access, Cpu, Exception,
 };
 use common::{components::debugger::Debugger, numutil::NumExt, Time};
 
-use crate::{
-    addr,
-    addr::{IE, IF, IME, WAITCNT},
-    GameGirlAdv,
-};
+use crate::{addr, GameGirlAdv};
 
 pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 
@@ -42,16 +37,12 @@ impl ArmSystem for GameGirlAdv {
     fn add_i_cycles(&mut self, cycles: u16) {
         self.scheduler.advance(cycles as Time);
         if self.cpu.pc() > 0x800_0000 {
-            if self[WAITCNT].is_bit(14) {
+            if self.memory.waitcnt.is_bit(14) {
                 self.memory.prefetch_len += 1;
             } else {
                 self.cpu.access_type = Access::NonSeq;
             }
         }
-    }
-
-    fn is_irq_pending(&self) -> bool {
-        (self[IME] == 1) && !self.cpu.flag(IrqDisable) && (self[IE] & self[IF]) != 0
     }
 
     fn exception_happened(&mut self, kind: Exception) {

@@ -35,8 +35,6 @@ impl AdvEvent {
         match self {
             PauseEmulation => gg.ticking = false,
             UpdateKeypad => {
-                // GGA input is active low
-                gg[KEYINPUT] = 0x3FF ^ gg.options.input.state(gg.scheduler.now()).0;
                 gg.check_keycnt();
                 gg.scheduler
                     .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);

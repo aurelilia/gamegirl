@@ -4,7 +4,7 @@
 // If a copy of the MPL2 was not distributed with this file, you can
 // obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::ops::{Deref, DerefMut, IndexMut};
+use std::ops::{Deref, DerefMut};
 
 use common::{components::debugger::Debugger, numutil::NumExt};
 
@@ -12,7 +12,7 @@ use super::Exception;
 use crate::{inst_arm::ArmLut, inst_thumb::ThumbLut, Access, Cpu};
 
 /// Trait for a system that contains this CPU.
-pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
+pub trait ArmSystem: Sized + 'static {
     /// Is this an ARMv5 system? ARMv4 otherwise.
     const IS_V5: bool;
     /// LUT for ARM instructions.
@@ -34,9 +34,6 @@ pub trait ArmSystem: IndexMut<u32, Output = u16> + Sized + 'static {
     /// Add I cycles to the system clock.
     fn add_i_cycles(&mut self, cycles: u16);
 
-    /// Should return if there is an IRQ pending.
-    /// If true, CPU will raise an IRQ exception.
-    fn is_irq_pending(&self) -> bool;
     /// Callback to perform any system-specific behavior on an exception.
     fn exception_happened(&mut self, kind: Exception);
     /// Callback to perform any system-specific behavior on a pipeline stall.

@@ -31,7 +31,6 @@ use ppu::Ppu;
 use scheduling::PpuEvent;
 
 use crate::{
-    addr::{IE, IF, KEYINPUT},
     dma::Dmas,
     scheduling::{AdvEvent, ApuEvent},
     timer::Timers,
@@ -84,7 +83,7 @@ impl Core for GameGirlAdv {
             // We're halted, emulate peripherals until an interrupt is pending
             let evt = self.scheduler.pop();
             evt.kind.dispatch(self, evt.late_by);
-            self.cpu.is_halted = (self[IE] & self[IF]) == 0;
+            self.cpu.is_halted = (self.cpu.ie & self.cpu.if_) == 0;
         } else {
             Cpu::continue_running(self);
         }
@@ -222,10 +221,6 @@ impl Default for GameGirlAdv {
             ticking: true,
         };
 
-        // Initialize various IO registers
-        gg[KEYINPUT] = 0x3FF;
-        gg.apu.bias = 0x200.into();
-
         // Initialize scheduler events
         gg.scheduler
             .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
@@ -235,8 +230,9 @@ impl Default for GameGirlAdv {
         gg.scheduler
             .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
 
-        // Initialize DMA
+        // Initialize various IO registers
         gg.dma.running = 99;
+        gg.apu.bias = 0x200.into();
 
         gg
     }

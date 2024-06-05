@@ -20,7 +20,7 @@ use common::{
 };
 
 use super::audio;
-use crate::{addr::*, dma::Dmas, timer::Timers, Apu, GameGirlAdv};
+use crate::{addr::*, dma::Dmas, input::KeyControl, timer::Timers, Apu, GameGirlAdv};
 
 pub const KB: usize = 1024;
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
@@ -33,8 +33,10 @@ pub struct Memory {
     pub ewram: [u8; 256 * KB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub iwram: [u8; 32 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub mmio: [u16; KB / 2],
+
+    // Various registers
+    pub keycnt: KeyControl,
+    pub waitcnt: u16,
 
     /// Value to return when trying to read BIOS outside of it
     pub(crate) bios_value: u32,
@@ -134,12 +136,15 @@ impl GameGirlAdv {
             TM1CNT_L => Timers::time_read::<1>(self),
             TM2CNT_L => Timers::time_read::<2>(self),
             TM3CNT_L => Timers::time_read::<3>(self),
+            TM0CNT_H => self.timers.control[0].into(),
+            TM1CNT_H => self.timers.control[1].into(),
+            TM2CNT_H => self.timers.control[2].into(),
+            TM3CNT_H => self.timers.control[3].into(),
 
             // PPU
-            DISPCNT..BLDALPHA if let Some(val) = self.ppu.read_mmio(a) => val,
+            DISPCNT..=BLDALPHA if let Some(val) = self.ppu.read_mmio(a) => val,
 
             // Sound
-            // Old sound
             0x60..=0x80 | 0x84 | 0x86 | 0x8A | 0x90..=0x9F => {
                 let low = Apu::read_register_psg(&self.apu.cgb_chans, a.u16());
                 let high = Apu::read_register_psg(&self.apu.cgb_chans, a.u16() + 1);
@@ -148,9 +153,27 @@ impl GameGirlAdv {
             SOUNDCNT_H => Into::<u16>::into(self.apu.cnt) & 0x770F,
             SOUNDBIAS_L => self.apu.bias.into(),
 
-            // Zero registers (DMA)
+            // Keyinput
+            KEYINPUT => self.keyinput(),
+
+            // Interrupt control
+            IME => self.cpu.ime as u16,
+            IE => self.cpu.ie.low(),
+            IF => self.cpu.if_.low(),
+            WAITCNT => self.memory.waitcnt,
+
+            // DMA
+            0xBA => Into::<u16>::into(self.dma.channels[0].ctrl) & 0xF7E0,
+            0xC6 => Into::<u16>::into(self.dma.channels[1].ctrl) & 0xF7E0,
+            0xD2 => Into::<u16>::into(self.dma.channels[2].ctrl) & 0xF7E0,
+            0xDE => Into::<u16>::into(self.dma.channels[3].ctrl) & 0xFFE0,
+            // DMA length registers read 0
             0xB8 | 0xC4 | 0xD0 | 0xDC => 0,
 
+            // Known 0 registers
+            0x136 | 0x142 | 0x15A | 0x206 | 0x20A | POSTFLG | 0x302 => 0,
+
+            // Known invalid read registers
             BG0HOFS..=WIN1V
             | MOSAIC
             | BLDY
@@ -170,7 +193,10 @@ impl GameGirlAdv {
             | 0x15C..=0x1FF
             | 0x304..=0x3FE => self.invalid_read::<false>(addr).u16(),
 
-            _ => self[a],
+            _ => {
+                log::info!("Read from unknown IO register 0x{a:03X}, returning open bus");
+                self.invalid_read::<false>(addr).u16()
+            }
         }
     }
 
@@ -325,15 +351,15 @@ impl GameGirlAdv {
         match a {
             // General
             IME => {
-                self[IME] = value & 1;
+                self.cpu.ime = value.is_bit(0);
                 Cpu::check_if_interrupt(self);
             }
             IE => {
-                self[IE] = value;
+                self.cpu.ie = value.u32();
                 Cpu::check_if_interrupt(self);
             }
             IF => {
-                self[IF] &= !value;
+                self.cpu.if_ &= !(value.u32());
                 // We assume that acknowledging the interrupt is the last thing the handler
                 // does, and set the BIOS read value to the post-interrupt
                 // state. Not entirely accurate...
@@ -342,8 +368,8 @@ impl GameGirlAdv {
                 }
             }
             WAITCNT => {
-                let prev = self[a];
-                self[a] = value;
+                let prev = self.memory.waitcnt;
+                self.memory.waitcnt = value;
                 // Only update things as needed
                 if value.bits(0, 11) != prev.bits(0, 11) {
                     self.update_wait_times();
@@ -376,14 +402,25 @@ impl GameGirlAdv {
             TM3CNT_H => Timers::hi_write::<3>(self, value),
 
             // DMAs
-            0xBA => Dmas::ctrl_write(self, 0, value),
-            0xC6 => Dmas::ctrl_write(self, 1, value),
-            0xD2 => Dmas::ctrl_write(self, 2, value),
-            0xDE => Dmas::ctrl_write(self, 3, value),
+            0xB0..0xE0 => {
+                let idx = (a.us() - 0xB0) / 12;
+                let reg = (a - 0xB0) % 12;
+
+                let dma = &mut self.dma.channels[idx];
+                match reg {
+                    0x0 => dma.sad = dma.sad.set_low(value),
+                    0x2 => dma.sad = dma.sad.set_high(value),
+                    0x4 => dma.dad = dma.dad.set_low(value),
+                    0x6 => dma.dad = dma.dad.set_high(value),
+                    0x8 => dma.count = value,
+                    0xA => Dmas::ctrl_write(self, idx, value),
+                    _ => unreachable!(),
+                }
+            }
 
             // Joypad control
             KEYCNT => {
-                self[a] = value;
+                self.memory.keycnt = value.into();
                 self.check_keycnt();
             }
 
@@ -399,19 +436,32 @@ impl GameGirlAdv {
                 );
             }
 
-            // RO registers
-            KEYINPUT | 0x136 | 0x142 | 0x15A | 0x206 | 0x20A | 0x302 => (),
-
             // Serial
             // TODO this is not how serial actually works but it tricks some tests...
             SIOCNT => {
-                self[a] = value.set_bit(7, false);
                 if value == 0x4003 {
                     Cpu::request_interrupt(self, Interrupt::Serial);
                 }
             }
 
-            _ => self[a] = value,
+            // RO registers, or otherwise invalid
+            KEYINPUT
+            | 0x86
+            | 0x134
+            | 0x136
+            | 0x15A
+            | 0x206
+            | 0x300
+            | 0x302
+            | 0x56..=0x5E
+            | 0x8A..=0x8E
+            | 0xA8..=0xAF
+            | 0xE0..=0xFF
+            | 0x110..=0x12E
+            | 0x140..=0x15E
+            | 0x20A..=0x21E => (),
+
+            _ => log::info!("Write to unknown IO register 0x{a:03X} (value {value:04X}), ignoring"),
         }
     }
 
@@ -471,22 +521,24 @@ impl GameGirlAdv {
                 self.calc_wait_time::<2>(addr, ty) + self.calc_wait_time::<2>(addr, Seq)
             }
 
-            (0x0800_0000..=0x09FF_FFFF, _, Seq) => 3 - self[WAITCNT].bit(4),
+            (0x0800_0000..=0x09FF_FFFF, _, Seq) => 3 - self.memory.waitcnt.bit(4),
             (0x0800_0000..=0x09FF_FFFF, _, NonSeq) => {
-                Self::WS_NONSEQ[self[WAITCNT].bits(2, 2).us()]
+                Self::WS_NONSEQ[self.memory.waitcnt.bits(2, 2).us()]
             }
 
-            (0x0A00_0000..=0x0BFF_FFFF, _, Seq) => 5 - (self[WAITCNT].bit(7) * 3),
+            (0x0A00_0000..=0x0BFF_FFFF, _, Seq) => 5 - (self.memory.waitcnt.bit(7) * 3),
             (0x0A00_0000..=0x0BFF_FFFF, _, NonSeq) => {
-                Self::WS_NONSEQ[self[WAITCNT].bits(5, 2).us()]
+                Self::WS_NONSEQ[self.memory.waitcnt.bits(5, 2).us()]
             }
 
-            (0x0C00_0000..=0x0DFF_FFFF, _, Seq) => 9 - (self[WAITCNT].bit(10) * 7),
+            (0x0C00_0000..=0x0DFF_FFFF, _, Seq) => 9 - (self.memory.waitcnt.bit(10) * 7),
             (0x0C00_0000..=0x0DFF_FFFF, _, NonSeq) => {
-                Self::WS_NONSEQ[self[WAITCNT].bits(8, 2).us()]
+                Self::WS_NONSEQ[self.memory.waitcnt.bits(8, 2).us()]
             }
 
-            (0x0E00_0000..=0x0EFF_FFFF, _, _) => Self::WS_NONSEQ[self[WAITCNT].bits(0, 2).us()],
+            (0x0E00_0000..=0x0EFF_FFFF, _, _) => {
+                Self::WS_NONSEQ[self.memory.waitcnt.bits(0, 2).us()]
+            }
 
             _ => 1,
         }
@@ -498,7 +550,8 @@ impl Default for Memory {
         Self {
             ewram: [0; 256 * KB],
             iwram: [0; 32 * KB],
-            mmio: [0; KB / 2],
+            keycnt: 0.into(),
+            waitcnt: 0,
             bios_value: 0xE129_F000,
             prefetch_len: 0,
             mapper: MemoryMapper::default(),
@@ -509,24 +562,6 @@ impl Default for Memory {
 }
 
 unsafe impl Send for Memory {}
-
-impl Index<u32> for GameGirlAdv {
-    type Output = u16;
-
-    fn index(&self, addr: u32) -> &Self::Output {
-        assert!(addr < 0x3FF);
-        assert_eq!(addr & 1, 0);
-        &self.memory.mmio[(addr >> 1).us()]
-    }
-}
-
-impl IndexMut<u32> for GameGirlAdv {
-    fn index_mut(&mut self, addr: u32) -> &mut Self::Output {
-        assert!(addr < 0x3FF);
-        assert_eq!(addr & 1, 0);
-        &mut self.memory.mmio[(addr >> 1).us()]
-    }
-}
 
 impl MemoryMappedSystem<8192> for GameGirlAdv {
     type Usize = u32;

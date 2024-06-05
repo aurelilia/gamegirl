@@ -32,7 +32,6 @@ impl Ppu {
                 self.windows[1].control.into(),
             ),
             WINOUT => hword(self.win_out.into(), self.win_obj.into()),
-            MOSAIC => self.mosaic.into(),
             BLDCNT => self.bldcnt.into(),
             BLDALPHA => self.bldalpha.into(),
 
@@ -85,12 +84,12 @@ impl Ppu {
                 self.windows[1].top = value.high();
             }
             WININ => {
-                self.windows[0].control = value.low().into();
-                self.windows[1].control = value.high().into();
+                self.windows[0].control = (value.low() & 0x3F).into();
+                self.windows[1].control = (value.high() & 0x3F).into();
             }
             WINOUT => {
-                self.win_out = value.low().into();
-                self.win_obj = value.high().into();
+                self.win_out = (value.low() & 0x3F).into();
+                self.win_obj = (value.high() & 0x3F).into();
             }
             MOSAIC => self.mosaic = value.into(),
 

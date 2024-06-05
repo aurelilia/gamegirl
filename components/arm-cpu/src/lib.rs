@@ -51,6 +51,10 @@ pub struct Cpu<S: ArmSystem + 'static> {
     pub access_type: Access,
     pub is_halted: bool,
 
+    pub ime: bool,
+    pub ie: u32,
+    pub if_: u32,
+
     block_ended: bool,
     pipeline_valid: bool,
     #[cfg_attr(feature = "serde", serde(default))]
@@ -244,13 +248,17 @@ impl<S: ArmSystem> Cpu<S> {
     /// Check if an interrupt needs to be handled and jump to the handler if so.
     /// Called on any events that might cause an interrupt to be triggered..
     pub fn check_if_interrupt(gg: &mut S) {
-        if gg.is_irq_pending() {
+        if gg.cpur().is_interrupt_pending() {
             gg.cpu().inc_pc_by(4);
             let mut wrapper = SysWrapper {
                 inner: gg as *mut S,
             };
             Cpu::exception_occurred(&mut wrapper, Exception::Irq);
         }
+    }
+
+    fn is_interrupt_pending(&self) -> bool {
+        self.ime && !self.flag(IrqDisable) && (self.ie & self.if_) != 0
     }
 
     /// An exception occurred, jump to the bootrom handler and deal with it.
@@ -334,11 +342,8 @@ impl<S: ArmSystem> Cpu<S> {
     /// right away.
     #[inline]
     pub fn request_interrupt_idx(gg: &mut S, idx: u16) {
-        if idx >= 16 {
-            gg[S::IF_ADDR + 2] = gg[S::IF_ADDR + 2].set_bit(idx - 16, true);
-        } else {
-            gg[S::IF_ADDR] = gg[S::IF_ADDR].set_bit(idx, true);
-        }
+        let me = gg.cpu();
+        me.if_ = me.if_.set_bit(idx, true);
         Self::check_if_interrupt(gg);
     }
 }
@@ -358,6 +363,10 @@ impl<S: ArmSystem> Default for Cpu<S> {
             block_ended: false,
             pipeline_valid: false,
             cache: Cache::default(),
+
+            ime: false,
+            ie: 0,
+            if_: 0,
 
             #[cfg(feature = "instruction-tracing")]
             instruction_tracer: None,

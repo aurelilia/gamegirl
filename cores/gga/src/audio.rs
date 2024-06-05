@@ -171,7 +171,7 @@ impl Apu {
         if gg.apu.buffers[CH].len() <= 16 {
             let dest = 0x400_0000 | (FIFO_A_L + CH.u32() * 4);
             for dma in 1..=2 {
-                if Dmas::get_dest(gg, dma) == dest {
+                if gg.dma.channels[dma].dad == dest {
                     Dmas::try_fifo_transfer(gg, dma);
                 }
             }

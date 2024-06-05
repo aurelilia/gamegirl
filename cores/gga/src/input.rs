@@ -8,21 +8,33 @@
 //! Luckily, GGA input is dead simple compared to even GG.
 
 use arm_cpu::{Cpu, Interrupt};
-use common::numutil::NumExt;
+use modular_bitfield::{bitfield, specifiers::B14};
 
-use crate::{
-    addr::{KEYCNT, KEYINPUT},
-    GameGirlAdv,
-};
+use crate::GameGirlAdv;
+
+#[bitfield]
+#[repr(u16)]
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct KeyControl {
+    irq_enables: B14,
+    global_irq: bool,
+    irq_is_and: bool,
+}
 
 impl GameGirlAdv {
+    pub fn keyinput(&self) -> u16 {
+        // GGA input is active low
+        0x3FF ^ self.options.input.state(self.scheduler.now()).0
+    }
+
     /// Check if KEYCNT should cause a joypad IRQ.
     pub fn check_keycnt(&mut self) {
-        let input = self[KEYINPUT];
-        let cnt = self[KEYCNT];
-        if cnt.is_bit(14) {
-            let cond = cnt.bits(0, 10);
-            let fire = if !cnt.is_bit(15) {
+        let input = self.keyinput();
+        let cnt = self.memory.keycnt;
+        if cnt.global_irq() {
+            let cond = cnt.irq_enables();
+            let fire = if !cnt.irq_is_and() {
                 cond & input != 0
             } else {
                 cond & input == cond

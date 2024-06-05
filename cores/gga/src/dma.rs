@@ -12,20 +12,32 @@ use arm_cpu::{
 };
 use arrayvec::ArrayVec;
 use common::numutil::{word, NumExt};
+use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use crate::{addr::VCOUNT, cartridge::SaveType, GameGirlAdv};
+use crate::{cartridge::SaveType, GameGirlAdv};
 
 const SRC_MASK: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
 const DST_MASK: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
+
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct Dma {
+    pub sad: u32,
+    pub dad: u32,
+    pub count: u16,
+    pub ctrl: DmaControl,
+
+    /// Internal source register
+    src: u32,
+    /// Internal destination register
+    dst: u32,
+}
 
 /// GGA's 4 DMA channels.
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dmas {
-    /// Internal source registers
-    src: [u32; 4],
-    /// Internal destination registers
-    dst: [u32; 4],
+    pub channels: [Dma; 4],
     /// Internal cache shared between DMAs
     pub(super) cache: u32,
     /// Currently running DMA, or 99
@@ -40,145 +52,140 @@ impl Dmas {
     /// Update all DMAs to see if they need ticking.
     pub fn update_all(gg: &mut GameGirlAdv, reason: Reason) {
         for idx in 0..4 {
-            let base = Self::base_addr(idx);
-            Self::step_dma(gg, idx, base, gg[base + 0xA], reason);
+            Self::step_dma(gg, idx, reason);
         }
     }
 
     /// Update a given DMA after it's control register was written.
-    pub fn ctrl_write(gg: &mut GameGirlAdv, idx: u16, new_ctrl: u16) {
-        let base = Self::base_addr(idx);
-        let old_ctrl = gg[base + 0xA];
-        if !old_ctrl.is_bit(15) && new_ctrl.is_bit(15) {
+    pub fn ctrl_write(gg: &mut GameGirlAdv, idx: usize, new_ctrl: u16) {
+        let channel = &mut gg.dma.channels[idx];
+        let old_ctrl = channel.ctrl;
+        let mut new_ctrl: DmaControl = new_ctrl.into();
+
+        if !old_ctrl.dma_en() && new_ctrl.dma_en() {
             // Reload SRC/DST
-            let src = word(gg[base], gg[base + 2]);
-            let dst = word(gg[base + 4], gg[base + 6]);
-            gg.dma.src[idx.us()] = src & SRC_MASK[idx.us()];
-            gg.dma.dst[idx.us()] = dst & DST_MASK[idx.us()];
+            channel.src = channel.sad & SRC_MASK[idx];
+            channel.dst = channel.dad & DST_MASK[idx];
         }
 
-        gg[base + 0xA] = new_ctrl & if idx == 3 { 0xFFE0 } else { 0xF7E0 };
-        Self::step_dma(gg, idx, base, new_ctrl, Reason::CtrlWrite);
+        new_ctrl.set_dma3_gamepak_drq_en(new_ctrl.dma3_gamepak_drq_en() && idx == 3);
+        gg.dma.channels[idx].ctrl = new_ctrl;
+        Self::step_dma(gg, idx, Reason::CtrlWrite);
     }
 
     /// Try to perform a FIFO transfer, if the DMA is otherwise configured for
     /// it.
-    pub fn try_fifo_transfer(gg: &mut GameGirlAdv, idx: u16) {
-        let base = Self::base_addr(idx);
-        Self::step_dma(gg, idx, base, gg[base + 0xA], Reason::Fifo);
-    }
-
-    /// Get the destination register for a DMA; this is not the internal one.
-    pub fn get_dest(gg: &GameGirlAdv, idx: u16) -> u32 {
-        let base = Self::base_addr(idx);
-        word(gg[base + 4], gg[base + 6])
+    pub fn try_fifo_transfer(gg: &mut GameGirlAdv, idx: usize) {
+        Self::step_dma(gg, idx, Reason::Fifo);
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma(gg: &mut GameGirlAdv, idx: u16, base: u32, ctrl: u16, reason: Reason) {
-        let fifo = reason == Reason::Fifo;
-        let vid_capture = idx == 3
-            && (2..162).contains(&gg[VCOUNT])
+    fn step_dma(gg: &mut GameGirlAdv, idx: usize, reason: Reason) {
+        let mut channel = gg.dma.channels[idx];
+        let ctrl = channel.ctrl;
+
+        let is_fifo = reason == Reason::Fifo;
+        let is_vid_capture = idx == 3
+            && (2..162).contains(&gg.ppu.vcount)
             && reason == Reason::HBlank
-            && ctrl.bits(12, 2) == 3;
-        let on = ctrl.is_bit(15)
-            && match ctrl.bits(12, 2) {
-                0 => reason == Reason::CtrlWrite,
-                1 => reason == Reason::VBlank,
-                2 => reason == Reason::HBlank && gg.ppu.vcount < 160,
-                _ => fifo || vid_capture,
+            && ctrl.timing() == Timing::Special;
+        let is_on = ctrl.dma_en()
+            && match ctrl.timing() {
+                Timing::Now => reason == Reason::CtrlWrite,
+                Timing::VBlank => reason == Reason::VBlank,
+                Timing::HBlank => reason == Reason::HBlank && gg.ppu.vcount < 160,
+                Timing::Special => is_fifo || is_vid_capture,
             };
-        if !on {
+        if !is_on {
             return;
         }
-        if gg.dma.running <= idx {
-            gg.dma.queued.push((idx, reason));
+        if gg.dma.running <= idx.u16() {
+            gg.dma.queued.push((idx.u16(), reason));
             return;
         }
 
-        let prev_dma = mem::replace(&mut gg.dma.running, idx);
+        let prev_dma = mem::replace(&mut gg.dma.running, idx.u16());
 
-        let count = gg[base + 8];
-        let count = match count {
-            _ if fifo => 4,
+        let count = match channel.count {
+            _ if is_fifo => 4,
             0 if idx == 3 => 0x1_0000,
             0 => 0x4000,
-            _ => count.u32(),
+            _ => channel.count.u32(),
         };
 
-        let src_mod = match gg.dma.src[idx.us()] {
+        let src_mod = match channel.src {
             0x800_0000..=0xDFF_FFFF => 2,
-            _ => Self::get_step(ctrl.bits(7, 2)),
+            _ => Self::get_step(ctrl.src_addr()),
         };
 
-        let dst_raw = ctrl.bits(5, 2);
-        let dst_mod = match dst_raw {
-            _ if fifo => 0,
-            3 => {
+        let dst_mod = match ctrl.dest_addr() {
+            _ if is_fifo => 0,
+            AddrControl::IncReload => {
                 // Reload DST + Increment
-                let dst = word(gg[base + 4], gg[base + 6]);
-                gg.dma.dst[idx.us()] = dst & DST_MASK[idx.us()];
+                channel.dst = channel.dad & DST_MASK[idx];
                 2
             }
-            _ => Self::get_step(dst_raw),
+            _ => Self::get_step(ctrl.dest_addr()),
         };
 
-        let word_transfer = ctrl.is_bit(10);
-        if fifo || word_transfer {
-            Self::perform_transfer::<u32>(gg, idx.us(), count, src_mod * 2, dst_mod * 2);
+        if is_fifo || ctrl.is_32bit() {
+            Self::perform_transfer::<u32>(gg, channel, idx, count, src_mod * 2, dst_mod * 2);
         } else if idx == 3 {
             // Maybe alert EEPROM, if the cart has one
             if let SaveType::Eeprom(eeprom) = &mut gg.cart.save_type {
-                eeprom.dma3_started(gg.dma.dst[3], count);
+                eeprom.dma3_started(channel.dst, count);
             }
-            Self::perform_transfer::<u16>(gg, 3, count, src_mod, dst_mod);
+            Self::perform_transfer::<u16>(gg, channel, 3, count, src_mod, dst_mod);
         } else {
-            Self::perform_transfer::<u16>(gg, idx.us(), count, src_mod, dst_mod);
+            Self::perform_transfer::<u16>(gg, channel, idx, count, src_mod, dst_mod);
         }
 
-        if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 || (vid_capture && gg[VCOUNT] == 161) {
+        if !ctrl.repeat_en()
+            || ctrl.timing() == Timing::Now
+            || (is_vid_capture && gg.ppu.vcount == 161)
+        {
             // Disable if reload is not enabled, it's an immediate transfer, or end of video
             // capture
-            gg[base + 0xA] = ctrl.set_bit(15, false);
+            gg.dma.channels[idx].ctrl.set_dma_en(false);
         }
-        if ctrl.is_bit(14) {
+        if ctrl.irq_en() {
             // Fire interrupt if configured
-            Cpu::request_interrupt_idx(gg, Interrupt::Dma0 as u16 + idx);
+            Cpu::request_interrupt_idx(gg, Interrupt::Dma0 as u16 + idx.u16());
         }
 
         gg.dma.running = prev_dma;
         if let Some((dma, reason)) = gg.dma.queued.pop() {
-            let base = Self::base_addr(dma);
-            Self::step_dma(gg, dma, base, gg[base + 0xA], reason);
+            Self::step_dma(gg, dma.us(), reason);
         }
     }
 
     /// Perform a transfer.
     fn perform_transfer<T: RwType>(
         gg: &mut GameGirlAdv,
+        mut channel: Dma,
         idx: usize,
         count: u32,
         src_mod: i32,
         dst_mod: i32,
     ) {
         gg.add_i_cycles(2);
-        if gg.dma.dst[idx] < 0x200_0000 {
+        if channel.dst < 0x200_0000 {
             return;
         }
 
         let mut kind = Access::NonSeq;
-        if gg.dma.src[idx] >= 0x200_0000 {
+        if channel.src >= 0x200_0000 {
             // First, align SRC/DST
             let align = T::WIDTH - 1;
-            gg.dma.src[idx] &= !align;
-            gg.dma.dst[idx] &= !align;
+            channel.src &= !align;
+            channel.dst &= !align;
 
             for _ in 0..count {
-                let value = gg.read::<T>(gg.dma.src[idx], kind).u32();
-                gg.write::<T>(gg.dma.dst[idx], T::from_u32(value), kind);
+                let value = gg.read::<T>(channel.src, kind).u32();
+                gg.write::<T>(channel.dst, T::from_u32(value), kind);
 
-                gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
-                gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
+                channel.src = channel.src.wrapping_add_signed(src_mod);
+                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
                 kind = Access::Seq;
                 gg.advance_clock();
@@ -186,37 +193,38 @@ impl Dmas {
 
             // Put last value into cache
             if T::WIDTH == 4 {
-                gg.dma.cache = gg.get::<u32>(gg.dma.src[idx].wrapping_add_signed(-src_mod));
+                gg.dma.cache = gg.get::<u32>(channel.src.wrapping_add_signed(-src_mod));
             } else {
-                let value = gg.get::<u16>(gg.dma.src[idx].wrapping_add_signed(-src_mod));
+                let value = gg.get::<u16>(channel.src.wrapping_add_signed(-src_mod));
                 gg.dma.cache = word(value, value);
             }
         } else {
             for _ in 0..count {
                 if T::WIDTH == 4 {
-                    gg.write::<u32>(gg.dma.dst[idx], gg.dma.cache, kind);
-                } else if gg.dma.dst[idx].is_bit(1) {
-                    gg.write::<u16>(gg.dma.dst[idx], (gg.dma.cache >> 16).u16(), kind);
+                    gg.write::<u32>(channel.dst, gg.dma.cache, kind);
+                } else if channel.dst.is_bit(1) {
+                    gg.write::<u16>(channel.dst, (gg.dma.cache >> 16).u16(), kind);
                 } else {
-                    gg.write::<u16>(gg.dma.dst[idx], gg.dma.cache.u16(), kind);
+                    gg.write::<u16>(channel.dst, gg.dma.cache.u16(), kind);
                 }
-                gg.dma.src[idx] = gg.dma.src[idx].wrapping_add_signed(src_mod);
-                gg.dma.dst[idx] = gg.dma.dst[idx].wrapping_add_signed(dst_mod);
+                channel.src = channel.src.wrapping_add_signed(src_mod);
+                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
                 kind = Access::Seq;
                 gg.advance_clock();
             }
         }
         gg.dma.pc_at_last_end = gg.cpu.pc();
+        gg.dma.channels[idx] = channel;
     }
 
     /// Get the step with which to change SRC/DST registers after every write.
     /// Multiplied by 2 for word-sized DMAs.
     /// Inc+Reload handled separately.
-    fn get_step(bits: u16) -> i32 {
-        match bits {
-            0 => 2,
-            1 => -2,
+    fn get_step(control: AddrControl) -> i32 {
+        match control {
+            AddrControl::Increment => 2,
+            AddrControl::Decrement => -2,
             _ => 0,
         }
     }
@@ -239,4 +247,41 @@ pub enum Reason {
     VBlank,
     /// A FIFO sound channel is requesting new samples.
     Fifo,
+}
+
+#[bitfield]
+#[repr(u16)]
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct DmaControl {
+    #[skip]
+    __: B5,
+    dest_addr: AddrControl,
+    src_addr: AddrControl,
+    repeat_en: bool,
+    is_32bit: bool,
+    dma3_gamepak_drq_en: bool,
+    timing: Timing,
+    irq_en: bool,
+    dma_en: bool,
+}
+
+#[derive(BitfieldSpecifier, Debug, PartialEq)]
+#[bits = 2]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub enum AddrControl {
+    Increment = 0,
+    Decrement = 1,
+    Fixed = 2,
+    IncReload = 3,
+}
+
+#[derive(BitfieldSpecifier, Debug, PartialEq)]
+#[bits = 2]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub enum Timing {
+    Now = 0,
+    VBlank = 1,
+    HBlank = 2,
+    Special = 3,
 }
