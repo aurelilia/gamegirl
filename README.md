@@ -232,3 +232,5 @@ cargo run -p tests --release -- --gg
 - [DenSinH, for FuzzARM and GBAC-](https://github.com/DenSinH)
 - [ladystarbreeze, for their testing ROMs](https://github.com/ladystarbreeze/GBA-Test-Collection)
 - [destoer, for their testing ROMs](https://github.com/destoer/gba_tests)
+- [michelhe, for their emulator](https://github.com/michelhe/rustboyadvance-ng)
+- [fleroviux, for NBA and it's MP3K implementation](https://github.com/nba-emu/NanoBoyAdvance)

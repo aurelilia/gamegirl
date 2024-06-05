@@ -1,8 +1,10 @@
+// Copyright (c) 2024 Leela Aurelia, git@elia.garden
+//
 // Unless otherwise noted, this file is released and thus subject to the
-// terms of the Mozilla Public License Version 2.0 (MPL2). Also, it is
-// "Incompatible With Secondary Licenses", as defined by the MPL2.
-// If a copy of the MPL2 was not distributed with this file, you can
-// obtain one at https://mozilla.org/MPL/2.0/.
+// terms of the Mozilla Public License Version 2.0 (MPL-2.0) or the
+// GNU General Public License Version 3 (GPL-3).
+// If a copy of these licenses was not distributed with this file, you can
+// obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
@@ -41,7 +43,6 @@ mod audio;
 mod cartridge;
 mod cpu;
 mod dma;
-// pub mod graphics;
 mod input;
 mod memory;
 mod ppu;
