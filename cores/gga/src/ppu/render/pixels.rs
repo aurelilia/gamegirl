@@ -221,6 +221,14 @@ impl PpuRender {
         let evy = self.r.bldy;
         blend(c, BLACK, 16 - evy, evy)
     }
+
+    pub(super) fn maybe_mosaic(val: i32, en: bool, mosaic: u8) -> i32 {
+        if en {
+            (val - (val % (mosaic as i32 + 1))).max(0)
+        } else {
+            val
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -26,7 +26,7 @@ minor graphical glitches.
 
 ### Features
 #### General
-- Highly configurable, including input
+- Highly configurable, including input (controller support!)
 - Savegame support in common `.sav` format (Basic RTC support)
 - Support for creating and loading save states with "undo last load" function
 - Fast forwarding hotkeys, both toggle and hold
@@ -96,7 +96,7 @@ minor graphical glitches.
     - [x] Windows
     - [x] Window blending
     - [x] Semi-transparent OBJs
-    - [ ] Mosaic
+    - [x] Mosaic
   - [x] APU
     - [x] CGB sound channels
     - [x] DMA sound channels
@@ -117,7 +117,6 @@ minor graphical glitches.
     - [x] Flash
 
 ### Planned Features
-- [ ] Controller support
 - [ ] Save export on Web/WASM
 
 

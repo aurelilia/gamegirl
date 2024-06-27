@@ -26,42 +26,92 @@ impl PpuRender {
         let char_block_base = cnt.character_base_block().us() * 0x4000;
         let size = cnt.screen_size();
         let bg_y = self.r.vcount.wrapping_add(vofs);
+        let bg_y = Self::maybe_mosaic(bg_y as i32, cnt.mosaic_en(), self.r.mosaic.bg_v()) as u16;
 
         for tile in -1..31 {
             let bg_x = (tile << 3) + hofs;
-            let map_addr = screen_block_base
-                + Self::get_map_offset((bg_x >> 3) as u32, (bg_y >> 3).u32(), size.u16()).us();
-            let map = hword(self.vram[map_addr], self.vram[map_addr + 1]);
+            if cnt.mosaic_en() {
+                // Mosaic: Slow path, pixel for pixel
+                // WIP: Doesn't work properly
+                for pixel in 0..8 {
+                    let inner_x = bg_x + pixel;
+                    let inner_x = (inner_x as i32
+                        - (inner_x as i32 % (self.r.mosaic.bg_h() as i32 + 1)))
+                        .max(0);
+                    let map_addr = screen_block_base
+                        + Self::get_map_offset(
+                            (inner_x >> 3) as u32,
+                            (bg_y >> 3).u32(),
+                            size.u16(),
+                        )
+                        .us();
+                    let map = hword(self.vram[map_addr], self.vram[map_addr + 1]);
 
-            let tile_idx = map.bits(0, 10);
-            let tile_y = if map.is_bit(11) {
-                7 - (bg_y & 7)
-            } else {
-                bg_y & 7
-            };
-            let base_x = tile * 8 - (hofs & 0x7);
-            let (mut x, x_step) = if map.is_bit(10) {
-                (base_x + 7, -1)
-            } else {
-                (base_x, 1)
-            };
+                    let tile_idx = map.bits(0, 10);
+                    let tile_y = if map.is_bit(11) {
+                        7 - (bg_y & 7)
+                    } else {
+                        bg_y & 7
+                    };
+                    let base_x = tile * 8 - (hofs & 0x7);
 
-            if cnt.palette_mode() == PaletteMode::Single256 {
-                let tile_addr = char_block_base + (tile_idx.us() * 64) + (tile_y.us() * 8);
-                for idx in 0..8 {
-                    let colour = self.vram[tile_addr + idx];
-                    self.set_pixel(bg, x, 0, colour);
-                    x += x_step;
+                    if cnt.palette_mode() == PaletteMode::Single256 {
+                        let tile_addr = char_block_base + (tile_idx.us() * 64) + (tile_y.us() * 8);
+                        let colour = self.vram[tile_addr];
+                        self.set_pixel(bg, base_x + pixel, 0, colour);
+                    } else {
+                        let tile_addr = char_block_base + (tile_idx.us() * 32) + (tile_y.us() * 4);
+                        let palette = map.bits(12, 4).u8();
+                        if inner_x % 2 == 0 {
+                            let byte = self.vram[tile_addr];
+                            self.set_pixel(bg, base_x + pixel, palette, byte & 0xF);
+                        } else {
+                            let byte = self.vram[tile_addr];
+                            self.set_pixel(bg, base_x + pixel, palette, byte >> 4);
+                        }
+                    }
                 }
             } else {
-                let tile_addr = char_block_base + (tile_idx.us() * 32) + (tile_y.us() * 4);
-                let palette = map.bits(12, 4).u8();
-                for idx in 0..4 {
-                    let byte = self.vram[tile_addr + idx];
-                    self.set_pixel(bg, x, palette, byte & 0xF);
-                    x += x_step;
-                    self.set_pixel(bg, x, palette, byte >> 4);
-                    x += x_step;
+                // No mosaic: Fast path, tile by tile
+                let map_addr = screen_block_base
+                    + Self::get_map_offset((bg_x >> 3) as u32, (bg_y >> 3).u32(), size.u16()).us();
+                let map = hword(self.vram[map_addr], self.vram[map_addr + 1]);
+
+                let tile_idx = map.bits(0, 10);
+                let tile_y = if map.is_bit(11) {
+                    7 - (bg_y & 7)
+                } else {
+                    bg_y & 7
+                };
+                let base_x = tile * 8 - (hofs & 0x7);
+                let mosaic_step = if cnt.mosaic_en() {
+                    (self.r.mosaic.bg_h() as i16) + 1
+                } else {
+                    1
+                };
+                let (mut x, x_step) = if map.is_bit(10) {
+                    (base_x + 7, -mosaic_step)
+                } else {
+                    (base_x, mosaic_step)
+                };
+
+                if cnt.palette_mode() == PaletteMode::Single256 {
+                    let tile_addr = char_block_base + (tile_idx.us() * 64) + (tile_y.us() * 8);
+                    for idx in 0..8 {
+                        let colour = self.vram[tile_addr + idx];
+                        self.set_pixel(bg, x, 0, colour);
+                        x += x_step;
+                    }
+                } else {
+                    let tile_addr = char_block_base + (tile_idx.us() * 32) + (tile_y.us() * 4);
+                    let palette = map.bits(12, 4).u8();
+                    for idx in 0..4 {
+                        let byte = self.vram[tile_addr + idx];
+                        self.set_pixel(bg, x, palette, byte & 0xF);
+                        x += x_step;
+                        self.set_pixel(bg, x, palette, byte >> 4);
+                        x += x_step;
+                    }
                 }
             }
         }
@@ -115,6 +165,8 @@ impl PpuRender {
                 y &= size - 1;
             }
 
+            let x = Self::maybe_mosaic(x, cnt.mosaic_en(), self.r.mosaic.bg_h());
+            let y = Self::maybe_mosaic(y, cnt.mosaic_en(), self.r.mosaic.bg_v());
             let map_addr = screen_block_base + (((y >> 3) * (size >> 3)) + (x >> 3)) as usize;
             let map = self.vram[map_addr];
 

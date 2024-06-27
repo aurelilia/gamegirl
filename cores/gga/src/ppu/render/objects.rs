@@ -78,6 +78,7 @@ impl PpuRender {
         } else {
             sprite_y
         };
+        let sprite_y = Self::maybe_mosaic(sprite_y, obj.mosaic_en(), self.r.mosaic.obj_v());
 
         let start = cmp::max(position.0, 0);
         let end = cmp::min(position.0 + width as i32, WIDTH as i32);
@@ -93,6 +94,7 @@ impl PpuRender {
             } else {
                 sprite_x
             };
+            let sprite_x = Self::maybe_mosaic(sprite_x, obj.mosaic_en(), self.r.mosaic.obj_h());
 
             let tile_addr = base_addr
                 + xy2dw(
@@ -159,6 +161,9 @@ impl PpuRender {
             let tex_y = trans_y + height / 2;
 
             if tex_x >= 0 && tex_x < width && tex_y >= 0 && tex_y < height {
+                let tex_x = Self::maybe_mosaic(tex_x, obj.mosaic_en(), self.r.mosaic.obj_h());
+                let tex_y = Self::maybe_mosaic(tex_y, obj.mosaic_en(), self.r.mosaic.obj_v());
+
                 let tile_addr = base_addr
                     + xy2dw(
                         (tex_x / 8) as usize,
@@ -265,7 +270,9 @@ impl Object {
     }
 
     fn draw_on(self, line: u16, self_y: i32, size_y: u8) -> bool {
-        self.valid() && (line as i32 >= self_y) && (line < (self_y as u16 + size_y as u16))
+        self.valid()
+            && (line as i32 >= self_y)
+            && (line < ((self_y as u16).wrapping_add(size_y as u16)))
     }
 
     fn valid(self) -> bool {

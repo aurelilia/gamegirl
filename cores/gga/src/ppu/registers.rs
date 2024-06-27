@@ -326,10 +326,10 @@ impl Window {
 #[derive(Debug, Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Mosaic {
-    pub bg_mosaic_h: B4,
-    pub bg_mosaic_v: B4,
-    pub obj_mosaic_h: B4,
-    pub obj_mosaic_v: B4,
+    pub bg_h: B4,
+    pub bg_v: B4,
+    pub obj_h: B4,
+    pub obj_v: B4,
 }
 
 #[bitfield]
