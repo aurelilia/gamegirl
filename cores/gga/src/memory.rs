@@ -42,7 +42,7 @@ pub struct Memory {
     /// Length of the prefetch buffer at the current PC.
     pub(crate) prefetch_len: u16,
 
-    mapper: MemoryMapper<8192>,
+    pub mapper: MemoryMapper<8192>,
     wait_word: [u16; 32],
     wait_other: [u16; 32],
 }

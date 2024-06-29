@@ -12,7 +12,7 @@ use arm_cpu::{
 };
 use common::{components::debugger::Debugger, numutil::NumExt, Time};
 
-use crate::{addr, GameGirlAdv};
+use crate::{addr, audio::mplayer::MusicPlayer, GameGirlAdv};
 
 pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 
@@ -57,6 +57,12 @@ impl ArmSystem for GameGirlAdv {
 
     fn pipeline_stalled(&mut self) {
         self.memory.prefetch_len = 0;
+    }
+
+    fn will_execute(&mut self, pc: u32) {
+        if self.apu.hle_hook == pc {
+            MusicPlayer::pc_match(self);
+        }
     }
 
     fn get<T: RwType>(&mut self, addr: u32) -> T {

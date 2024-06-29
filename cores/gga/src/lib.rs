@@ -14,7 +14,7 @@
 use std::{iter, mem, path::PathBuf};
 
 use arm_cpu::{registers::Flag, Cpu};
-use audio::Apu;
+use audio::{mplayer, Apu};
 use cartridge::Cartridge;
 use common::{
     common_functions,
@@ -170,6 +170,7 @@ impl GameGirlAdv {
 
         let mut gga = Box::<GameGirlAdv>::default();
         gga.config = config.clone();
+        // gga.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO still buggy
         gga.cart.load_rom(cart);
         if let Some(save) = Storage::load(path, gga.cart.title()) {
             gga.cart.load_save(save);

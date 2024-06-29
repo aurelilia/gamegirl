@@ -89,6 +89,8 @@ pub fn find_mp2k(rom: &[u8]) -> Option<u32> {
     None
 }
 
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MusicPlayer {
     samplers: [Sampler; MAX_CH],
     envelopes: [Envelope; MAX_CH],
@@ -103,7 +105,14 @@ pub struct MusicPlayer {
 }
 
 impl MusicPlayer {
-    pub fn sound_main_ram(&mut self, bus: MemoryMapper<8192>, info_addr: u32) {
+    pub fn pc_match(gg: &mut GameGirlAdv) {
+        let addr = gg.get_word(0x300_7FF0);
+        if addr != 0 {
+            gg.apu.mplayer.sound_main_ram(&mut gg.memory.mapper, addr);
+        }
+    }
+
+    pub fn sound_main_ram(&mut self, bus: &mut MemoryMapper<8192>, info_addr: u32) {
         let Some(sound_info) = bus.get::<GameGirlAdv, SoundInfo>(info_addr) else {
             return;
         };
@@ -114,7 +123,7 @@ impl MusicPlayer {
 
         if !self.engaged {
             assert_ne!(self.sound_info.pcm_samples_per_vblank, 0);
-            self.buffer.clear();
+            self.recreate_buffer();
             self.engaged = true;
         }
 
@@ -254,7 +263,16 @@ impl MusicPlayer {
         }
     }
 
-    fn render_frame(&mut self, bus: MemoryMapper<8192>) {
+    fn recreate_buffer(&mut self) {
+        let capacity = (SAMPLES_PER_FRAME * TOTAL_FRAME_COUNT * 4) as usize;
+        self.buffer.reserve_exact(capacity - self.buffer.len());
+        unsafe {
+            self.buffer.set_len(capacity);
+        }
+        self.buffer.fill(0.0);
+    }
+
+    fn render_frame(&mut self, bus: &mut MemoryMapper<8192>) {
         const DIFFERENTIAL_LUT: &[f32] = &[
             i8_to_float(0x00u8 as i8),
             i8_to_float(0x01u8 as i8),
@@ -275,6 +293,7 @@ impl MusicPlayer {
         ];
 
         self.current_frame = (self.current_frame + 1) % TOTAL_FRAME_COUNT;
+        self.recreate_buffer();
 
         let reverb_strength = if self.force_reverb {
             cmp::max(self.sound_info.reverb, 48)
@@ -310,7 +329,7 @@ impl MusicPlayer {
             let wave_info = &sampler.wave_info;
 
             let mut wave_size = wave_info.number_of_samples;
-            if sampler.compressed != compressed || !sampler.wave_data.is_null() {
+            if sampler.compressed != compressed || sampler.wave_data.is_null() {
                 if compressed {
                     wave_size *= 33;
                     wave_size = (wave_size + 63) / 64;
@@ -328,6 +347,7 @@ impl MusicPlayer {
                 sampler.compressed = compressed;
             }
 
+            dbg!(sampler.wave_data, wave_size);
             let wave_data =
                 unsafe { slice::from_raw_parts_mut(sampler.wave_data, wave_size as usize) };
             for j in 0..SAMPLES_PER_FRAME {
@@ -462,7 +482,7 @@ impl MusicPlayer {
         }
     }
 
-    fn read_sample(&mut self, bus: MemoryMapper<8192>) -> [f32; 2] {
+    pub fn read_sample(&mut self, bus: &mut MemoryMapper<8192>) -> [f32; 2] {
         if self.buffer_read_index == 0 {
             self.render_frame(bus);
         }
@@ -479,6 +499,8 @@ impl MusicPlayer {
     }
 }
 
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(C)]
 struct SoundInfo {
     magic: u32,
@@ -495,6 +517,7 @@ struct SoundInfo {
 
 #[repr(C)]
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct SoundChannel {
     status: u8,
     type_: u8,
@@ -516,6 +539,7 @@ struct SoundChannel {
     _unknown2: [u32; 6],
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct Sampler {
     compressed: bool,
     should_fetch_sample: bool,
@@ -523,7 +547,16 @@ struct Sampler {
     resample_phase: f32,
     sample_history: [f32; 4],
     wave_info: WaveInfo,
+    #[serde(skip)]
+    #[serde(default = "null")]
     wave_data: *mut u8,
+}
+
+unsafe impl Send for Sampler {}
+unsafe impl Sync for Sampler {}
+
+fn null() -> *mut u8 {
+    ptr::null::<u8>() as *mut u8
 }
 
 impl Default for Sampler {
@@ -541,6 +574,7 @@ impl Default for Sampler {
 }
 
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct WaveInfo {
     type_: u16,
     status: u16,
@@ -550,6 +584,7 @@ struct WaveInfo {
 }
 
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct Envelope {
     volume: f32,
     volume_l: [f32; 2],

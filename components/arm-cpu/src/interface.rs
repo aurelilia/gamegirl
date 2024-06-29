@@ -40,6 +40,9 @@ pub trait ArmSystem: Sized + 'static {
     fn exception_happened(&mut self, kind: Exception);
     /// Callback to perform any system-specific behavior on a pipeline stall.
     fn pipeline_stalled(&mut self);
+    /// Callback that is called before an instruction is executed for tracing,
+    /// debugging and similar functionality
+    fn will_execute(&mut self, pc: u32);
 
     /// Get the value at the given memory address.
     fn get<T: RwType>(&mut self, addr: u32) -> T;

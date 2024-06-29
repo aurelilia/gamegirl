@@ -90,10 +90,12 @@ impl<S: ArmSystem> Cpu<S> {
         gg.advance_clock();
         Self::ensure_pipeline_valid(gg);
         if gg.cpu().flag(Thumb) {
-            let (inst, _) = Self::fetch_next_inst::<u16>(gg);
+            let (inst, _, pc) = Self::fetch_next_inst::<u16>(gg);
+            gg.will_execute(pc);
             gg.execute_inst_thumb(inst.u16());
         } else {
-            let (inst, _) = Self::fetch_next_inst::<u32>(gg);
+            let (inst, _, pc) = Self::fetch_next_inst::<u32>(gg);
+            gg.will_execute(pc);
             gg.execute_inst_arm(inst);
         }
     }
@@ -113,7 +115,8 @@ impl<S: ArmSystem> Cpu<S> {
                         return;
                     }
 
-                    gg.cpu().inc_pc_by(4);
+                    let pc = gg.cpu().inc_pc_by(4);
+                    gg.will_execute(pc);
                     Self::trace_inst::<u32>(gg, inst.inst);
                     gg.add_sn_cycles(inst.sn_cycles);
                     if gg.check_arm_cond(inst.inst) {
@@ -130,7 +133,8 @@ impl<S: ArmSystem> Cpu<S> {
                         return;
                     }
 
-                    gg.cpu().inc_pc_by(2);
+                    let pc = gg.cpu().inc_pc_by(2);
+                    gg.will_execute(pc);
                     Self::trace_inst::<u16>(gg, inst.inst.u32());
                     gg.add_sn_cycles(inst.sn_cycles);
                     (inst.handler)(gg, ThumbInst(inst.inst));
@@ -155,7 +159,8 @@ impl<S: ArmSystem> Cpu<S> {
                     return;
                 }
 
-                let (inst, sn_cycles) = Self::fetch_next_inst::<u16>(gg);
+                let (inst, sn_cycles, pc) = Self::fetch_next_inst::<u16>(gg);
+                gg.will_execute(pc);
                 let inst = inst.u16();
                 let handler = SysWrapper::<S>::get_handler_thumb(inst);
 
@@ -183,7 +188,8 @@ impl<S: ArmSystem> Cpu<S> {
                     return;
                 }
 
-                let (inst, sn_cycles) = Self::fetch_next_inst::<u32>(gg);
+                let (inst, sn_cycles, pc) = Self::fetch_next_inst::<u32>(gg);
+                gg.will_execute(pc);
                 let handler = SysWrapper::<S>::get_handler_arm(inst);
 
                 if gg.check_arm_cond(inst) {
@@ -206,8 +212,8 @@ impl<S: ArmSystem> Cpu<S> {
     }
 
     /// Fetch the next instruction of the CPU.
-    fn fetch_next_inst<TY: RwType>(gg: &mut S) -> (u32, u16) {
-        gg.cpu().inc_pc_by(TY::WIDTH);
+    fn fetch_next_inst<TY: RwType>(gg: &mut S) -> (u32, u16, u32) {
+        let pc = gg.cpu().inc_pc_by(TY::WIDTH);
         let sn_cycles = gg.wait_time::<TY>(gg.cpur().pc(), gg.cpur().access_type);
         gg.add_sn_cycles(sn_cycles);
 
@@ -217,7 +223,7 @@ impl<S: ArmSystem> Cpu<S> {
         gg.cpu().access_type = Access::Seq;
 
         Self::trace_inst::<TY>(gg, inst);
-        (inst, sn_cycles)
+        (inst, sn_cycles, pc)
     }
 
     fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32) {
@@ -311,8 +317,9 @@ impl<S: ArmSystem> Cpu<S> {
     }
 
     #[inline]
-    fn inc_pc_by(&mut self, count: u32) {
+    fn inc_pc_by(&mut self, count: u32) -> u32 {
         self.registers[15] = self.registers[15].wrapping_add(count);
+        self.registers[15]
     }
 
     #[inline]

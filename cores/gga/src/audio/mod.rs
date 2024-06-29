@@ -14,11 +14,12 @@ pub mod mplayer;
 use std::collections::VecDeque;
 
 use common::{
-    components::scheduler::Scheduler,
+    components::{memory::MemoryMapper, scheduler::Scheduler},
     numutil::{NumExt, U16Ext},
     TimeS,
 };
 use modular_bitfield::{bitfield, specifiers::*};
+use mplayer::MusicPlayer;
 use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use super::scheduling::AdvEvent;
@@ -69,11 +70,14 @@ pub struct Apu {
     pub cnt: SoundControl,
     pub bias: SoundBias,
 
+    pub mplayer: MusicPlayer,
+    pub hle_hook: u32,
+
     // 4 channels found on GG(C)
     pub(crate) cgb_chans: GenericApu,
     // DMA channels
     buffers: [VecDeque<i8>; 2],
-    current_samples: [i8; 2],
+    current_samples: [i16; 2],
     // Output buffer
     pub buffer: Vec<f32>,
 }
@@ -93,7 +97,7 @@ impl Apu {
             }
 
             ApuEvent::PushSample => {
-                gg.apu.push_output();
+                gg.apu.push_output(&mut gg.memory.mapper);
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
@@ -107,7 +111,7 @@ impl Apu {
         );
     }
 
-    fn push_output(&mut self) {
+    fn push_output(&mut self, bus: &mut MemoryMapper<8192>) {
         if !self.cgb_chans.power {
             // Master enable, also applies to DMA channels
             self.buffer.push(0.);
@@ -120,8 +124,17 @@ impl Apu {
         let cnt = self.cnt;
         let a_vol_mul = 1 + cnt.a_vol() as i16;
         let b_vol_mul = 1 + cnt.b_vol() as i16;
-        let a = self.current_samples[0] as i16 * a_vol_mul * 2;
-        let b = self.current_samples[1] as i16 * b_vol_mul * 2;
+
+        let a: i16;
+        let b: i16;
+        if self.hle_hook != 0 {
+            let mplayer = self.mplayer.read_sample(bus);
+            a = (mplayer[0] * 512.) as i16 * a_vol_mul;
+            b = (mplayer[1] * 512.) as i16 * b_vol_mul;
+        } else {
+            a = self.current_samples[0] as i16 * a_vol_mul * 2;
+            b = self.current_samples[1] as i16 * b_vol_mul * 2;
+        }
 
         if cnt.a_right_en() {
             right += a;
@@ -169,7 +182,12 @@ impl Apu {
     /// more samples if needed
     pub fn timer_overflow<const CH: usize>(gg: &mut GameGirlAdv) {
         if let Some(next) = gg.apu.buffers[CH].pop_front() {
-            gg.apu.current_samples[CH] = next;
+            if gg.apu.hle_hook != 0 && CH == 0 {
+                let mplayer = gg.apu.mplayer.read_sample(&mut gg.memory.mapper);
+                gg.apu.current_samples = [(mplayer[0] * 512.) as i16, (mplayer[1] * 512.) as i16];
+            } else {
+                gg.apu.current_samples[CH] = next as i16 * 2;
+            }
         }
 
         if gg.apu.buffers[CH].len() <= 16 {

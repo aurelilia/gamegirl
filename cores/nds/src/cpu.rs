@@ -83,6 +83,10 @@ impl ArmSystem for Nds7 {
     fn can_cache_at(_addr: u32) -> bool {
         false
     }
+
+    fn will_execute(&mut self, pc: u32) {
+        todo!()
+    }
 }
 
 impl ArmSystem for Nds9 {
@@ -139,5 +143,9 @@ impl ArmSystem for Nds9 {
 
     fn can_cache_at(_addr: u32) -> bool {
         false
+    }
+
+    fn will_execute(&mut self, pc: u32) {
+        todo!()
     }
 }
