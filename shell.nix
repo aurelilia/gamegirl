@@ -3,6 +3,8 @@ let
   packages = with pkgs; [
     pkg-config
     udev
+    llvmPackages.bintools
+    clang
     alsa-lib
     gtk3
     wayland
