@@ -8,7 +8,7 @@
 
 use std::fmt::UpperHex;
 
-use common::numutil::NumExt;
+use common::{components::debugger::Severity, numutil::NumExt};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{Access::NonSeq, Cpu, Exception};
@@ -19,7 +19,11 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     pub fn und_inst<T: UpperHex>(&mut self, code: T) {
-        log::error!("Unknown opcode '{:08X}'", code);
+        self.debugger().log(
+            "unknown-opcode",
+            format!("Unknown opcode '{:08X}'", code),
+            Severity::Error,
+        );
         Cpu::exception_occurred(self, Exception::Undefined);
     }
 

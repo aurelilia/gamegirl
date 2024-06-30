@@ -13,11 +13,13 @@ mod psx;
 use std::any::Any;
 
 use common::{
-    components::debugger::{Breakpoint, Debugger},
+    components::debugger::{Breakpoint, Debugger, Severity},
     numutil::NumExt,
     Core,
 };
-use eframe::egui::{self, Align, Color32, Context, Layout, TextEdit, Ui};
+use eframe::egui::{
+    self, Align, Color32, ComboBox, Context, Label, Layout, RichText, ScrollArea, TextEdit, Ui,
+};
 use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
 
 use crate::app::{App, GuiStyle};
@@ -95,6 +97,8 @@ fn debugger_footer<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
     inst_dump(ui, dbg);
     ui.add_space(10.0);
     breakpoints(dbg, ui);
+    ui.add_space(10.0);
+    event_log(dbg, ui);
 }
 
 fn inst_dump<T: NumExt>(ui: &mut Ui, debugger: &mut Debugger<T>) {
@@ -164,4 +168,56 @@ fn breakpoints<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
             bps.remove(i);
         }
     });
+}
+
+fn event_log<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
+    ui.horizontal(|ui| {
+        ui.heading("Event Log");
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ComboBox::from_label("Level")
+                .selected_text(format!("{:?}", dbg.diagnostic_level))
+                .show_ui(ui, |ui| {
+                    for level in [
+                        Severity::Error,
+                        Severity::Warning,
+                        Severity::Info,
+                        Severity::Debug,
+                        Severity::None,
+                    ] {
+                        ui.selectable_value(
+                            &mut dbg.diagnostic_level,
+                            level,
+                            format!("{:?}", level),
+                        );
+                    }
+                });
+            if ui.button("Clear").clicked() {
+                dbg.diagnostic_events.lock().unwrap().clear();
+            }
+        });
+    });
+
+    ui.separator();
+    ScrollArea::vertical().show(ui, |ui| {
+        let events = dbg.diagnostic_events.lock().unwrap();
+        for event in events.iter().rev() {
+            ui.label(
+                RichText::new(format!("{}", event.event)).color(severity_color(event.severity)),
+            )
+            .on_hover_ui(|ui| {
+                ui.label(format!("Type: {}", event.evt_type));
+                ui.label(format!("Time: {:?}", event.time));
+            });
+        }
+    });
+}
+
+fn severity_color(severity: Severity) -> Color32 {
+    match severity {
+        Severity::Error => Color32::RED,
+        Severity::Warning => Color32::YELLOW,
+        Severity::Info => Color32::LIGHT_BLUE,
+        Severity::Debug => Color32::LIGHT_GRAY,
+        Severity::None => Color32::BLACK,
+    }
 }

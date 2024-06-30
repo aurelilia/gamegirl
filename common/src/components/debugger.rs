@@ -6,10 +6,12 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use std::{fmt::Debug, sync::Mutex, time::Instant};
+
 /// Debugger info that is required to be known by the system.
-/// Is generic over GGC/GGA; generic type Ptr is pointer size
+/// Is generic over cores; generic type Ptr is pointer size
 /// on the current system (u16/u32)
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     /// Contains the serial output that was written to IO register SB.
     /// Currently only on GG.
@@ -24,6 +26,12 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     /// If instructions should be traced and printed to a file, this contains
     /// the instructions to be printed / file contents.
     pub traced_instructions: Option<String>,
+    /// The diagnostic level that is currently enabled.
+    /// Any diagnostic events with a severity lower than this will not be
+    /// logged and discarded.
+    pub diagnostic_level: Severity,
+    /// Diagnostic events that have occurred.
+    pub diagnostic_events: Mutex<Vec<DiagnosticEvent>>,
 }
 
 impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
@@ -74,6 +82,23 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
             instr.push_str(&text);
         }
     }
+
+    /// Log a diagnostic event that occured, if the corresponding level
+    /// is enabled.
+    pub fn log(&self, evt_type: &str, event: String, severity: Severity) {
+        if severity >= self.diagnostic_level {
+            self.diagnostic_events
+                .lock()
+                .unwrap()
+                .push(DiagnosticEvent {
+                    evt_type: evt_type.to_string(),
+                    event,
+                    severity,
+                    time: Instant::now(),
+                    state: None,
+                });
+        }
+    }
 }
 
 /// A breakpoint.
@@ -88,4 +113,39 @@ pub struct Breakpoint<Ptr> {
     pub pc: bool,
     /// If this breakpoint triggers on a write.
     pub write: bool,
+}
+
+/// A diagnostic event that might be interesting during debugging.
+#[derive(Debug)]
+pub struct DiagnosticEvent {
+    /// The type of the event.
+    /// This is used to for breakpointing on specific events.
+    pub evt_type: String,
+    /// The display message of what occurred.
+    pub event: String,
+    /// The severity of the event.
+    pub severity: Severity,
+    /// The time the event occurred .
+    pub time: Instant,
+    /// Save state, if enabled, to be used to aid debugging.
+    pub state: Option<Vec<u8>>,
+}
+
+/// The severity of a diagnostic event.
+/// Event severity is decided by the system and can be used to filter.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[repr(C)]
+pub enum Severity {
+    Debug = 0,
+    Info = 10,
+    Warning = 100,
+    Error = 1000,
+    #[default]
+    None = 10000,
+}
+
+impl PartialOrd for Severity {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some((*self as u32).cmp(&(*other as u32)))
+    }
 }

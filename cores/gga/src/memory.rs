@@ -14,7 +14,10 @@ use arm_cpu::{
     Cpu, Interrupt,
 };
 use common::{
-    components::memory::{MemoryMappedSystem, MemoryMapper},
+    components::{
+        debugger::Severity,
+        memory::{MemoryMappedSystem, MemoryMapper},
+    },
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
@@ -133,12 +136,7 @@ impl GameGirlAdv {
     }
 
     fn get_mmio(&self, addr: u32) -> u16 {
-        if addr == 0x400_100C {
-            // annoying edge case register
-            return self.invalid_read::<false>(addr).u16();
-        }
-
-        let a = addr & 0x3FE;
+        let a = addr & 0x1FFE;
         match a {
             // Timers
             TM0CNT_L => Timers::time_read::<0>(self),
@@ -200,10 +198,24 @@ impl GameGirlAdv {
             | 0x138..=0x140
             | 0x144..=0x158
             | 0x15C..=0x1FF
-            | 0x304..=0x3FE => self.invalid_read::<false>(addr).u16(),
+            | 0x304..=0x3FE
+            | 0x100C => {
+                self.debugger.log(
+                    "invalid-mmio-read-known",
+                    format!(
+                        "Read from write-only/shadow IO register 0x{a:03X}, returning open bus"
+                    ),
+                    Severity::Info,
+                );
+                self.invalid_read::<false>(addr).u16()
+            }
 
             _ => {
-                log::info!("Read from unknown IO register 0x{a:03X}, returning open bus");
+                self.debugger.log(
+                    "invalid-mmio-read-unknown",
+                    format!("Read from unknown IO register 0x{a:03X}, returning open bus"),
+                    Severity::Warning,
+                );
                 self.invalid_read::<false>(addr).u16()
             }
         }
@@ -476,9 +488,19 @@ impl GameGirlAdv {
             | 0xE0..=0xFF
             | 0x110..=0x12E
             | 0x140..=0x15E
-            | 0x20A..=0x21E => (),
+            | 0x20A..=0x21E => self.debugger.log(
+                "invalid-mmio-write-known",
+                format!(
+                    "Write to known read-only IO register 0x{a:03X} (value {value:04X}), ignoring"
+                ),
+                Severity::Info,
+            ),
 
-            _ => log::info!("Write to unknown IO register 0x{a:03X} (value {value:04X}), ignoring"),
+            _ => self.debugger.log(
+                "invalid-mmio-write-unknown",
+                format!("Write to unknown IO register 0x{a:03X} (value {value:04X}), ignoring"),
+                Severity::Warning,
+            ),
         }
     }
 
