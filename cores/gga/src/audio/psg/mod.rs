@@ -10,7 +10,6 @@
 //! https://github.com/Amjad50/mizu/tree/master/mizu-core/src/apu
 //! Thank you to it's authors!
 
-#![feature(trait_alias)]
 type TimeS = i64;
 
 use bitflags::bitflags;

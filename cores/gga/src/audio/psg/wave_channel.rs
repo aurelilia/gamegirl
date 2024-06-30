@@ -6,8 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use super::{Channel, ScheduleFn};
-use crate::{GenApuEvent, TimeS};
+use super::{Channel, GenApuEvent, ScheduleFn, TimeS};
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 

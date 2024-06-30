@@ -10,6 +10,7 @@
 #![feature(generic_const_exprs)]
 #![feature(if_let_guard)]
 #![feature(const_fn_floating_point_arithmetic)]
+#![feature(trait_alias)]
 
 use std::{iter, mem, path::PathBuf};
 

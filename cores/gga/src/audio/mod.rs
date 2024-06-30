@@ -10,6 +10,7 @@
 //! for the time being: broken!
 
 pub mod mplayer;
+pub mod psg;
 
 use std::collections::VecDeque;
 
@@ -20,7 +21,7 @@ use common::{
 };
 use modular_bitfield::{bitfield, specifiers::*};
 use mplayer::MusicPlayer;
-use psg_apu::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
+use psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use super::scheduling::AdvEvent;
 use crate::{addr::FIFO_A_L, dma::Dmas, scheduling::ApuEvent, GameGirlAdv, CPU_CLOCK};

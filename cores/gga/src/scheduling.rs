@@ -7,10 +7,14 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use common::{components::scheduler::Kind, TimeS};
-use psg_apu::GenApuEvent;
 use AdvEvent::*;
 
-use crate::{audio::Apu, ppu::Ppu, timer::Timers, GameGirlAdv};
+use crate::{
+    audio::{psg::GenApuEvent, Apu},
+    ppu::Ppu,
+    timer::Timers,
+    GameGirlAdv,
+};
 
 /// All scheduler events on the GGA.
 #[derive(Copy, Clone, Eq, PartialEq, Default)]

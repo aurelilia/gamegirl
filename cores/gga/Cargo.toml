@@ -8,14 +8,13 @@ edition = "2021"
 [dependencies]
 common = { path = "../../common" }
 arm-cpu = { path = "../../components/arm-cpu" }
-gga-ppu = { path = "../../components/gga-ppu" }
-psg-apu = { path = "../../components/psg-apu" }
 
 log.workspace = true
 serde = { workspace = true, optional = true }
 serde_arrays = { workspace = true, optional = true }
 arrayvec.workspace = true
 modular-bitfield.workspace = true
+bitflags.workspace = true
 
 elf_rs = "0.3.1"
 rubato = "0.15.0"
@@ -23,13 +22,11 @@ rubato = "0.15.0"
 
 [features]
 default = []
-threaded-ppu = ["gga-ppu/threaded"]
+threaded-ppu = []
 serde = [
     "dep:serde",
     "dep:serde_arrays",
     "arrayvec/serde",
     "common/serde",
     "arm-cpu/serde",
-    "gga-ppu/serde",
-    "psg-apu/serde",
 ]
