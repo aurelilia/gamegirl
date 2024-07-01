@@ -547,8 +547,8 @@ struct Sampler {
     resample_phase: f32,
     sample_history: [f32; 4],
     wave_info: WaveInfo,
-    #[serde(skip)]
-    #[serde(default = "null")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default = "null"))]
     wave_data: *mut u8,
 }
 
