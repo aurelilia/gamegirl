@@ -1,5 +1,13 @@
+use gamegirl::common::misc::SystemConfig;
+
 fn main() {
-    let mut core = dynacore::new_core(include_bytes!("../../../bench.gb").to_vec());
+    let mut core = gamegirl::load_cart(
+        include_bytes!("../../../bench.gb").to_vec(),
+        None,
+        &SystemConfig::default(),
+        None,
+        0,
+    );
     for _ in 0..1000 {
         core.advance_delta(0.1);
     }

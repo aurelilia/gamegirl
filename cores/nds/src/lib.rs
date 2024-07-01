@@ -158,6 +158,10 @@ impl Core for Nds {
     fn make_save(&self) -> Option<GameSave> {
         todo!();
     }
+
+    fn get_rom(&self) -> Vec<u8> {
+        self.cart.rom.clone()
+    }
 }
 
 impl Nds {

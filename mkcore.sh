@@ -1,4 +1,4 @@
 #!/bin/sh
 
-cargo build -p dynacore --release
-cp $CARGO_TARGET_DIR/release/libdynacore.so dyn-cores/$1
+cargo build -p gamegirl --release --features dynamic,gga,nds,ggc,serde
+cp $CARGO_TARGET_DIR/release/libgamegirl.so dyn-cores/$1

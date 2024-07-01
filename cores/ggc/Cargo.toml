@@ -15,4 +15,4 @@ bitflags.workspace = true
 
 
 [features]
-serde = ["dep:serde", "dep:serde_arrays", "common/serde"]
+serde = ["dep:serde", "dep:serde_arrays", "common/serde", "bitflags/serde"]

@@ -87,6 +87,10 @@ impl Core for PlayStation {
         log::error!("PSX does not support making a save yet");
         None
     }
+
+    fn get_rom(&self) -> Vec<u8> {
+        self.iso.raw.clone()
+    }
 }
 
 impl PlayStation {

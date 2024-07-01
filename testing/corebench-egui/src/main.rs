@@ -16,9 +16,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use dynacore::{common::Core, gamegirl::dummy_core, NewCoreFn};
 use eframe::{egui::ViewportBuilder, emath::History, Theme};
-use libloading::{Library, Symbol};
+use gamegirl::{
+    common::Core,
+    dummy_core,
+    dynamic::{DynamicContext, NewCoreFn},
+};
 use testsuite::TestSuiteResult;
 
 use crate::app::App;
@@ -29,7 +32,7 @@ pub struct DCore {
     bench: History<f64>,
     bench_iso: Arc<Mutex<History<f64>>>,
     loader: NewCoreFn,
-    _library: Option<Library>,
+    idx: Option<usize>,
     name: String,
 }
 
@@ -48,18 +51,14 @@ fn main() {
     .unwrap()
 }
 
-fn load_core(path: PathBuf) -> Result<DCore, libloading::Error> {
-    unsafe {
-        let lib = Library::new(&path)?;
-        let fun: Symbol<NewCoreFn> = lib.get(b"new_core")?;
-        Ok(DCore {
-            c: dummy_core(),
-            suites: vec![],
-            bench: History::new(10..5000, 30.0),
-            bench_iso: Arc::new(Mutex::new(History::new(10..5000, 100.0))),
-            loader: *fun,
-            _library: Some(lib),
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-        })
-    }
+fn load_core(ctx: &mut DynamicContext, path: PathBuf) -> Result<DCore, libloading::Error> {
+    ctx.load_core(&path).map(|idx| DCore {
+        c: dummy_core(),
+        suites: vec![],
+        bench: History::new(10..5000, 30.0),
+        bench_iso: Arc::new(Mutex::new(History::new(10..5000, 100.0))),
+        loader: ctx.get_core(idx).loader,
+        idx: Some(idx),
+        name: path.file_name().unwrap().to_string_lossy().to_string(),
+    })
 }

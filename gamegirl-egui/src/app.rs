@@ -59,6 +59,9 @@ pub struct App {
     pub rewinder: Rewinder,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     pub fast_forward_toggled: bool,
+    /// Dynamic loading state, to be used for debugging
+    #[cfg(feature = "dynamic")]
+    pub dyn_ctx: gamegirl::dynamic::DynamicContext,
 
     /// Texture(s) for the core's graphics output.
     pub textures: Vec<TextureId>,
@@ -244,6 +247,23 @@ impl App {
                     core.reset();
                     core.options().input.load_replay(file.content);
                 }
+
+                #[cfg(feature = "dynamic")]
+                Message::CoreLoad(path) => {
+                    if let Ok(idx) = self
+                        .dyn_ctx
+                        .load_core(&path)
+                        .inspect_err(|e| log::error!("Failed to load core! {e:#?}"))
+                    {
+                        let mut old_core = self.core.lock().unwrap();
+                        let state = old_core.save_state();
+                        let rom = old_core.get_rom();
+
+                        let mut core = (self.dyn_ctx.get_core(idx).loader)(rom);
+                        core.load_state(&state);
+                        *old_core = core;
+                    }
+                }
             }
         }
     }
@@ -266,6 +286,10 @@ impl App {
             TextureOptions::NEAREST,
         )];
 
+        let (tx, rx) = mpsc::channel();
+        #[cfg(feature = "dynamic")]
+        let tx2 = tx.clone();
+
         catppuccin_egui::set_theme(&ctx.egui_ctx, catppuccin_egui::MOCHA);
         Box::new(App {
             core,
@@ -273,13 +297,18 @@ impl App {
 
             rewinder: Rewinder::new(state.options.rewind_buffer_size),
             fast_forward_toggled: false,
+            #[cfg(feature = "dynamic")]
+            dyn_ctx: gamegirl::dynamic::DynamicContext::watch_dir(move |path| {
+                tx2.send(Message::CoreLoad(path)).unwrap();
+            }),
+
             app_window_states: [false; APP_WINDOW_COUNT],
             debugger_window_states: Vec::from([false; 10]),
 
             textures,
             gil: Gilrs::new().unwrap(),
             controller_axes: HashMap::with_capacity(6),
-            message_channel: mpsc::channel(),
+            message_channel: (tx, rx),
             frame_times: History::new(0..120, 2.0),
             audio_stream: None,
 
@@ -320,6 +349,10 @@ pub enum Message {
     RomOpen(File),
     /// A file picked by the user to be opened as a replay.
     ReplayOpen(File),
+    #[cfg(feature = "dynamic")]
+    /// A new core got compiled and should be loaded.
+    /// Only used when dynamic support is compiled in.
+    CoreLoad(PathBuf),
 }
 
 /// User-configurable options.

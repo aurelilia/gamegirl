@@ -21,6 +21,7 @@ gamegirl = { path = "../gamegirl", features = [
     "nds",
     "psx",
     "serde",
+    "dynamic",
 ] }
 
 eframe = { version = "0.26.2", default-features = false, features = [
@@ -53,6 +54,7 @@ gga = { path = "../cores/gga", default-features = false }
 nds = { path = "../cores/nds", default-features = false }
 
 [features]
-default = ["remote-debugger", "filters"]
+default = ["remote-debugger", "filters", "dynamic"]
 remote-debugger = ["gamegirl/remote-debugger", "once_cell"]
 filters = ["hqx"]
+dynamic = ["gamegirl/dynamic"]

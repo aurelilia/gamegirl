@@ -6,7 +6,6 @@ members = [
     "gamegirl",
     "gamegirl-egui",
     "testing/corebench-egui",
-    "testing/dynacore",
     "testing/flamegraph",
 ]
 resolver = "2"

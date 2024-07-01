@@ -29,4 +29,5 @@ serde = [
     "arrayvec/serde",
     "common/serde",
     "arm-cpu/serde",
+    "bitflags/serde",
 ]

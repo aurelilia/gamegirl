@@ -85,6 +85,6 @@ pub trait Core: Send + Sync {
     }
 
     fn as_any(&mut self) -> &mut dyn Any;
-}
 
-impl dyn Core {}
+    fn get_rom(&self) -> Vec<u8>;
+}

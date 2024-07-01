@@ -122,6 +122,10 @@ impl Core for GameGirl {
     fn get_serial(&self) -> &[u8] {
         self.debugger.serial_output.as_bytes()
     }
+
+    fn get_rom(&self) -> Vec<u8> {
+        self.cart.rom.clone()
+    }
 }
 
 impl GameGirl {

@@ -13,15 +13,16 @@ use std::{
     time::Instant,
 };
 
-use dynacore::{
-    common::components::input::{InputReplay, ReplayState},
-    gamegirl::dummy_core,
-};
 use eframe::{
     egui::{Color32, Context, TextureOptions},
     emath::History,
     epaint::{ColorImage, ImageData, ImageDelta, TextureId},
     CreationContext, Frame,
+};
+use gamegirl::{
+    common::components::input::{InputReplay, ReplayState},
+    dummy_core,
+    dynamic::DynamicContext,
 };
 use notify::{
     event::{AccessKind, AccessMode},
@@ -53,8 +54,8 @@ pub struct App {
     pub message_channel: (mpsc::Sender<Message>, mpsc::Receiver<Message>),
     /// App window states.
     pub app_window_states: [bool; APP_WINDOW_COUNT],
-    /// Needs to be kept alive
-    _watcher: INotifyWatcher,
+    /// Dynamic loading
+    pub dyn_ctx: DynamicContext,
 }
 
 impl eframe::App for App {
@@ -112,7 +113,7 @@ impl App {
                 }
 
                 Message::CoreOpen(path) => {
-                    if let Ok(core) = crate::load_core(path) {
+                    if let Ok(core) = crate::load_core(&mut self.dyn_ctx, path) {
                         self.cores.push(core);
                         self.textures.push(App::make_screen_texture(
                             &ctx,
@@ -162,22 +163,9 @@ impl App {
         let message_channel = mpsc::channel();
 
         let tx = message_channel.0.clone();
-        let mut _watcher = notify::recommended_watcher(move |res| match res {
-            Ok(notify::Event {
-                kind: EventKind::Access(AccessKind::Close(AccessMode::Write)),
-                mut paths,
-                ..
-            }) => {
-                tx.send(Message::CoreOpen(paths.pop().unwrap())).unwrap();
-            }
-            Ok(_) => (),
-            Err(_) => panic!(),
-        })
-        .unwrap();
-        _watcher
-            .watch(Path::new("./dyn-cores"), RecursiveMode::Recursive)
-            .unwrap();
-
+        let dyn_ctx = DynamicContext::watch_dir(move |path| {
+            tx.send(Message::CoreOpen(path)).unwrap();
+        });
         for file in fs::read_dir("./dyn-cores").unwrap() {
             let file = file.unwrap();
             message_channel
@@ -192,8 +180,8 @@ impl App {
                 suites: vec![],
                 bench: History::new(10..5000, 30.0),
                 bench_iso: Arc::new(Mutex::new(History::new(10..5000, 100.0))),
-                loader: dynacore::new_core,
-                _library: None,
+                loader: gamegirl::dynamic::new_core,
+                idx: None,
                 name: "Baseline".to_string(),
             }],
             replay: None,
@@ -204,7 +192,7 @@ impl App {
             textures,
             app_window_states: [true; APP_WINDOW_COUNT],
             message_channel,
-            _watcher,
+            dyn_ctx,
         })
     }
 

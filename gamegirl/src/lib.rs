@@ -26,6 +26,8 @@ pub use nds;
 #[cfg(feature = "psx")]
 pub use psx;
 
+#[cfg(all(feature = "dynamic", target_family = "unix"))]
+pub mod dynamic;
 #[cfg(all(feature = "remote-debugger", target_family = "unix"))]
 pub mod remote_debugger;
 
@@ -165,5 +167,9 @@ impl Core for Dummy {
 
     fn wanted_sample_rate(&self) -> u32 {
         48000
+    }
+
+    fn get_rom(&self) -> Vec<u8> {
+        vec![]
     }
 }

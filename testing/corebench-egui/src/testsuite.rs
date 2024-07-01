@@ -14,7 +14,7 @@ use std::{
     thread,
 };
 
-use dynacore::{common::Core, NewCoreFn};
+use gamegirl::{dynamic::NewCoreFn, Core};
 use walkdir::WalkDir;
 
 pub type TestInspector = Box<dyn Fn(&mut Box<dyn Core>) -> TestStatus + Send + Sync>;

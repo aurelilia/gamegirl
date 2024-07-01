@@ -123,6 +123,10 @@ impl Core for GameGirlAdv {
     fn get_serial(&self) -> &[u8] {
         unimplemented!("Not implemented for this core")
     }
+
+    fn get_rom(&self) -> Vec<u8> {
+        self.cart.rom.clone()
+    }
 }
 
 impl GameGirlAdv {

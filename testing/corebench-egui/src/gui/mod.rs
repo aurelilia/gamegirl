@@ -145,8 +145,10 @@ fn game_screens(app: &mut App, ctx: &Context, size: [usize; 2]) {
     }
 
     if let Some(core) = remove {
-        let DCore { _library, name, .. } = app.cores.remove(core);
-        drop(_library);
+        let DCore { idx, name, .. } = app.cores.remove(core);
+        if let Some(idx) = idx {
+            app.dyn_ctx.remove_core(idx);
+        }
         fs::remove_file(format!("dyn-cores/{name}")).unwrap();
     }
 }

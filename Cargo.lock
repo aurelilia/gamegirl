@@ -803,11 +803,11 @@ dependencies = [
 name = "corebench-egui"
 version = "0.1.0"
 dependencies = [
- "dynacore",
  "eframe",
  "egui_plot",
  "env_logger",
  "futures-executor",
+ "gamegirl",
  "libloading",
  "notify",
  "rfd",
@@ -963,15 +963,6 @@ name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
-
-[[package]]
-name = "dynacore"
-version = "0.1.0"
-dependencies = [
- "common",
- "gamegirl",
- "once_cell",
-]
 
 [[package]]
 name = "ecolor"
@@ -1280,7 +1271,7 @@ dependencies = [
 name = "flamegraph"
 version = "0.1.0"
 dependencies = [
- "dynacore",
+ "gamegirl",
 ]
 
 [[package]]
@@ -1440,9 +1431,11 @@ dependencies = [
  "gga",
  "ggc",
  "glow",
+ "libloading",
  "log",
  "nds",
  "nes",
+ "notify",
  "psx",
  "web-sys",
  "zstd",

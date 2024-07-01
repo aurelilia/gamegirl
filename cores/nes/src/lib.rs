@@ -85,6 +85,10 @@ impl Core for Nes {
     fn make_save(&self) -> Option<GameSave> {
         todo!();
     }
+
+    fn get_rom(&self) -> Vec<u8> {
+        unimplemented!();
+    }
 }
 
 impl Nes {

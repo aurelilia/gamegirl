@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-dynacore = { path = "../dynacore" }
+gamegirl = { path = "../../gamegirl" }
 eframe = { version = "0.26.2", default-features = false, features = [
     "default_fonts",
     "glow",
