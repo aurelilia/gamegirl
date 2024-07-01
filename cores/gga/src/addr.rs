@@ -62,3 +62,4 @@ pub const FIFO_B_H: u32 = 0xA6;
 
 // Serial
 pub const SIOCNT: u32 = 0x128;
+pub const RCNT: u32 = 0x134;

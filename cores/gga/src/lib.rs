@@ -33,6 +33,7 @@ use elf_rs::{Elf, ElfFile};
 use memory::Memory;
 use ppu::Ppu;
 use scheduling::PpuEvent;
+use serial::Serial;
 
 use crate::{
     dma::Dmas,
@@ -49,6 +50,7 @@ mod input;
 mod memory;
 mod ppu;
 mod scheduling;
+mod serial;
 pub mod timer;
 
 pub type GGADebugger = Debugger<u32>;
@@ -64,6 +66,7 @@ pub struct GameGirlAdv {
     pub dma: Dmas,
     pub timers: Timers,
     pub cart: Cartridge,
+    pub serial: Serial,
 
     scheduler: Scheduler<AdvEvent>,
     pub options: EmulateOptions,
@@ -219,6 +222,7 @@ impl Default for GameGirlAdv {
             dma: Dmas::default(),
             timers: Timers::default(),
             cart: Cartridge::default(),
+            serial: Serial::default(),
 
             scheduler: Scheduler::default(),
             options: EmulateOptions::default(),

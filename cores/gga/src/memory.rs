@@ -177,6 +177,9 @@ impl GameGirlAdv {
             // DMA length registers read 0
             0xB8 | 0xC4 | 0xD0 | 0xDC => 0,
 
+            // Serial
+            RCNT => self.serial.rcnt,
+
             // Known 0 registers
             0x136 | 0x142 | 0x15A | 0x206 | 0x20A | POSTFLG | 0x302 => 0,
 
@@ -194,7 +197,6 @@ impl GameGirlAdv {
             | 0xA0..=0xAF
             | 0xE0..=0xFF
             | 0x110..=0x12F
-            | 0x134
             | 0x138..=0x140
             | 0x144..=0x158
             | 0x15C..=0x1FF
@@ -476,6 +478,7 @@ impl GameGirlAdv {
                     Cpu::request_interrupt(self, Interrupt::Serial);
                 }
             }
+            RCNT => self.serial.rcnt = (self.serial.rcnt & 0x800F) | (value & 0x41F0),
 
             // RO registers, or otherwise invalid
             KEYINPUT
