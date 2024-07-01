@@ -32,6 +32,7 @@ pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
     app.debugger_window_states[4] ^= ui.button("OBJ Tileset Viewer").clicked();
     ui.separator();
     app.debugger_window_states[5] ^= ui.button("Timer Status").clicked();
+    app.debugger_window_states[6] ^= ui.button("DMA Status").clicked();
 }
 
 pub fn get_windows() -> Windows<GameGirlAdv> {
@@ -42,6 +43,7 @@ pub fn get_windows() -> Windows<GameGirlAdv> {
         ("BG Tileset Viewer", bg_tileset_viewer),
         ("OBJ Tileset Viewer", obj_tileset_viewer),
         ("Timer Status", timer_status),
+        ("DMA Status", dma_status),
     ]
 }
 
@@ -429,5 +431,34 @@ fn timer_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         if timer != 3 {
             ui.separator();
         }
+    }
+}
+
+fn dma_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
+    for dma in 0..4 {
+        ui.heading(format!("DMA {dma}"));
+        let ctrl = gg.dma.channels[dma].ctrl;
+        ui.label(format!(
+            "SAD: 0x{:08X} ({:?})",
+            gg.dma.channels[dma].sad,
+            ctrl.src_addr()
+        ));
+        ui.label(format!(
+            "DAD: 0x{:08X} ({:?})",
+            gg.dma.channels[dma].dad,
+            ctrl.dest_addr()
+        ));
+
+        ui.label(format!(
+            "Enable: {:?}, IRQ: {:?}",
+            ctrl.dma_en(),
+            ctrl.irq_en()
+        ));
+        ui.label(format!(
+            "Type: {}, Repeat: {:?}",
+            if ctrl.is_32bit() { "Word" } else { "Halfword" },
+            ctrl.repeat_en()
+        ));
+        ui.label(format!("Timing: {:?}", ctrl.timing()));
     }
 }

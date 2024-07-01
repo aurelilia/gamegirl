@@ -253,14 +253,14 @@ pub enum Reason {
 pub struct DmaControl {
     #[skip]
     __: B5,
-    dest_addr: AddrControl,
-    src_addr: AddrControl,
-    repeat_en: bool,
-    is_32bit: bool,
-    dma3_gamepak_drq_en: bool,
-    timing: Timing,
-    irq_en: bool,
-    dma_en: bool,
+    pub dest_addr: AddrControl,
+    pub src_addr: AddrControl,
+    pub repeat_en: bool,
+    pub is_32bit: bool,
+    pub dma3_gamepak_drq_en: bool,
+    pub timing: Timing,
+    pub irq_en: bool,
+    pub dma_en: bool,
 }
 
 #[derive(BitfieldSpecifier, Debug, PartialEq)]
