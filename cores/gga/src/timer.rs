@@ -69,7 +69,7 @@ impl Timers {
         if is_scheduled {
             // Is on scheduler, calculate current value
             let scaler = DIVS[ctrl.prescaler().us()] as Time;
-            let elapsed = gg.scheduler.now() - (gg.timers.scheduled_at[TIM] - 2);
+            let elapsed = gg.scheduler.now() - gg.timers.scheduled_at[TIM];
             gg.timers.counters[TIM].wrapping_add((elapsed / scaler).u16())
         } else {
             // Either off or inc on overflow, just return current counter

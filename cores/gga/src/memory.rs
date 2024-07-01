@@ -554,7 +554,10 @@ impl GameGirlAdv {
         }
     }
 
-    const WS_NONSEQ: [u16; 4] = [5, 4, 3, 9];
+    // TODO This is wrong, but without prefetch it's too slow and breaks
+    // some games. Need to implement prefetch properly
+    // const WS_NONSEQ: [u16; 4] = [5, 4, 3, 9];
+    const WS_NONSEQ: [u16; 4] = [3, 2, 1, 7];
 
     fn calc_wait_time<const W: u32>(&self, addr: u32, ty: Access) -> u16 {
         match (addr, W, ty) {
