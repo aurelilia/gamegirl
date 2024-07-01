@@ -303,7 +303,7 @@ impl GameGirlAdv {
             0x0E00_0000..=0x0FFF_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
 
             // VRAM weirdness
-            0x0500_0000..=0x0600_FFFF if self.ppu.regs.dispcnt.bg_mode() as usize <= 2 => {
+            0x0500_0000..=0x0600_FFFF if !self.ppu.regs.is_bitmap_mode() => {
                 self.set_hword(addr & !1, hword(value, value))
             }
             0x0500_0000..=0x0601_3FFF => self.set_hword(addr & !1, hword(value, value)),
@@ -311,8 +311,8 @@ impl GameGirlAdv {
                 // Only BG VRAM gets written to, OBJ VRAM is ignored
                 self.set_hword(addr & !1, hword(value, value));
             }
-            0x0601_0000..=0x07FF_FFFF if self.ppu.regs.dispcnt.bg_mode() as usize <= 2 => (), /* Ignored */
-            0x0601_4000..=0x07FF_FFFF => (), // Ignored
+            0x0601_0000..=0x07FF_FFFF if !self.ppu.regs.is_bitmap_mode() => (), // Ignored
+            0x0601_4000..=0x07FF_FFFF => (),                                    // Ignored
 
             _ => {
                 self.memory.mapper.set::<Self, _>(addr, value);
