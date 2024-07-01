@@ -325,7 +325,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         let width = if byte { 1 } else { 4 };
 
         let offs = if IMM {
-            inst.0 & 0x7FF
+            inst.0 & 0xFFF
         } else {
             let m = inst.reg(0);
             let s = inst.0.bits(7, 5);
