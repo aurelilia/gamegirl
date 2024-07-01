@@ -21,7 +21,7 @@ pub mod registers;
 
 use std::sync::Arc;
 
-use common::numutil::NumExt;
+use common::{components::debugger::Severity, numutil::NumExt};
 
 use crate::{
     caching::{Cache, CacheEntry, CachedInst},
@@ -269,6 +269,11 @@ impl<S: ArmSystem> Cpu<S> {
         gg.cpu().set_flag(Thumb, false);
         gg.cpu().set_flag(IrqDisable, true);
         if let Exception::Reset | Exception::Fiq = kind {
+            gg.debugger().log(
+                "exception-raised",
+                format!("An unusual exception got raised: {kind:?}"),
+                Severity::Warning,
+            );
             gg.cpu().set_flag(FiqDisable, true);
         }
 
@@ -392,7 +397,7 @@ pub enum Interrupt {
 /// Possible exceptions.
 /// Most are only listed to preserve bit order in IE/IF, only SWI, UND
 /// and IRQ ever get raised on the GGA.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Exception {
     Reset,
     Undefined,

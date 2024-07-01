@@ -74,6 +74,7 @@ pub trait ArmSystem: Sized + 'static {
     fn write<T: RwType>(&mut self, addr: u32, value: T, access: Access) {
         let time = self.wait_time::<T>(addr, access);
         self.add_sn_cycles(time);
+        self.debugger().write_occurred(addr);
         self.set(addr, value);
     }
 

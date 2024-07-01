@@ -6,7 +6,11 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{fmt::Debug, sync::Mutex, time::Instant};
+use std::{
+    fmt::{Debug, UpperHex},
+    sync::Mutex,
+    time::Instant,
+};
 
 /// Debugger info that is required to be known by the system.
 /// Is generic over cores; generic type Ptr is pointer size
@@ -34,7 +38,7 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     pub diagnostic_events: Mutex<Vec<DiagnosticEvent>>,
 }
 
-impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
+impl<Ptr: PartialEq + Clone + Copy + UpperHex> Debugger<Ptr> {
     /// Called before a memory write is executed, which might trigger a BP.
     /// Returns if emulation should continue.
     pub fn write_occurred(&mut self, addr: Ptr) {
@@ -45,6 +49,7 @@ impl<Ptr: PartialEq + Clone + Copy> Debugger<Ptr> {
                 .position(|bp| bp.value == Some(addr) && bp.write);
             self.breakpoint_hit = bp;
             self.running &= bp.is_none();
+            self.add_traced_instruction(|| format!("Write to Breakpoint at {:#X}", addr));
         }
     }
 
