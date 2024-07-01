@@ -38,6 +38,10 @@ impl PpuRegisters {
         self.dispcnt.bg_en().is_bit(bg)
     }
 
+    pub fn is_bitmap_mode(&self) -> bool {
+        self.dispcnt.bg_mode() as usize >= 3
+    }
+
     pub fn read_mmio(&self, addr: u32) -> Option<u16> {
         Some(match addr {
             DISPCNT => self.dispcnt.into(),

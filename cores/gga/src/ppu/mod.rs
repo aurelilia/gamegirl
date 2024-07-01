@@ -40,7 +40,7 @@ const TRANS: Colour = [0, 0, 0, 0];
 
 #[derive(Debug, Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-struct Point(i32, i32);
+pub struct Point(i32, i32);
 
 impl Point {
     fn inbounds(self, w: usize, h: usize) -> bool {

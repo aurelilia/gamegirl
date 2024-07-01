@@ -46,10 +46,7 @@ impl Default for ObjPixel {
 impl PpuRender {
     pub(super) fn render_objs(&mut self) {
         for idx in 0..128 {
-            let addr = idx << 3;
-            let bytes = &self.oam[addr..(addr + 8)];
-            let obj = Object::from_bytes(bytes.try_into().unwrap());
-
+            let obj = self.get_object(idx);
             match obj.kind() {
                 ObjectKind::Normal => self.render_obj_normal(obj),
                 ObjectKind::Affine => self.render_obj_affine(obj, false),
@@ -57,6 +54,12 @@ impl PpuRender {
                 ObjectKind::Disable => (),
             }
         }
+    }
+
+    pub fn get_object(&self, idx: u8) -> Object {
+        let addr = idx.us() << 3;
+        let bytes = &self.oam[addr..(addr + 8)];
+        Object::from_bytes(bytes.try_into().unwrap())
     }
 
     fn render_obj_normal(&mut self, obj: Object) {
@@ -69,6 +72,9 @@ impl PpuRender {
         }
 
         let base_addr = 0x1_0000 + (0x20 * obj.tilenum().u32());
+        if self.r.is_bitmap_mode() && obj.tilenum() < 512 {
+            return; // Invalid tile number for bitmap mode(s)
+        }
         let tile_width = obj.tile_width(self.r.dispcnt.character_mapping_mode(), width);
         let tile_size = obj.tile_size();
 
@@ -219,30 +225,30 @@ impl PpuRender {
 #[bitfield]
 #[repr(u64)]
 #[derive(Debug, Copy, Clone)]
-struct Object {
-    y: B8,
-    kind: ObjectKind,
-    mode: ObjectMode,
-    mosaic_en: bool,
-    palette_mode: PaletteMode,
-    shape: B2,
-    x: B9,
-    rotscal: B5,
-    obj_size: B2,
-    tilenum: B10,
-    priority: B2,
-    palette: B4,
+pub struct Object {
+    pub y: B8,
+    pub kind: ObjectKind,
+    pub mode: ObjectMode,
+    pub mosaic_en: bool,
+    pub palette_mode: PaletteMode,
+    pub shape: B2,
+    pub x: B9,
+    pub rotscal: B5,
+    pub obj_size: B2,
+    pub tilenum: B10,
+    pub priority: B2,
+    pub palette: B4,
     #[skip]
     __: B16,
 }
 
 impl Object {
-    fn size(self) -> (u16, u16) {
+    pub fn size(self) -> (u16, u16) {
         let addr = (self.obj_size() | (self.shape() << 2)).us();
         (OBJ_X_SIZE[addr], OBJ_Y_SIZE[addr])
     }
 
-    fn position(&self) -> Point {
+    pub fn position(&self) -> Point {
         let mut y = self.y() as i16 as i32;
         let mut x = self.x() as i16 as i32;
         if y >= (HEIGHT as i32) {
@@ -254,7 +260,7 @@ impl Object {
         Point(x, y)
     }
 
-    fn tile_width(&self, mode: CharacterMappingMode, width: u16) -> u16 {
+    pub fn tile_width(&self, mode: CharacterMappingMode, width: u16) -> u16 {
         match mode {
             CharacterMappingMode::TwoDim if self.palette_mode() == PaletteMode::Single256 => 16,
             CharacterMappingMode::TwoDim => 32,
@@ -262,7 +268,7 @@ impl Object {
         }
     }
 
-    fn tile_size(&self) -> u32 {
+    pub fn tile_size(&self) -> u32 {
         match self.palette_mode() {
             PaletteMode::Palettes16 => 0x20,
             PaletteMode::Single256 => 0x40,
@@ -272,7 +278,7 @@ impl Object {
     fn draw_on(self, line: u16, self_y: i32, size_y: u8) -> bool {
         self.valid()
             && (line as i32 >= self_y)
-            && (line < ((self_y as u16).wrapping_add(size_y as u16)))
+            && ((line as i32) < ((self_y).wrapping_add(size_y as i32)))
     }
 
     fn valid(self) -> bool {

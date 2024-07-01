@@ -30,6 +30,7 @@ pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
     ui.separator();
     app.debugger_window_states[3] ^= ui.button("BG Tileset Viewer").clicked();
     app.debugger_window_states[4] ^= ui.button("OBJ Tileset Viewer").clicked();
+    app.debugger_window_states[7] ^= ui.button("OBJ Viewer").clicked();
     ui.separator();
     app.debugger_window_states[5] ^= ui.button("Timer Status").clicked();
     app.debugger_window_states[6] ^= ui.button("DMA Status").clicked();
@@ -44,6 +45,7 @@ pub fn get_windows() -> Windows<GameGirlAdv> {
         ("OBJ Tileset Viewer", obj_tileset_viewer),
         ("Timer Status", timer_status),
         ("DMA Status", dma_status),
+        ("OBJ Viewer", obj_viewer),
     ]
 }
 
@@ -335,6 +337,7 @@ fn obj_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Co
         });
     });
 }
+
 /// Create a buffer with the given size in tiles (8x8 tiles)
 fn make_buffer(x: usize, y: usize) -> Vec<Colour> {
     let count = (x * 8) * (y * 8);
@@ -460,5 +463,12 @@ fn dma_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
             ctrl.repeat_en()
         ));
         ui.label(format!("Timing: {:?}", ctrl.timing()));
+    }
+}
+
+/// Window showing current objects.
+fn obj_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
+    for obj in 0..128 {
+        
     }
 }
