@@ -40,11 +40,9 @@ pub trait Core: Send + Sync {
     fn produce_samples(&mut self, buffer: &mut [f32]);
 
     /// Create a save state that can be loaded with [load_state].
-    #[cfg(feature = "serde")]
     fn save_state(&mut self) -> Vec<u8>;
     /// Load a state produced by [save_state].
     /// Will restore the current cartridge and debugger.
-    #[cfg(feature = "serde")]
     fn load_state(&mut self, state: &[u8]);
 
     /// Advance by one step, where step is system-defined.

@@ -64,6 +64,14 @@ macro_rules! common_functions {
             self.restore_from(old_self);
         }
 
+        #[cfg(not(feature = "serde"))]
+        fn save_state(&mut self) -> Vec<u8> {
+            vec![]
+        }
+
+        #[cfg(not(feature = "serde"))]
+        fn load_state(&mut self, state: &[u8]) {}
+
         fn last_frame(&mut self) -> Option<Vec<::common::Colour>> {
             self.ppu.last_frame.take()
         }

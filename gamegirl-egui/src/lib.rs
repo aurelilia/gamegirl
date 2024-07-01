@@ -7,6 +7,7 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 #![feature(trait_upcasting)]
+#![feature(ptr_metadata)]
 
 mod app;
 mod debug;

@@ -31,6 +31,13 @@ web-sys = { version = "0.3.69", features = ["Storage", "Window"] }
 base64 = "0.22.0"
 
 [features]
-serde = ["common/serde", "ggc/serde", "gga/serde", "nds/serde", "nes/serde"]
+serde = [
+    "common/serde",
+    "ggc/serde",
+    "gga/serde",
+    "nds/serde",
+    "nes/serde",
+    "psx/serde",
+]
 remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch"]
 dynamic = ["dep:libloading", "dep:notify"]

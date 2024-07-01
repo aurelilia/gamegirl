@@ -33,19 +33,23 @@ pub fn apply_filter(
     filter: Filter,
 ) -> (Vec<Color32>, [usize; 2], TextureOptions) {
     match filter {
-        Filter::Nearest => (
-            unsafe { mem::transmute(input) },
-            size,
-            TextureOptions::NEAREST,
-        ),
         Filter::Linear => (
             unsafe { mem::transmute(input) },
             size,
             TextureOptions::LINEAR,
         ),
 
+        #[cfg(feature = "hqx")]
         Filter::Hq2x => hqx!(hq2x, 2, size, input),
+        #[cfg(feature = "hqx")]
         Filter::Hq3x => hqx!(hq3x, 3, size, input),
+        #[cfg(feature = "hqx")]
         Filter::Hq4x => hqx!(hq4x, 4, size, input),
+
+        _ => (
+            unsafe { mem::transmute(input) },
+            size,
+            TextureOptions::NEAREST,
+        ),
     }
 }

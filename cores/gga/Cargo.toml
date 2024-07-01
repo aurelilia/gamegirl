@@ -22,7 +22,6 @@ rubato = "0.15.0"
 
 [features]
 default = []
-threaded-ppu = []
 serde = [
     "dep:serde",
     "dep:serde_arrays",

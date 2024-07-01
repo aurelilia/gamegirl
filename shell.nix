@@ -13,6 +13,7 @@ let
     trunk
     cargo-edit
     cargo-flamegraph
+    cargo-watch
   ];
 in
   pkgs.mkShell {

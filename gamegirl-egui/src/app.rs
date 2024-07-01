@@ -8,7 +8,9 @@
 
 use std::{
     collections::HashMap,
+    mem,
     path::PathBuf,
+    ptr::{self, Pointee},
     sync::{mpsc, Arc, Mutex},
 };
 
@@ -21,6 +23,7 @@ use eframe::{
     glow::{self},
     CreationContext, Frame, Storage,
 };
+use gamegirl::dummy_core;
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
@@ -255,13 +258,20 @@ impl App {
                         .load_core(&path)
                         .inspect_err(|e| log::error!("Failed to load core! {e:#?}"))
                     {
-                        let mut old_core = self.core.lock().unwrap();
-                        let state = old_core.save_state();
+                        let mut lock = self.core.lock().unwrap();
+                        let old_core = mem::replace(&mut *lock, dummy_core());
+                        let old_core = Box::leak(old_core);
                         let rom = old_core.get_rom();
 
-                        let mut core = (self.dyn_ctx.get_core(idx).loader)(rom);
-                        core.load_state(&state);
-                        *old_core = core;
+                        let new_core = (self.dyn_ctx.get_core(idx).loader)(rom);
+                        let vtable = ptr::metadata(new_core.as_ref() as *const _);
+
+                        *lock = unsafe {
+                            Box::from_raw(ptr::from_raw_parts::<dyn Core>(
+                                old_core as *const _ as *const (),
+                                vtable,
+                            ) as *mut _)
+                        };
                     }
                 }
             }

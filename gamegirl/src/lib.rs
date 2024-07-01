@@ -115,12 +115,10 @@ impl Core for Dummy {
 
     fn produce_samples(&mut self, _: &mut [f32]) {}
 
-    #[cfg(feature = "serde")]
     fn save_state(&mut self) -> Vec<u8> {
         vec![]
     }
 
-    #[cfg(feature = "serde")]
     fn load_state(&mut self, _: &[u8]) {}
 
     fn advance(&mut self) {}

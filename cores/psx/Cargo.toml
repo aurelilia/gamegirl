@@ -18,5 +18,4 @@ glow.workspace = true
 
 
 [features]
-default = ["serde"]
 serde = ["dep:serde", "dep:serde_arrays", "common/serde"]
