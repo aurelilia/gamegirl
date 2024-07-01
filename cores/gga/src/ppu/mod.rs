@@ -86,12 +86,6 @@ impl Ppu {
             PpuEvent::HblankEnd => {
                 gg.ppu.regs.vcount += 1;
 
-                let vcount_match = gg.ppu.regs.vcount.u8() == gg.ppu.regs.dispstat.vcount();
-                gg.ppu.regs.dispstat.set_vcounter_match(vcount_match);
-                if vcount_match {
-                    Self::maybe_interrupt(gg, Interrupt::VCounter);
-                }
-
                 let vcount = gg.ppu.regs.vcount;
                 match () {
                     _ if gg.ppu.regs.vcount == HEIGHT.u16() => {
@@ -108,6 +102,12 @@ impl Ppu {
                         gg.ppu.end_frame();
                     }
                     _ => (),
+                }
+
+                let vcount_match = gg.ppu.regs.vcount.u8() == gg.ppu.regs.dispstat.vcount();
+                gg.ppu.regs.dispstat.set_vcounter_match(vcount_match);
+                if vcount_match {
+                    Self::maybe_interrupt(gg, Interrupt::VCounter);
                 }
 
                 gg.ppu.regs.dispstat.set_in_hblank(false);
@@ -134,8 +134,10 @@ impl Ppu {
 
         // Update affines
         for bg in 2..4 {
-            self.regs.bg_scale[bg - 2].latched.0 += self.regs.bg_scale[bg - 2].pb as i32;
-            self.regs.bg_scale[bg - 2].latched.1 += self.regs.bg_scale[bg - 2].pd as i32;
+            if self.regs.bg_enabled(bg.u16()) {
+                self.regs.bg_scale[bg - 2].latched.0 += self.regs.bg_scale[bg - 2].pb as i32;
+                self.regs.bg_scale[bg - 2].latched.1 += self.regs.bg_scale[bg - 2].pd as i32;
+            }
         }
     }
 

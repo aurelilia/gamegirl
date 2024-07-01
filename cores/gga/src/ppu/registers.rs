@@ -83,10 +83,22 @@ impl PpuRegisters {
                 0x2 => self.bg_scale[addr.bit(4).us()].pb = value as i16,
                 0x4 => self.bg_scale[addr.bit(4).us()].pc = value as i16,
                 0x6 => self.bg_scale[addr.bit(4).us()].pd = value as i16,
-                0x8 => self.bg_scale[addr.bit(4).us()].xl = value,
-                0xA => self.bg_scale[addr.bit(4).us()].xh = value,
-                0xC => self.bg_scale[addr.bit(4).us()].yl = value,
-                0xE => self.bg_scale[addr.bit(4).us()].yh = value,
+                0x8 => {
+                    self.bg_scale[addr.bit(4).us()].xl = value;
+                    self.bg_scale[addr.bit(4).us()].latch_x();
+                }
+                0xA => {
+                    self.bg_scale[addr.bit(4).us()].xh = value;
+                    self.bg_scale[addr.bit(4).us()].latch_x();
+                }
+                0xC => {
+                    self.bg_scale[addr.bit(4).us()].yl = value;
+                    self.bg_scale[addr.bit(4).us()].latch_y();
+                }
+                0xE => {
+                    self.bg_scale[addr.bit(4).us()].yh = value;
+                    self.bg_scale[addr.bit(4).us()].latch_y();
+                }
                 _ => (),
             },
 
@@ -245,18 +257,26 @@ pub struct BgRotScal {
 
 impl BgRotScal {
     pub fn latch(&mut self) {
-        fn get_affine_offs(lo: u16, hi: u16) -> i32 {
-            if hi.is_bit(11) {
-                (word(lo, hi & 0x7FF) | 0xF800_0000) as i32
-            } else {
-                word(lo, hi & 0x7FF) as i32
-            }
-        }
-
         self.latched = Point(
-            get_affine_offs(self.xl, self.xh),
-            get_affine_offs(self.yl, self.yh),
+            Self::get_affine_offs(self.xl, self.xh),
+            Self::get_affine_offs(self.yl, self.yh),
         );
+    }
+
+    pub fn latch_x(&mut self) {
+        self.latched.0 = Self::get_affine_offs(self.xl, self.xh);
+    }
+
+    pub fn latch_y(&mut self) {
+        self.latched.1 = Self::get_affine_offs(self.yl, self.yh);
+    }
+
+    fn get_affine_offs(lo: u16, hi: u16) -> i32 {
+        if hi.is_bit(11) {
+            (word(lo, hi & 0x7FF) | 0xF800_0000) as i32
+        } else {
+            word(lo, hi & 0x7FF) as i32
+        }
     }
 }
 
