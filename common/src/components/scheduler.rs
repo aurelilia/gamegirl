@@ -22,7 +22,7 @@ pub struct Scheduler<E: Kind> {
     next: Time,
     /// Events currently awaiting execution.
     #[cfg_attr(feature = "serde", serde(bound = ""))]
-    events: ArrayVec<ScheduledEvent<E>, 16>,
+    events: Vec<ScheduledEvent<E>>,
 }
 
 impl<E: Kind> Scheduler<E> {
@@ -38,7 +38,7 @@ impl<E: Kind> Scheduler<E> {
             kind,
             execute_at: time,
         };
-        unsafe { self.events.push_unchecked(event) };
+        self.events.push(event);
 
         // Ensure the event list is still sorted
         // (Swap the new element further back until it is in the right spot)

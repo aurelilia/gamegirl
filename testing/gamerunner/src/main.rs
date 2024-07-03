@@ -3,7 +3,7 @@ use std::{
     fs::{self, DirEntry, File},
     io::Read,
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use clap::Parser;
@@ -102,8 +102,16 @@ fn run_game(
     };
     let mut core = gamegirl::load_cart(rom, None, &config, None, 0);
 
-    for _ in 0..20 {
-        core.advance_delta(2.0);
+    for _ in 0..80 {
+        let time = Instant::now();
+        core.advance_delta(0.5);
+        if time.elapsed() > Duration::from_secs(1) {
+            // This game is too slow, skip it
+            // Likely emulator bug
+            bar.finish_with_message(Cow::Owned(format!("Skipping {name}: Ran too slow!")));
+            total_bar.inc(1);
+            return;
+        }
         bar.tick();
     }
     write_png(&args.output_path, &mut core, &name, "noinput");
