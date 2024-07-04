@@ -7,7 +7,7 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use arm_cpu::{Cpu, Interrupt};
-use common::{numutil::NumExt, Time, TimeS};
+use common::{components::scheduler::Scheduler, numutil::NumExt, Time, TimeS};
 use modular_bitfield::{bitfield, specifiers::*};
 
 use crate::{audio::Apu, scheduling::AdvEvent, GameGirlAdv};
@@ -62,57 +62,57 @@ impl Timers {
 
     /// Read current time of the given timer. Might be a bit expensive, since
     /// time needs to be calculated for timers on the scheduler.
-    pub fn time_read<const TIM: usize>(gg: &GameGirlAdv) -> u16 {
-        let ctrl = gg.timers.control[TIM];
-        let is_scheduled = ctrl.enable() && (TIM == 0 || !ctrl.count_up());
+    pub fn time_read(&self, timer: usize, now: Time) -> u16 {
+        let ctrl = self.control[timer];
+        let is_scheduled = ctrl.enable() && (timer == 0 || !ctrl.count_up());
 
         if is_scheduled {
             // Is on scheduler, calculate current value
             let scaler = DIVS[ctrl.prescaler().us()] as Time;
-            let elapsed = gg.scheduler.now() - gg.timers.scheduled_at[TIM];
-            gg.timers.counters[TIM].wrapping_add((elapsed / scaler).u16())
+            let elapsed = now - self.scheduled_at[timer];
+            self.counters[timer].wrapping_add((elapsed / scaler).u16())
         } else {
             // Either off or inc on overflow, just return current counter
-            gg.timers.counters[TIM]
+            self.counters[timer]
         }
     }
 
     /// Handle CTRL write by scheduling timer as appropriate.
-    pub fn hi_write<const TIM: usize>(gg: &mut GameGirlAdv, new_ctrl: u16) {
+    pub fn hi_write(&mut self, sched: &mut Scheduler<AdvEvent>, timer: usize, new_ctrl: u16) {
+        let now = sched.now();
         // Update current counter value first
-        gg.timers.counters[TIM] = Self::time_read::<TIM>(gg);
+        self.counters[timer] = self.time_read(timer, now);
 
-        let old_ctrl = gg.timers.control[TIM];
+        let old_ctrl = self.control[timer];
         let new_ctrl: TimerCtrl = new_ctrl.into();
-        let was_scheduled = old_ctrl.enable() && (TIM == 0 || !old_ctrl.count_up());
-        let is_scheduled = new_ctrl.enable() && (TIM == 0 || !new_ctrl.count_up());
+        let was_scheduled = old_ctrl.enable() && (timer == 0 || !old_ctrl.count_up());
+        let is_scheduled = new_ctrl.enable() && (timer == 0 || !new_ctrl.count_up());
 
         if was_scheduled {
             // Need to cancel current scheduled event
-            gg.scheduler
-                .cancel_single(AdvEvent::TimerOverflow(TIM.u8()));
+            sched.cancel_single(AdvEvent::TimerOverflow(timer.u8()));
         }
         if is_scheduled {
             if !was_scheduled {
                 // Reload counter.
-                gg.timers.counters[TIM] = gg.timers.reload[TIM];
+                self.counters[timer] = self.reload[timer];
             }
 
             // Need to start scheduling this timer
-            let until_ov = Self::next_overflow_time(gg.timers.counters[TIM], new_ctrl);
-            gg.timers.scheduled_at[TIM] = gg.scheduler.now() + 2;
-            gg.scheduler
-                .schedule(AdvEvent::TimerOverflow(TIM.u8()), until_ov as TimeS);
+            let until_ov = Self::next_overflow_time(self.counters[timer], new_ctrl);
+            self.scheduled_at[timer] = now + 2;
+            sched.schedule(AdvEvent::TimerOverflow(timer.u8()), until_ov as TimeS);
         }
 
-        gg.timers.control[TIM] = new_ctrl;
+        self.control[timer] = new_ctrl;
     }
 
     /// Handle an overflow and return time until next.
     fn overflow(gg: &mut GameGirlAdv, idx: u8) -> u32 {
         let ctrl = gg.timers.control[idx.us()];
+        let reload = gg.timers.reload[idx.us()];
         // Set to reload value
-        gg.timers.counters[idx.us()] = gg.timers.reload[idx.us()];
+        gg.timers.counters[idx.us()] = reload;
         // Fire IRQ if enabled
         if ctrl.irq_en() {
             Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16());
@@ -133,7 +133,7 @@ impl Timers {
             Self::inc_timer(gg, idx.us() + 1);
         }
 
-        Self::next_overflow_time(gg.timers.reload[idx.us()], ctrl)
+        Self::next_overflow_time(reload, ctrl)
     }
 
     /// Time until next overflow, for scheduling.

@@ -137,10 +137,10 @@ impl GameGirlAdv {
         let a = addr & 0x1FFE;
         match a {
             // Timers
-            TM0CNT_L => Timers::time_read::<0>(self),
-            TM1CNT_L => Timers::time_read::<1>(self),
-            TM2CNT_L => Timers::time_read::<2>(self),
-            TM3CNT_L => Timers::time_read::<3>(self),
+            TM0CNT_L => self.timers.time_read(0, self.scheduler.now()),
+            TM1CNT_L => self.timers.time_read(1, self.scheduler.now()),
+            TM2CNT_L => self.timers.time_read(2, self.scheduler.now()),
+            TM3CNT_L => self.timers.time_read(3, self.scheduler.now()),
             TM0CNT_H => self.timers.control[0].into(),
             TM1CNT_H => self.timers.control[1].into(),
             TM2CNT_H => self.timers.control[2].into(),
@@ -430,10 +430,10 @@ impl GameGirlAdv {
             TM1CNT_L => self.timers.reload[1] = value,
             TM2CNT_L => self.timers.reload[2] = value,
             TM3CNT_L => self.timers.reload[3] = value,
-            TM0CNT_H => Timers::hi_write::<0>(self, value),
-            TM1CNT_H => Timers::hi_write::<1>(self, value),
-            TM2CNT_H => Timers::hi_write::<2>(self, value),
-            TM3CNT_H => Timers::hi_write::<3>(self, value),
+            TM0CNT_H => self.timers.hi_write(&mut self.scheduler, 0, value),
+            TM1CNT_H => self.timers.hi_write(&mut self.scheduler, 1, value),
+            TM2CNT_H => self.timers.hi_write(&mut self.scheduler, 2, value),
+            TM3CNT_H => self.timers.hi_write(&mut self.scheduler, 3, value),
 
             // DMAs
             0xB0..0xE0 => {
