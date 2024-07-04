@@ -31,10 +31,8 @@ pub const BIOS: &[u8] = include_bytes!("bios.bin");
 /// and other auxiliary cached information relating to memory.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub ewram: [u8; 256 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub iwram: [u8; 32 * KB],
+    pub ewram: Box<[u8]>,
+    pub iwram: Box<[u8]>,
 
     // Various registers
     pub keycnt: KeyControl,
@@ -598,8 +596,8 @@ impl GameGirlAdv {
 impl Default for Memory {
     fn default() -> Self {
         Self {
-            ewram: [0; 256 * KB],
-            iwram: [0; 32 * KB],
+            ewram: Box::new([0; 256 * KB]),
+            iwram: Box::new([0; 32 * KB]),
             keycnt: 0.into(),
             waitcnt: 0,
             bios_value: 0xE129_F000,

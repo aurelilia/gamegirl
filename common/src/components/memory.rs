@@ -40,11 +40,11 @@ pub trait MemoryMappedSystem<const SIZE: usize>: Sized {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryMapper<const SIZE: usize> {
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_pages"))]
-    read_pages: [*mut u8; SIZE],
+    #[cfg_attr(feature = "serde", serde(default = "serde_pages::<SIZE>"))]
+    read_pages: Box<[*mut u8]>,
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_pages"))]
-    write_pages: [*mut u8; SIZE],
+    #[cfg_attr(feature = "serde", serde(default = "serde_pages::<SIZE>"))]
+    write_pages: Box<[*mut u8]>,
 }
 
 impl<const SIZE: usize> MemoryMapper<SIZE> {
@@ -108,8 +108,8 @@ impl<const SIZE: usize> MemoryMapper<SIZE> {
 impl<const SIZE: usize> Default for MemoryMapper<SIZE> {
     fn default() -> Self {
         Self {
-            read_pages: serde_pages(),
-            write_pages: serde_pages(),
+            read_pages: serde_pages::<SIZE>(),
+            write_pages: serde_pages::<SIZE>(),
         }
     }
 }
@@ -117,6 +117,6 @@ impl<const SIZE: usize> Default for MemoryMapper<SIZE> {
 unsafe impl<const SIZE: usize> Send for MemoryMapper<SIZE> {}
 unsafe impl<const SIZE: usize> Sync for MemoryMapper<SIZE> {}
 
-fn serde_pages<const SIZE: usize>() -> [*mut u8; SIZE] {
-    [ptr::null::<u8>() as *mut u8; SIZE]
+fn serde_pages<const SIZE: usize>() -> Box<[*mut u8]> {
+    Box::new([ptr::null::<u8>() as *mut u8; SIZE])
 }
