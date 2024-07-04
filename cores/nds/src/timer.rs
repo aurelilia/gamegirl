@@ -7,13 +7,29 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use arm_cpu::{Cpu, Interrupt};
-use common::{numutil::NumExt, Time, TimeS};
+use common::{components::scheduler::Scheduler, numutil::NumExt, Time, TimeS};
+use modular_bitfield::{bitfield, specifiers::*};
 
 use crate::{addr::TM0CNT_H, scheduling::NdsEvent, NdsCpu};
 
 /// All 2x to account for the ARM9's double clock speed,
 /// which also affects the scheduler
 const DIVS: [u16; 4] = [2, 128, 512, 2048];
+
+#[bitfield]
+#[repr(u16)]
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct TimerCtrl {
+    pub prescaler: B2,
+    pub count_up: bool,
+    #[skip]
+    __: B3,
+    pub irq_en: bool,
+    pub enable: bool,
+    #[skip]
+    __: B8,
+}
 
 /// Timers on the NDS. Separated by CPU.
 /// They run on the scheduler when in regular counting mode.
@@ -25,6 +41,10 @@ const DIVS: [u16; 4] = [2, 128, 512, 2048];
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Timers {
+    // Registers
+    pub reload: [u16; 4],
+    pub control: [TimerCtrl; 4],
+
     /// Counter value. Used for cascading counters; for scheduled counters this
     /// will be the reload value (actual counter is calculated on read)
     counters: [u16; 4],
@@ -52,71 +72,78 @@ impl Timers {
 
     /// Read current time of the given timer. Might be a bit expensive, since
     /// time needs to be calculated for timers on the scheduler.
-    pub fn time_read<DS: NdsCpu, const TIM: usize>(ds: &DS) -> u16 {
-        let ctrl = ds[Self::hi_addr(TIM.u8())];
-        let is_scheduled = ctrl.is_bit(7) && (TIM == 0 || !ctrl.is_bit(2));
+    pub fn time_read(&self, timer: usize, now: Time) -> u16 {
+        let ctrl = self.control[timer];
+        let is_scheduled = ctrl.enable() && (timer == 0 || !ctrl.count_up());
 
         if is_scheduled {
             // Is on scheduler, calculate current value
-            let scaler = DIVS[(ctrl & 3).us()] as Time;
-            let elapsed = ds.scheduler.now() - ds.timers[DS::I].scheduled_at[TIM];
-            ds.timers[DS::I].counters[TIM].wrapping_add((elapsed / scaler).u16())
+            let scaler = DIVS[ctrl.prescaler().us()] as Time;
+            let elapsed = now - self.scheduled_at[timer];
+            self.counters[timer].wrapping_add((elapsed / scaler).u16())
         } else {
             // Either off or inc on overflow, just return current counter
-            ds.timers[DS::I].counters[TIM]
+            self.counters[timer]
         }
     }
 
     /// Handle CTRL write by scheduling timer as appropriate.
-    pub fn hi_write<DS: NdsCpu, const TIM: usize>(ds: &mut DS, addr: u32, new_ctrl: u16) {
+    pub fn hi_write(
+        &mut self,
+        is_arm9: bool,
+        sched: &mut Scheduler<NdsEvent>,
+        timer: usize,
+        new_ctrl: u16,
+    ) {
+        let now = sched.now();
         // Update current counter value first
-        ds.timers[DS::I].counters[TIM] = Self::time_read::<DS, TIM>(ds);
+        self.counters[timer] = self.time_read(timer, now);
 
-        let old_ctrl = ds[addr];
-        let was_scheduled = old_ctrl.is_bit(7) && (TIM == 0 || !old_ctrl.is_bit(2));
-        let is_scheduled = new_ctrl.is_bit(7) && (TIM == 0 || !new_ctrl.is_bit(2));
+        let old_ctrl = self.control[timer];
+        let new_ctrl: TimerCtrl = new_ctrl.into();
+        let was_scheduled = old_ctrl.enable() && (timer == 0 || !old_ctrl.count_up());
+        let is_scheduled = new_ctrl.enable() && (timer == 0 || !new_ctrl.count_up());
 
         if was_scheduled {
             // Need to cancel current scheduled event
-            ds.scheduler.cancel_single(NdsEvent::TimerOverflow {
-                timer: TIM.u8(),
-                is_arm9: DS::I == 1,
+            sched.cancel_single(NdsEvent::TimerOverflow {
+                timer: timer.u8(),
+                is_arm9,
             });
         }
         if is_scheduled {
             if !was_scheduled {
                 // Reload counter.
-                ds.timers[DS::I].counters[TIM] = ds[addr - 2];
+                self.counters[timer] = self.reload[timer];
             }
 
             // Need to start scheduling this timer
-            let until_ov = Self::next_overflow_time(ds.timers[DS::I].counters[TIM], new_ctrl);
-            ds.timers[DS::I].scheduled_at[TIM] = ds.scheduler.now() + 2;
-            ds.scheduler.schedule(
+            let until_ov = Self::next_overflow_time(self.counters[timer], new_ctrl);
+            self.scheduled_at[timer] = now + 2;
+            sched.schedule(
                 NdsEvent::TimerOverflow {
-                    timer: TIM.u8(),
-                    is_arm9: DS::I == 1,
+                    timer: timer.u8(),
+                    is_arm9,
                 },
                 until_ov as TimeS,
             );
         }
 
-        ds[addr] = new_ctrl;
+        self.control[timer] = new_ctrl;
     }
 
     /// Handle an overflow and return time until next.
     fn overflow<DS: NdsCpu>(ds: &mut DS, idx: u8) -> u32 {
-        let addr = Self::hi_addr(idx);
-        let reload = ds[addr - 2];
-        let ctrl = ds[addr];
+        let ctrl = ds.timers[DS::I].control[idx.us()];
+        let reload = ds.timers[DS::I].reload[idx.us()];
         // Set to reload value
         ds.timers[DS::I].counters[idx.us()] = reload;
         // Fire IRQ if enabled
-        if ctrl.is_bit(6) {
+        if ctrl.irq_en() {
             Cpu::request_interrupt_idx(ds, Interrupt::Timer0 as u16 + idx.u16());
         }
 
-        if idx != 3 && ds[addr + 2].is_bit(2) {
+        if idx != 3 && ds.timers[DS::I].control[idx.us() + 1].count_up() {
             // Next timer is set to inc when we overflow.
             Self::inc_timer(ds, idx.us() + 1);
         }
@@ -125,8 +152,8 @@ impl Timers {
     }
 
     /// Time until next overflow, for scheduling.
-    fn next_overflow_time(reload: u16, ctrl: u16) -> u32 {
-        let scaler = DIVS[(ctrl & 3).us()].u32();
+    fn next_overflow_time(reload: u16, ctrl: TimerCtrl) -> u32 {
+        let scaler = DIVS[ctrl.prescaler().us()].u32();
         (scaler * (0x1_0000 - reload.u32())) + 6
     }
 
@@ -140,11 +167,5 @@ impl Timers {
                 Self::overflow(ds, idx.u8());
             }
         }
-    }
-
-    /// Get the CTRL address of the given timer.
-    #[inline]
-    fn hi_addr(tim: u8) -> u32 {
-        TM0CNT_H + (tim.u32() << 2)
     }
 }

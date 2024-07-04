@@ -50,7 +50,7 @@ use crate::{
 /// the use case of being able to implement ARM CPU support twice,
 /// since the NDS has 2 CPUs.
 macro_rules! nds_wrapper {
-    ($name:ident, $mmio:ident, $idx:expr) => {
+    ($name:ident, $idx:expr) => {
         /// Wrapper for one of the CPUs.
         /// Raw pointer was chosen to avoid lifetimes.
         #[repr(transparent)]
@@ -72,22 +72,6 @@ macro_rules! nds_wrapper {
             }
         }
 
-        impl Index<u32> for $name {
-            type Output = u16;
-
-            fn index(&self, addr: u32) -> &Self::Output {
-                assert_eq!(addr & 1, 0);
-                &self.memory.$mmio[(addr >> 1).us()]
-            }
-        }
-
-        impl IndexMut<u32> for $name {
-            fn index_mut(&mut self, addr: u32) -> &mut Self::Output {
-                assert_eq!(addr & 1, 0);
-                &mut self.memory.$mmio[(addr >> 1).us()]
-            }
-        }
-
         impl NdsCpu for $name {
             const I: usize = $idx;
         }
@@ -103,8 +87,8 @@ macro_rules! nds_wrapper {
     };
 }
 
-nds_wrapper!(Nds7, mmio7, 0);
-nds_wrapper!(Nds9, mmio9, 1);
+nds_wrapper!(Nds7, 0);
+nds_wrapper!(Nds9, 1);
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Nds {
@@ -227,11 +211,11 @@ impl Default for Nds {
 }
 
 /// Trait for things that need to operate on a single CPU,
-/// line a DMA or timer.
+/// like a DMA or timer.
 /// I = 0 for the ARM7, I = 1 for the ARM9;
 /// things separated by CPU generally use CpuDevice for easy
 /// access with I.
-pub trait NdsCpu: ArmSystem + IndexMut<u32, Output = u16> + DerefMut<Target = Nds> {
+pub trait NdsCpu: ArmSystem + DerefMut<Target = Nds> {
     const I: usize;
 }
 

@@ -10,7 +10,10 @@ use std::ptr;
 
 use arm_cpu::{interface::RwType, Cpu};
 use common::{
-    components::memory::{MemoryMappedSystem, MemoryMapper},
+    components::{
+        debugger::Severity,
+        memory::{MemoryMappedSystem, MemoryMapper},
+    },
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
@@ -28,21 +31,12 @@ pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
 /// A lot is separated by the 2 CPUs.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub psram: [u8; 4 * MB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    wram: [u8; 32 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub mmio7: [u16; 0x520 / 2],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub mmio9: [u16; 0x1010 / 2],
+    pub psram: Box<[u8]>,
+    wram: Box<[u8]>,
 
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    wram7: [u8; 64 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    inst_tcm: [u8; 32 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    data_tcm: [u8; 16 * KB],
+    wram7: Box<[u8]>,
+    inst_tcm: Box<[u8]>,
+    data_tcm: Box<[u8]>,
 
     pub mapper: CpuDevice<MemoryMapper<8192>>,
     wait_word: CpuDevice<[u16; 32]>,
@@ -56,24 +50,49 @@ impl Nds {
         MemoryMapper::init_pages(&mut self.nds9());
     }
 
+    pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &mut DS, addr: u32) -> u16 {
+        match addr & 0xFFFF {
+            // Interrupt control
+            IME => ds.cpu().ime as u16,
+            IE_L => ds.cpu().ie.low(),
+            IE_H => ds.cpu().ie.high(),
+            IF_L => ds.cpu().if_.low(),
+            IF_H => ds.cpu().if_.high(),
+
+            _ => {
+                ds.debugger.log(
+                    "unknown-io-read",
+                    format!("Read from unknown IO register {addr:08X}"),
+                    Severity::Warning,
+                );
+                0
+            }
+        }
+    }
+
     pub fn try_set_mmio_shared<DS: NdsCpu>(ds: &mut DS, addr: u32, value: u16) {
-        match addr {
+        match addr & 0xFFFF {
             // Interrupts
             IME => {
-                ds[IME] = value & 1;
+                ds.cpu().ime = value.is_bit(0);
                 Cpu::check_if_interrupt(ds);
             }
-            IE_L | IE_H => {
-                ds[addr] = value;
+            IE_L => {
+                ds.cpu().ie = word(value, ds.cpu().ie.high());
                 Cpu::check_if_interrupt(ds);
             }
-            IF_L | IF_H => ds[addr] &= !value,
+            IE_H => {
+                ds.cpu().ie = word(ds.cpu().ie.low(), value);
+                Cpu::check_if_interrupt(ds);
+            }
+            IF_L => ds.cpu().if_ &= (!value).u32() | 0xFFFF_0000,
+            IF_H => ds.cpu().if_ &= ((!value).u32() << 16) | 0x0000_FFFF,
 
             // Timers
-            TM0CNT_H => Timers::hi_write::<DS, 0>(ds, addr, value),
-            TM1CNT_H => Timers::hi_write::<DS, 1>(ds, addr, value),
-            TM2CNT_H => Timers::hi_write::<DS, 2>(ds, addr, value),
-            TM3CNT_H => Timers::hi_write::<DS, 3>(ds, addr, value),
+            TM0CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 0, value),
+            TM1CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 1, value),
+            TM2CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 2, value),
+            TM3CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 3, value),
 
             // DMAs
             0xBA => Dmas::ctrl_write(ds, 0, value),
@@ -81,7 +100,11 @@ impl Nds {
             0xD2 => Dmas::ctrl_write(ds, 2, value),
             0xDE => Dmas::ctrl_write(ds, 3, value),
 
-            _ => ds[addr] = value,
+            _ => ds.debugger.log(
+                "unknown-io-write",
+                format!("Write to unknown IO register {addr:08X}"),
+                Severity::Warning,
+            ),
         }
     }
 }
@@ -128,11 +151,6 @@ impl Nds7 {
     fn set_mmio(&mut self, addr: u32, value: u16) {
         let addr = addr & !1;
         Nds::try_set_mmio_shared(self, addr, value);
-    }
-
-    fn mmio_mirror_nds9(&mut self, addr: u32, value: u16) {
-        self[addr] = value;
-        self.memory.mmio9[addr.us() >> 1] = value
     }
 }
 
@@ -183,28 +201,19 @@ impl Nds9 {
     fn set_mmio(&mut self, addr: u32, value: u16) {
         let addr = addr & 0x1FFE;
         match addr {
-            EXMEM => self.mmio_mirror_nds7(addr, value),
             _ => Nds::try_set_mmio_shared(self, addr, value),
         }
-    }
-
-    fn mmio_mirror_nds7(&mut self, addr: u32, value: u16) {
-        self[addr] = value;
-        self.memory.mmio7[addr.us() >> 1] = value
     }
 }
 
 impl Default for Memory {
     fn default() -> Self {
         Self {
-            psram: [0; 4 * MB],
-            wram: [0; 32 * KB],
-            mmio7: [0; 0x520 / 2],
-            mmio9: [0; 0x1010 / 2],
-
-            wram7: [0; 64 * KB],
-            inst_tcm: [0; 32 * KB],
-            data_tcm: [0; 16 * KB],
+            psram: Box::new([0; 4 * MB]),
+            wram: Box::new([0; 32 * KB]),
+            wram7: Box::new([0; 64 * KB]),
+            inst_tcm: Box::new([0; 32 * KB]),
+            data_tcm: Box::new([0; 16 * KB]),
 
             mapper: [MemoryMapper::default(), MemoryMapper::default()],
             wait_word: [[0; 32]; 2],

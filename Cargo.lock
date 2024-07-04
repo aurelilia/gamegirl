@@ -2375,6 +2375,7 @@ dependencies = [
  "common",
  "gga-ppu",
  "log",
+ "modular-bitfield",
  "serde",
  "serde_arrays",
 ]

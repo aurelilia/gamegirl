@@ -13,6 +13,7 @@ gga-ppu = { path = "../../components/gga-ppu" }
 log.workspace = true
 serde = { workspace = true, optional = true }
 serde_arrays = { workspace = true, optional = true }
+modular-bitfield.workspace = true
 
 [features]
 default = []
