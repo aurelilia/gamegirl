@@ -6,7 +6,10 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    mem,
+    ops::{Deref, DerefMut},
+};
 
 use common::{components::debugger::Debugger, numutil::NumExt};
 
@@ -104,7 +107,7 @@ pub trait ArmSystem: Sized + 'static {
 /// and not bother with a wrapper.
 #[repr(transparent)]
 pub struct SysWrapper<S: ArmSystem> {
-    pub inner: *mut S,
+    pub inner: S,
 }
 
 impl<S: ArmSystem> SysWrapper<S> {
@@ -136,6 +139,10 @@ impl<S: ArmSystem> SysWrapper<S> {
             val
         }
     }
+
+    pub fn new(sys: &mut S) -> &mut Self {
+        unsafe { mem::transmute(sys) }
+    }
 }
 
 impl<S: ArmSystem> Deref for SysWrapper<S> {
@@ -143,14 +150,14 @@ impl<S: ArmSystem> Deref for SysWrapper<S> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.inner }
+        &self.inner
     }
 }
 
 impl<S: ArmSystem> DerefMut for SysWrapper<S> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.inner }
+        &mut self.inner
     }
 }
 

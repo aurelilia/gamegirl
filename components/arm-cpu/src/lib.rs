@@ -70,19 +70,17 @@ impl<S: ArmSystem> Cpu<S> {
             return;
         }
 
-        let mut wrapper = SysWrapper {
-            inner: gg as *mut S,
-        };
+        let mut gg = SysWrapper::new(gg);
         if gg.cpu().cache.enabled {
             if let Some(cache) = gg.cpu().cache.get(pc) {
-                Cpu::run_cache(&mut wrapper, cache);
+                Cpu::run_cache(&mut gg, cache);
                 return;
             } else if S::can_cache_at(pc) {
-                Cpu::try_make_cache(&mut wrapper);
+                Cpu::try_make_cache(&mut gg);
                 return;
             }
         }
-        Self::execute_next_inst(&mut wrapper);
+        Self::execute_next_inst(&mut gg);
     }
 
     /// Execute the next instruction and advance the scheduler.
@@ -249,9 +247,7 @@ impl<S: ArmSystem> Cpu<S> {
     pub fn check_if_interrupt(gg: &mut S) {
         if gg.cpur().is_interrupt_pending() {
             gg.cpu().inc_pc_by(4);
-            let mut wrapper = SysWrapper {
-                inner: gg as *mut S,
-            };
+            let mut wrapper = SysWrapper::new(gg);
             Cpu::exception_occurred(&mut wrapper, Exception::Irq);
         }
     }
