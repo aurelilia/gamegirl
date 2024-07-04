@@ -49,7 +49,9 @@ impl<S: ArmSystem> Cache<S> {
                 Self::insert(&mut self.iwram, location, entry);
                 self.iwram_cache_indices[location.us() / IWRAM_PAGE_SIZE.us()].push(location);
             }
-            0x800_0000..=0xDFF_FFFF => Self::insert(&mut self.rom, (pc - 0x800_0000) >> 1, entry),
+            _ if (0x800_0000..=(0x800_0000 + (self.rom.len() << 1))).contains(&pc.us()) => {
+                Self::insert(&mut self.rom, (pc - 0x800_0000) >> 1, entry)
+            }
             _ => (),
         }
     }

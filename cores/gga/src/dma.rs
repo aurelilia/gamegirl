@@ -102,7 +102,7 @@ impl Dmas {
             return;
         }
         if gg.dma.running <= idx.u16() {
-            gg.dma.queued.push((idx.u16(), reason));
+            gg.dma.queued.try_push((idx.u16(), reason)).ok();
             return;
         }
 

@@ -238,6 +238,7 @@ impl GameGirlAdv {
                 // Open bus
                 if self.cpu.pc() > 0xFFF_FFFF
                     || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
+                    || (self.cpu.pc() >= 0x400_0000 && self.cpu.pc() < 0x500_0000)
                 {
                     return 0;
                 }

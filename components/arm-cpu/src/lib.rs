@@ -105,9 +105,9 @@ impl<S: ArmSystem> Cpu<S> {
         gg.cpu().block_ended = false;
         gg.cpu().pipeline_valid = false;
 
+        let is_thumb = gg.cpu().flag(Thumb);
         match cache {
-            CacheEntry::Arm(cache) => {
-                assert!(!gg.cpu().flag(Thumb));
+            CacheEntry::Arm(cache) if !is_thumb => {
                 for inst in cache.iter() {
                     gg.advance_clock();
                     if gg.cpu().block_ended {
@@ -124,8 +124,7 @@ impl<S: ArmSystem> Cpu<S> {
                     }
                 }
             }
-            CacheEntry::Thumb(cache) => {
-                assert!(gg.cpu().flag(Thumb));
+            CacheEntry::Thumb(cache) if is_thumb => {
                 for inst in cache.iter() {
                     gg.advance_clock();
                     if gg.cpu().block_ended {
@@ -140,6 +139,11 @@ impl<S: ArmSystem> Cpu<S> {
                     (inst.handler)(gg, ThumbInst(inst.inst));
                 }
             }
+
+            // Edge case: Somehow we got a cache entry that doesn't match the CPU state
+            // Just advance regularly and ignore the cache
+            // (The only game known to me that triggers this is "Hello Kitty - Happy Party Pals")
+            _ => Self::execute_next_inst(gg),
         }
     }
 

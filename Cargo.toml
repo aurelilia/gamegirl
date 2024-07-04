@@ -17,6 +17,10 @@ debug = true
 panic = "abort"
 opt-level = 2
 
+[profile.release-unwind]
+inherits = "release"
+panic = "unwind"
+
 [profile.dev]
 opt-level = 1
 

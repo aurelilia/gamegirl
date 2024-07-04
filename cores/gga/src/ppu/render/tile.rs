@@ -51,7 +51,7 @@ impl PpuRender {
             if cnt.palette_mode() == PaletteMode::Single256 {
                 let tile_addr = char_block_base + (tile_idx.us() * 64) + (tile_y.us() * 8);
                 for idx in 0..8 {
-                    let colour = self.vram[tile_addr + idx];
+                    let colour = self.vram[(tile_addr + idx) & 0xFFFF];
                     self.set_pixel(bg, x, 0, colour);
                     x += x_step;
                 }
@@ -59,7 +59,7 @@ impl PpuRender {
                 let tile_addr = char_block_base + (tile_idx.us() * 32) + (tile_y.us() * 4);
                 let palette = map.bits(12, 4).u8();
                 for idx in 0..4 {
-                    let byte = self.vram[tile_addr + idx];
+                    let byte = self.vram[(tile_addr + idx) & 0xFFFF];
                     self.set_pixel(bg, x, palette, byte & 0xF);
                     x += x_step;
                     self.set_pixel(bg, x, palette, byte >> 4);
