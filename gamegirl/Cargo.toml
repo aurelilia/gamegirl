@@ -35,7 +35,6 @@ serde = [
     "common/serde",
     "ggc/serde",
     "gga/serde",
-    "nds/serde",
     "nes/serde",
     "psx/serde",
 ]

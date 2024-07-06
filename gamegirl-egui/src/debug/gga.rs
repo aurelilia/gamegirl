@@ -10,10 +10,12 @@ use std::iter;
 
 use common::{numutil::NumExt, Core};
 use eframe::{
-    egui::{load::SizedTexture, Context, Label, RichText, TextureOptions, Ui},
+    egui::{load::SizedTexture, Checkbox, Context, Label, RichText, TextureOptions, Ui},
     epaint::{vec2, ColorImage, ImageData, ImageDelta, TextureId},
 };
 use gamegirl::gga::{
+    self,
+    ppu::registers::{Window, WindowCtrl},
     timer::{self, Timers},
     GameGirlAdv,
 };
@@ -28,6 +30,7 @@ pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
         app.debugger_window_states[2] ^= ui.button("Remote Debugger").clicked();
     }
     ui.separator();
+    app.debugger_window_states[8] ^= ui.button("PPU Register Viewer").clicked();
     app.debugger_window_states[3] ^= ui.button("BG Tileset Viewer").clicked();
     app.debugger_window_states[4] ^= ui.button("OBJ Tileset Viewer").clicked();
     app.debugger_window_states[7] ^= ui.button("OBJ Viewer").clicked();
@@ -46,6 +49,7 @@ pub fn get_windows() -> Windows<GameGirlAdv> {
         ("Timer Status", timer_status),
         ("DMA Status", dma_status),
         ("OBJ Viewer", obj_viewer),
+        ("PPU Register Viewer", ppu_registers),
     ]
 }
 
@@ -411,12 +415,7 @@ fn get_or_make_texture(ctx: &Context, app: &mut App, id: usize) -> TextureId {
 fn timer_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     for timer in 0..4 {
         ui.heading(format!("Timer {timer}"));
-        let current = match timer {
-            0 => Timers::time_read::<0>(gg),
-            1 => Timers::time_read::<1>(gg),
-            2 => Timers::time_read::<2>(gg),
-            _ => Timers::time_read::<3>(gg),
-        };
+        let current = gg.timers.time_read(timer, gg.get_time());
         ui.label(format!("Current Value: 0x{current:04X}"));
 
         let ctrl = gg.timers.control[timer];
@@ -468,7 +467,84 @@ fn dma_status(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
 
 /// Window showing current objects.
 fn obj_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
-    for obj in 0..128 {
-        
+    for obj in 0..128 {}
+}
+
+/// Window showing PPU state.
+fn ppu_registers(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
+    let cnt = gg.ppu.regs.dispcnt;
+    ui.collapsing("Display Control", |ui| {
+        ui.label(format!("BG Mode: {:?}", cnt.bg_mode()));
+        if cnt.bg_mode() as usize > 3 {
+            ui.label(format!("Frame Select: {}", cnt.frame_select() as usize));
+        }
+
+        ui.checkbox(&mut cnt.hblank_oam_free(), "OAM during H-Blank");
+        ui.checkbox(
+            &mut (cnt.character_mapping_mode() as usize == 0),
+            "Object 2D mapping",
+        );
+        ui.checkbox(&mut cnt.forced_blank_enable(), "Forced Blank");
+
+        for bg in 0..4 {
+            ui.checkbox(&mut cnt.bg_en().is_bit(bg), format!("BG{bg} Enable"));
+        }
+        ui.checkbox(&mut cnt.obj_en(), "OBJ Enable");
+        ui.checkbox(&mut cnt.win0_en(), "WIN0 Enable");
+        ui.checkbox(&mut cnt.win1_en(), "WIN1 Enable");
+        ui.checkbox(&mut cnt.winobj_en(), "WINOBJ Enable");
+    });
+
+    for bg in 0..4 {
+        let bgcnt = gg.ppu.regs.bg_cnt[bg];
+        ui.collapsing(format!("BG{bg} Control"), |ui| {
+            ui.label(format!("Priority: {}", bgcnt.priority()));
+            ui.label(format!(
+                "Character Base Block: 0x{:04X}",
+                bgcnt.character_base_block().u32() * 0x4000
+            ));
+            ui.label(format!(
+                "Screen Base Block: {:?}",
+                bgcnt.screen_base_block().u32() * 0x800
+            ));
+            ui.checkbox(&mut bgcnt.mosaic_en(), "Mosaic");
+            ui.checkbox(&mut (bgcnt.palette_mode() as usize == 1), "8BPP Mode");
+
+            ui.separator();
+            ui.label(format!("Scroll X: {}", gg.ppu.regs.bg_offsets[bg * 2]));
+            ui.label(format!("Scroll Y: {}", gg.ppu.regs.bg_offsets[bg * 2 + 1]));
+        });
     }
+
+    ui.collapsing("Windows", |ui| {
+        window_ui("0", &gg.ppu.regs.windows[0], ui);
+        window_ui("1", &gg.ppu.regs.windows[1], ui);
+        window_ctrl_ui("OBJ", &gg.ppu.regs.win_obj, ui);
+        window_ctrl_ui("OUT", &gg.ppu.regs.win_out, ui);
+    });
+}
+
+fn window_ui(win: &str, ctrl: &Window, ui: &mut Ui) {
+    ui.label(format!(
+        "Window {win} Left/Right: {}-{}",
+        ctrl.left(),
+        ctrl.right()
+    ));
+    ui.label(format!(
+        "Window {win} Top/Bottom: {}-{}",
+        ctrl.top(),
+        ctrl.bottom()
+    ));
+    window_ctrl_ui(win, &ctrl.control, ui)
+}
+
+fn window_ctrl_ui(win: &str, ctrl: &WindowCtrl, ui: &mut Ui) {
+    for bg in 0..4 {
+        ui.checkbox(
+            &mut ctrl.bg_en().is_bit(bg),
+            format!("WIN{win} BG{bg} Enable"),
+        );
+    }
+    ui.checkbox(&mut ctrl.obj_en(), "OBJ Enable");
+    ui.checkbox(&mut ctrl.special_en(), "Special Enable");
 }

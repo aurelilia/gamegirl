@@ -48,7 +48,7 @@ mod cpu;
 mod dma;
 mod input;
 mod memory;
-mod ppu;
+pub mod ppu;
 mod scheduling;
 mod serial;
 pub mod timer;

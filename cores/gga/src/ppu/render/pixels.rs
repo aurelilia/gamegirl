@@ -65,14 +65,14 @@ impl PpuRender {
             if self.r.dispcnt.win0_en() && self.r.windows[0].contains_y(y) {
                 let win = WindowInfo::new(self.r.windows[0].control);
                 let backgrounds = filter_active_window_bgs(&sorted_backgrounds, win.ctrl);
-                for (x, is_occupid) in occupied
+                for (x, is_occupied) in occupied
                     .iter_mut()
                     .enumerate()
                     .take(self.r.windows[0].right())
                     .skip(self.r.windows[0].left())
                 {
                     self.finalize_pixel(x, y, &win, &backgrounds, backdrop_color);
-                    *is_occupid = true;
+                    *is_occupied = true;
                     occupied_count += 1;
                 }
             }
@@ -82,17 +82,15 @@ impl PpuRender {
             if self.r.dispcnt.win1_en() && self.r.windows[1].contains_y(y) {
                 let win = WindowInfo::new(self.r.windows[1].control);
                 let backgrounds = filter_active_window_bgs(&sorted_backgrounds, win.ctrl);
-                for (x, is_occupid) in occupied
+                for (x, is_occupied) in occupied
                     .iter_mut()
                     .enumerate()
                     .take(self.r.windows[1].right())
                     .skip(self.r.windows[1].left())
+                    .filter(|(_, o)| !**o)
                 {
-                    if *is_occupid {
-                        continue;
-                    }
                     self.finalize_pixel(x, y, &win, &backgrounds, backdrop_color);
-                    *is_occupid = true;
+                    *is_occupied = true;
                     occupied_count += 1;
                 }
             }
@@ -105,10 +103,7 @@ impl PpuRender {
                 let win_obj = WindowInfo::new(self.r.win_obj);
                 let win_obj_backgrounds =
                     filter_active_window_bgs(&sorted_backgrounds, win_obj.ctrl);
-                for (x, is_occupid) in occupied.iter().enumerate().take(WIDTH) {
-                    if *is_occupid {
-                        continue;
-                    }
+                for (x, _) in occupied.iter().enumerate().take(WIDTH).filter(|(_, o)| !*o) {
                     let obj_entry = self.obj_pixel(x);
                     if obj_entry.is_window {
                         // WinObj
@@ -135,6 +130,13 @@ impl PpuRender {
                 let b = self.pixels[xy2d(x + 1, y)][1];
                 self.pixels[xy2d(x, y)][1] = b;
                 self.pixels[xy2d(x + 1, y)][1] = a;
+            }
+        }
+
+        // Consider forced blank
+        if self.r.dispcnt.forced_blank_enable() {
+            for x in 0..WIDTH {
+                self.pixels[xy2d(x, y)] = [255; 4];
             }
         }
     }

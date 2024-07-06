@@ -275,30 +275,8 @@ impl GameGirlAdv {
     pub fn set_byte(&mut self, addr: u32, value: u8) {
         let a = addr.us();
         match a {
-            // DMA channel edge case, why do games do this
-            0x0400_00A0..=0x0400_00A3 => self.apu.push_sample::<0>(value),
-            0x0400_00A4..=0x0400_00A7 => self.apu.push_sample::<1>(value),
-
-            // HALTCNT
-            0x0400_0301 => {
-                self.cpu.is_halted = true;
-            }
-
-            // Old sound
-            0x0400_0060..=0x0400_0080 | 0x0400_0084 | 0x0400_0090..=0x0400_009F => {
-                Apu::write_register_psg(
-                    &mut self.apu.cgb_chans,
-                    (addr & 0xFFF).u16(),
-                    value,
-                    &mut audio::shed(&mut self.scheduler),
-                );
-            }
-
             // MMIO
-            0x0400_0000..=0x0400_0301 if addr.is_bit(0) => {
-                self.set_hword(addr, self.get_hword(addr).set_high(value));
-            }
-            0x0400_0000..=0x0400_0301 => self.set_hword(addr, self.get_hword(addr).set_low(value)),
+            0x0400_0000..=0x04FF_FFFF => self.set_mmio_byte(addr, value),
 
             // Cart save
             0x0E00_0000..=0x0FFF_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
@@ -378,6 +356,63 @@ impl GameGirlAdv {
             };
         }
         self.cpu.cache.write(addr);
+    }
+
+    fn set_mmio_byte(&mut self, addr: u32, value: u8) {
+        let a = addr & 0x3FF;
+        match a {
+            // DMA channel edge case, why do games do this
+            0xA0..=0xA3 => self.apu.push_sample::<0>(value),
+            0xA4..=0xA7 => self.apu.push_sample::<1>(value),
+
+            // Control registers
+            0x301 => self.cpu.is_halted = true,
+            WAITCNT => self.set_mmio(addr, hword(value, self.memory.waitcnt.high())),
+            0x205 => self.set_mmio(addr, hword(self.memory.waitcnt.low(), value)),
+
+            // Old sound
+            0x60..=0x80 | 0x84 | 0x90..=0x9F => {
+                Apu::write_register_psg(
+                    &mut self.apu.cgb_chans,
+                    (addr & 0xFFF).u16(),
+                    value,
+                    &mut audio::shed(&mut self.scheduler),
+                );
+            }
+
+            // DMAs
+            0xB0..0xE0 => {
+                let idx = (a.us() - 0xB0) / 12;
+                let reg = (a - 0xB0) % 12;
+
+                let dma = &mut self.dma.channels[idx];
+                let ctrl = Into::<u16>::into(dma.ctrl);
+                match reg {
+                    0x0 => dma.sad = dma.sad.set_low(dma.sad.low().set_low(value)),
+                    0x1 => dma.sad = dma.sad.set_low(dma.sad.low().set_high(value)),
+                    0x2 => dma.sad = dma.sad.set_high(dma.sad.high().set_low(value)),
+                    0x3 => dma.sad = dma.sad.set_high(dma.sad.high().set_high(value)),
+                    0x4 => dma.sad = dma.dad.set_low(dma.dad.low().set_low(value)),
+                    0x5 => dma.sad = dma.dad.set_low(dma.dad.low().set_high(value)),
+                    0x6 => dma.sad = dma.dad.set_high(dma.dad.high().set_low(value)),
+                    0x7 => dma.sad = dma.dad.set_high(dma.dad.high().set_high(value)),
+                    0x8 => dma.count = dma.count.set_low(value),
+                    0x9 => dma.count = dma.count.set_high(value),
+                    0xA => Dmas::ctrl_write(self, idx, ctrl.set_low(value)),
+                    0xB => Dmas::ctrl_write(self, idx, ctrl.set_high(value)),
+                    _ => unreachable!(),
+                }
+            }
+
+            // PPU
+            DISPCNT..=BLDY => self.ppu.regs.write_mmio_byte(a, value),
+
+            // Treat as halfword
+            _ if addr.is_bit(0) => {
+                self.set_hword(addr, self.get_hword(addr).set_high(value));
+            }
+            _ => self.set_hword(addr, self.get_hword(addr).set_low(value)),
+        }
     }
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
@@ -482,7 +517,6 @@ impl GameGirlAdv {
             // RO registers, or otherwise invalid
             KEYINPUT
             | 0x86
-            | 0x134
             | 0x136
             | 0x15A
             | 0x206

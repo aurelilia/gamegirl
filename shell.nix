@@ -1,6 +1,7 @@
 let 
   pkgs = import <nixpkgs> { };
   packages = with pkgs; [
+  	# Build related
     pkg-config
     udev
     llvmPackages.bintools
@@ -11,9 +12,15 @@ let
     libxkbcommon
     libGL
     trunk
+
+    # Useful tools
     cargo-edit
     cargo-flamegraph
     cargo-watch
+
+    # Other emulators for ease of debugging
+    mgba
+    nanoboyadvance
   ];
 in
   pkgs.mkShell {

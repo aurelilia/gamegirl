@@ -20,12 +20,12 @@ pub struct PpuRegisters {
     pub(super) dispstat: DisplayStatus,
     pub(crate) vcount: u16,
     pub bg_cnt: [BgControl; 4],
-    pub(super) bg_offsets: [u16; 8],
-    pub(super) bg_scale: [BgRotScal; 2],
+    pub bg_offsets: [u16; 8],
+    pub bg_scale: [BgRotScal; 2],
 
-    pub(super) windows: [Window; 2],
-    pub(super) win_obj: WindowCtrl,
-    pub(super) win_out: WindowCtrl,
+    pub windows: [Window; 2],
+    pub win_obj: WindowCtrl,
+    pub win_out: WindowCtrl,
 
     pub(super) mosaic: Mosaic,
     pub(super) bldcnt: BlendControl,
@@ -64,6 +64,42 @@ impl PpuRegisters {
 
             _ => return None,
         })
+    }
+
+    pub fn get_mmio_inner(&mut self, addr: u32) -> u16 {
+        match addr {
+            BG0HOFS..=BG3VOFS => self.bg_offsets[(addr.us() & 0xF) >> 1],
+            BG2PA..WIN0H => match addr & 0xF {
+                0x0 => self.bg_scale[addr.bit(4).us()].pa as u16,
+                0x2 => self.bg_scale[addr.bit(4).us()].pb as u16,
+                0x4 => self.bg_scale[addr.bit(4).us()].pc as u16,
+                0x6 => self.bg_scale[addr.bit(4).us()].pd as u16,
+                0x8 => self.bg_scale[addr.bit(4).us()].xl,
+                0xA => self.bg_scale[addr.bit(4).us()].xh,
+                0xC => self.bg_scale[addr.bit(4).us()].yl,
+                0xE => self.bg_scale[addr.bit(4).us()].yh,
+                _ => unreachable!(),
+            },
+
+            WIN0H => hword(self.windows[0].right, self.windows[0].left),
+            WIN1H => hword(self.windows[1].right, self.windows[1].left),
+            WIN0V => hword(self.windows[0].bottom, self.windows[0].top),
+            WIN1V => hword(self.windows[1].bottom, self.windows[1].top),
+
+            MOSAIC => self.mosaic.into(),
+            BLDY => self.bldy,
+
+            _ => self.read_mmio(addr).unwrap_or(0),
+        }
+    }
+
+    pub fn write_mmio_byte(&mut self, addr: u32, value: u8) {
+        let var = self.get_mmio_inner(addr & !1);
+        if addr.is_bit(0) {
+            self.write_mmio(addr, var.set_high(value));
+        } else {
+            self.write_mmio(addr, var.set_low(value));
+        }
     }
 
     pub fn write_mmio(&mut self, addr: u32, value: u16) {

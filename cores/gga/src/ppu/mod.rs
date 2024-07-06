@@ -14,7 +14,7 @@
 //! second attempt at an implementation. Thank you to michelhe, too.
 //! The code is under the MIT license at  https://github.com/michelhe/rustboyadvance-ng.
 
-mod registers;
+pub mod registers;
 mod render;
 
 use std::sync::Arc;
