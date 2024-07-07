@@ -49,7 +49,9 @@ impl<Ptr: PartialEq + Clone + Copy + UpperHex> Debugger<Ptr> {
                 .position(|bp| bp.value == Some(addr) && bp.write);
             self.breakpoint_hit = bp;
             self.running &= bp.is_none();
-            self.add_traced_instruction(|| format!("Write to Breakpoint at {:#X}", addr));
+            if !self.running {
+                self.add_traced_instruction(|| format!("Write to Breakpoint at {:#X}", addr));
+            }
         }
     }
 

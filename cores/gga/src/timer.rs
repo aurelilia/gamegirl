@@ -53,8 +53,6 @@ impl Timers {
         // Handle overflow
         let until_ov = Self::overflow(gg, idx) as TimeS;
         // Reschedule event
-        // Edge case: with high reload and fast timers, sometimes (late_by > until_ov).
-        // In this case, we simply schedule the next overflow event to be immediately.
         gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by as Time + 2;
         gg.scheduler
             .schedule(AdvEvent::TimerOverflow(idx), until_ov - late_by);

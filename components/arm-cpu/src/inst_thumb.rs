@@ -193,10 +193,10 @@ impl<S: ArmSystem> SysWrapper<S> {
         let d = inst.low(8);
         let n = inst.0 & 0xFF;
 
-        // LDR has +1I
-        self.idle_nonseq();
         self.cpu().registers[d.us()] =
             self.read_word_ldrswp(self.cpur().adj_pc() + (n.u32() << 2), NONSEQ);
+        // LDR has +1I
+        self.idle_nonseq();
     }
 
     // THUMB.7/8
@@ -263,9 +263,9 @@ impl<S: ArmSystem> SysWrapper<S> {
         if STR {
             self.write::<u16>(addr, rd.u16(), NONSEQ);
         } else {
+            self.cpu().registers[d.us()] = self.read::<u16>(addr, NONSEQ).u32();
             // LDR has +1I
             self.add_i_cycles(1);
-            self.cpu().registers[d.us()] = self.read::<u16>(addr, NONSEQ).u32();
         }
     }
 
@@ -282,10 +282,10 @@ impl<S: ArmSystem> SysWrapper<S> {
     pub fn thumb_ldr_sp(&mut self, inst: ThumbInst) {
         let n = inst.0 & 0xFF;
         let d = inst.low(8);
-        // LDR has +1I
-        self.idle_nonseq();
         self.cpu().registers[d.us()] =
             self.read_word_ldrswp(self.cpur().sp() + (n.u32() << 2), NONSEQ);
+        // LDR has +1I
+        self.idle_nonseq();
     }
 
     // THUMB.12
@@ -408,9 +408,6 @@ impl<S: ArmSystem> SysWrapper<S> {
 
     // THUMB.16
     pub fn thumb_bcond<const COND: u16>(&mut self, inst: ThumbInst) {
-        if inst.0.bits(8, 4) != COND {
-            println!("{COND:X}{:X}", inst.0);
-        }
         let condition = self.cpu().eval_condition(COND);
         if condition {
             let nn = ((inst.0 & 0xFF) as i8 as i32) * 2; // Step 2

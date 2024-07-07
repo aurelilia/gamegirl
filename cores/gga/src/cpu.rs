@@ -36,11 +36,15 @@ impl ArmSystem for GameGirlAdv {
     fn add_sn_cycles(&mut self, cycles: u16) {
         self.scheduler.advance(cycles as Time);
         self.step_prefetch(cycles);
+        self.debugger
+            .add_traced_instruction(|| format!("Added {} SN cycles", cycles));
     }
 
     fn add_i_cycles(&mut self, cycles: u16) {
         self.scheduler.advance(cycles as Time);
         self.step_prefetch(cycles);
+        self.debugger
+            .add_traced_instruction(|| format!("Added {} I cycles", cycles));
     }
 
     fn exception_happened(&mut self, kind: Exception) {
@@ -52,7 +56,7 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn pipeline_stalled(&mut self) {
-        self.memory.prefetch_len = 0;
+        self.stop_prefetch();
     }
 
     fn will_execute(&mut self, pc: u32) {
@@ -62,10 +66,14 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn get<T: RwType>(&mut self, addr: u32) -> T {
+        self.debugger
+            .add_traced_instruction(|| format!("Got 0x{addr:X}"));
         GameGirlAdv::get(self, addr)
     }
 
     fn set<T: RwType>(&mut self, addr: u32, value: T) {
+        self.debugger
+            .add_traced_instruction(|| format!("Set 0x{addr:X}"));
         GameGirlAdv::set(self, addr, value)
     }
 

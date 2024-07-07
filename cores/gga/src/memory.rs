@@ -10,7 +10,7 @@ use std::ptr;
 
 use arm_cpu::{
     access::{CODE, NONSEQ, SEQ},
-    interface::RwType,
+    interface::{ArmSystem, RwType},
     registers::Flag,
     Access, Cpu, Interrupt,
 };
@@ -54,6 +54,7 @@ pub struct WaitCnt {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Prefetch {
     active: bool,
+    restart: bool,
     thumb: bool,
 
     head: u32,
@@ -74,14 +75,11 @@ pub struct Memory {
     // Various registers
     pub keycnt: KeyControl,
     pub waitcnt: WaitCnt,
-
     /// Value to return when trying to read BIOS outside of it
     pub(crate) bios_value: u32,
-    /// Length of the prefetch buffer at the current PC.
-    pub(crate) prefetch_len: u16,
 
     pub mapper: MemoryMapper<8192>,
-    prefetch: Prefetch,
+    pub(crate) prefetch: Prefetch,
     wait_word: [u16; 32],
     wait_other: [u16; 32],
 }
@@ -396,9 +394,9 @@ impl GameGirlAdv {
 
             // Treat as halfword
             _ if addr.is_bit(0) => {
-                self.set::<u16>(addr, self.get::<u16>(addr).set_high(value));
+                self.set::<u16>(addr, Self::get::<u16>(&self, addr).set_high(value));
             }
-            _ => self.set::<u16>(addr, self.get::<u16>(addr).set_low(value)),
+            _ => self.set::<u16>(addr, Self::get::<u16>(&self, addr).set_low(value)),
         }
     }
 
@@ -431,7 +429,8 @@ impl GameGirlAdv {
                     self.update_wait_times();
                 }
                 if value.bit(14) != prev.bit(14) {
-                    self.memory.prefetch_len = 0;
+                    self.memory.prefetch.active = false;
+                    self.memory.prefetch.restart = true;
                     self.cpu.cache.invalidate_rom();
                 } else if value.bits(2, 9) != prev.bits(2, 9) {
                     self.cpu.cache.invalidate_rom();
@@ -553,7 +552,12 @@ impl GameGirlAdv {
         }
     }
 
-    fn handle_prefetch<T: NumExt + 'static>(&mut self, addr: u32, ty: Access, regular: u16) -> u16 {
+    fn handle_prefetch<T: NumExt + 'static>(
+        &mut self,
+        addr: u32,
+        ty: Access,
+        mut regular: u16,
+    ) -> u16 {
         if (ty & CODE) == 0 {
             self.stop_prefetch();
             return regular;
@@ -575,13 +579,22 @@ impl GameGirlAdv {
             }
         }
 
+        self.stop_prefetch();
+
         // Prefetch should keep transfer alive
         if self.memory.waitcnt.prefetch_en() {
-            let duty = if pf.thumb {
+            let duty = if self.cpu.flag(Flag::Thumb) {
                 self.wait_time_inner::<u16>(addr, SEQ | CODE)
             } else {
                 self.wait_time_inner::<u32>(addr, SEQ | CODE)
             };
+
+            let pf = &mut self.memory.prefetch;
+            if pf.restart {
+                pf.restart = false;
+                // Force non-seq
+                regular = self.wait_time_inner::<T>(addr, CODE);
+            }
 
             let pf = &mut self.memory.prefetch;
             pf.thumb = self.cpu.flag(Flag::Thumb);
@@ -612,7 +625,7 @@ impl GameGirlAdv {
         }
     }
 
-    fn stop_prefetch(&mut self) {
+    pub(super) fn stop_prefetch(&mut self) {
         let prefetch = &mut self.memory.prefetch;
         if prefetch.active {
             // Penalty for accessing ROM/RAM during last cycle of prefetch fetch
@@ -620,7 +633,8 @@ impl GameGirlAdv {
                 let duty = prefetch.duty / 2 + 1;
                 if prefetch.countdown == 1 || (!prefetch.thumb && duty == prefetch.countdown as u16)
                 {
-                    self.scheduler.advance(1);
+                    self.add_i_cycles(1);
+                    self.cpu().access_type = NONSEQ;
                 }
             }
             self.memory.prefetch.active = false;
@@ -699,7 +713,6 @@ impl Default for Memory {
             keycnt: 0.into(),
             waitcnt: 0.into(),
             bios_value: 0xE129_F000,
-            prefetch_len: 0,
             mapper: MemoryMapper::default(),
             prefetch: Prefetch::default(),
             wait_word: [0; 32],

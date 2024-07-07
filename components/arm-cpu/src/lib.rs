@@ -116,7 +116,6 @@ impl<S: ArmSystem> Cpu<S> {
 
                     let pc = gg.cpu().inc_pc_by(4);
                     gg.will_execute(pc);
-                    Self::trace_inst::<u32>(gg, inst.inst);
                     gg.add_sn_cycles(inst.sn_cycles);
                     if gg.check_arm_cond(inst.inst) {
                         (inst.handler)(gg, ArmInst(inst.inst));
@@ -133,7 +132,6 @@ impl<S: ArmSystem> Cpu<S> {
 
                     let pc = gg.cpu().inc_pc_by(2);
                     gg.will_execute(pc);
-                    Self::trace_inst::<u16>(gg, inst.inst.u32());
                     gg.add_sn_cycles(inst.sn_cycles);
                     (inst.handler)(gg, ThumbInst(inst.inst));
                 }
@@ -225,11 +223,11 @@ impl<S: ArmSystem> Cpu<S> {
         gg.cpu().pipeline[1] = gg.get::<TY>(gg.cpur().pc()).u32();
         gg.cpu().access_type = SEQ;
 
-        Self::trace_inst::<TY>(gg, inst);
+        Self::trace_inst::<TY>(gg, inst, sn_cycles);
         (inst, sn_cycles, pc)
     }
 
-    fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32) {
+    fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32, cycles: u16) {
         if gg.debugger().tracing() {
             let pc = gg.cpu().pc();
             gg.debugger().add_traced_instruction(|| {
@@ -238,7 +236,7 @@ impl<S: ArmSystem> Cpu<S> {
                 } else {
                     Self::get_mnemonic_arm(inst)
                 };
-                format!("0x{:08X} {}", pc, mnem)
+                format!("0x{pc:08X} - {cycles} - {mnem}")
             });
         }
     }
@@ -286,7 +284,6 @@ impl<S: ArmSystem> Cpu<S> {
 
     /// Emulate a pipeline stall / fill; used when PC changes.
     pub fn pipeline_stall(gg: &mut S) {
-        // gg.memory.prefetch_len = 0; // Discard prefetch
         gg.pipeline_stalled();
         if gg.cpu().flag(Thumb) {
             let time = gg.wait_time::<u16>(gg.cpur().pc(), NONSEQ | CODE);
