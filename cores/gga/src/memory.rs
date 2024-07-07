@@ -234,88 +234,70 @@ impl GameGirlAdv {
 
     /// Write a byte to the bus. Does no timing-related things; simply sets the
     /// value.
-    pub fn set_byte(&mut self, addr: u32, value: u8) {
-        let a = addr.us();
-        match a {
+    pub fn set<T: RwType>(&mut self, addr_unaligned: u32, value: T) {
+        let addr = addr_unaligned & !(T::WIDTH - 1);
+
+        // Bytes only use the mapper later, since VRAM does weird behavior
+        // on byte writes
+        if T::WIDTH != 1 {
+            let success = self.memory.mapper.set::<Self, _>(addr, value);
+            if success {
+                self.cpu.cache.write(addr);
+                return;
+            }
+        }
+
+        match addr {
             // MMIO
-            0x0400_0000..=0x04FF_FFFF => self.set_mmio_byte(addr, value),
-
-            // Cart save
-            0x0E00_0000..=0x0FFF_FFFF => self.cart.write_ram_byte(addr.us() & 0xFFFF, value),
-
-            // VRAM weirdness
-            0x0500_0000..=0x0600_FFFF if !self.ppu.regs.is_bitmap_mode() => {
-                self.set_hword(addr & !1, hword(value, value))
+            0x0400_0000..=0x04FF_FFFF if T::WIDTH == 1 => self.set_mmio_byte(addr, value.u8()),
+            0x0400_0000..=0x0400_0300 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
+            0x0400_0000..=0x0400_0300 if T::WIDTH == 4 => {
+                self.set_mmio(addr, value.u16());
+                self.set_mmio(addr + 2, value.u32().high());
             }
-            0x0500_0000..=0x0601_3FFF => self.set_hword(addr & !1, hword(value, value)),
-            0x0602_0000..=0x06FF_FFFF if a & 0x1_FFFF < 0x1_0000 => {
-                // Only BG VRAM gets written to, OBJ VRAM is ignored
-                self.set_hword(addr & !1, hword(value, value));
+
+            // Maybe write EEPROM
+            0x0D00_0000..=0x0DFF_FFFF if T::WIDTH == 2 && self.cart.is_eeprom_at(addr) => {
+                self.cart.write_ram_hword(value.u16());
             }
-            0x0601_0000..=0x07FF_FFFF if !self.ppu.regs.is_bitmap_mode() => (), // Ignored
-            0x0601_4000..=0x07FF_FFFF => (),                                    // Ignored
 
-            _ => {
-                self.memory.mapper.set::<Self, _>(addr, value);
+            // Other saves
+            0x0E00_0000..=0x0FFF_FFFF => {
+                let byte = match T::WIDTH {
+                    1 => value.u8(),
+                    2 if addr_unaligned.is_bit(0) => value.u16().high(),
+                    2 => value.u8(),
+                    4 => {
+                        let byte_shift = (addr_unaligned & 3) * 8;
+                        (value.u32() >> byte_shift).u8()
+                    }
+                    _ => unreachable!(),
+                };
+                self.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
             }
-        }
-        self.cpu.cache.write(addr);
-    }
 
-    /// Write a half-word from the bus (LE). Does no timing-related things;
-    /// simply sets the value.
-    pub(super) fn set_hword(&mut self, addr_unaligned: u32, value: u16) {
-        let addr = addr_unaligned & !1; // Forcibly align: All write instructions do this
-        let success = self.memory.mapper.set::<Self, _>(addr, value);
-        if !success {
-            match addr {
-                0x0400_0000..=0x0400_0300 => self.set_mmio(addr, value),
+            // VRAM weirdness on byte writes
+            _ if T::WIDTH == 1 => {
+                let value = value.u8();
+                match addr {
+                    0x0500_0000..=0x0600_FFFF if !self.ppu.regs.is_bitmap_mode() => {
+                        self.set(addr & !1, hword(value, value))
+                    }
+                    0x0500_0000..=0x0601_3FFF => self.set(addr & !1, hword(value, value)),
+                    0x0602_0000..=0x06FF_FFFF if addr & 0x1_FFFF < 0x1_0000 => {
+                        // Only BG VRAM gets written to, OBJ VRAM is ignored
+                        self.set(addr & !1, hword(value, value));
+                    }
+                    0x0601_0000..=0x07FF_FFFF if !self.ppu.regs.is_bitmap_mode() => (), // Ignored
+                    0x0601_4000..=0x07FF_FFFF => (),                                    // Ignored
 
-                // Maybe write EEPROM
-                0x0D00_0000..=0x0DFF_FFFF if self.cart.is_eeprom_at(addr) => {
-                    self.cart.write_ram_hword(value);
-                }
-
-                // Other saves
-                0x0E00_0000..=0x0FFF_FFFF => {
-                    // Writing halfwords causes a byte from it to be written
-                    let byte = if addr_unaligned.is_bit(0) {
-                        value.high()
-                    } else {
-                        value.low()
-                    };
-                    self.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
-                }
-
-                _ => (),
+                    _ => {
+                        self.memory.mapper.set::<Self, _>(addr, value);
+                    }
+                };
             }
-        }
-        self.cpu.cache.write(addr);
-    }
 
-    /// Write a word from the bus (LE). Does no timing-related things; simply
-    /// sets the value.
-    pub(super) fn set_word(&mut self, addr_unaligned: u32, value: u32) {
-        let addr = addr_unaligned & !3; // Forcibly align: All write instructions do this
-        let success = self.memory.mapper.set::<Self, _>(addr, value);
-        if !success {
-            match addr {
-                0x0400_0000..=0x0400_0300 => {
-                    self.set_mmio(addr, value.low());
-                    self.set_mmio(addr.wrapping_add(2), value.high());
-                }
-
-                // Saves
-                0x0E00_0000..=0x0FFF_FFFF => {
-                    // Writing words causes a byte from it to be written
-                    let byte_shift = (addr_unaligned & 3) * 8;
-                    let byte = (value >> byte_shift) & 0xFF;
-                    self.cart
-                        .write_ram_byte(addr_unaligned.us() & 0xFFFF, byte.u8());
-                }
-
-                _ => (),
-            };
+            _ => (),
         }
         self.cpu.cache.write(addr);
     }
@@ -371,9 +353,9 @@ impl GameGirlAdv {
 
             // Treat as halfword
             _ if addr.is_bit(0) => {
-                self.set_hword(addr, self.get::<u16>(addr).set_high(value));
+                self.set::<u16>(addr, self.get::<u16>(addr).set_high(value));
             }
-            _ => self.set_hword(addr, self.get::<u16>(addr).set_low(value)),
+            _ => self.set::<u16>(addr, self.get::<u16>(addr).set_low(value)),
         }
     }
 

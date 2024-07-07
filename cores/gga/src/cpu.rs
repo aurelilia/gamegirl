@@ -70,11 +70,7 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        match T::WIDTH {
-            1 => self.set_byte(addr, value.u8()),
-            2 => self.set_hword(addr, value.u16()),
-            _ => self.set_word(addr, value.u32()),
-        }
+        GameGirlAdv::set(self, addr, value)
     }
 
     fn wait_time<T: RwType>(&mut self, addr: u32, access: Access) -> u16 {
