@@ -11,7 +11,7 @@ use std::fmt::UpperHex;
 use common::{components::debugger::Severity, numutil::NumExt};
 
 use super::interface::{ArmSystem, SysWrapper};
-use crate::{Access::NonSeq, Cpu, Exception};
+use crate::{access::NONSEQ, Cpu, Exception};
 
 impl<S: ArmSystem> SysWrapper<S> {
     pub fn swi(&mut self) {
@@ -42,9 +42,9 @@ impl<S: ArmSystem> SysWrapper<S> {
                 (false, false) => addr.wrapping_sub(0x3C),
             };
             let value = self.cpur().pc() + self.cpur().inst_size();
-            self.write::<u32>(addr, value, NonSeq);
+            self.write::<u32>(addr, value, NONSEQ);
         } else if !S::IS_V5 {
-            let val = self.read::<u32>(addr, NonSeq);
+            let val = self.read::<u32>(addr, NONSEQ);
             self.set_pc(val);
         }
     }
@@ -61,7 +61,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     /// Idle for 1 cycle and set access type to non-sequential.
     pub fn idle_nonseq(&mut self) {
         self.add_i_cycles(1);
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
     }
 
     /// Calculate MUL instruction wait cycles for ARMv4.

@@ -12,7 +12,7 @@ use bitmatch::bitmatch;
 use common::numutil::{NumExt, U16Ext};
 
 use super::interface::{ArmSystem, SysWrapper};
-use crate::{registers::Flag::*, Access::*, Cpu};
+use crate::{access::*, registers::Flag::*, Cpu};
 
 pub type ThumbHandler<S> = fn(&mut SysWrapper<S>, ThumbInst);
 pub type ThumbLut<S> = [ThumbHandler<S>; 256];
@@ -196,7 +196,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         // LDR has +1I
         self.idle_nonseq();
         self.cpu().registers[d.us()] =
-            self.read_word_ldrswp(self.cpur().adj_pc() + (n.u32() << 2), NonSeq);
+            self.read_word_ldrswp(self.cpur().adj_pc() + (n.u32() << 2), NONSEQ);
     }
 
     // THUMB.7/8
@@ -206,22 +206,22 @@ impl<S: ArmSystem> SysWrapper<S> {
         let ro = self.cpu().low(inst.low(3));
         let rd = self.cpu().low(d);
         let addr = rb.wrapping_add(ro);
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
 
         match O {
-            0 => self.write::<u32>(addr, rd, NonSeq),       // STR
-            1 => self.write::<u16>(addr, rd.u16(), NonSeq), // STRH
-            2 => self.write::<u8>(addr, rd.u8(), NonSeq),   // STRB
-            3 => self.cpu().registers[d.us()] = self.read::<u8>(addr, NonSeq) as i8 as i32 as u32, /* LDSB */
-            4 => self.cpu().registers[d.us()] = self.read_word_ldrswp(addr, NonSeq), // LDR
-            5 => self.cpu().registers[d.us()] = self.read::<u16>(addr, NonSeq),      // LDRH
-            6 => self.cpu().registers[d.us()] = self.read::<u8>(addr, NonSeq).u32(), // LDRB
+            0 => self.write::<u32>(addr, rd, NONSEQ),       // STR
+            1 => self.write::<u16>(addr, rd.u16(), NONSEQ), // STRH
+            2 => self.write::<u8>(addr, rd.u8(), NONSEQ),   // STRB
+            3 => self.cpu().registers[d.us()] = self.read::<u8>(addr, NONSEQ) as i8 as i32 as u32, /* LDSB */
+            4 => self.cpu().registers[d.us()] = self.read_word_ldrswp(addr, NONSEQ), // LDR
+            5 => self.cpu().registers[d.us()] = self.read::<u16>(addr, NONSEQ),      // LDRH
+            6 => self.cpu().registers[d.us()] = self.read::<u8>(addr, NONSEQ).u32(), // LDRB
             // LDSH, needs special handling for unaligned reads which makes it behave as
             // LBSB
             _ if addr.is_bit(0) => {
-                self.cpu().registers[d.us()] = self.read::<u8>(addr, NonSeq) as i8 as i32 as u32;
+                self.cpu().registers[d.us()] = self.read::<u8>(addr, NONSEQ) as i8 as i32 as u32;
             }
-            _ => self.cpu().registers[d.us()] = self.read::<u16>(addr, NonSeq) as i16 as i32 as u32,
+            _ => self.cpu().registers[d.us()] = self.read::<u16>(addr, NONSEQ) as i16 as i32 as u32,
         }
         if O > 2 {
             // LDR has +1I
@@ -235,13 +235,13 @@ impl<S: ArmSystem> SysWrapper<S> {
         let rb = self.cpu().low(inst.low(3));
         let rd = self.cpu().low(d);
         let n = inst.0.bits(6, 5);
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
 
         match O {
-            0 => self.write::<u32>(rb + (n.u32() << 2), rd, NonSeq), // STR
-            1 => self.cpu().registers[d.us()] = self.read_word_ldrswp(rb + (n.u32() << 2), NonSeq), /* LDR */
-            2 => self.write::<u8>(rb + n.u32(), rd.u8(), NonSeq), // STRB
-            _ => self.cpu().registers[d.us()] = self.read::<u8>(rb + n.u32(), NonSeq).u32(), // LDRB
+            0 => self.write::<u32>(rb + (n.u32() << 2), rd, NONSEQ), // STR
+            1 => self.cpu().registers[d.us()] = self.read_word_ldrswp(rb + (n.u32() << 2), NONSEQ), /* LDR */
+            2 => self.write::<u8>(rb + n.u32(), rd.u8(), NONSEQ), // STRB
+            _ => self.cpu().registers[d.us()] = self.read::<u8>(rb + n.u32(), NONSEQ).u32(), // LDRB
         }
 
         if O.is_bit(0) {
@@ -258,14 +258,14 @@ impl<S: ArmSystem> SysWrapper<S> {
         let ro = n.u32() << 1; // Step 2
         let rd = self.cpu().low(d);
         let addr = rb + ro;
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
 
         if STR {
-            self.write::<u16>(addr, rd.u16(), NonSeq);
+            self.write::<u16>(addr, rd.u16(), NONSEQ);
         } else {
             // LDR has +1I
             self.add_i_cycles(1);
-            self.cpu().registers[d.us()] = self.read::<u16>(addr, NonSeq).u32();
+            self.cpu().registers[d.us()] = self.read::<u16>(addr, NONSEQ).u32();
         }
     }
 
@@ -275,8 +275,8 @@ impl<S: ArmSystem> SysWrapper<S> {
         let d = inst.low(8);
         let rd = self.low(d);
         let addr = self.cpur().sp() + (n.u32() << 2);
-        self.cpu().access_type = NonSeq;
-        self.write::<u32>(addr, rd, NonSeq);
+        self.cpu().access_type = NONSEQ;
+        self.write::<u32>(addr, rd, NONSEQ);
     }
 
     pub fn thumb_ldr_sp(&mut self, inst: ThumbInst) {
@@ -285,7 +285,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         // LDR has +1I
         self.idle_nonseq();
         self.cpu().registers[d.us()] =
-            self.read_word_ldrswp(self.cpur().sp() + (n.u32() << 2), NonSeq);
+            self.read_word_ldrswp(self.cpur().sp() + (n.u32() << 2), NONSEQ);
     }
 
     // THUMB.12
@@ -313,13 +313,13 @@ impl<S: ArmSystem> SysWrapper<S> {
     // THUMB.14
     pub fn thumb_push<const SP: bool>(&mut self, inst: ThumbInst) {
         let mut sp = self.cpu().sp();
-        let mut kind = NonSeq;
+        let mut kind = NONSEQ;
         // PUSH
         if SP {
             sp -= 4;
             let lr = self.cpur().lr();
             self.write::<u32>(sp, lr, kind);
-            kind = Seq;
+            kind = SEQ;
         }
 
         for reg in (0..8).rev() {
@@ -327,23 +327,23 @@ impl<S: ArmSystem> SysWrapper<S> {
                 sp -= 4;
                 let reg = self.cpur().registers[reg.us()];
                 self.write::<u32>(sp, reg, kind);
-                kind = Seq;
+                kind = SEQ;
             }
         }
-        assert!(kind == Seq);
+        assert!(kind == SEQ);
         self.cpu().set_sp(sp);
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
     }
 
     pub fn thumb_pop<const PC: bool>(&mut self, inst: ThumbInst) {
         let mut sp = self.cpu().sp();
-        let mut kind = NonSeq;
+        let mut kind = NONSEQ;
         // POP
         for reg in 0..8 {
             if inst.0.is_bit(reg) {
                 self.cpu().registers[reg.us()] = self.read::<u32>(sp, kind);
                 sp += 4;
-                kind = Seq;
+                kind = SEQ;
             }
         }
         if PC {
@@ -353,9 +353,9 @@ impl<S: ArmSystem> SysWrapper<S> {
             }
             self.set_pc(pc);
             sp += 4;
-            kind = Seq;
+            kind = SEQ;
         }
-        assert!(kind == Seq);
+        assert!(kind == SEQ);
         self.cpu().set_sp(sp);
         self.idle_nonseq();
     }
@@ -363,19 +363,19 @@ impl<S: ArmSystem> SysWrapper<S> {
     // THUMB.15
     pub fn thumb_stmia(&mut self, inst: ThumbInst) {
         let b = inst.low(8);
-        let mut kind = NonSeq;
+        let mut kind = NONSEQ;
         let mut base_rlist_addr = None;
         let mut rb = self.low(b);
         for reg in 0..8 {
             if inst.0.is_bit(reg) {
-                if reg == b && kind != NonSeq {
+                if reg == b && kind != NONSEQ {
                     base_rlist_addr = Some(self.low(b));
                 }
                 let reg = self.low(reg);
                 self.write::<u32>(rb, reg, kind);
                 rb = rb.wrapping_add(4);
                 self.cpu().registers[b.us()] = rb;
-                kind = Seq;
+                kind = SEQ;
             }
         }
         if let Some(addr) = base_rlist_addr {
@@ -383,24 +383,24 @@ impl<S: ArmSystem> SysWrapper<S> {
             // We ignore timing since this was already (wrongly) written in the loop above.
             self.set::<u32>(addr, rb);
         }
-        if kind == NonSeq {
+        if kind == NONSEQ {
             self.on_empty_rlist(b.u32(), true, true, false);
         }
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
     }
 
     pub fn thumb_ldmia(&mut self, inst: ThumbInst) {
         let b = inst.low(8);
-        let mut kind = NonSeq;
+        let mut kind = NONSEQ;
         for reg in 0..8 {
             if inst.0.is_bit(reg) {
                 let addr = self.low(b);
                 self.cpu().registers[reg.us()] = self.read::<u32>(addr, kind);
                 self.cpu().registers[b.us()] = self.low(b).wrapping_add(4);
-                kind = Seq;
+                kind = SEQ;
             }
         }
-        if kind == NonSeq {
+        if kind == NONSEQ {
             self.on_empty_rlist(b.u32(), false, true, false);
         }
         self.idle_nonseq();

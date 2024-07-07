@@ -9,6 +9,7 @@
 use std::mem;
 
 use arm_cpu::{
+    access::{DMA, NONSEQ, SEQ},
     interface::{ArmSystem, RwType},
     Access, Cpu, Interrupt,
 };
@@ -175,7 +176,7 @@ impl Dmas {
             return;
         }
 
-        let mut kind = Access::NonSeq;
+        let mut kind = NONSEQ | DMA;
         if channel.src >= 0x200_0000 {
             // First, align SRC/DST
             let align = T::WIDTH - 1;
@@ -189,7 +190,7 @@ impl Dmas {
                 channel.src = channel.src.wrapping_add_signed(src_mod);
                 channel.dst = channel.dst.wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
-                kind = Access::Seq;
+                kind = SEQ | DMA;
                 gg.advance_clock();
             }
 
@@ -212,7 +213,7 @@ impl Dmas {
                 channel.src = channel.src.wrapping_add_signed(src_mod);
                 channel.dst = channel.dst.wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
-                kind = Access::Seq;
+                kind = SEQ | DMA;
                 gg.advance_clock();
             }
         }

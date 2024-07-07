@@ -7,6 +7,7 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use arm_cpu::{
+    access::NONSEQ,
     interface::{ArmSystem, RwType},
     Access, Cpu, Exception,
 };
@@ -34,17 +35,12 @@ impl ArmSystem for GameGirlAdv {
 
     fn add_sn_cycles(&mut self, cycles: u16) {
         self.scheduler.advance(cycles as Time);
+        self.step_prefetch(cycles);
     }
 
     fn add_i_cycles(&mut self, cycles: u16) {
         self.scheduler.advance(cycles as Time);
-        if self.cpu.pc() > 0x800_0000 {
-            if self.memory.waitcnt.is_bit(14) {
-                self.memory.prefetch_len += 1;
-            } else {
-                self.cpu.access_type = Access::NonSeq;
-            }
-        }
+        self.step_prefetch(cycles);
     }
 
     fn exception_happened(&mut self, kind: Exception) {

@@ -130,7 +130,7 @@ impl Core for GameGirlAdv {
 }
 
 impl GameGirlAdv {
-    /// Advance everything but the CPU by a clock cycle.
+    /// Advance everything but the CPU.
     fn advance_clock(&mut self) {
         if self.scheduler.has_events() {
             while let Some(event) = self.scheduler.get_next_pending() {

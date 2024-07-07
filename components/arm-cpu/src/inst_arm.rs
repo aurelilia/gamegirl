@@ -13,8 +13,8 @@ use common::numutil::{NumExt, U32Ext};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{
+    access::*,
     registers::{Flag::*, Mode},
-    Access::*,
     Cpu,
 };
 
@@ -201,15 +201,15 @@ impl<S: ArmSystem> SysWrapper<S> {
         let m = inst.reg(0);
         let addr = self.reg(n);
         let mem_value = if byte {
-            self.read::<u8>(addr, NonSeq).u32()
+            self.read::<u8>(addr, NONSEQ).u32()
         } else {
-            self.read_word_ldrswp(addr, NonSeq)
+            self.read_word_ldrswp(addr, NONSEQ)
         };
         let reg = self.reg(m);
         if byte {
-            self.write::<u8>(addr, reg.u8(), NonSeq);
+            self.write::<u8>(addr, reg.u8(), NONSEQ);
         } else {
-            self.write::<u32>(addr, reg, NonSeq);
+            self.write::<u32>(addr, reg, NONSEQ);
         }
         self.set_reg(d, mem_value);
         self.idle_nonseq();
@@ -271,7 +271,7 @@ impl<S: ArmSystem> SysWrapper<S> {
             addr = Self::mod_with_offs(addr, 4, !pre);
             addr = addr.wrapping_sub(end_offs);
         }
-        let mut kind = NonSeq;
+        let mut kind = NONSEQ;
         let mut set_n = false;
 
         for reg in regs {
@@ -291,7 +291,7 @@ impl<S: ArmSystem> SysWrapper<S> {
                 self.write::<u32>(addr, val, kind);
             }
 
-            kind = Seq;
+            kind = SEQ;
             if !pre {
                 addr = addr.wrapping_add(4);
             }
@@ -304,10 +304,10 @@ impl<S: ArmSystem> SysWrapper<S> {
         if user {
             self.cpu().set_cpsr(cpsr);
         }
-        if kind == NonSeq {
+        if kind == NONSEQ {
             self.on_empty_rlist(n, !ldr, up, pre);
         }
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
         if ldr {
             // All LDR stall by 1I
             self.add_i_cycles(1);
@@ -539,34 +539,34 @@ impl<S: ArmSystem> SysWrapper<S> {
         match (str, width) {
             (true, 4) => {
                 let val = self.cpur().reg_pc4(d);
-                self.write::<u32>(addr, val, NonSeq);
+                self.write::<u32>(addr, val, NONSEQ);
             }
             (true, 2) => {
                 let val = (self.cpur().reg_pc4(d) & 0xFFFF).u16();
-                self.write::<u16>(addr, val, NonSeq);
+                self.write::<u16>(addr, val, NONSEQ);
             }
             (true, _) => {
                 let val = (self.cpur().reg_pc4(d) & 0xFF).u8();
-                self.write::<u8>(addr, val, NonSeq);
+                self.write::<u8>(addr, val, NONSEQ);
             }
             (false, 4) if ALIGN => {
-                let val = self.read::<u32>(addr, NonSeq);
+                let val = self.read::<u32>(addr, NONSEQ);
                 self.set_reg(d, val);
             }
             (false, 4) => {
-                let val = self.read_word_ldrswp(addr, NonSeq);
+                let val = self.read_word_ldrswp(addr, NONSEQ);
                 self.set_reg(d, val);
             }
             (false, 2) if ALIGN => {
-                let val = self.read::<u16>(addr, NonSeq);
+                let val = self.read::<u16>(addr, NONSEQ);
                 self.set_reg(d, val);
             }
             (false, 2) => {
-                let val = self.read_hword_ldrsh(addr, NonSeq);
+                let val = self.read_hword_ldrsh(addr, NONSEQ);
                 self.set_reg(d, val);
             }
             (false, _) => {
-                let val = self.read::<u8>(addr, NonSeq).u32();
+                let val = self.read::<u8>(addr, NONSEQ).u32();
                 self.set_reg(d, val);
             }
         }
@@ -579,7 +579,7 @@ impl<S: ArmSystem> SysWrapper<S> {
             self.set_reg(n, addr);
         }
 
-        self.cpu().access_type = NonSeq;
+        self.cpu().access_type = NONSEQ;
         if !str {
             // All LDR stall by 1I
             self.add_i_cycles(1);

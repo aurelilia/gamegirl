@@ -19,8 +19,9 @@ pub mod interface;
 mod lut;
 pub mod registers;
 
-use std::sync::Arc;
+use std::{sync::Arc, u8};
 
+use access::{CODE, NONSEQ, SEQ};
 use common::{components::debugger::Severity, numutil::NumExt};
 
 use crate::{
@@ -216,13 +217,13 @@ impl<S: ArmSystem> Cpu<S> {
     /// Fetch the next instruction of the CPU.
     fn fetch_next_inst<TY: RwType>(gg: &mut S) -> (u32, u16, u32) {
         let pc = gg.cpu().inc_pc_by(TY::WIDTH);
-        let sn_cycles = gg.wait_time::<TY>(gg.cpur().pc(), gg.cpur().access_type);
+        let sn_cycles = gg.wait_time::<TY>(gg.cpur().pc(), gg.cpur().access_type | CODE);
         gg.add_sn_cycles(sn_cycles);
 
         let inst = gg.cpu().pipeline[0];
         gg.cpu().pipeline[0] = gg.cpu().pipeline[1];
         gg.cpu().pipeline[1] = gg.get::<TY>(gg.cpur().pc()).u32();
-        gg.cpu().access_type = Access::Seq;
+        gg.cpu().access_type = SEQ;
 
         Self::trace_inst::<TY>(gg, inst);
         (inst, sn_cycles, pc)
@@ -288,19 +289,19 @@ impl<S: ArmSystem> Cpu<S> {
         // gg.memory.prefetch_len = 0; // Discard prefetch
         gg.pipeline_stalled();
         if gg.cpu().flag(Thumb) {
-            let time = gg.wait_time::<u16>(gg.cpur().pc(), Access::NonSeq);
+            let time = gg.wait_time::<u16>(gg.cpur().pc(), NONSEQ | CODE);
             gg.add_sn_cycles(time);
             gg.cpu().inc_pc_by(2);
-            let time = gg.wait_time::<u16>(gg.cpur().pc(), Access::Seq);
+            let time = gg.wait_time::<u16>(gg.cpur().pc(), SEQ | CODE);
             gg.add_sn_cycles(time);
         } else {
-            let time = gg.wait_time::<u32>(gg.cpur().pc(), Access::NonSeq);
+            let time = gg.wait_time::<u32>(gg.cpur().pc(), NONSEQ | CODE);
             gg.add_sn_cycles(time);
             gg.cpu().inc_pc_by(4);
-            let time = gg.wait_time::<u32>(gg.cpur().pc(), Access::Seq);
+            let time = gg.wait_time::<u32>(gg.cpur().pc(), SEQ | CODE);
             gg.add_sn_cycles(time);
         };
-        gg.cpu().access_type = Access::Seq;
+        gg.cpu().access_type = SEQ;
         gg.cpu().block_ended = true;
         gg.cpu().pipeline_valid = false;
     }
@@ -359,7 +360,7 @@ impl<S: ArmSystem> Default for Cpu<S> {
             spsr: ModeReg::default(),
             registers: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
             pipeline: [0; 2],
-            access_type: Access::NonSeq,
+            access_type: NONSEQ,
             is_halted: false,
             block_ended: false,
             pipeline_valid: false,
@@ -434,9 +435,12 @@ impl Exception {
 /// Enum for the types of memory accesses; either sequential
 /// or non-sequential. The numbers assigned to the variants are
 /// to speed up reading the wait times in `memory.rs`.
-#[derive(Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub enum Access {
-    Seq = 0,
-    NonSeq = 16,
+pub type Access = u8;
+
+pub mod access {
+    use crate::Access;
+    pub const NONSEQ: Access = 0;
+    pub const SEQ: Access = 1 << 0;
+    pub const CODE: Access = 1 << 1;
+    pub const DMA: Access = 1 << 2;
 }
