@@ -46,7 +46,7 @@ pub struct Cpu<S: ArmSystem + 'static> {
     pub spsr: ModeReg,
 
     pub registers: [u32; 16],
-    pipeline: [u32; 2],
+    pub pipeline: [u32; 2],
     pub access_type: Access,
     pub is_halted: bool,
 

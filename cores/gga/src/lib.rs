@@ -113,7 +113,7 @@ impl Core for GameGirlAdv {
     }
 
     fn get_memory(&self, addr: usize) -> u8 {
-        self.get_byte(addr as u32)
+        self.get(addr as u32)
     }
 
     fn get_registers(&self) -> Vec<usize> {
@@ -141,10 +141,10 @@ impl GameGirlAdv {
 
     pub fn get_inst_mnemonic(&self, ptr: u32) -> String {
         if self.cpu.flag(Flag::Thumb) {
-            let inst = self.get_hword(ptr);
+            let inst = self.get(ptr);
             Cpu::<Self>::get_mnemonic_thumb(inst)
         } else {
-            let inst = self.get_word(ptr);
+            let inst = self.get(ptr);
             Cpu::<Self>::get_mnemonic_arm(inst)
         }
     }

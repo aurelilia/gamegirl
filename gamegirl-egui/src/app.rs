@@ -272,6 +272,8 @@ impl App {
                                 vtable,
                             ) as *mut _)
                         };
+
+                        println!("Loaded core: {path:?}");
                     }
                 }
             }

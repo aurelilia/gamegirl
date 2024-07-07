@@ -66,11 +66,7 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn get<T: RwType>(&mut self, addr: u32) -> T {
-        match T::WIDTH {
-            1 => T::from_u8(self.get_byte(addr)),
-            2 => T::from_u16(self.get_hword(addr)),
-            _ => T::from_u32(self.get_word(addr)),
-        }
+        GameGirlAdv::get(self, addr)
     }
 
     fn set<T: RwType>(&mut self, addr: u32, value: T) {

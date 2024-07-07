@@ -93,7 +93,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
             for _ in 0..0xF {
                 ui.add(
                     Label::new(
-                        RichText::new(format!("0x{:08X} - {:08X}", sp, gg.get_word(sp)))
+                        RichText::new(format!("0x{:08X} - {:08X}", sp, gg.get::<u32>(sp)))
                             .monospace(),
                     )
                     .wrap(false),
@@ -471,7 +471,7 @@ fn obj_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
 }
 
 /// Window showing PPU state.
-fn ppu_registers(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Context) {
+fn ppu_registers(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     let cnt = gg.ppu.regs.dispcnt;
     ui.collapsing("Display Control", |ui| {
         ui.label(format!("BG Mode: {:?}", cnt.bg_mode()));

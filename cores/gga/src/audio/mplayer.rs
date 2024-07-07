@@ -106,7 +106,7 @@ pub struct MusicPlayer {
 
 impl MusicPlayer {
     pub fn pc_match(gg: &mut GameGirlAdv) {
-        let addr = gg.get_word(0x300_7FF0);
+        let addr = gg.get(0x300_7FF0);
         if addr != 0 {
             gg.apu.mplayer.sound_main_ram(&mut gg.memory.mapper, addr);
         }

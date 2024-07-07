@@ -9,6 +9,7 @@
 use std::ptr;
 
 use arm_cpu::{
+    interface::RwType,
     registers::Flag,
     Access::{self, *},
     Cpu, Interrupt,
@@ -22,7 +23,7 @@ use common::{
 };
 
 use super::audio;
-use crate::{addr::*, dma::Dmas, input::KeyControl, timer::Timers, Apu, GameGirlAdv};
+use crate::{addr::*, dma::Dmas, input::KeyControl, Apu, GameGirlAdv};
 
 pub const KB: usize = 1024;
 pub const BIOS: &[u8] = include_bytes!("bios.bin");
@@ -49,86 +50,50 @@ pub struct Memory {
 }
 
 impl GameGirlAdv {
-    /// Read a byte from the bus. Does no timing-related things; simply fetches
-    /// the value.
-    #[inline]
-    pub fn get_byte(&self, addr: u32) -> u8 {
+    pub fn get<T: RwType>(&self, addr: u32) -> T {
+        let addr = addr & !(T::WIDTH - 1);
         self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
             match addr {
+                // BIOS
                 0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
-                0x0000_0000..=0x0000_3FFF => self.memory.bios_value.u8(),
+                0x0000_0000..=0x0000_3FFF => T::from_u32(self.memory.bios_value),
 
-                0x0400_0000..=0x04FF_FFFF if addr.is_bit(0) => self.get_mmio(addr).high(),
-                0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr).low(),
+                // MMIO
+                0x0400_0000..=0x04FF_FFFF => match T::WIDTH {
+                    1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
+                    1 => T::from_u8(self.get_mmio(addr).low()),
+                    2 => T::from_u16(self.get_mmio(addr)),
+                    4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
+                    _ => unreachable!(),
+                },
 
-                0x0E00_0000..=0x0FFF_FFFF => self.cart.read_ram_byte(addr.us() & 0xFFFF),
-                // Account for unmapped last page due to EEPROM
-                0x0DFF_8000..=0x0DFF_FFFF if self.cart.rom.len() >= (addr.us() - 0x800_0000) => {
-                    self.cart.rom[addr.us() - 0x800_0000]
-                }
-
-                _ => self.invalid_read::<false>(addr).u8(),
-            }
-        })
-    }
-
-    /// Read a half-word from the bus (LE). Does no timing-related things;
-    /// simply fetches the value.
-    #[inline]
-    pub(super) fn get_hword(&self, addr: u32) -> u16 {
-        let addr = addr & !1;
-        self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
-            match addr {
-                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
-                0x0000_0000..=0x0000_3FFF => self.memory.bios_value.u16(),
-
-                0x0400_0000..=0x04FF_FFFF => self.get_mmio(addr),
-
-                // If EEPROM, use that...
-                0x0D00_0000..=0x0DFF_FFFF if self.cart.is_eeprom_at(addr) => {
-                    self.cart.read_ram_hword()
-                }
-                // If not, account for unmapped last page due to EEPROM
-                0x0DFF_8000..=0x0DFF_FFFF => hword(self.get_byte(addr), self.get_byte(addr + 1)),
-
-                // Other saves
+                // Cart save
+                // Flash / SRAM
                 0x0E00_0000..=0x0FFF_FFFF => {
-                    // Reading halfwords causes the byte to be repeated
+                    // Reading [half]words causes the byte to be repeated
                     let byte = self.cart.read_ram_byte(addr.us() & 0xFFFF);
-                    hword(byte, byte)
+                    match T::WIDTH {
+                        1 => T::from_u8(byte),
+                        2 => T::from_u16(hword(byte, byte)),
+                        4 => T::from_u32(word(hword(byte, byte), hword(byte, byte))),
+                        _ => unreachable!(),
+                    }
                 }
-
-                _ => self.invalid_read::<false>(addr).u16(),
-            }
-        })
-    }
-
-    /// Read a word from the bus (LE). Does no timing-related things; simply
-    /// fetches the value. Also does not handle unaligned reads.
-    #[inline]
-    pub fn get_word(&self, addr: u32) -> u32 {
-        let addr = addr & !3;
-        self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
-            match addr {
-                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
-                0x0000_0000..=0x0000_3FFF => self.memory.bios_value,
-
-                0x0400_0000..=0x04FF_FFFF => {
-                    word(self.get_mmio(addr), self.get_mmio(addr.wrapping_add(2)))
+                // EEPROM
+                0x0D00_0000..=0x0DFF_FFFF if T::WIDTH == 2 && self.cart.is_eeprom_at(addr) => {
+                    T::from_u16(self.cart.read_ram_hword())
                 }
 
                 // Account for unmapped last page due to EEPROM
-                0x0DFF_8000..=0x0DFF_FFFF => word(self.get_hword(addr), self.get_hword(addr + 2)),
+                0x0DFF_8000..=0x0DFF_FFFF
+                    if self.cart.rom.len() >= (addr.us() - 0x800_0001 + T::WIDTH.us()) =>
+                unsafe {
+                    let ptr = self.cart.rom.as_ptr().add(addr.us() - 0x800_0000);
+                    ptr.cast::<T>().read()
+                },
 
-                // Other saves
-                0x0E00_0000..=0x0FFF_FFFF => {
-                    // Reading words causes the byte to be repeated
-                    let byte = self.cart.read_ram_byte(addr.us() & 0xFFFF);
-                    let hword = hword(byte, byte);
-                    word(hword, hword)
-                }
-
-                _ => self.invalid_read::<true>(addr),
+                _ if T::WIDTH == 4 => T::from_u32(self.invalid_read::<true>(addr)),
+                _ => T::from_u32(self.invalid_read::<false>(addr)),
             }
         })
     }
@@ -222,12 +187,13 @@ impl GameGirlAdv {
     }
 
     fn invalid_read<const WORD: bool>(&self, addr: u32) -> u32 {
-        match addr {
+        let shift = (addr & 3) << 3;
+        let value = match addr {
             0x0800_0000..=0x0DFF_FFFF => {
                 // Out of bounds ROM read
                 let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
                 let low = addr.u16();
-                word(low, low.wrapping_add(1))
+                return word(low, low.wrapping_add(1));
             }
 
             _ if self.cpu.pc() == self.dma.pc_at_last_end => self.dma.cache,
@@ -243,31 +209,27 @@ impl GameGirlAdv {
 
                 if !self.cpu.flag(Flag::Thumb) {
                     // Simple case: just read PC in ARM mode
-                    self.get_word(self.cpu.pc())
+                    self.get(self.cpu.pc())
                 } else {
                     // Thumb mode... complicated.
                     // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
                     match self.cpu.pc() >> 24 {
                         0x02 | 0x05 | 0x06 | 0x08..=0xD => {
-                            let hword = self.get_hword(self.cpu.pc());
+                            let hword = self.get(self.cpu.pc());
                             word(hword, hword)
                         }
-                        _ if self.cpu.pc().is_bit(1) => word(
-                            self.get_hword(self.cpu.pc() - 2),
-                            self.get_hword(self.cpu.pc()),
-                        ),
-                        0x00 | 0x07 => word(
-                            self.get_hword(self.cpu.pc()),
-                            self.get_hword(self.cpu.pc() + 2),
-                        ),
-                        _ => word(
-                            self.get_hword(self.cpu.pc()),
-                            self.get_hword(self.cpu.pc() - 2),
-                        ),
+                        _ if self.cpu.pc().is_bit(1) => {
+                            word(self.get(self.cpu.pc() - 2), self.get(self.cpu.pc()))
+                        }
+                        0x00 | 0x07 => word(self.get(self.cpu.pc()), self.get(self.cpu.pc() + 2)),
+                        0x03 => word(self.get(self.cpu.pc()), self.get(self.cpu.pc() - 2)),
+
+                        _ => unreachable!(),
                     }
                 }
             }
-        }
+        };
+        value >> shift
     }
 
     /// Write a byte to the bus. Does no timing-related things; simply sets the
@@ -409,9 +371,9 @@ impl GameGirlAdv {
 
             // Treat as halfword
             _ if addr.is_bit(0) => {
-                self.set_hword(addr, self.get_hword(addr).set_high(value));
+                self.set_hword(addr, self.get::<u16>(addr).set_high(value));
             }
-            _ => self.set_hword(addr, self.get_hword(addr).set_low(value)),
+            _ => self.set_hword(addr, self.get::<u16>(addr).set_low(value)),
         }
     }
 
