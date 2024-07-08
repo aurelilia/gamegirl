@@ -284,7 +284,7 @@ impl GameGirlAdv {
 
         match addr {
             // MMIO
-            0x0400_0000..=0x04FF_FFFF if T::WIDTH == 1 => self.set_mmio_byte(addr, value.u8()),
+            0x0400_0000..=0x0400_0301 if T::WIDTH == 1 => self.set_mmio_byte(addr, value.u8()),
             0x0400_0000..=0x0400_0300 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
             0x0400_0000..=0x0400_0300 if T::WIDTH == 4 => {
                 self.set_mmio(addr, value.u16());

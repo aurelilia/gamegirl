@@ -93,9 +93,10 @@ impl PpuRegisters {
         }
     }
 
-    pub fn write_mmio_byte(&mut self, addr: u32, value: u8) {
-        let var = self.get_mmio_inner(addr & !1);
-        if addr.is_bit(0) {
+    pub fn write_mmio_byte(&mut self, addr_unalign: u32, value: u8) {
+        let addr = addr_unalign & !1;
+        let var = self.get_mmio_inner(addr);
+        if addr_unalign.is_bit(0) {
             self.write_mmio(addr, var.set_high(value));
         } else {
             self.write_mmio(addr, var.set_low(value));
