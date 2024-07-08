@@ -9,7 +9,7 @@
     <title>gamegirl</title>
 
     <!-- config for our rust wasm binary. go to https://trunkrs.dev/assets/#rust for more customization -->
-    <link data-trunk rel="rust" data-wasm-opt="2" />
+    <link data-trunk rel="rust" data-wasm-opt="2" data-target-name="gamegirl_bin" />
     <!-- this is the base url relative to which other urls will be constructed. trunk will insert this from the public-url option -->
     <base data-trunk-public-url />
 
@@ -22,7 +22,6 @@
 
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#404040">
-    <link rel="apple-touch-icon" href="icon_ios_touch_192.png">
 
     <style>
         html {
@@ -54,15 +53,16 @@
             width: 100%;
         }
 
-        /* Position canvas in center-top: */
+        /* Make canvas fill entire document: */
         canvas {
             margin-right: auto;
             margin-left: auto;
             display: block;
             position: absolute;
-            top: 0%;
-            left: 50%;
-            transform: translate(-50%, 0%);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
 
         .centered {
@@ -115,6 +115,14 @@
     <!-- The WASM code will resize the canvas dynamically -->
     <!-- the id is hardcoded in main.rs; make sure both match. -->
     <canvas id="the_canvas_id"></canvas>
+
+    <!-- the loading spinner will be removed in main.rs -->
+    <div class="centered" id="loading_text">
+        <p style="font-size:16px">
+            Loading…
+        </p>
+        <div class="lds-dual-ring"></div>
+    </div>
 </body>
 
 </html>

@@ -17,8 +17,6 @@ modular-bitfield.workspace = true
 bitflags.workspace = true
 
 elf_rs = "0.3.1"
-rubato = "0.15.0"
-
 
 [features]
 default = []

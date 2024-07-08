@@ -72,7 +72,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
                         .monospace()
                         .color(Colour::GREEN),
                 )
-                .wrap(false),
+                .extend(),
             );
             pc += gg.cpu.inst_size();
             for _ in 0..0xF {
@@ -81,14 +81,14 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
                         RichText::new(format!("0x{:08X} {}", pc, gg.get_inst_mnemonic(pc)))
                             .monospace(),
                     )
-                    .wrap(false),
+                    .extend(),
                 );
                 pc += gg.cpu.inst_size();
             }
         });
         ui.separator();
         ui.vertical(|ui| {
-            ui.add(Label::new(RichText::new("Stack:").monospace()).wrap(false));
+            ui.add(Label::new(RichText::new("Stack:").monospace()).extend());
             let mut sp = gg.cpu.sp();
             for _ in 0..0xF {
                 ui.add(
@@ -96,7 +96,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
                         RichText::new(format!("0x{:08X} - {:08X}", sp, gg.get::<u32>(sp)))
                             .monospace(),
                     )
-                    .wrap(false),
+                    .extend(),
                 );
                 sp = sp.wrapping_add(4);
             }
@@ -111,7 +111,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
             ui.monospace(format!("LR  = {:08X}", gg.cpu.lr()));
             ui.add(
                 Label::new(RichText::new(format!("PC  = {:08X} ", gg.cpu.pc())).monospace())
-                    .wrap(false),
+                    .extend(),
             );
         });
     });

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 gamegirl = { path = "../../gamegirl", features = ["ggc", "gga"] }
 png = "0.17"
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 zip = "2.1"
-rayon = "1.5"
+rayon = "1.10"
 indicatif = "0.17"

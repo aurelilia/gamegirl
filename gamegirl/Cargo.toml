@@ -15,7 +15,7 @@ gga = { path = "../cores/gga", optional = true }
 nds = { path = "../cores/nds", optional = true }
 psx = { path = "../cores/psx", optional = true }
 nes = { path = "../cores/nes", optional = true }
-log = "0.4.21"
+log = "0.4.22"
 
 gdbstub = { version = "0.7.1", optional = true }
 gdbstub_arch = { version = "0.3.0", optional = true }
@@ -26,17 +26,10 @@ notify = { version = "6.1.1", optional = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-zstd = { version = "0.13.0", default-features = false, features = ["wasm"] }
 web-sys = { version = "0.3.69", features = ["Storage", "Window"] }
-base64 = "0.22.0"
+base64 = "0.22.1"
 
 [features]
-serde = [
-    "common/serde",
-    "ggc/serde",
-    "gga/serde",
-    "nes/serde",
-    "psx/serde",
-]
+serde = ["common/serde", "ggc?/serde", "gga?/serde", "nes?/serde", "psx?/serde"]
 remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch"]
 dynamic = ["dep:libloading", "dep:notify"]

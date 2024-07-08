@@ -91,7 +91,7 @@ pub enum CgbMode {
 
 /// Serialize an object that can be loaded with [deserialize].
 /// It is (optionally zstd-compressed) bincode.
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "zstd"))]
 pub fn serialize<T: serde::Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
     if with_zstd {
         let mut dest = vec![];
@@ -106,7 +106,7 @@ pub fn serialize<T: serde::Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
 
 /// Deserialize an object that was made with [serialize].
 /// It is (optionally zstd-compressed) bincode.
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "zstd"))]
 pub fn deserialize<T: serde::de::DeserializeOwned>(state: &[u8], with_zstd: bool) -> T {
     if with_zstd {
         let decoder = zstd::stream::Decoder::new(state).unwrap();
@@ -114,4 +114,17 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(state: &[u8], with_zstd: bool
     } else {
         bincode::deserialize(state).unwrap()
     }
+}
+/// Serialize an object that can be loaded with [deserialize].
+/// It is (optionally zstd-compressed) bincode.
+#[cfg(all(feature = "serde", not(feature = "zstd")))]
+pub fn serialize<T: serde::Serialize>(thing: &T, _with_zstd: bool) -> Vec<u8> {
+    bincode::serialize(thing).unwrap()
+}
+
+/// Deserialize an object that was made with [serialize].
+/// It is (optionally zstd-compressed) bincode.
+#[cfg(all(feature = "serde", not(feature = "zstd")))]
+pub fn deserialize<T: serde::de::DeserializeOwned>(state: &[u8], with_zstd: bool) -> T {
+    bincode::deserialize(state).unwrap()
 }

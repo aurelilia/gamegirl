@@ -62,7 +62,7 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
                         .monospace()
                         .color(Colour::GREEN),
                 )
-                .wrap(false),
+                .extend(),
             );
             pc += inst.size().u16();
             for _ in 0..0xF {
@@ -73,14 +73,14 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
                         RichText::new(format!("0x{:04X} {}", pc, inst.formatted_name(arg)))
                             .monospace(),
                     )
-                    .wrap(false),
+                    .extend(),
                 );
                 pc += inst.size().u16();
             }
         });
         ui.separator();
         ui.vertical(|ui| {
-            ui.add(Label::new(RichText::new("Stack:").monospace()).wrap(false));
+            ui.add(Label::new(RichText::new("Stack:").monospace()).extend());
             let mut sp = gg.cpu.sp;
             for _ in 0..0xF {
                 ui.add(
@@ -88,7 +88,7 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
                         RichText::new(format!("0x{:04X} - {:04X}", sp, gg.get::<u16>(sp)))
                             .monospace(),
                     )
-                    .wrap(false),
+                    .extend(),
                 );
                 sp = sp.wrapping_add(2);
             }
@@ -105,7 +105,7 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
             ui.separator();
             ui.add(
                 Label::new(RichText::new(format!("IME = {}", gg.cpu.ime as u8)).monospace())
-                    .wrap(false),
+                    .extend(),
             );
             ui.monospace(format!("IF = {:05b}", gg[IF] & 0x1F));
             ui.monospace(format!("IE = {:05b}", gg[IE] & 0x1F));
@@ -171,7 +171,7 @@ fn memory(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
                 write!(&mut buf, " {:02X}", gg.get::<u8>(row_start + offset)).unwrap();
             }
 
-            let label = ui.add(Label::new(RichText::new(&buf).monospace()).wrap(false));
+            let label = ui.add(Label::new(RichText::new(&buf).monospace()).extend());
             if position == Some(row_start) {
                 ui.scroll_to_rect(label.rect, Some(Align::Min));
             }

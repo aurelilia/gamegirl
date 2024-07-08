@@ -46,7 +46,7 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
                         .monospace()
                         .color(Colour::GREEN),
                 )
-                .wrap(false),
+                .extend(),
             );
             pc += 4;
             for _ in 0..0x1F {
@@ -56,7 +56,7 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
                         RichText::new(format!("0x{:08X} {}", pc, PlayStation::get_mnemonic(inst)))
                             .monospace(),
                     )
-                    .wrap(false),
+                    .extend(),
                 );
                 pc += 4;
             }
@@ -70,8 +70,7 @@ fn debugger(ps: &mut PlayStation, ui: &mut Ui, _: &mut App, _: &Context) {
             ui.monospace(format!("HI  = {:08X}", ps.cpu.hi));
             ui.monospace(format!("LO  = {:08X}", ps.cpu.lo));
             ui.add(
-                Label::new(RichText::new(format!("PC  = {:08X} ", ps.cpu.pc)).monospace())
-                    .wrap(false),
+                Label::new(RichText::new(format!("PC  = {:08X} ", ps.cpu.pc)).monospace()).extend(),
             );
         });
     });

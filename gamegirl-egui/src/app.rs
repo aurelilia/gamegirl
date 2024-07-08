@@ -302,7 +302,6 @@ impl App {
         #[cfg(feature = "dynamic")]
         let tx2 = tx.clone();
 
-        catppuccin_egui::set_theme(&ctx.egui_ctx, catppuccin_egui::MOCHA);
         Box::new(App {
             core,
             current_rom_path: None,
