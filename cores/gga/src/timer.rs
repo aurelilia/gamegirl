@@ -50,12 +50,7 @@ pub struct Timers {
 impl Timers {
     /// Handle overflow of a scheduled timer.
     pub fn handle_overflow_event(gg: &mut GameGirlAdv, idx: u8, late_by: TimeS) {
-        // Handle overflow
-        let until_ov = Self::overflow(gg, idx) as TimeS;
-        // Reschedule event
-        gg.timers.scheduled_at[idx.us()] = gg.scheduler.now() - late_by as Time + 2;
-        gg.scheduler
-            .schedule(AdvEvent::TimerOverflow(idx), until_ov - late_by);
+        Self::overflow(gg, idx, -late_by);
     }
 
     /// Read current time of the given timer. Might be a bit expensive, since
@@ -95,18 +90,37 @@ impl Timers {
                 // Reload counter.
                 self.counters[timer] = self.reload[timer];
             }
-
-            // Need to start scheduling this timer
-            let until_ov = Self::next_overflow_time(self.counters[timer], new_ctrl);
-            self.scheduled_at[timer] = now + 2;
-            sched.schedule(AdvEvent::TimerOverflow(timer.u8()), until_ov as TimeS);
+            self.start_timer(sched, timer, new_ctrl, 2, 0);
         }
 
         self.control[timer] = new_ctrl;
     }
 
+    fn start_timer(
+        &mut self,
+        sched: &mut Scheduler<AdvEvent>,
+        timer: usize,
+        new_ctrl: TimerCtrl,
+        mut base_offset: TimeS,
+        mut timer_offset: TimeS,
+    ) {
+        let (until_ov, mask) = Self::overflow_time(self.counters[timer], new_ctrl);
+        if until_ov == 1 {
+            // Bit of a hack.
+            timer_offset += 1;
+        }
+        self.scheduled_at[timer] = sched
+            .now()
+            .wrapping_add_signed(base_offset)
+            .wrapping_add_signed(timer_offset);
+        sched.schedule(
+            AdvEvent::TimerOverflow(timer.u8()),
+            until_ov as TimeS + base_offset + 3,
+        );
+    }
+
     /// Handle an overflow and return time until next.
-    fn overflow(gg: &mut GameGirlAdv, idx: u8) -> u32 {
+    fn overflow(gg: &mut GameGirlAdv, idx: u8, offset: TimeS) {
         let ctrl = gg.timers.control[idx.us()];
         let reload = gg.timers.reload[idx.us()];
         // Set to reload value
@@ -131,13 +145,23 @@ impl Timers {
             Self::inc_timer(gg, idx.us() + 1);
         }
 
-        Self::next_overflow_time(reload, ctrl)
+        if !ctrl.count_up() {
+            Self::start_timer(
+                &mut gg.timers,
+                &mut gg.scheduler,
+                idx.us(),
+                ctrl,
+                offset,
+                -7,
+            )
+        }
     }
 
-    /// Time until next overflow, for scheduling.
-    fn next_overflow_time(reload: u16, ctrl: TimerCtrl) -> u32 {
+    /// Time until an overflow, for scheduling.
+    /// Second return is the prescaler mask.
+    fn overflow_time(reload: u16, ctrl: TimerCtrl) -> (u32, u32) {
         let scaler = DIVS[ctrl.prescaler().us()].u32();
-        (scaler * (0x1_0000 - reload.u32())) + 6
+        ((scaler * (0x1_0000 - reload.u32())), (scaler - 1))
     }
 
     /// Increment a timer. Used for cascading timers.
@@ -147,7 +171,7 @@ impl Timers {
         match new {
             Some(val) => gg.timers.counters[idx] = val,
             None => {
-                Self::overflow(gg, idx.u8());
+                Self::overflow(gg, idx.u8(), 0);
             }
         }
     }
