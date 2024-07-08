@@ -97,8 +97,10 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         ComboBox::from_label("GUI Style")
             .selected_text(format!("{:?}", opt.gui_style))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut opt.gui_style, GuiStyle::SingleWindow, "SingleWindow");
-                ui.selectable_value(&mut opt.gui_style, GuiStyle::MultiWindow, "MultiWindow");
+                ui.selectable_value(&mut opt.gui_style, GuiStyle::OnTop, "Windows on top of game");
+                ui.selectable_value(&mut opt.gui_style, GuiStyle::AllWindows, "Everything in windows");
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.selectable_value(&mut opt.gui_style, GuiStyle::MultiWindow, "Multiple native windows");
             });
 
         ui.checkbox(&mut opt.pixel_perfect, "Pixel perfect scaling")

@@ -403,15 +403,16 @@ impl Default for Options {
             tex_filter: Filter::Nearest,
             pixel_perfect: false,
             #[cfg(target_arch = "wasm32")]
-            gui_style: GuiStyle::SingleWindow,
+            gui_style: GuiStyle::OnTop,
             #[cfg(not(target_arch = "wasm32"))]
-            gui_style: GuiStyle::SingleWindow,
+            gui_style: GuiStyle::MultiWindow,
         }
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
 pub enum GuiStyle {
-    SingleWindow,
+    OnTop,
+    AllWindows,
     MultiWindow,
 }

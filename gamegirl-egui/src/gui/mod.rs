@@ -205,12 +205,12 @@ fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
 
 fn game_screen(app: &App, ctx: &Context, size: [usize; 2]) {
     match app.state.options.gui_style {
-        GuiStyle::SingleWindow => {
+        GuiStyle::AllWindows => {
             egui::Window::new("Screen").show(ctx, |ui| {
                 ui.add(make_screen_ui(app, size, ui.available_size()))
             });
         }
-        GuiStyle::MultiWindow => {
+        GuiStyle::OnTop | GuiStyle::MultiWindow => {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.add(make_screen_ui(app, size, ui.available_size()))
             });
@@ -240,7 +240,7 @@ fn make_screen_ui(app: &App, size: [usize; 2], avail_size: Vec2) -> Image {
 
 fn make_window(app: &mut App, ctx: &Context, title: &str, open: &mut bool, content: AppFn) {
     match app.state.options.gui_style {
-        GuiStyle::SingleWindow => {
+        GuiStyle::OnTop | GuiStyle::AllWindows => {
             egui::Window::new(title)
                 .open(open)
                 .show(ctx, |ui| content(app, ctx, ui));

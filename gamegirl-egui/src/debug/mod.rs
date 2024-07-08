@@ -75,7 +75,7 @@ fn make_window<T>(
     content: DbgFn<T>,
 ) {
     match app.state.options.gui_style {
-        GuiStyle::SingleWindow => {
+        GuiStyle::OnTop | GuiStyle::AllWindows => {
             egui::Window::new(title)
                 .open(open)
                 .show(ctx, |ui| content(core, ui, app, ctx));
