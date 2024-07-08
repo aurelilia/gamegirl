@@ -53,9 +53,12 @@ impl Timers {
         Self::overflow(gg, idx, -late_by);
     }
 
-    /// Read current time of the given timer. Might be a bit expensive, since
-    /// time needs to be calculated for timers on the scheduler.
+    /// Read current time of the given timer.
     pub fn time_read(&self, timer: usize, now: Time) -> u16 {
+        self.time_read_inner(timer, now).u16()
+    }
+
+    fn time_read_inner(&self, timer: usize, now: Time) -> u32 {
         let ctrl = self.control[timer];
         let is_scheduled = ctrl.enable() && (timer == 0 || !ctrl.count_up());
 
@@ -63,10 +66,12 @@ impl Timers {
             // Is on scheduler, calculate current value
             let scaler = DIVS[ctrl.prescaler().us()] as Time;
             let elapsed = now - self.scheduled_at[timer];
-            self.counters[timer].wrapping_add((elapsed / scaler).u16())
+            self.counters[timer]
+                .u32()
+                .wrapping_add((elapsed / scaler).u32())
         } else {
             // Either off or inc on overflow, just return current counter
-            self.counters[timer]
+            self.counters[timer].u32()
         }
     }
 
@@ -123,8 +128,9 @@ impl Timers {
     fn overflow(gg: &mut GameGirlAdv, idx: u8, offset: TimeS) {
         let ctrl = gg.timers.control[idx.us()];
         let reload = gg.timers.reload[idx.us()];
-        // Set to reload value
-        gg.timers.counters[idx.us()] = reload;
+        let scaler = DIVS[ctrl.prescaler().us()].u32();
+        let mut value = Self::time_read_inner(&gg.timers, idx.us(), gg.scheduler.now());
+
         // Fire IRQ if enabled
         if ctrl.irq_en() {
             Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16());
@@ -140,9 +146,18 @@ impl Timers {
             }
         }
 
-        if idx != 3 && gg.timers.control[idx.us() + 1].count_up() {
-            // Next timer is set to inc when we overflow.
-            Self::inc_timer(gg, idx.us() + 1);
+        loop {
+            if idx != 3 && gg.timers.control[idx.us() + 1].count_up() {
+                // Next timer is set to inc when we overflow.
+                Self::inc_timer(gg, idx.us() + 1);
+            }
+
+            let new_counter = reload.u32() + (value - 0x10000);
+            gg.timers.counters[idx.us()] = new_counter.u16();
+            if new_counter < 0x10000 {
+                break;
+            }
+            value -= 0x10000 - reload.u32();
         }
 
         if !ctrl.count_up() {
@@ -152,7 +167,7 @@ impl Timers {
                 idx.us(),
                 ctrl,
                 offset,
-                -7,
+                -4,
             )
         }
     }

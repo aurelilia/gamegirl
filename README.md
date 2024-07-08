@@ -169,7 +169,7 @@ cargo run -p tests --release -- --gg
   - [x] I/O read: 130/130
   - [ ] Timing: 1395/2020
   - [ ] Timer count-up: Freezes...
-  - [ ] Timer IRQ: 84/90
+  - [x] Timer IRQ: 90/90
   - [x] Shifter: 140/140
   - [x] Carry: 93/93
   - [x] Multiply long: 52/72 (cosidered complete; carry is still not researched in general)
