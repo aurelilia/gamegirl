@@ -74,6 +74,7 @@ pub struct Memory {
 
     // Various registers
     pub keycnt: KeyControl,
+    pub keys_prev: u16,
     pub waitcnt: WaitCnt,
     /// Value to return when trying to read BIOS outside of it
     pub(crate) bios_value: u32,
@@ -711,6 +712,7 @@ impl Default for Memory {
             ewram: Box::new([0; 256 * KB]),
             iwram: Box::new([0; 32 * KB]),
             keycnt: 0.into(),
+            keys_prev: 0,
             waitcnt: 0.into(),
             bios_value: 0xE129_F000,
             mapper: MemoryMapper::default(),

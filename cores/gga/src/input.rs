@@ -37,11 +37,12 @@ impl GameGirlAdv {
         let cnt = self.memory.keycnt;
         if cnt.global_irq() {
             let cond = cnt.irq_enables();
-            let fire = if !cnt.irq_is_and() {
-                cond & input != 0
-            } else {
-                cond & input == cond
-            };
+            let fire = (input != self.memory.keys_prev)
+                && if !cnt.irq_is_and() {
+                    cond & input != 0
+                } else {
+                    cond & input == cond
+                };
             if fire {
                 Cpu::request_interrupt(self, Interrupt::Joypad);
             }
@@ -49,5 +50,7 @@ impl GameGirlAdv {
             self.scheduler
                 .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
         }
+
+        self.memory.keys_prev = input;
     }
 }
