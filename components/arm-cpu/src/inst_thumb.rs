@@ -411,7 +411,9 @@ impl<S: ArmSystem> SysWrapper<S> {
         let condition = self.cpu().eval_condition(COND);
         if condition {
             let nn = ((inst.0 & 0xFF) as i8 as i32) * 2; // Step 2
-            self.set_pc(self.cpur().pc().wrapping_add_signed(nn));
+            let pc = self.cpur().pc();
+            self.cpu().is_halted = !self.cpu().waitloop.on_jump(pc, nn);
+            self.set_pc(pc.wrapping_add_signed(nn));
         }
     }
 
@@ -423,7 +425,9 @@ impl<S: ArmSystem> SysWrapper<S> {
     // THUMB.18
     pub fn thumb_br(&mut self, inst: ThumbInst) {
         let nn = (inst.0.i10() as i32) * 2; // Step 2
-        self.set_pc(self.cpur().pc().wrapping_add_signed(nn));
+        let pc = self.cpur().pc();
+        self.cpu().is_halted = !self.cpu().waitloop.on_jump(pc, nn);
+        self.set_pc(pc.wrapping_add_signed(nn));
     }
 
     // THUMB.19

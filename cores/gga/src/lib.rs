@@ -89,7 +89,7 @@ impl Core for GameGirlAdv {
             // We're halted, emulate peripherals until an interrupt is pending
             let evt = self.scheduler.pop();
             evt.kind.dispatch(self, evt.late_by);
-            self.cpu.is_halted = (self.cpu.ie & self.cpu.if_) == 0;
+            Cpu::check_unsuspend(self);
         } else {
             Cpu::continue_running(self);
         }

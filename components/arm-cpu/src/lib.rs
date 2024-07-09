@@ -18,11 +18,13 @@ pub mod inst_thumb;
 pub mod interface;
 mod lut;
 pub mod registers;
+mod waitloop;
 
 use std::{sync::Arc, u8};
 
 use access::{CODE, NONSEQ, SEQ};
 use common::{components::debugger::Severity, numutil::NumExt};
+use waitloop::WaitloopData;
 
 use crate::{
     caching::{Cache, CacheEntry, CachedInst},
@@ -60,6 +62,9 @@ pub struct Cpu<S: ArmSystem + 'static> {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "serde", serde(skip))]
     pub cache: Cache<S>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    waitloop: WaitloopData,
 }
 
 impl<S: ArmSystem> Cpu<S> {
@@ -377,6 +382,7 @@ impl<S: ArmSystem> Default for Cpu<S> {
             block_ended: false,
             pipeline_valid: false,
             cache: Cache::default(),
+            waitloop: WaitloopData::default(),
 
             ime: false,
             ie: 0,

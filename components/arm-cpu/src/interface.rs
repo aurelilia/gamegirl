@@ -60,7 +60,11 @@ pub trait ArmSystem: Sized + 'static {
     fn read<T: RwType>(&mut self, addr: u32, access: Access) -> T::ReadOutput {
         let time = self.wait_time::<T>(addr, access);
         self.add_sn_cycles(time);
+
         let value = self.get::<T>(addr).u32();
+        self.cpu()
+            .waitloop
+            .on_read(addr, value.u32(), T::from_u32(u32::MAX).u32());
         T::ReadOutput::from_u32(if !Self::IS_V5 && T::WIDTH == 2 {
             // Special handling for halfwords on ARMv4
             if addr.is_bit(0) {
@@ -77,6 +81,7 @@ pub trait ArmSystem: Sized + 'static {
     fn write<T: RwType>(&mut self, addr: u32, value: T, access: Access) {
         let time = self.wait_time::<T>(addr, access);
         self.add_sn_cycles(time);
+        self.cpu().waitloop.on_write();
         self.debugger().write_occurred(addr);
         self.set(addr, value);
     }
