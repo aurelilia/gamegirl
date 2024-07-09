@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use std::cmp;
+
 use common::numutil::{hword, word, NumExt, U16Ext};
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
@@ -171,7 +173,7 @@ impl PpuRegisters {
 
             BLDCNT => self.bldcnt = (value & 0x3FFF).into(),
             BLDALPHA => self.bldalpha = (value & 0x1F1F).into(),
-            BLDY => self.bldy = value & 0x1F,
+            BLDY => self.bldy = cmp::min(16, value & 0x1F),
 
             _ => (),
         }
