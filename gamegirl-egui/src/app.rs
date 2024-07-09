@@ -225,6 +225,13 @@ impl App {
         while let Ok(msg) = self.message_channel.1.try_recv() {
             match msg {
                 Message::RomOpen(file) => {
+                    if file.content.len() < 0x1000 {
+                        self.toasts
+                            .error("ROM too small! Not loading")
+                            .set_duration(Some(Duration::from_secs(5)));
+                        return;
+                    }
+
                     self.save_game();
 
                     let tex = match self.textures[0] {
@@ -270,6 +277,12 @@ impl App {
                     core.options().input.load_replay(file.content);
                     self.toasts
                         .info("Loaded replay")
+                        .set_duration(Some(Duration::from_secs(5)));
+                }
+
+                Message::Error(msg) => {
+                    self.toasts
+                        .error(msg)
                         .set_duration(Some(Duration::from_secs(5)));
                 }
 
@@ -387,6 +400,8 @@ pub enum Message {
     RomOpen(File),
     /// A file picked by the user to be opened as a replay.
     ReplayOpen(File),
+    /// An error occured.
+    Error(String),
     #[cfg(feature = "dynamic")]
     /// A new core got compiled and should be loaded.
     /// Only used when dynamic support is compiled in.

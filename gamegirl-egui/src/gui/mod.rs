@@ -26,6 +26,24 @@ use crate::{
     input::file_dialog,
 };
 
+const DEMO_APP_URLS: &[(&str, &str, &str)] = &[
+    (
+        "Apotris",
+        "https://gg.elia.garden/game/Apotris.gba",
+        "https://akouzoukos.com/apotris",
+    ),
+    (
+        "Celeste Classic",
+        "https://gg.elia.garden/game/CelesteClassic.gba",
+        "https://github.com/JeffRuLz/Celeste-Classic-GBA",
+    ),
+    (
+        "Feline",
+        "https://gg.elia.garden/game/feline.gba",
+        "https://github.com/foopod/gbaGamejam2021",
+    ),
+];
+
 /// Function signature for an app window
 type AppFn = fn(&mut App, &Context, &mut Ui);
 /// Count of GUI windows that take the App as a parameter.
@@ -91,6 +109,34 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
                 }
             });
         }
+
+        ui.menu_button("🌐 Download Game", |ui| {
+            for (name, url, _) in DEMO_APP_URLS {
+                if ui.button(*name).clicked() {
+                    app.toasts
+                        .info(format!("Downloading {url}..."))
+                        .set_duration(Some(Duration::from_secs(5)));
+
+                    let request = ehttp::Request::get(url);
+                    let tx = app.message_channel.0.clone();
+                    ehttp::fetch(
+                        request,
+                        move |result: ehttp::Result<ehttp::Response>| match result {
+                            Ok(r) => tx
+                                .send(Message::RomOpen(File {
+                                    content: r.bytes,
+                                    path: None,
+                                }))
+                                .unwrap(),
+                            Err(err) => {
+                                tx.send(Message::Error(format!("Download failed: {err:?}...")))
+                                    .unwrap();
+                            }
+                        },
+                    );
+                }
+            }
+        });
         ui.separator();
 
         if ui.button("💾 Save").clicked() {

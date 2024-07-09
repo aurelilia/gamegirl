@@ -31,8 +31,12 @@ fn main() {
     let web_options = eframe::WebOptions::default();
     wasm_bindgen_futures::spawn_local(async {
         let start_result = eframe::WebRunner::new()
-        .start("the_canvas_id", web_options, Box::new(|ctx| Ok(App::new(ctx))))
-        .await;
+            .start(
+                "the_canvas_id",
+                web_options,
+                Box::new(|ctx| Ok(App::new(ctx))),
+            )
+            .await;
 
         // Remove the loading text and spinner:
         let loading_text = web_sys::window()

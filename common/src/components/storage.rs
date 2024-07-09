@@ -20,6 +20,10 @@ impl Storage {
     /// since this is on native.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn save(path: Option<PathBuf>, save: GameSave) {
+        if path.is_none() {
+            return;
+        }
+
         let sav_path = Self::get_path(path.clone().unwrap(), "sav");
         std::fs::write(sav_path, save.ram).ok(); // TODO handle error
 

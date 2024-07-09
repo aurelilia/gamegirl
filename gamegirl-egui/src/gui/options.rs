@@ -202,6 +202,16 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.label("Made possible thanks to many amazing people. <3");
             });
+
+            ui.add(Separator::default().spacing(10.));
+
+            ui.heading("Credit for downloadable games");
+            for game in super::DEMO_APP_URLS {
+                ui.horizontal(|ui| {
+                    ui.label(game.0);
+                    ui.hyperlink_to("Source", game.2);
+                });
+            }
         }
     }
 }
