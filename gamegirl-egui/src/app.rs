@@ -82,6 +82,8 @@ pub struct App {
     pub app_window_states: [bool; APP_WINDOW_COUNT],
     /// Debugger window states.
     pub debugger_window_states: Vec<bool>,
+    /// State of OSI
+    pub on_screen_input: bool,
 
     /// The App state, which is persisted on reboot.
     pub state: State,
@@ -315,6 +317,7 @@ impl App {
 
             app_window_states: [false; APP_WINDOW_COUNT],
             debugger_window_states: Vec::from([false; 10]),
+            on_screen_input: false,
 
             textures,
             gil: Gilrs::new().unwrap(),

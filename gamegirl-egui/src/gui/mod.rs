@@ -6,6 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+mod input;
 mod options;
 
 use std::fs;
@@ -46,6 +47,9 @@ pub fn draw(app: &mut App, ctx: &Context, frame: &Frame, size: [usize; 2]) {
     }
     app.app_window_states = states;
 
+    if app.on_screen_input {
+        input::render(app, ctx);
+    }
     debug::render(app, ctx);
 }
 
@@ -154,6 +158,10 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
         }
     });
 
+    if ui.button("On-screen Input").clicked() {
+        app.on_screen_input ^= true;
+    }
+
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         let time = frame.info().cpu_usage.unwrap_or(0.0);
         app.frame_times.add(now, time);
@@ -212,7 +220,9 @@ fn game_screen(app: &App, ctx: &Context, size: [usize; 2]) {
         }
         GuiStyle::OnTop | GuiStyle::MultiWindow => {
             egui::CentralPanel::default().show(ctx, |ui| {
-                ui.add(make_screen_ui(app, size, ui.available_size()))
+                ui.centered_and_justified(|ui| {
+                    ui.add(make_screen_ui(app, size, ui.available_size()))
+                });
             });
         }
     }
