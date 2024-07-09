@@ -17,7 +17,7 @@ use crate::{cpu::CPU_CLOCK, scheduling::AdvEvent, GameGirlAdv};
 
 #[bitfield]
 #[repr(u16)]
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct KeyControl {
     irq_enables: B14,
@@ -33,7 +33,7 @@ impl GameGirlAdv {
 
     /// Check if KEYCNT should cause a joypad IRQ.
     pub fn check_keycnt(&mut self) {
-        let input = self.keyinput();
+        let input = 0x3FF ^ self.keyinput();
         let cnt = self.memory.keycnt;
         if cnt.global_irq() {
             let cond = cnt.irq_enables();
@@ -42,6 +42,7 @@ impl GameGirlAdv {
             } else {
                 cond & input == cond
             };
+            println!("KEYPAD IRQ: {:#?}", cnt);
             if fire {
                 Cpu::request_interrupt(self, Interrupt::Joypad);
             }
