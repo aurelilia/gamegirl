@@ -42,7 +42,6 @@ impl GameGirlAdv {
             } else {
                 cond & input == cond
             };
-            println!("KEYPAD IRQ: {:#?}", cnt);
             if fire {
                 Cpu::request_interrupt(self, Interrupt::Joypad);
             }
