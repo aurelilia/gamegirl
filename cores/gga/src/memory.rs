@@ -88,6 +88,10 @@ pub struct Memory {
 impl GameGirlAdv {
     pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
+        if addr >= 0x1000_0000 {
+            return T::from_u32(self.invalid_read::<false>(addr));
+        }
+
         self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
             match addr {
                 // BIOS
@@ -272,6 +276,9 @@ impl GameGirlAdv {
     /// value.
     pub fn set<T: RwType>(&mut self, addr_unaligned: u32, value: T) {
         let addr = addr_unaligned & !(T::WIDTH - 1);
+        if addr >= 0x1000_0000 {
+            return;
+        }
 
         // Bytes only use the mapper later, since VRAM does weird behavior
         // on byte writes
@@ -541,7 +548,7 @@ impl GameGirlAdv {
     /// Get wait time for a given address.
     #[inline]
     pub fn wait_time<T: NumExt + 'static>(&mut self, addr: u32, ty: Access) -> u16 {
-        let region = (addr.us() >> 24) & 0xF;
+        let region = addr.us() >> 24;
         let wait = self.wait_time_inner::<T>(addr, ty);
         match region {
             0x08..=0x0D => self.handle_prefetch::<T>(addr, ty, wait),
@@ -549,6 +556,7 @@ impl GameGirlAdv {
                 self.stop_prefetch();
                 wait
             }
+            0x10.. => 1,
             _ => wait,
         }
     }
