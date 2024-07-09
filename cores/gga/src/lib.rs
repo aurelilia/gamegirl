@@ -103,9 +103,9 @@ impl Core for GameGirlAdv {
     fn skip_bootrom(&mut self) {
         self.cpu.set_cpsr(0x1F);
         self.cpu.registers[15] = 0x0800_0004;
-        self.cpu.sp[1] = 0x0300_7F00;
-        self.cpu.sp[3] = 0x0300_7F00;
-        self.cpu.sp[5] = 0x0300_7F00;
+        self.cpu.sp[0] = 0x0300_7F00;
+        self.cpu.sp[2] = 0x0300_7FE0;
+        self.cpu.sp[4] = 0x0300_7FA0;
     }
 
     fn make_save(&self) -> Option<GameSave> {

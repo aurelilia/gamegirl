@@ -61,6 +61,9 @@ impl ArmSystem for GameGirlAdv {
     }
 
     fn will_execute(&mut self, pc: u32) {
+        if pc > 0x1000_0000 {
+            self.debugger.running = false;
+        }
         if self.apu.hle_hook == pc {
             MusicPlayer::pc_match(self);
         }
