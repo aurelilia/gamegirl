@@ -46,7 +46,7 @@ fn main() {
     eframe::run_native(
         "gamegirl core workbench",
         options,
-        Box::new(|ctx| App::new(ctx)),
+        Box::new(|ctx| Ok(App::new(ctx))),
     )
     .unwrap()
 }

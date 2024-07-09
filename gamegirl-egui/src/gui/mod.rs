@@ -7,7 +7,7 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 mod input;
-mod options;
+pub mod options;
 
 use std::fs;
 
@@ -29,15 +29,13 @@ use crate::{
 /// Function signature for an app window
 type AppFn = fn(&mut App, &Context, &mut Ui);
 /// Count of GUI windows that take the App as a parameter.
-pub const APP_WINDOW_COUNT: usize = 3;
+pub const APP_WINDOW_COUNT: usize = 2;
 /// GUI windows that take the App as a parameter.
-const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] = [
-    ("Options", options::options),
-    ("About", options::about),
-    ("Replays", replays),
-];
+const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] =
+    [("Options", options::options), ("Replays", replays)];
 
 pub fn draw(app: &mut App, ctx: &Context, frame: &Frame, size: [usize; 2]) {
+    ctx.style_mut(|s| s.spacing.item_spacing[1] = 5.);
     navbar(app, ctx, frame);
     game_screen(app, ctx, size);
 
@@ -66,14 +64,15 @@ fn navbar(app: &mut App, ctx: &Context, frame: &Frame) {
 fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mut Ui) {
     widgets::global_dark_light_mode_switch(ui);
     ui.separator();
+    ui.spacing_mut().item_spacing[0] = 13.0;
 
-    ui.menu_button("File", |ui| {
-        if ui.button("Open ROM").clicked() {
+    ui.menu_button("🗁 File", |ui| {
+        if ui.button("📂 Open ROM").clicked() {
             file_dialog::open_rom(app.message_channel.0.clone());
             ui.close_menu();
         }
         if !app.state.last_opened.is_empty() {
-            ui.menu_button("Last Opened", |ui| {
+            ui.menu_button("🕐 Last Opened", |ui| {
                 for path in &app.state.last_opened {
                     if ui
                         .button(path.file_name().unwrap().to_str().unwrap())
@@ -93,38 +92,38 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
         }
         ui.separator();
 
-        if ui.button("Save").clicked() {
+        if ui.button("💾 Save").clicked() {
             app.save_game();
             ui.close_menu();
         }
-        if ui.button("Pause").clicked() {
+        if ui.button("⏸ Pause").clicked() {
             let mut core = app.core.lock().unwrap();
             *core.is_running() = !*core.is_running() && core.options().rom_loaded;
             ui.close_menu();
         }
-        if ui.button("Reset").clicked() {
+        if ui.button("↺ Reset").clicked() {
             app.core.lock().unwrap().reset();
             ui.close_menu();
         }
-        if ui.button("Replays").clicked() {
-            app.app_window_states[2] ^= true;
+        if ui.button("⏪ Replays").clicked() {
+            app.app_window_states[1] ^= true;
             ui.close_menu();
         }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
             ui.separator();
-            if ui.button("Exit").clicked() {
+            if ui.button("🚪 Exit").clicked() {
                 ctx.send_viewport_cmd(ViewportCommand::Close)
             }
         }
     });
 
-    ui.menu_button("Debugger", |ui| debug::menu(app, ui));
+    ui.menu_button("🐛 Debugger", |ui| debug::menu(app, ui));
 
-    ui.menu_button("Savestates", |ui| {
+    ui.menu_button("🖴 Savestates", |ui| {
         for (i, state) in app.rewinder.save_states.iter_mut().enumerate() {
-            if ui.button(format!("Save State {}", i + 1)).clicked() {
+            if ui.button(format!("↘ Save State {}", i + 1)).clicked() {
                 *state = Some(app.core.lock().unwrap().save_state());
                 ui.close_menu();
             }
@@ -138,7 +137,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             .filter_map(|s| s.as_ref())
             .enumerate()
         {
-            if ui.button(format!("Load State {}", i + 1)).clicked() {
+            if ui.button(format!("↗ Load State {}", i + 1)).clicked() {
                 let mut core = app.core.lock().unwrap();
                 app.rewinder.before_last_ss_load = Some(core.save_state());
                 core.load_state(state);
@@ -147,18 +146,17 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
         }
     });
 
-    ui.menu_button("Options", |ui| {
-        if ui.button("Options").clicked() {
-            app.app_window_states[0] ^= true;
-            ui.close_menu();
-        }
-        if ui.button("About").clicked() {
-            app.app_window_states[1] ^= true;
-            ui.close_menu();
+    ui.menu_button("☸ Options", |ui| {
+        for (name, panel) in options::Panel::ALL {
+            if ui.button(name).clicked() {
+                app.app_window_states[0] ^= true;
+                app.open_option = panel;
+                ui.close_menu();
+            }
         }
     });
 
-    if ui.button("On-screen Input").clicked() {
+    if ui.button("🖱 On-screen Input").clicked() {
         app.on_screen_input ^= true;
     }
 
