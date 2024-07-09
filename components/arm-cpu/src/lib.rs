@@ -223,21 +223,36 @@ impl<S: ArmSystem> Cpu<S> {
         gg.cpu().pipeline[1] = gg.get::<TY>(gg.cpur().pc()).u32();
         gg.cpu().access_type = SEQ;
 
-        Self::trace_inst::<TY>(gg, inst, sn_cycles);
+        Self::trace_inst::<TY>(gg, inst);
         (inst, sn_cycles, pc)
     }
 
-    fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32, cycles: u16) {
+    fn trace_inst<TY: NumExt + 'static>(gg: &mut S, inst: u32) {
         if gg.debugger().tracing() {
-            let pc = gg.cpu().pc();
-            gg.debugger().add_traced_instruction(|| {
-                let mnem = if TY::WIDTH == 2 {
-                    Self::get_mnemonic_thumb(inst.u16())
-                } else {
-                    Self::get_mnemonic_arm(inst)
-                };
-                format!("0x{pc:08X} - {cycles} - {mnem}")
-            });
+            let cpsr = gg.cpu().cpsr;
+            let mnem = if TY::WIDTH == 2 {
+                Self::get_mnemonic_thumb(inst.u16())
+            } else {
+                Self::get_mnemonic_arm(inst)
+            };
+
+            let mut buf = String::with_capacity(100);
+            for reg in gg.cpu().registers.iter().enumerate() {
+                let reg = reg.1;
+                let reg = format!("{reg:08X}");
+                buf.push_str(&reg);
+                buf.push(' ');
+            }
+
+            if TY::WIDTH == 2 {
+                gg.debugger().add_traced_instruction(|| {
+                    format!("{buf}cpsr: {cpsr:08X} |     {inst:04X}: {mnem}")
+                });
+            } else {
+                gg.debugger().add_traced_instruction(|| {
+                    format!("{buf}cpsr: {cpsr:08X} | {inst:08X}: {mnem}")
+                });
+            }
         }
     }
 
