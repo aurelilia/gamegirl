@@ -6,8 +6,6 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arrayvec::ArrayVec;
-
 pub type Time = u64;
 pub type TimeS = i64;
 

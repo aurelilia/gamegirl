@@ -9,7 +9,6 @@ edition = "2021"
 log.workspace = true
 serde = { workspace = true, optional = true }
 serde_arrays = { workspace = true, optional = true }
-arrayvec.workspace = true
 
 bincode = { version = "1.3.3", optional = true }
 zstd = { version = "0.13.2", default-features = false, optional = true }
@@ -19,11 +18,5 @@ web-sys = { version = "0.3.69", features = ["Storage", "Window"] }
 base64 = "0.22.1"
 
 [features]
-serde = [
-    "dep:serde",
-    "dep:serde_arrays",
-    "dep:bincode",
-    "arrayvec/serde",
-    "serde_config",
-]
+serde = ["dep:serde", "dep:serde_arrays", "dep:bincode", "serde_config"]
 serde_config = ["dep:serde"]
