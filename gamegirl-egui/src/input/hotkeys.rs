@@ -16,15 +16,8 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
             file_dialog::open_rom(app.message_channel.0.clone())
         })
     }),
-    ("Reset", |a, p| {
-        pressed(a, p, |app| app.core.lock().unwrap().reset())
-    }),
-    ("Pause", |a, p| {
-        pressed(a, p, |app| {
-            let mut core = app.core.lock().unwrap();
-            *core.is_running() = !*core.is_running() && core.options().rom_loaded;
-        })
-    }),
+    ("Reset", |a, p| pressed(a, p, App::reset)),
+    ("Pause", |a, p| pressed(a, p, App::pause)),
     ("Save", |a, p| pressed(a, p, |app| app.save_game())),
     ("Fast Forward (Hold)", |app, pressed| {
         let mut core = app.core.lock().unwrap();

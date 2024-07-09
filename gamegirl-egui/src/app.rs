@@ -12,6 +12,7 @@ use std::{
     path::PathBuf,
     ptr::{self, Pointee},
     sync::{mpsc, Arc, Mutex},
+    time::Duration,
 };
 
 use common::{misc::SystemConfig, Colour as RColour, Core};
@@ -23,6 +24,7 @@ use eframe::{
     glow::{self},
     CreationContext, Frame, Storage,
 };
+use egui_notify::{Anchor, Toasts};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
@@ -85,6 +87,8 @@ pub struct App {
     pub on_screen_input: bool,
     /// State of options window
     pub open_option: options::Panel,
+    /// Toasts
+    pub toasts: Toasts,
 
     /// The App state, which is persisted on reboot.
     pub state: State,
@@ -175,6 +179,10 @@ impl App {
 
         if self.rewinder.rewinding {
             let frame = if let Some(state) = self.rewinder.rewind_buffer.pop() {
+                self.toasts
+                    .info("Rewinding")
+                    .set_closable(false)
+                    .set_duration(Some(Duration::from_millis(1)));
                 core.load_state(state);
                 core.options().invert_audio_samples = true;
                 core.produce_frame()
@@ -236,6 +244,10 @@ impl App {
 
                     self.current_rom_path = file.path.clone();
                     if let Some(path) = file.path {
+                        self.toasts
+                            .success(format!("Loaded ROM: {path:?}"))
+                            .set_duration(Some(Duration::from_secs(5)));
+
                         if let Some(existing) =
                             self.state.last_opened.iter().position(|p| *p == path)
                         {
@@ -244,6 +256,10 @@ impl App {
                             self.state.last_opened.insert(0, path);
                             self.state.last_opened.truncate(10);
                         }
+                    } else {
+                        self.toasts
+                            .success("Loaded ROM")
+                            .set_duration(Some(Duration::from_secs(5)));
                     }
                 }
 
@@ -252,6 +268,9 @@ impl App {
                     let mut core = self.core.lock().unwrap();
                     core.reset();
                     core.options().input.load_replay(file.content);
+                    self.toasts
+                        .info("Loaded replay")
+                        .set_duration(Some(Duration::from_secs(5)));
                 }
 
                 #[cfg(feature = "dynamic")]
@@ -276,7 +295,9 @@ impl App {
                             ) as *mut _)
                         };
 
-                        println!("Loaded core: {path:?}");
+                        self.toasts
+                            .success(format!("Loaded core: {path:?}"))
+                            .set_duration(Duration::from_secs(10));
                     }
                 }
             }
@@ -320,6 +341,7 @@ impl App {
             debugger_window_states: Vec::from([false; 10]),
             on_screen_input: false,
             open_option: options::Panel::About,
+            toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
 
             textures,
             gil: Gilrs::new().unwrap(),
@@ -420,4 +442,27 @@ pub enum GuiStyle {
     OnTop,
     AllWindows,
     MultiWindow,
+}
+
+impl App {
+    pub fn pause(&mut self) {
+        let mut core = self.core.lock().unwrap();
+        *core.is_running() = !*core.is_running() && core.options().rom_loaded;
+        if *core.is_running() {
+            self.toasts
+                .info("Resuming")
+                .set_duration(Some(Duration::from_secs(2)));
+        } else {
+            self.toasts
+                .info("Paused")
+                .set_duration(Some(Duration::from_secs(2)));
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.core.lock().unwrap().reset();
+        self.toasts
+            .warning("Console reset")
+            .set_duration(Some(Duration::from_secs(5)));
+    }
 }

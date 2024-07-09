@@ -23,6 +23,7 @@ eframe = { version = "0.28", default-features = false, features = [
     "glow",
     "persistence",
 ] }
+egui-notify = { git = "https://github.com/ItsEthra/egui-notify" }
 
 cpal = "0.15.3"
 rfd = "0.14.1"

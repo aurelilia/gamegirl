@@ -1159,6 +1159,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-notify"
+version = "0.15.0"
+source = "git+https://github.com/ItsEthra/egui-notify#b828cbcdc222e01cfde37eac3c5b3cc84409a621"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui-winit"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1565,6 +1573,7 @@ dependencies = [
  "cpal",
  "eframe",
  "egui",
+ "egui-notify",
  "env_logger",
  "futures-executor",
  "gamegirl",
