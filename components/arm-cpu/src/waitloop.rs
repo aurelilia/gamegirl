@@ -7,19 +7,26 @@ impl<S: ArmSystem> Cpu<S> {
     /// Check if the CPU should be unsuspended
     pub fn check_unsuspend(gg: &mut S) {
         let intr_pending = (gg.cpur().ie & gg.cpur().if_) != 0;
-        let waitloop_complete = Self::check_waitloop_resume(gg);
-        gg.cpu().is_halted = !intr_pending && !waitloop_complete;
+        gg.cpu().is_halted = !intr_pending && !Self::check_waitloop_resume(gg);
+    }
+
+    /// Immediately halt the CPU until an IRQ is pending
+    pub fn halt_on_irq(&mut self) {
+        self.is_halted = true;
+        self.waitloop = WaitloopData::InLoopIrq;
     }
 
     /// Check if the value we were waitlooping on changed, if applicable
     fn check_waitloop_resume(gg: &mut S) -> bool {
         let gg = SysWrapper::new(gg);
-        let WaitloopData::InLoopMem { memory } = gg.cpu().waitloop else {
-            return true;
-        };
-
-        let value = gg.get::<u32>(memory.addr);
-        value & memory.mask != memory.value
+        match gg.cpu().waitloop {
+            WaitloopData::InLoopIrq => false,
+            WaitloopData::InLoopMem { memory } => {
+                let value = gg.get::<u32>(memory.addr);
+                value & memory.mask != memory.value
+            }
+            _ => true,
+        }
     }
 }
 
@@ -50,13 +57,24 @@ pub enum WaitloopData {
         br_address: u32,
         read: Option<ReadValue>,
     },
+    /// This is confirmed a loop we can waitloop on. Make sure that the register
+    /// values are the same as when we first saw the jump, to make
+    /// sure the game isn't doing something else.
+    CheckHash {
+        regs_hash: u64,
+        read: Option<ReadValue>,
+    },
     /// We're in a loop reading a single memory value
     InLoopMem { memory: ReadValue },
+    /// We're in a loop waiting for IRQ
+    /// This variant is also used when waiting via some low-power state,
+    /// like HALTCNT on the GBA
+    InLoopIrq,
 }
 
 impl WaitloopData {
     /// Returns if CPU is still running.
-    pub fn on_jump(&mut self, br_address: u32, dest: i32) -> bool {
+    pub fn on_jump(&mut self, regs: &[u32; 16], br_address: u32, dest: i32) -> bool {
         if !(-0xF..0x0).contains(&dest) {
             return true;
         }
@@ -71,19 +89,32 @@ impl WaitloopData {
             }
             WaitloopData::SuspicousJump { .. } => WaitloopData::None,
 
-            WaitloopData::FindReads { read: None, .. } => {
-                // Waitlooping on INTR
-                log::warn!("Waitlooping on INTR");
+            WaitloopData::FindReads { read, .. } => WaitloopData::CheckHash {
+                regs_hash: hash(regs),
+                read: *read,
+            },
+
+            WaitloopData::CheckHash {
+                regs_hash,
+                read: Some(memory),
+            } if *regs_hash == hash(regs) => {
+                // Waitlooping on memory
+                *self = WaitloopData::InLoopMem { memory: *memory };
                 return false;
             }
-            WaitloopData::FindReads {
-                read: Some(memory), ..
-            } => {
-                *self = WaitloopData::InLoopMem { memory: *memory };
-                return false; // TODO
+            WaitloopData::CheckHash {
+                regs_hash,
+                read: None,
+            } if *regs_hash == hash(regs) => {
+                // Waitlooping on INTR
+                *self = WaitloopData::InLoopIrq;
+                return false;
             }
+            // Registers were different, the game is doing something weird.
+            // Do not trigger waitloop detection.
+            WaitloopData::CheckHash { .. } => WaitloopData::None,
 
-            WaitloopData::InLoopMem { .. } => WaitloopData::None,
+            WaitloopData::InLoopMem { .. } | WaitloopData::InLoopIrq => WaitloopData::None,
         };
         true
     }
@@ -97,7 +128,10 @@ impl WaitloopData {
                 br_address,
                 read: Some(ReadValue { addr, value, mask }),
             },
-            WaitloopData::SuspicousJump { .. } | WaitloopData::InLoopMem { .. } => return,
+            WaitloopData::SuspicousJump { .. }
+            | WaitloopData::CheckHash { .. }
+            | WaitloopData::InLoopMem { .. }
+            | WaitloopData::InLoopIrq => return,
 
             _ => WaitloopData::None,
         };
@@ -106,4 +140,13 @@ impl WaitloopData {
     pub fn on_write(&mut self) {
         *self = WaitloopData::None;
     }
+}
+
+fn hash(regs: &[u32; 16]) -> u64 {
+    // FNV-1
+    let init = 0xcbf29ce484222325;
+    let prime = 0x100000001b3;
+    regs.iter()
+        .flat_map(|u| u.to_le_bytes())
+        .fold(init, |hash, byte| hash.wrapping_mul(prime) ^ byte as u64)
 }

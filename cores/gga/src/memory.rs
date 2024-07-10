@@ -353,7 +353,7 @@ impl GameGirlAdv {
             0xA4..=0xA7 => self.apu.push_sample::<1>(value),
 
             // Control registers
-            0x301 => self.cpu.is_halted = true,
+            0x301 => self.cpu.halt_on_irq(),
             WAITCNT => self.set_mmio(
                 addr,
                 hword(value, Into::<u16>::into(self.memory.waitcnt).high()),

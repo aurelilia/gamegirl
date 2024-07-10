@@ -51,12 +51,13 @@ impl<S: ArmSystem> SysWrapper<S> {
             self.armv5_blx::<BL>(inst);
         } else {
             let nn = inst.0.i24() * 4; // Step 4
-            let pc = self.cpur().pc();
+            let cpu = self.cpu();
+            let pc = cpu.pc();
             if BL {
                 let lr = pc - 4;
-                self.cpu().set_lr(lr);
+                cpu.set_lr(lr);
             } else {
-                self.cpu().is_halted = !self.cpu().waitloop.on_jump(pc, nn);
+                cpu.is_halted = !cpu.waitloop.on_jump(&cpu.registers, pc, nn);
             }
             self.set_pc(pc.wrapping_add_signed(nn));
         }
