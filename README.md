@@ -7,37 +7,40 @@ NDS support is in the works!
 
 
 ## Screenshots
-##### Playing Pokemon Emerald
-![Gamegirl playing Pokemon Emerald](img/4.jpg)
-##### Playing Pokemon Crystal Clear
-![Gamegirl playing Pokemon Crystal Clear](img/1.jpg)
-##### Pokemon Pinball with running debugger and memory viewer
-![Gamegirl playing Pokemon Pinball](img/2.jpg)
-##### TLoZ: Oracle of Ages with some visual debugging tools open
-![Gamegirl playing Oracle of Ages](img/3.jpg)
+##### Playing Apotris
+![Gamegirl playing Apotris](img/apotris.png)
+##### Playing Pokemon Emerald with debugger
+![Gamegirl playing Pokemon Emerald](img/emerald.png)
+##### TLoZ: Oracle of Ages with running debugger
+![Gamegirl playing Oracle of Ages](img/oracle.png)
 
 
 ## Status
-The DMG/CGB emulator is in a good and usable state. Both DMG and CGB emulation is complete and quite accurate, 
-enough to make most commercial games run perfectly.  
-AGB support is getting there. Some things  are still missing; especially
-the PPU needs a few more features implemented. Most games are playable, but with
-minor graphical glitches.
+The AGB (GameBoy Advance) emulator is in a good and usable state.  
+Automated testing of most commercial games shows that most of them are playable,
+and work without any major glitches.  
+The core is well optimized and ready to be used.
+
+The CGB/DMG (GameBoy [Color]) core is fairly accurate, but still has some bugs
+left to be worked out. Many games run well.
+
+The NDS core is still very early and unable to boot anything at this time.
 
 ### Features
 #### General
 - Highly configurable, including input (controller support!)
 - Savegame support in common `.sav` format (Basic RTC support)
 - Support for creating and loading save states with "undo last load" function
-- Fast forwarding hotkeys, both toggle and hold
-- Rewinding support with little memory use (~1MB per second of rewinding at 60fps)
+- Fast forwarding (toggle and hold), live rewinding support
 - Debugger with:
     - Line-by-line advance
     - PC and write breakpoints
     - Memory, register and stack view
     - Cartridge Info Viewer
     - Visual debugging tools: VRAM and map viewers
-- Automated running of a bunch of different tests
+- Automated running of a bunch of different tests and games
+- Replay support for playback of previous inputs
+- Able to run in the browser!
 
 #### GG(C)
 - Accurate scheduler-based emulation of the system
@@ -46,16 +49,15 @@ minor graphical glitches.
 
 #### GGA
 - Accurate scheduler-based emulation of the system
-- A cached interpreter
+- A cached interpreter and threaded PPU
 - Remote debugger support (GDB server)
 - Support for playing ELF files
+- Waitloop detection
 
 ### System emulation
 - [ ] DMG/CGB
   - [x] Most commercial games running glitch-free 
   - [ ] Full SM83 CPU
-    - [x] Full instruction set implemented and passing tests
-    - [x] M-cycle accuracy
     - [ ] Highly accurate interrupts (Pinball Fantasy)
   - [ ] PPU
     - [x] Passing visual tests
@@ -71,50 +73,35 @@ minor graphical glitches.
     - [x] MBC2
     - [x] MBC3
     - [x] MBC5
-  - [x] CGB features
-    - [x] 2x Speed
-    - [x] HDMA
-    - [x] Banking
-    - [x] PPU: DMG compatibility mode
+  - [x] CGB
 
 - [ ] AGB
-  - [ ] Most commercial games running glitch-free
+  - [x] Most commercial games running glitch-free
   - [x] Full ARM7DTMI CPU
-    - [x] Instruction-level accuracy
-    - [x] Accurate interrupts
-    - [x] Accurate waitstates
-    - [x] Cached interpreter
   - [x] Open bus behavior
   - [ ] PPU
-    - [ ] Passing visual tests 
-    - [x] Text mode Backgrounds
-    - [x] Bitmap mode Backgrounds
-    - [x] Objects
-    - [x] Priority
-    - [x] Blending
-    - [x] Affine BGs/objects
-    - [x] Windows
-    - [x] Window blending
-    - [x] Semi-transparent OBJs
-    - [x] Mosaic
+    - [ ] Passing precise visual tests 
+    - [x] Everything else
   - [x] APU
-    - [x] CGB sound channels
-    - [x] DMA sound channels
-    - [x] All Volume control registers
   - [x] DMAs
-    - [x] General transfers
-    - [x] Fine register behavior (Not replacing address if invalid, etc)
-    - [x] APU FIFO transfers
-    - [x] GamePak EEPROM transfers
-    - [x] DMA3 Video Capture
   - [x] Timers
-    - [x] Scheduled timers
-    - [x] Cascading timers
-    - [x] APU FIFO ticking
   - [x] Cartridge save types
-    - [x] EEPROM
-    - [x] SRAM
-    - [x] Flash
+  - [ ] RTC
+
+- [ ] NTR
+  - [ ] ARM7 and ARM9 CPUs
+    - [x] ARM7
+    - [x] ARM9
+    - [ ] ARM9 CP15
+  - [ ] FIFO
+  - [ ] PPU
+    - [ ] Tile PPU
+    - [ ] 3D Engine
+  - [x] Timers
+  - [x] DMA
+  - [ ] Cartridge support
+  - [ ] Memory control
+  - [ ] Many other things
 
 ### Planned Features
 - [ ] Save export on Web/WASM
@@ -144,15 +131,6 @@ if you do not plan on using those cores, simply supply empty files.
 
 
 ## Testing
-Test ROMs can be run automatically:
-```bash
-# Run GGA test roms
-cargo run -p tests --release
-
-# Also run GG test roms
-cargo run -p tests --release -- --gg
-```
-
 ### GG/GGC
 - [x] All Blargg tests (`oam_bug` untested)
 - [ ] Mooneye
@@ -232,4 +210,4 @@ cargo run -p tests --release -- --gg
 - [ladystarbreeze, for their testing ROMs](https://github.com/ladystarbreeze/GBA-Test-Collection)
 - [destoer, for their testing ROMs](https://github.com/destoer/gba_tests)
 - [michelhe, for their emulator](https://github.com/michelhe/rustboyadvance-ng)
-- [fleroviux, for NBA and it's MP3K implementation](https://github.com/nba-emu/NanoBoyAdvance)
+- [fleroviux, for NBA and it's MP2K implementation](https://github.com/nba-emu/NanoBoyAdvance)
