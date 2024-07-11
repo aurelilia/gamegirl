@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 common = { path = "../common", features = ["serde_config"] }
-gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nes"] }
+gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nds", "nes"] }
 
 egui = "0.28"
 eframe = { version = "0.28", default-features = false, features = [

@@ -32,8 +32,8 @@ impl NdsEvent {
         match self {
             PauseEmulation => ds.ticking = false,
             PpuEvent(evt) => {
-                Ppu::handle_event(&mut ds.nds7(), evt, late_by);
-                Ppu::handle_event(&mut ds.nds9(), evt, late_by);
+                // Ppu::handle_event(&mut ds.nds7(), evt, late_by);
+                // Ppu::handle_event(&mut ds.nds9(), evt, late_by);
             }
             ApuEvent(evt) => {
                 let time = Apu::handle_event(ds, evt, late_by);

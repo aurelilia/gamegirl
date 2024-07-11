@@ -50,14 +50,14 @@ impl Nds {
         MemoryMapper::init_pages(&mut self.nds9());
     }
 
-    pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &mut DS, addr: u32) -> u16 {
+    pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &DS, addr: u32) -> u16 {
         match addr & 0xFFFF {
             // Interrupt control
-            IME => ds.cpu().ime as u16,
-            IE_L => ds.cpu().ie.low(),
-            IE_H => ds.cpu().ie.high(),
-            IF_L => ds.cpu().if_.low(),
-            IF_H => ds.cpu().if_.high(),
+            IME => ds.cpur().ime as u16,
+            IE_L => ds.cpur().ie.low(),
+            IE_H => ds.cpur().ie.high(),
+            IF_L => ds.cpur().if_.low(),
+            IF_H => ds.cpur().if_.high(),
 
             _ => {
                 ds.debugger.log(
@@ -70,23 +70,24 @@ impl Nds {
         }
     }
 
-    pub fn try_set_mmio_shared<DS: NdsCpu>(ds: &mut DS, addr: u32, value: u16) {
+    pub fn try_set_mmio_shared<DS: NdsCpu>(dsx: &mut DS, addr: u32, value: u16) {
+        let ds = dsx.deref_mut();
         match addr & 0xFFFF {
             // Interrupts
             IME => {
-                ds.cpu().ime = value.is_bit(0);
-                Cpu::check_if_interrupt(ds);
+                dsx.cpu().ime = value.is_bit(0);
+                Cpu::check_if_interrupt(dsx);
             }
             IE_L => {
-                ds.cpu().ie = word(value, ds.cpu().ie.high());
-                Cpu::check_if_interrupt(ds);
+                dsx.cpu().ie = word(value, dsx.cpu().ie.high());
+                Cpu::check_if_interrupt(dsx);
             }
             IE_H => {
-                ds.cpu().ie = word(ds.cpu().ie.low(), value);
-                Cpu::check_if_interrupt(ds);
+                dsx.cpu().ie = word(dsx.cpu().ie.low(), value);
+                Cpu::check_if_interrupt(dsx);
             }
-            IF_L => ds.cpu().if_ &= (!value).u32() | 0xFFFF_0000,
-            IF_H => ds.cpu().if_ &= ((!value).u32() << 16) | 0x0000_FFFF,
+            IF_L => dsx.cpu().if_ &= (!value).u32() | 0xFFFF_0000,
+            IF_H => dsx.cpu().if_ &= ((!value).u32() << 16) | 0x0000_FFFF,
 
             // Timers
             TM0CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 0, value),
@@ -95,10 +96,10 @@ impl Nds {
             TM3CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 3, value),
 
             // DMAs
-            0xBA => Dmas::ctrl_write(ds, 0, value),
-            0xC6 => Dmas::ctrl_write(ds, 1, value),
-            0xD2 => Dmas::ctrl_write(ds, 2, value),
-            0xDE => Dmas::ctrl_write(ds, 3, value),
+            0xBA => Dmas::ctrl_write(dsx, 0, value),
+            0xC6 => Dmas::ctrl_write(dsx, 1, value),
+            0xD2 => Dmas::ctrl_write(dsx, 2, value),
+            0xDE => Dmas::ctrl_write(dsx, 3, value),
 
             _ => ds.debugger.log(
                 "unknown-io-write",
@@ -145,7 +146,9 @@ impl Nds7 {
 
     fn get_mmio(&self, addr: u32) -> u16 {
         let addr = addr & !1;
-        self[addr]
+        match addr {
+            _ => Nds::try_get_mmio_shared(self, addr),
+        }
     }
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
@@ -195,7 +198,9 @@ impl Nds9 {
 
     fn get_mmio(&self, addr: u32) -> u16 {
         let addr = addr & 0x1FFE;
-        self[addr]
+        match addr {
+            _ => Nds::try_get_mmio_shared(self, addr),
+        }
     }
 
     fn set_mmio(&mut self, addr: u32, value: u16) {
@@ -316,20 +321,19 @@ impl MemoryMappedSystem<8192> for Nds9 {
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.psram, a - 0x200_0000),
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.wram, a - 0x300_0000),
 
-            0x0500_0000..=0x05FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-                offs(&self.ppu_a_nomut().palette, a - 0x500_0000)
-            }
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_b_nomut().palette, a - 0x501_0000),
-            0x0600_0000..=0x061F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x600_0000),
-            0x0620_0000..=0x063F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x620_0000),
-            // TODO not quite right...
-            0x0640_0000..=0x065F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x640_0000),
-            0x0660_0000..=0x067F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x660_0000),
-            0x0700_0000..=0x07FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-                offs(&self.ppu_a_nomut().oam, a - 0x700_0000)
-            }
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_b_nomut().oam, a - 0x701_0000),
-
+            // 0x0500_0000..=0x05FF_FFFF if (a & 0x1FFF) < 0x1000 => {
+            //     offs(&self.ppu_a_nomut().palette, a - 0x500_0000)
+            // }
+            // 0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_b_nomut().palette, a - 0x501_0000),
+            // 0x0600_0000..=0x061F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x600_0000),
+            // 0x0620_0000..=0x063F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x620_0000),
+            // // TODO not quite right...
+            // 0x0640_0000..=0x065F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x640_0000),
+            // 0x0660_0000..=0x067F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x660_0000),
+            // 0x0700_0000..=0x07FF_FFFF if (a & 0x1FFF) < 0x1000 => {
+            //     offs(&self.ppu_a_nomut().oam, a - 0x700_0000)
+            // }
+            // 0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_b_nomut().oam, a - 0x701_0000),
             0x0600_0000..=0x06FF_FFFF if false => todo!(),
 
             _ => ptr::null::<u8>() as *mut u8,

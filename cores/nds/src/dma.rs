@@ -6,210 +6,213 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arm_cpu::{interface::RwType, Access, Cpu, Interrupt};
+use arm_cpu::{
+    access::{DMA, NONSEQ, SEQ},
+    interface::RwType,
+    Access, Cpu, Interrupt,
+};
+use arrayvec::ArrayVec;
 use common::numutil::{word, NumExt};
+use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
 use crate::{addr::VCOUNT, NdsCpu};
 
 const SRC_MASK_7: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
 const DST_MASK_7: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
 
-/// NDS's 2x4 DMA channels.
-/// This is separated by CPU.
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct Dma {
+    pub sad: u32,
+    pub dad: u32,
+    pub count: u16,
+    pub ctrl: DmaControl,
+
+    /// Internal source register
+    src: u32,
+    /// Internal destination register
+    dst: u32,
+}
+
+/// NDS's 8 DMA channels, separated by CPU.
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dmas {
-    /// Internal source registers
-    src: [u32; 4],
-    /// Internal destination registers
-    dst: [u32; 4],
+    pub channels: [Dma; 4],
     /// Internal cache shared between DMAs
     pub(super) cache: u32,
+    /// Currently running DMA, or 99
+    pub(super) running: u16,
+    /// DMAs waiting to run after current.
+    queued: ArrayVec<(u16, Reason), 3>,
+    /// PC when the last DMA finished (for lingering bus behavior)
+    pub(super) pc_at_last_end: u32,
 }
 
 impl Dmas {
     /// Update all DMAs to see if they need ticking.
     pub fn update_all(ds: &mut impl NdsCpu, reason: Reason) {
         for idx in 0..4 {
-            let base = Self::base_addr(idx);
-            Self::step_dma(ds, idx, base, ds[base + 0xA], reason);
+            Self::step_dma(ds, idx, reason);
         }
     }
 
     /// Update a given DMA after it's control register was written.
-    pub fn ctrl_write<DS: NdsCpu>(ds: &mut DS, idx: u16, new_ctrl: u16) {
-        let base = Self::base_addr(idx);
-        let old_ctrl = ds[base + 0xA];
-        if !old_ctrl.is_bit(15) && new_ctrl.is_bit(15) {
+    pub fn ctrl_write<DS: NdsCpu>(ds: &mut DS, idx: usize, new_ctrl: u16) {
+        let channel = &mut ds.dmas[DS::I].channels[idx];
+        let old_ctrl = channel.ctrl;
+        let mut new_ctrl: DmaControl = new_ctrl.into();
+
+        if !old_ctrl.dma_en() && new_ctrl.dma_en() {
             // Reload SRC/DST
-            let src = word(ds[base], ds[base + 2]);
-            let dst = word(ds[base + 4], ds[base + 6]);
             if DS::I == 0 {
-                // NDS7
-                ds.dmas[DS::I].src[idx.us()] = src & SRC_MASK_7[idx.us()];
-                ds.dmas[DS::I].dst[idx.us()] = dst & DST_MASK_7[idx.us()];
+                channel.src = channel.sad & SRC_MASK_7[idx];
+                channel.dst = channel.dad & DST_MASK_7[idx];
             } else {
-                // NDS9
-                ds.dmas[DS::I].src[idx.us()] = src & 0xFFF_FFFF;
-                ds.dmas[DS::I].dst[idx.us()] = dst & 0xFFF_FFFF;
+                channel.src = channel.sad;
+                channel.dst = channel.dad;
             }
         }
 
-        ds[base + 0xA] = new_ctrl & if idx == 3 { 0xFFE0 } else { 0xF7E0 };
-        Self::step_dma(ds, idx, base, new_ctrl, Reason::CtrlWrite);
-    }
-
-    /// Get the destination register for a DMA; this is not the internal one.
-    pub fn get_dest(ds: &impl NdsCpu, idx: u16) -> u32 {
-        let base = Self::base_addr(idx);
-        word(ds[base + 4], ds[base + 6])
+        ds.dmas[DS::I].channels[idx].ctrl = new_ctrl;
+        Self::step_dma(ds, idx, Reason::CtrlWrite);
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma<DS: NdsCpu>(ds: &mut DS, idx: u16, base: u32, ctrl: u16, reason: Reason) {
-        let on = ctrl.is_bit(15)
+    fn step_dma<DS: NdsCpu>(ds: &mut DS, idx: usize, reason: Reason) {
+        let mut channel = ds.dmas[DS::I].channels[idx];
+        let ctrl = channel.ctrl;
+
+        let on = ctrl.dma_en()
             && if DS::I == 0 {
                 // NDS7
-                match ctrl.bits(12, 2) {
-                    0 => reason == Reason::CtrlWrite,
-                    1 => reason == Reason::VBlank,
-                    2 => reason == Reason::CartridgeReady,
-                    _ => false, // TODO wireless?
+                match ctrl.timing() {
+                    Timing::Now => reason == Reason::CtrlWrite,
+                    Timing::VBlank => reason == Reason::VBlank,
+                    Timing::HBlank => reason == Reason::CartridgeReady,
+                    Timing::Special => false, // TODO wireless?
                 }
             } else {
                 // NDS9
-                match ctrl.bits(11, 3) {
-                    0 => reason == Reason::CtrlWrite,
-                    1 => reason == Reason::VBlank,
-                    2 => reason == Reason::HBlank && ds[VCOUNT] < 160,
-                    3 => reason == Reason::HBlank && ds[VCOUNT] == 0,
-                    4 => false, // TODO
-                    5 => reason == Reason::CartridgeReady,
-                    6 => false,
-                    _ => false, // TODO
+                match (ctrl.timing_ext(), ctrl.timing()) {
+                    (false, Timing::Now) => reason == Reason::CtrlWrite,
+                    (true, Timing::Now) => reason == Reason::VBlank,
+                    (false, Timing::VBlank) => reason == Reason::HBlank, // && ds[VCOUNT] < 160,
+                    (true, Timing::VBlank) => reason == Reason::HBlank,  // && ds[VCOUNT] == 0,
+                    (false, Timing::HBlank) => false,                    // TODO
+                    (true, Timing::HBlank) => reason == Reason::CartridgeReady,
+                    (false, Timing::Special) => false,
+                    (true, Timing::Special) => false, // TODO
                 }
             };
         if !on {
             return;
         }
 
-        let count = ds[base + 8];
-        let count = match count {
+        let count = match channel.count {
             0 if DS::I == 1 => 0x20_0000,
             0 if idx == 3 => 0x1_0000,
             0 => 0x4000,
-            _ => count.u32(),
+            _ => channel.count.u32(),
         };
 
-        let src_mod = Self::get_step(ctrl.bits(7, 2));
-        let dst_raw = ctrl.bits(5, 2);
-        let dst_mod = match dst_raw {
-            3 => {
+        let src_mod = Self::get_step(ctrl.src_addr());
+        let dst_mod = match ctrl.dest_addr() {
+            AddrControl::IncReload => {
                 // Reload DST + Increment
-                let dst = word(ds[base + 4], ds[base + 6]);
-                ds.dmas[DS::I].dst[idx.us()] = dst
-                    & if DS::I == 0 {
+                channel.dst = channel.dad
+                    & &if DS::I == 0 {
                         DST_MASK_7[idx.us()]
                     } else {
                         0xFFF_FFFF
                     };
                 2
             }
-            _ => Self::get_step(dst_raw),
+            _ => Self::get_step(ctrl.dest_addr()),
         };
 
-        let word_transfer = ctrl.is_bit(10);
-        if word_transfer {
-            Self::perform_transfer::<DS, u32>(ds, idx.us(), count, src_mod * 2, dst_mod * 2);
+        if ctrl.is_32bit() {
+            Self::perform_transfer::<DS, u32>(ds, channel, idx, count, src_mod * 2, dst_mod * 2);
         } else {
-            Self::perform_transfer::<DS, u16>(ds, idx.us(), count, src_mod, dst_mod);
+            Self::perform_transfer::<DS, u16>(ds, channel, idx, count, src_mod, dst_mod);
         }
 
-        if !ctrl.is_bit(9) || ctrl.bits(12, 2) == 0 {
+        if !ctrl.repeat_en() || ctrl.timing() == Timing::Now {
             // Disable if reload is not enabled or it's an immediate transfer
-            ds[base + 0xA] = ctrl.set_bit(15, false);
+            ds.dmas[DS::I].channels[idx].ctrl.set_dma_en(false);
         }
-        if ctrl.is_bit(14) {
+        if ctrl.irq_en() {
             // Fire interrupt if configured
-            Cpu::request_interrupt_idx(ds, Interrupt::Dma0 as u16 + idx);
+            Cpu::request_interrupt_idx(ds, Interrupt::Dma0 as u16 + idx.u16());
         }
     }
 
     /// Perform a transfer.
     fn perform_transfer<DS: NdsCpu, T: RwType>(
         ds: &mut DS,
+        mut channel: Dma,
         idx: usize,
         count: u32,
         src_mod: i32,
         dst_mod: i32,
     ) {
-        if ds.dmas[DS::I].dst[idx] < 0x200_0000 {
+        ds.add_i_cycles(2);
+        if channel.dst < 0x200_0000 {
             return;
         }
 
-        let mut kind = Access::NonSeq;
-        if ds.dmas[DS::I].src[idx] >= 0x200_0000 {
+        let mut kind = NONSEQ | DMA;
+        if channel.src >= 0x200_0000 {
             // First, align SRC/DST
             let align = T::WIDTH - 1;
-            ds.dmas[DS::I].src[idx] &= !align;
-            ds.dmas[DS::I].dst[idx] &= !align;
+            channel.src &= !align;
+            channel.dst &= !align;
 
             for _ in 0..count {
-                let value = ds.read::<T>(ds.dmas[DS::I].src[idx], kind).u32();
-                ds.write::<T>(ds.dmas[DS::I].dst[idx], T::from_u32(value), kind);
+                let value = ds.read::<T>(channel.src, kind).u32();
+                ds.write::<T>(channel.dst, T::from_u32(value), kind);
 
-                ds.dmas[DS::I].src[idx] = ds.dmas[DS::I].src[idx].wrapping_add_signed(src_mod);
-                ds.dmas[DS::I].dst[idx] = ds.dmas[DS::I].dst[idx].wrapping_add_signed(dst_mod);
+                channel.src = channel.src.wrapping_add_signed(src_mod);
+                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
-                kind = Access::Seq;
+                kind = SEQ;
                 ds.advance_clock();
             }
 
             // Put last value into cache
             if T::WIDTH == 4 {
-                ds.dmas[DS::I].cache =
-                    ds.get::<u32>(ds.dmas[DS::I].src[idx].wrapping_add_signed(-src_mod));
+                ds.dmas[DS::I].cache = ds.get::<u32>(channel.src.wrapping_add_signed(-src_mod));
             } else {
-                let value = ds.get::<u16>(ds.dmas[DS::I].src[idx].wrapping_add_signed(-src_mod));
+                let value = ds.get::<u16>(channel.src.wrapping_add_signed(-src_mod));
                 ds.dmas[DS::I].cache = word(value, value);
             }
         } else {
             for _ in 0..count {
                 if T::WIDTH == 4 {
-                    ds.write::<u32>(ds.dmas[DS::I].dst[idx], ds.dmas[DS::I].cache, kind);
-                } else if ds.dmas[DS::I].dst[idx].is_bit(1) {
-                    ds.write::<u16>(
-                        ds.dmas[DS::I].dst[idx],
-                        (ds.dmas[DS::I].cache >> 16).u16(),
-                        kind,
-                    );
+                    ds.write::<u32>(channel.dst, ds.dmas[DS::I].cache, kind);
+                } else if channel.dst.is_bit(1) {
+                    ds.write::<u16>(channel.dst, (ds.dmas[DS::I].cache >> 16).u16(), kind);
                 } else {
-                    ds.write::<u16>(ds.dmas[DS::I].dst[idx], ds.dmas[DS::I].cache.u16(), kind);
+                    ds.write::<u16>(channel.dst, ds.dmas[DS::I].cache.u16(), kind);
                 }
-                ds.dmas[DS::I].src[idx] = ds.dmas[DS::I].src[idx].wrapping_add_signed(src_mod);
-                ds.dmas[DS::I].dst[idx] = ds.dmas[DS::I].dst[idx].wrapping_add_signed(dst_mod);
+                channel.src = channel.src.wrapping_add_signed(src_mod);
+                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
                 // Only first is NonSeq
-                kind = Access::Seq;
+                kind = SEQ;
                 ds.advance_clock();
             }
         }
-        ds.add_i_cycles(2);
     }
 
     /// Get the step with which to change SRC/DST registers after every write.
     /// Multiplied by 2 for word-sized DMAs.
     /// Inc+Reload handled separately.
-    fn get_step(bits: u16) -> i32 {
-        match bits {
-            0 => 2,
-            1 => -2,
+    fn get_step(control: AddrControl) -> i32 {
+        match control {
+            AddrControl::Increment => 2,
+            AddrControl::Decrement => -2,
             _ => 0,
         }
-    }
-
-    /// Get the base address for a DMA (First register: SRC low)
-    fn base_addr(idx: u16) -> u32 {
-        0xB0 + (idx.u32() * 0xC)
     }
 }
 
@@ -227,4 +230,41 @@ pub enum Reason {
     MemoryDisplay,
     /// Cartridge has data
     CartridgeReady,
+}
+
+#[bitfield]
+#[repr(u16)]
+#[derive(Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct DmaControl {
+    #[skip]
+    __: B5,
+    pub dest_addr: AddrControl,
+    pub src_addr: AddrControl,
+    pub repeat_en: bool,
+    pub is_32bit: bool,
+    pub timing_ext: bool,
+    pub timing: Timing,
+    pub irq_en: bool,
+    pub dma_en: bool,
+}
+
+#[derive(BitfieldSpecifier, Debug, PartialEq)]
+#[bits = 2]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub enum AddrControl {
+    Increment = 0,
+    Decrement = 1,
+    Fixed = 2,
+    IncReload = 3,
+}
+
+#[derive(BitfieldSpecifier, Debug, PartialEq)]
+#[bits = 2]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub enum Timing {
+    Now = 0,
+    VBlank = 1,
+    HBlank = 2,
+    Special = 3,
 }
