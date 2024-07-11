@@ -204,13 +204,11 @@ fn event_log<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
     ScrollArea::vertical().show(ui, |ui| {
         let events = dbg.diagnostic_events.lock().unwrap();
         for event in events.iter().rev() {
-            ui.label(
-                RichText::new(format!("{}", event.event)).color(severity_color(event.severity)),
-            )
-            .on_hover_ui(|ui| {
-                ui.label(format!("Type: {}", event.evt_type));
-                ui.label(format!("Time: {:?}", event.time));
-            });
+            ui.label(RichText::new(&event.event).color(severity_color(event.severity)))
+                .on_hover_ui(|ui| {
+                    ui.label(format!("Type: {}", event.evt_type));
+                    ui.label(format!("Time: {:?}", event.time));
+                });
         }
     });
 }

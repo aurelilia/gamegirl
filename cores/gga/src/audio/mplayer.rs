@@ -58,7 +58,7 @@ pub fn find_mp2k(rom: &[u8]) -> Option<u32> {
             }
         }
 
-        return !crc;
+        !crc
     }
 
     const CRC32: u32 = 0x27EA7FCF;
@@ -393,10 +393,8 @@ impl MusicPlayer {
                     sampler.should_fetch_sample = false;
                 }
 
-                let sample;
                 let mu = sampler.resample_phase;
-
-                if self.use_cubic_filter {
+                let sample = if self.use_cubic_filter {
                     // http://paulbourke.net/miscellaneous/interpolation/
                     let mu2 = mu * mu;
                     let a0 = sample_history[0] - sample_history[1] - sample_history[3]
@@ -404,10 +402,10 @@ impl MusicPlayer {
                     let a1 = sample_history[3] - sample_history[2] - a0;
                     let a2 = sample_history[1] - sample_history[3];
                     let a3 = sample_history[2];
-                    sample = a0 * mu * mu2 + a1 * mu2 + a2 * mu + a3;
+                    a0 * mu * mu2 + a1 * mu2 + a2 * mu + a3
                 } else {
-                    sample = sample_history[0] * mu + sample_history[1] * (1.0 - mu);
-                }
+                    sample_history[0] * mu + sample_history[1] * (1.0 - mu)
+                };
 
                 self.buffer[destination + (j * 2 + 0) as usize] += sample * volume_r;
                 self.buffer[destination + (j * 2 + 1) as usize] += sample * volume_l;
@@ -495,7 +493,7 @@ impl MusicPlayer {
             self.buffer_read_index = 0;
         }
 
-        return [sample[0], sample[1]];
+        [sample[0], sample[1]]
     }
 }
 

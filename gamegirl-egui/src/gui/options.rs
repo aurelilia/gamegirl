@@ -23,7 +23,7 @@ use crate::{
 pub enum Panel {
     Emulation,
     Features,
-    GUI,
+    Gui,
     Audio,
     Input,
     About,
@@ -33,7 +33,7 @@ impl Panel {
     pub const ALL: [(&'static str, Panel); 6] = [
         ("🖭 Emulation", Panel::Emulation),
         ("❇ Features", Panel::Features),
-        ("🖵 GUI", Panel::GUI),
+        ("🖵 GUI", Panel::Gui),
         ("🔊 Audio", Panel::Audio),
         ("🎮 Input", Panel::Input),
         ("😼 About", Panel::About),
@@ -119,7 +119,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
             }
         }
 
-        Panel::GUI => {
+        Panel::Gui => {
             ComboBox::from_label("Texture filter")
                 .selected_text(format!("{:?}", opt.tex_filter))
                 .show_ui(ui, |ui| {

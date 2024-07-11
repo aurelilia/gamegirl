@@ -133,8 +133,8 @@ impl Apu {
             a = (mplayer[0] * 512.) as i16 * a_vol_mul;
             b = (mplayer[1] * 512.) as i16 * b_vol_mul;
         } else {
-            a = self.current_samples[0] as i16 * a_vol_mul * 2;
-            b = self.current_samples[1] as i16 * b_vol_mul * 2;
+            a = self.current_samples[0] * a_vol_mul * 2;
+            b = self.current_samples[1] * b_vol_mul * 2;
         }
 
         if cnt.a_right_en() {
@@ -167,11 +167,7 @@ impl Apu {
 
     fn bias(mut sample: i16, bias: i16) -> i16 {
         sample += bias;
-        if sample > 0x3ff {
-            sample = 0x3ff;
-        } else if sample < 0 {
-            sample = 0;
-        }
+        sample = sample.clamp(0, 0x3ff);
         sample -= bias;
         sample
     }

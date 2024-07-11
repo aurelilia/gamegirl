@@ -126,7 +126,6 @@ fn game_screens(app: &mut App, ctx: &Context, size: [usize; 2]) {
                                             .0
                                             .send(Message::RomOpen(File {
                                                 content: test.test.rom.clone(),
-                                                path: None,
                                             }))
                                             .unwrap();
                                     }

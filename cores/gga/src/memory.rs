@@ -402,9 +402,9 @@ impl GameGirlAdv {
 
             // Treat as halfword
             _ if addr.is_bit(0) => {
-                self.set::<u16>(addr, Self::get::<u16>(&self, addr).set_high(value));
+                self.set::<u16>(addr, Self::get::<u16>(self, addr).set_high(value));
             }
-            _ => self.set::<u16>(addr, Self::get::<u16>(&self, addr).set_low(value)),
+            _ => self.set::<u16>(addr, Self::get::<u16>(self, addr).set_low(value)),
         }
     }
 

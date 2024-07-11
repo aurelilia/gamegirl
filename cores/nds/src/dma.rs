@@ -121,7 +121,7 @@ impl Dmas {
             AddrControl::IncReload => {
                 // Reload DST + Increment
                 channel.dst = channel.dad
-                    & &if DS::I == 0 {
+                    & if DS::I == 0 {
                         DST_MASK_7[idx.us()]
                     } else {
                         0xFFF_FFFF

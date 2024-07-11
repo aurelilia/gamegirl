@@ -16,8 +16,6 @@ use crate::app::Message;
 pub struct File {
     /// File content in bytes
     pub content: Vec<u8>,
-    /// Path of the file. Always None on WASM.
-    pub path: Option<PathBuf>,
 }
 
 /// Open a file dialog. This operation is async and returns immediately,
@@ -30,9 +28,8 @@ pub fn open_rom(sender: mpsc::Sender<Message>) {
     execute(async move {
         let file = task.await;
         if let Some(file) = file {
-            let path = path(&file);
             let content = file.read().await;
-            sender.send(Message::RomOpen(File { content, path })).ok();
+            sender.send(Message::RomOpen(File { content })).ok();
         }
     });
 }
@@ -47,11 +44,8 @@ pub fn open_replay(sender: mpsc::Sender<Message>) {
     execute(async move {
         let file = task.await;
         if let Some(file) = file {
-            let path = path(&file);
             let content = file.read().await;
-            sender
-                .send(Message::ReplayOpen(File { content, path }))
-                .ok();
+            sender.send(Message::ReplayOpen(File { content })).ok();
         }
     });
 }

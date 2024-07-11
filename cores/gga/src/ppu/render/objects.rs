@@ -145,7 +145,7 @@ impl PpuRender {
 
         let rotscal = self.get_rotscal(obj.rotscal());
         let (half_w, half_h) = (bounds_w / 2, bounds_h / 2);
-        let iy = line - (position.1 + half_h as i32);
+        let iy = line - (position.1 + half_h);
 
         for ix in (-half_w)..half_w {
             let screen_x = position.0 + half_w + ix;

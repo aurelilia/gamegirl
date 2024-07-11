@@ -878,7 +878,6 @@ dependencies = [
  "futures-executor",
  "gamegirl",
  "libloading",
- "notify",
  "rfd",
  "walkdir",
 ]

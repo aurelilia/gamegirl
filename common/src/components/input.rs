@@ -53,6 +53,7 @@ impl ButtonState {
     }
 }
 
+#[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Input {
     external: ButtonState,
@@ -82,17 +83,12 @@ impl Input {
     pub fn load_replay(&mut self, file: Vec<u8>) {
         self.replay = ReplayState::Playback(InputReplay::load(String::from_utf8(file).unwrap()));
     }
-
-    pub fn new() -> Self {
-        Self {
-            external: ButtonState::default(),
-            replay: ReplayState::None,
-        }
-    }
 }
 
+#[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum ReplayState {
+    #[default]
     None,
     Recording(InputReplay),
     Playback(InputReplay),
@@ -142,7 +138,7 @@ impl InputReplay {
             .unwrap_or_default()
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn serialize(&self) -> String {
         self.states.iter().fold(
             format!("{}\n", self.file.to_str().unwrap()),
             |mut acc, e| {

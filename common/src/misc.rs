@@ -31,7 +31,7 @@ impl Default for EmulateOptions {
             rom_loaded: false,
             invert_audio_samples: false,
             speed_multiplier: 1,
-            input: Input::new(),
+            input: Input::default(),
         }
     }
 }

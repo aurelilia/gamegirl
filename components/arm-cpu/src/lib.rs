@@ -20,7 +20,7 @@ mod lut;
 pub mod registers;
 mod waitloop;
 
-use std::{sync::Arc, u8};
+use std::sync::Arc;
 
 use access::{CODE, NONSEQ, SEQ};
 use common::{components::debugger::Severity, numutil::NumExt};
@@ -76,17 +76,17 @@ impl<S: ArmSystem> Cpu<S> {
             return;
         }
 
-        let mut gg = SysWrapper::new(gg);
+        let gg = SysWrapper::new(gg);
         if gg.cpu().cache.enabled {
             if let Some(cache) = gg.cpu().cache.get(pc) {
-                Cpu::run_cache(&mut gg, cache);
+                Cpu::run_cache(gg, cache);
                 return;
             } else if S::can_cache_at(pc) {
-                Cpu::try_make_cache(&mut gg);
+                Cpu::try_make_cache(gg);
                 return;
             }
         }
-        Self::execute_next_inst(&mut gg);
+        Self::execute_next_inst(gg);
     }
 
     /// Execute the next instruction and advance the scheduler.
@@ -266,8 +266,7 @@ impl<S: ArmSystem> Cpu<S> {
     pub fn check_if_interrupt(gg: &mut S) {
         if gg.cpur().is_interrupt_pending() {
             gg.cpu().inc_pc_by(4);
-            let mut wrapper = SysWrapper::new(gg);
-            Cpu::exception_occurred(&mut wrapper, Exception::Irq);
+            Cpu::exception_occurred(SysWrapper::new(gg), Exception::Irq);
         }
     }
 

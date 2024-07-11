@@ -5,12 +5,12 @@ use crate::App;
 
 pub fn render(app: &mut App, ctx: &Context) {
     let mut core = app.core.lock().unwrap();
-    button_win(ctx, &mut *core, input::Button::A, "A");
-    button_win(ctx, &mut *core, input::Button::B, "B");
-    button_win(ctx, &mut *core, input::Button::L, "L");
-    button_win(ctx, &mut *core, input::Button::R, "R");
-    button_win(ctx, &mut *core, input::Button::Start, "START");
-    button_win(ctx, &mut *core, input::Button::Select, "SELECT");
+    button_win(ctx, &mut core, input::Button::A, "A");
+    button_win(ctx, &mut core, input::Button::B, "B");
+    button_win(ctx, &mut core, input::Button::L, "L");
+    button_win(ctx, &mut core, input::Button::R, "R");
+    button_win(ctx, &mut core, input::Button::Start, "START");
+    button_win(ctx, &mut core, input::Button::Select, "SELECT");
 
     egui::Window::new("dpad")
         .title_bar(false)
@@ -18,17 +18,17 @@ pub fn render(app: &mut App, ctx: &Context) {
         .show(ctx, |ui| {
             egui::Grid::new("dpadgrid").show(ui, |ui| {
                 ui.label("");
-                button_ui(ui, &mut *core, input::Button::Up, "^");
+                button_ui(ui, &mut core, input::Button::Up, "^");
                 ui.label("");
                 ui.end_row();
 
-                button_ui(ui, &mut *core, input::Button::Left, "<");
+                button_ui(ui, &mut core, input::Button::Left, "<");
                 ui.label("");
-                button_ui(ui, &mut *core, input::Button::Right, ">");
+                button_ui(ui, &mut core, input::Button::Right, ">");
                 ui.end_row();
 
                 ui.label("");
-                button_ui(ui, &mut *core, input::Button::Down, "v");
+                button_ui(ui, &mut core, input::Button::Down, "v");
                 ui.label("");
                 ui.end_row();
             });

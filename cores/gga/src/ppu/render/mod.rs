@@ -43,7 +43,7 @@ type Layer = [Colour; WIDTH];
 pub enum PpuRendererKind {
     #[default]
     Invalid,
-    SingleCore(PpuRender),
+    SingleCore(Box<PpuRender>),
     Threaded {
         sender: Sender<PpuRegisters>,
         last: Arc<Mutex<Option<Vec<Colour>>>>,
@@ -88,7 +88,7 @@ impl PpuRendererKind {
 
             Self::Threaded { sender, last }
         } else {
-            Self::SingleCore(render)
+            Self::SingleCore(Box::new(render))
         }
     }
 }

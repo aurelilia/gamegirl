@@ -139,7 +139,7 @@ fn run_game(
     } else {
         fs::read(&path).unwrap()
     };
-    let mut core = gamegirl::load_cart(rom, None, &config, None, 0);
+    let mut core = gamegirl::load_cart(rom, None, config, None, 0);
 
     for _ in 0..80 {
         let time = Instant::now();
@@ -153,7 +153,7 @@ fn run_game(
         }
         bar.tick();
     }
-    write_png(&args.output_path, &mut core, &name, "noinput");
+    write_png(&args.output_path, &mut core, name, "noinput");
 
     for _ in 0..15 {
         core.advance_delta(1.5);
@@ -166,9 +166,9 @@ fn run_game(
         core.options().input.set(0, Button::A, false);
         bar.tick();
     }
-    write_png(&args.output_path, &mut core, &name, "astart");
+    write_png(&args.output_path, &mut core, name, "astart");
 
-    mp.remove(&bar);
+    mp.remove(bar);
     bar.abandon();
     total_bar.inc(1);
 }

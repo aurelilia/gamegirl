@@ -110,8 +110,8 @@ impl PpuRender {
 
             if !point.inbounds(160, 127) {
                 if wrap {
-                    point.0 = point.0.rem_euclid(160 as i32);
-                    point.1 = point.1.rem_euclid(127 as i32);
+                    point.0 = point.0.rem_euclid(160);
+                    point.1 = point.1.rem_euclid(127);
                 } else {
                     continue;
                 }

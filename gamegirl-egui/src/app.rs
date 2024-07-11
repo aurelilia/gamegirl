@@ -168,9 +168,9 @@ impl App {
                     _ => (),
                 }
             }
-            i.unstable_dt.min(0.016).max(0.001) - 0.0009
+            i.unstable_dt.clamp(0.001, 0.016) - 0.0009
         });
-        let delta = raw_delta.min(0.016).max(0.001) - 0.0009;
+        let delta = raw_delta.clamp(0.001, 0.016) - 0.0009;
 
         let mut core = self.core.lock().unwrap();
         let size = core.screen_size();

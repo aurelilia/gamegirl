@@ -8,7 +8,7 @@
 
 use std::{
     fs, mem,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{mpsc, Arc, Mutex},
     time::Instant,
 };
@@ -23,10 +23,6 @@ use gamegirl::{
     common::components::input::{InputReplay, ReplayState},
     dummy_core,
     dynamic::DynamicContext,
-};
-use notify::{
-    event::{AccessKind, AccessMode},
-    EventKind, INotifyWatcher, RecursiveMode, Watcher,
 };
 
 use crate::{
@@ -116,7 +112,7 @@ impl App {
                     if let Ok(core) = crate::load_core(&mut self.dyn_ctx, path) {
                         self.cores.push(core);
                         self.textures.push(App::make_screen_texture(
-                            &ctx,
+                            ctx,
                             [160, 144],
                             TextureOptions::NEAREST,
                         ));
@@ -148,8 +144,7 @@ impl App {
     pub fn update_test_suites(&mut self) {
         for core in &mut self.cores {
             for suite in self.suites.iter().skip(core.suites.len()) {
-                core.suites
-                    .push(Arc::clone(&suite).run_on_core(core.loader))
+                core.suites.push(Arc::clone(suite).run_on_core(core.loader))
             }
         }
     }
