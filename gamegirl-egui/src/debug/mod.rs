@@ -19,7 +19,7 @@ use common::{
     Core,
 };
 use eframe::egui::{
-    self, Align, Color32, ComboBox, Context, Label, Layout, RichText, ScrollArea, TextEdit, Ui,
+    self, Align, Color32, ComboBox, Context, Layout, RichText, ScrollArea, TextEdit, Ui,
 };
 use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
 

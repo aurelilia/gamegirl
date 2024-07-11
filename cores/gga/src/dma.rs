@@ -11,7 +11,7 @@ use std::mem;
 use arm_cpu::{
     access::{DMA, NONSEQ, SEQ},
     interface::{ArmSystem, RwType},
-    Access, Cpu, Interrupt,
+    Cpu, Interrupt,
 };
 use arrayvec::ArrayVec;
 use common::numutil::{word, NumExt};

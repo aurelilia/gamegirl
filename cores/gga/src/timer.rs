@@ -106,10 +106,10 @@ impl Timers {
         sched: &mut Scheduler<AdvEvent>,
         timer: usize,
         new_ctrl: TimerCtrl,
-        mut base_offset: TimeS,
+        base_offset: TimeS,
         mut timer_offset: TimeS,
     ) {
-        let (until_ov, mask) = Self::overflow_time(self.counters[timer], new_ctrl);
+        let until_ov = Self::overflow_time(self.counters[timer], new_ctrl);
         if until_ov == 1 {
             // Bit of a hack.
             timer_offset += 1;
@@ -128,7 +128,6 @@ impl Timers {
     fn overflow(gg: &mut GameGirlAdv, idx: u8, offset: TimeS) {
         let ctrl = gg.timers.control[idx.us()];
         let reload = gg.timers.reload[idx.us()];
-        let scaler = DIVS[ctrl.prescaler().us()].u32();
         let mut value = Self::time_read_inner(&gg.timers, idx.us(), gg.scheduler.now());
 
         // Fire IRQ if enabled
@@ -173,10 +172,9 @@ impl Timers {
     }
 
     /// Time until an overflow, for scheduling.
-    /// Second return is the prescaler mask.
-    fn overflow_time(reload: u16, ctrl: TimerCtrl) -> (u32, u32) {
+    fn overflow_time(reload: u16, ctrl: TimerCtrl) -> u32 {
         let scaler = DIVS[ctrl.prescaler().us()].u32();
-        ((scaler * (0x1_0000 - reload.u32())), (scaler - 1))
+        scaler * (0x1_0000 - reload.u32())
     }
 
     /// Increment a timer. Used for cascading timers.

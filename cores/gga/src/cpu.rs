@@ -7,11 +7,10 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use arm_cpu::{
-    access::NONSEQ,
     interface::{ArmSystem, RwType},
     Access, Cpu, Exception,
 };
-use common::{components::debugger::Debugger, numutil::NumExt, Time};
+use common::{components::debugger::Debugger, Time};
 
 use crate::{addr, audio::mplayer::MusicPlayer, GameGirlAdv};
 

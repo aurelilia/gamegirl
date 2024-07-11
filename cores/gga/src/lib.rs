@@ -15,7 +15,7 @@
 use std::{iter, mem, path::PathBuf};
 
 use arm_cpu::{registers::Flag, Cpu};
-use audio::{mplayer, Apu};
+use audio::Apu;
 use cartridge::Cartridge;
 use common::{
     common_functions,

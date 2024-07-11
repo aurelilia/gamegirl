@@ -8,9 +8,7 @@
 
 use std::{
     collections::HashMap,
-    mem,
     path::PathBuf,
-    ptr::{self, Pointee},
     sync::{mpsc, Arc, Mutex},
     time::Duration,
 };

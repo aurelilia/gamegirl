@@ -30,7 +30,6 @@ const CHANNEL_ENV_MASK: u8 = 0x03;
 const CHANNEL_ENV_ATTACK: u8 = 0x03;
 const CHANNEL_ENV_DECAY: u8 = 0x02;
 const CHANNEL_ENV_SUSTAIN: u8 = 0x01;
-const CHANNEL_ENV_RELEASE: u8 = 0x00;
 const CHANNEL_ON: u8 = CHANNEL_START | CHANNEL_STOP | CHANNEL_ECHO | CHANNEL_ENV_MASK;
 
 fn u8_to_float(value: u8) -> f32 {
@@ -41,6 +40,7 @@ const fn i8_to_float(value: i8) -> f32 {
     value as f32 / 127.
 }
 
+#[allow(dead_code)] // TODO Still unfinished
 pub fn find_mp2k(rom: &[u8]) -> Option<u32> {
     fn crc32(dat: &[u8]) -> u32 {
         let mut crc = u32::MAX;

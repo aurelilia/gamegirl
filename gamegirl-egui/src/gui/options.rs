@@ -30,7 +30,7 @@ pub enum Panel {
 }
 
 impl Panel {
-    pub const ALL: [(&str, Panel); 6] = [
+    pub const ALL: [(&'static str, Panel); 6] = [
         ("🖭 Emulation", Panel::Emulation),
         ("❇ Features", Panel::Features),
         ("🖵 GUI", Panel::GUI),
