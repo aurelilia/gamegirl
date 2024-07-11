@@ -8,11 +8,11 @@ NDS support is in the works!
 
 ## Screenshots
 ##### Playing Apotris
-![Gamegirl playing Apotris](img/apotris.png)
+![Gamegirl playing Apotris](web/img/apotris.png)
 ##### Playing Pokemon Emerald with debugger
-![Gamegirl playing Pokemon Emerald](img/emerald.png)
+![Gamegirl playing Pokemon Emerald](web/img/emerald.png)
 ##### TLoZ: Oracle of Ages with running debugger
-![Gamegirl playing Oracle of Ages](img/oracle.png)
+![Gamegirl playing Oracle of Ages](web/img/oracle.png)
 
 
 ## Status
