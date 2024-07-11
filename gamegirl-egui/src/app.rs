@@ -278,6 +278,16 @@ impl App {
                         .set_duration(Some(Duration::from_secs(5)));
                 }
 
+                Message::BiosOpen { file, console_id } => {
+                    self.state
+                        .options
+                        .sys
+                        .bioses
+                        .iter_mut()
+                        .find(|b| b.console_id == console_id)
+                        .map(|b| b.bios = Some(file.content.clone()));
+                }
+
                 Message::Error(msg) => {
                     self.toasts
                         .error(msg)
@@ -400,6 +410,8 @@ pub enum Message {
     ReplayOpen(File),
     /// An error occured.
     Error(String),
+    /// A BIOS file was picked.
+    BiosOpen { file: File, console_id: String },
     #[cfg(feature = "dynamic")]
     /// A new core got compiled and should be loaded.
     /// Only used when dynamic support is compiled in.

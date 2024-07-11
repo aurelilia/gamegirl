@@ -257,7 +257,7 @@ fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
             ui.label("Status: Recording replay");
             ui.label(&format!("Recorded {} states!", ir.states.len()));
             if ui.button("End & Save Replay").clicked() {
-                file_dialog::save(ir.serialize());
+                file_dialog::save_replay(ir.serialize());
                 core.options().input.replay = ReplayState::None;
             }
         }

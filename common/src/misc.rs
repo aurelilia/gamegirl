@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use std::vec;
+
 use crate::components::input::Input;
 
 /// Options that are used by the GUI and shared between all systems.
@@ -57,6 +59,18 @@ pub struct SystemConfig {
     pub cached_interpreter: bool,
     /// If the PPU should run on a sepearate thread.
     pub threaded_ppu: bool,
+    /// BIOSes to use / load.
+    pub bioses: Vec<ConsoleBios>,
+}
+
+impl SystemConfig {
+    /// Get the BIOS for a given console ID.
+    pub fn get_bios(&self, console_id: &str) -> Option<&[u8]> {
+        self.bioses
+            .iter()
+            .find(|bios| bios.console_id == console_id)
+            .and_then(|bios| bios.bios.as_deref())
+    }
 }
 
 impl Default for SystemConfig {
@@ -71,6 +85,38 @@ impl Default for SystemConfig {
             cached_interpreter: true,
             // WASM doesn't do threads
             threaded_ppu: !cfg!(target_arch = "wasm32"),
+            bioses: vec![
+                ConsoleBios {
+                    console_id: "dmg".into(),
+                    console_name: "Game Boy".into(),
+                    bios: None,
+                },
+                ConsoleBios {
+                    console_id: "cgb".into(),
+                    console_name: "Game Boy Color".into(),
+                    bios: None,
+                },
+                ConsoleBios {
+                    console_id: "agb".into(),
+                    console_name: "Game Boy Advance".into(),
+                    bios: None,
+                },
+                ConsoleBios {
+                    console_id: "nds7".into(),
+                    console_name: "DS (ARM7)".into(),
+                    bios: None,
+                },
+                ConsoleBios {
+                    console_id: "nds9".into(),
+                    console_name: "DS (ARM9)".into(),
+                    bios: None,
+                },
+                ConsoleBios {
+                    console_id: "psx".into(),
+                    console_name: "PlayStation".into(),
+                    bios: None,
+                },
+            ],
         }
     }
 }
@@ -87,6 +133,14 @@ pub enum CgbMode {
     Prefer,
     /// Never run the cart in CGB mode unless it requires it.
     Never,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
+pub struct ConsoleBios {
+    pub console_id: String,
+    pub console_name: String,
+    pub bios: Option<Vec<u8>>,
 }
 
 /// Serialize an object that can be loaded with [deserialize].

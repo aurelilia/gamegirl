@@ -383,9 +383,16 @@ impl MemoryMappedSystem<256> for GameGirl {
         }
 
         match a {
-            0x0000..=0x00FF if self.mem.bootrom_enable && self.cgb => offs(CGB_BOOTROM, a),
-            0x0000..=0x00FF if self.mem.bootrom_enable => offs(BOOTIX_ROM, a),
-            0x0200..=0x08FF if self.mem.bootrom_enable && self.cgb => offs(CGB_BOOTROM, a - 0x0100),
+            0x0000..=0x00FF if self.mem.bootrom_enable && self.cgb => {
+                offs(self.config.get_bios("cgb").unwrap_or(CGB_BOOTROM), a)
+            }
+            0x0000..=0x00FF if self.mem.bootrom_enable => {
+                offs(self.config.get_bios("dmg").unwrap_or(BOOTIX_ROM), a)
+            }
+            0x0200..=0x08FF if self.mem.bootrom_enable && self.cgb => offs(
+                self.config.get_bios("cgb").unwrap_or(CGB_BOOTROM),
+                a - 0x0100,
+            ),
             0x0000..=0x3FFF => offs(&self.cart.rom, a),
             0x4000..=0x7FFF => offs(&self.cart.rom, a - 0x4000),
 

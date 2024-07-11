@@ -56,8 +56,28 @@ pub fn open_replay(sender: mpsc::Sender<Message>) {
     });
 }
 
+/// Open a file dialog. This operation is async and returns immediately,
+/// sending a [Message] once the user has picked a file.
+pub fn open_bios(sender: mpsc::Sender<Message>, console_id: String) {
+    let task = rfd::AsyncFileDialog::new().pick_file();
+
+    execute(async move {
+        let file = task.await;
+        if let Some(file) = file {
+            let path = path(&file);
+            let content = file.read().await;
+            sender
+                .send(Message::BiosOpen {
+                    file: File { content, path },
+                    console_id,
+                })
+                .ok();
+        }
+    });
+}
+
 /// Open a file save dialog. This operation is async and returns immediately.
-pub fn save(content: String) {
+pub fn save_replay(content: String) {
     let task = rfd::AsyncFileDialog::new()
         .add_filter("GameGirl replays", &["rpl"])
         .save_file();

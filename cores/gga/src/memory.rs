@@ -24,10 +24,9 @@ use common::{
 use modular_bitfield::{bitfield, specifiers::*};
 
 use super::audio;
-use crate::{addr::*, dma::Dmas, input::KeyControl, Apu, GameGirlAdv};
+use crate::{addr::*, bios::BIOS, dma::Dmas, input::KeyControl, Apu, GameGirlAdv};
 
 pub const KB: usize = 1024;
-pub const BIOS: &[u8] = include_bytes!("bios.bin");
 
 #[bitfield]
 #[repr(u16)]
@@ -69,6 +68,7 @@ pub struct Prefetch {
 /// and other auxiliary cached information relating to memory.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
+    pub bios: Box<[u8]>,
     pub ewram: Box<[u8]>,
     pub iwram: Box<[u8]>,
 
@@ -95,7 +95,9 @@ impl GameGirlAdv {
         self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
             match addr {
                 // BIOS
-                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => Self::bios_read(addr),
+                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => {
+                    Self::bios_read(&self.memory.bios, addr)
+                }
                 0x0000_0000..=0x0000_3FFF => T::from_u32(self.memory.bios_value),
 
                 // MMIO
@@ -538,9 +540,9 @@ impl GameGirlAdv {
         }
     }
 
-    fn bios_read<T>(addr: u32) -> T {
+    fn bios_read<T>(bios: &[u8], addr: u32) -> T {
         unsafe {
-            let ptr = BIOS.as_ptr().add(addr.us() & 0x3FFF);
+            let ptr = bios.as_ptr().add(addr.us() & 0x3FFF);
             ptr.cast::<T>().read()
         }
     }
@@ -717,6 +719,7 @@ impl GameGirlAdv {
 impl Default for Memory {
     fn default() -> Self {
         Self {
+            bios: BIOS.into(),
             ewram: Box::new([0; 256 * KB]),
             iwram: Box::new([0; 32 * KB]),
             keycnt: 0.into(),

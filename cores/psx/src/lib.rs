@@ -124,6 +124,7 @@ impl PlayStation {
         }
 
         let mut ps = Box::<Self>::default();
+        ps.memory.bios = config.get_bios("psx").unwrap().into();
         ps.ppu.init(ogl_ctx, ogl_tex_id);
 
         // DMA

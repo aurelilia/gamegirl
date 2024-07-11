@@ -25,7 +25,6 @@ use crate::{
 
 const KB: usize = 1024;
 const MB: usize = KB * KB;
-const BIOS: [u8; 512 * KB] = *include_bytes!("bios.bin");
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Memory {
@@ -33,8 +32,7 @@ pub struct Memory {
     ram: [u8; 2 * MB],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     scratchpad: [u8; KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    bios: [u8; 512 * KB],
+    pub bios: Box<[u8]>,
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub mmio: [u32; 8 * KB / 4],
 }
@@ -157,7 +155,7 @@ impl Default for Memory {
         Self {
             ram: [0; 2 * MB],
             scratchpad: [0; KB],
-            bios: BIOS,
+            bios: Box::new([]),
             mmio: [0; 2 * KB],
         }
     }

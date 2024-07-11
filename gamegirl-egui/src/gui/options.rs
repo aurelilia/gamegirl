@@ -11,12 +11,12 @@ use eframe::{
     egui,
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, Ui},
 };
-use egui::Separator;
+use egui::{Color32, RichText, Separator};
 
 use crate::{
     app::{App, GuiStyle, Options},
     filter::Filter,
-    input::{InputAction, HOTKEYS},
+    input::{file_dialog, InputAction, HOTKEYS},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +53,35 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
 
     match app.open_option {
         Panel::Emulation => {
+            ui.heading("Console BIOSes");
+            ui.label("Select the BIOS files to use for the emulated consoles.");
+            ui.label("All 3 GameBoy consoles will use a replacement BIOS if not provided.");
+            ui.label(
+                RichText::new("Some GBA games need an official BIOS to work.")
+                    .color(Color32::YELLOW),
+            );
+            egui::Grid::new("bios").spacing((8.0, 4.0)).show(ui, |ui| {
+                for bios in opt.sys.bioses.iter_mut() {
+                    ui.strong(&bios.console_name);
+                    if bios.bios.is_some() {
+                        ui.label(RichText::new("    ✅ Using provided BIOS").color(Color32::GREEN));
+                        if ui.button("Clear").clicked() {
+                            bios.bios = None;
+                        }
+                    } else {
+                        ui.label("    ❌ No BIOS provided");
+                        if ui.button("Load").clicked() {
+                            file_dialog::open_bios(
+                                app.message_channel.0.clone(),
+                                bios.console_id.clone(),
+                            );
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+            ui.add(Separator::default().spacing(10.));
+
             ui.heading("GameBoy");
             ComboBox::from_label("GB Color mode")
                 .selected_text(format!("{:?}", opt.sys.mode))

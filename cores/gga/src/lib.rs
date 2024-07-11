@@ -43,6 +43,7 @@ use crate::{
 
 pub mod addr;
 mod audio;
+mod bios;
 mod cartridge;
 mod cpu;
 mod dma;
@@ -182,6 +183,9 @@ impl GameGirlAdv {
         gga.cart.load_rom(cart);
         if let Some(save) = Storage::load(path, gga.cart.title()) {
             gga.cart.load_save(save);
+        }
+        if let Some(bios) = config.get_bios("agb") {
+            gga.memory.bios = bios.into();
         }
         gga.init_memory();
         Ppu::init_render(&mut gga);

@@ -171,6 +171,8 @@ impl Nds {
     pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
         let mut nds = Box::<Self>::default();
         nds.config = config.clone();
+        nds.memory.bios7 = config.get_bios("nds7").unwrap().into();
+        nds.memory.bios9 = config.get_bios("nds9").unwrap().into();
         nds.cart.load_rom(cart);
         nds.init_memory();
         nds.skip_bootrom();

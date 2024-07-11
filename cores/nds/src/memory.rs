@@ -23,9 +23,6 @@ use crate::{addr::*, dma::Dmas, timer::Timers, CpuDevice, Nds, NdsCpu};
 pub const KB: usize = 1024;
 pub const MB: usize = KB * KB;
 
-pub const BIOS7: &[u8] = include_bytes!("bios7.bin");
-pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
-
 /// Memory struct containing the NDS's memory regions along with page tables
 /// and other auxiliary cached information relating to memory.
 /// A lot is separated by the 2 CPUs.
@@ -33,6 +30,9 @@ pub const BIOS9: &[u8] = include_bytes!("bios9.bin");
 pub struct Memory {
     pub psram: Box<[u8]>,
     wram: Box<[u8]>,
+
+    pub bios7: Box<[u8]>,
+    pub bios9: Box<[u8]>,
 
     wram7: Box<[u8]>,
     inst_tcm: Box<[u8]>,
@@ -170,7 +170,11 @@ impl Nds9 {
             }
 
             0xFFFF_0000..=0xFFFF_FFFF => unsafe {
-                let ptr = BIOS9.as_ptr().add(addr.us() % BIOS9.len());
+                let ptr = self
+                    .memory
+                    .bios9
+                    .as_ptr()
+                    .add(addr.us() % self.memory.bios9.len());
                 ptr.cast::<T>().read()
             },
 
@@ -216,6 +220,9 @@ impl Default for Memory {
         Self {
             psram: Box::new([0; 4 * MB]),
             wram: Box::new([0; 32 * KB]),
+            bios7: Box::new([]),
+            bios9: Box::new([]),
+
             wram7: Box::new([0; 64 * KB]),
             inst_tcm: Box::new([0; 32 * KB]),
             data_tcm: Box::new([0; 16 * KB]),
@@ -267,7 +274,7 @@ impl MemoryMappedSystem<8192> for Nds7 {
         }
 
         match a {
-            0x0000_0000..=0x00FF_FFFF if R => offs(BIOS7, a),
+            0x0000_0000..=0x00FF_FFFF if R => offs(&self.memory.bios7, a),
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.psram, a - 0x200_0000),
             // TODO not quite right...
             0x0300_0000..=0x037F_FFFF => offs(&self.memory.wram, a - 0x300_0000),
