@@ -24,6 +24,7 @@ pub struct File {
 /// sending a [Message] once the user has picked a file.
 pub fn open_rom(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
+        .set_title("Open ROM")
         .add_filter("GameGirl games", &["gb", "gbc", "gba", "elf", "iso", "zip"])
         .pick_file();
 
@@ -41,6 +42,7 @@ pub fn open_rom(sender: mpsc::Sender<Message>) {
 /// sending a [Message] once the user has picked a file.
 pub fn open_replay(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
+        .set_title("Open Replay")
         .add_filter("GameGirl replays", &["rpl"])
         .pick_file();
 
@@ -59,7 +61,9 @@ pub fn open_replay(sender: mpsc::Sender<Message>) {
 /// Open a file dialog. This operation is async and returns immediately,
 /// sending a [Message] once the user has picked a file.
 pub fn open_bios(sender: mpsc::Sender<Message>, console_id: String) {
-    let task = rfd::AsyncFileDialog::new().pick_file();
+    let task = rfd::AsyncFileDialog::new()
+        .set_title("Open BIOS")
+        .pick_file();
 
     execute(async move {
         let file = task.await;
@@ -79,6 +83,7 @@ pub fn open_bios(sender: mpsc::Sender<Message>, console_id: String) {
 /// Open a file save dialog. This operation is async and returns immediately.
 pub fn save_replay(content: String) {
     let task = rfd::AsyncFileDialog::new()
+        .set_title("Save Replay")
         .add_filter("GameGirl replays", &["rpl"])
         .save_file();
 
@@ -86,6 +91,22 @@ pub fn save_replay(content: String) {
         let file = task.await;
         if let Some(file) = file {
             file.write(content.as_bytes()).await.unwrap();
+        }
+    });
+}
+
+/// Open a file save dialog. This operation is async and returns immediately.
+pub fn save_gamesave(name: String, content: Vec<u8>) {
+    let task = rfd::AsyncFileDialog::new()
+        .set_title("Save Game As")
+        .set_file_name(format!("{name}.sav"))
+        .add_filter("Game Save", &["sav"])
+        .save_file();
+
+    execute(async move {
+        let file = task.await;
+        if let Some(file) = file {
+            file.write(&content).await.unwrap();
         }
     });
 }

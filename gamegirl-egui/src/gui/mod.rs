@@ -90,7 +90,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
     ui.spacing_mut().item_spacing[0] = 13.0;
 
     ui.menu_button("🗁 File", |ui| {
-        if ui.button("📂 Open ROM").clicked() {
+        if ui.button("📂 Open ROM...").clicked() {
             file_dialog::open_rom(app.message_channel.0.clone());
             ui.close_menu();
         }
@@ -148,6 +148,16 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             app.toasts
                 .info("Game saved")
                 .set_duration(Some(Duration::from_secs(5)));
+            ui.close_menu();
+        }
+        if ui.button("💾 Save As...").clicked() {
+            let save = { app.core.lock().unwrap().make_save() };
+            if let Some(file) = save {
+                file_dialog::save_gamesave(file.title, file.ram);
+                app.toasts
+                    .info(format!("Game saved"))
+                    .set_duration(Some(Duration::from_secs(5)));
+            }
             ui.close_menu();
         }
 
