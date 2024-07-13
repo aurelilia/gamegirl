@@ -7,7 +7,8 @@ fn main() {
         &SystemConfig::default(),
         None,
         0,
-    );
+    )
+    .unwrap();
     for _ in 0..1000 {
         core.advance_delta(0.1);
     }

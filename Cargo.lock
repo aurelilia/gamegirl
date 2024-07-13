@@ -1609,7 +1609,9 @@ dependencies = [
  "nes",
  "notify",
  "psx",
+ "thiserror",
  "web-sys",
+ "zip",
 ]
 
 [[package]]

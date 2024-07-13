@@ -25,7 +25,7 @@ pub type NewCoreFn = extern "C" fn(Vec<u8>) -> Box<dyn Core>;
 #[allow(improper_ctypes_definitions)]
 #[no_mangle]
 pub extern "C" fn new_core(cart: Vec<u8>) -> Box<dyn Core> {
-    crate::load_cart(cart, None, &SystemConfig::default(), None, 0)
+    crate::load_cart(cart, None, &SystemConfig::default(), None, 0).unwrap()
 }
 
 pub struct DynamicContext {

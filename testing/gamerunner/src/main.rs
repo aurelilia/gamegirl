@@ -139,7 +139,7 @@ fn run_game(
     } else {
         fs::read(&path).unwrap()
     };
-    let mut core = gamegirl::load_cart(rom, None, config, None, 0);
+    let mut core = gamegirl::load_cart(rom, None, config, None, 0).unwrap();
 
     for _ in 0..80 {
         let time = Instant::now();

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use common::Width;
-use egui::{Button, Checkbox, Color32, Context, Layout, Separator, TextEdit, Ui};
+use egui::{Button, Checkbox, Color32, Context, Separator, TextEdit, Ui};
 use egui_extras::{Column, TableBuilder};
 
 use crate::App;

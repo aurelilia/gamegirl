@@ -8,7 +8,12 @@
 
 //! This crate contains common structures shared by all systems.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    io,
+    io::{Cursor, Read},
+    path::PathBuf,
+    sync::Arc,
+};
 
 pub use common::{self, Core};
 use common::{
@@ -25,11 +30,25 @@ use glow::Context;
 pub use nds;
 #[cfg(feature = "psx")]
 pub use psx;
+use thiserror::Error;
+use zip::result::ZipError;
 
 #[cfg(all(feature = "dynamic", target_family = "unix"))]
 pub mod dynamic;
 #[cfg(all(feature = "remote-debugger", target_family = "unix"))]
 pub mod remote_debugger;
+
+#[derive(Error, Debug)]
+pub enum GamegirlError {
+    #[error("ROM is too small")]
+    RomTooSmall,
+    #[error("Zip error: {0}")]
+    ZipError(ZipError),
+    #[error("IO error: {0}")]
+    IoError(io::Error),
+    #[error("Console autodetection failed, make sure you have a valid ROM file")]
+    AutodetectFailed,
+}
 
 /// Save a game to disk.
 pub fn save_game(system: &dyn Core, path: Option<PathBuf>) {
@@ -40,13 +59,42 @@ pub fn save_game(system: &dyn Core, path: Option<PathBuf>) {
 }
 
 /// Load a cart. Tries to automatically pick the right system kind.
+/// ROM can optionally be compressed
+pub fn load_cart_maybe_zip(
+    cart: Vec<u8>,
+    path: Option<PathBuf>,
+    config: &SystemConfig,
+    _ogl_ctx: Option<Arc<Context>>,
+    _ogl_tex_id: u32,
+) -> Result<Box<dyn Core>, GamegirlError> {
+    let reader = Cursor::new(&cart);
+    let zip = zip::ZipArchive::new(reader);
+    match zip {
+        Ok(mut archive) => {
+            let mut rom = Vec::new();
+            archive
+                .by_index(0)
+                .map_err(GamegirlError::ZipError)?
+                .read_to_end(&mut rom)
+                .map_err(GamegirlError::IoError)?;
+            load_cart(rom, path, config, _ogl_ctx, _ogl_tex_id)
+        }
+        Err(_) => load_cart(cart, path, config, _ogl_ctx, _ogl_tex_id),
+    }
+}
+
+/// Load a cart. Tries to automatically pick the right system kind.
 pub fn load_cart(
     cart: Vec<u8>,
     path: Option<PathBuf>,
     config: &SystemConfig,
     _ogl_ctx: Option<Arc<Context>>,
     _ogl_tex_id: u32,
-) -> Box<dyn Core> {
+) -> Result<Box<dyn Core>, GamegirlError> {
+    if cart.len() < 0x1000 {
+        return Err(GamegirlError::RomTooSmall);
+    }
+
     // We detect GG(C) carts by the first 2 bytes of the "Nintendo" logo header
     // that is present on every cartridge.
     let _is_ggc = cart[0x0104] == 0xCE && cart[0x0105] == 0xED;
@@ -84,7 +132,7 @@ pub fn load_cart(
         }
 
         #[cfg(not(feature = "gga"))]
-        _ => panic!("Failed to detect cart and no GGA core available!."),
+        _ => return Err(GamegirlError::AutodetectFailed),
     };
 
     *sys.is_running() = config.run_on_open;
@@ -92,7 +140,7 @@ pub fn load_cart(
     if config.skip_bootrom {
         sys.skip_bootrom();
     }
-    sys
+    Ok(sys)
 }
 
 pub fn dummy_core() -> Box<dyn Core> {

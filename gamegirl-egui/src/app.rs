@@ -225,13 +225,6 @@ impl App {
         while let Ok(msg) = self.message_channel.1.try_recv() {
             match msg {
                 Message::RomOpen(file) => {
-                    if file.content.len() < 0x1000 {
-                        self.toasts
-                            .error("ROM too small! Not loading")
-                            .set_duration(Some(Duration::from_secs(5)));
-                        return;
-                    }
-
                     self.save_game();
 
                     let tex = match self.textures[0] {
@@ -239,13 +232,24 @@ impl App {
                         _ => panic!(),
                     };
 
-                    *self.core.lock().unwrap() = gamegirl::load_cart(
+                    let sys = gamegirl::load_cart_maybe_zip(
                         file.content,
                         file.path.clone(),
                         &self.state.options.sys,
                         gl.cloned(),
                         tex as u32,
                     );
+                    match sys {
+                        Ok(sys) => {
+                            *self.core.lock().unwrap() = sys;
+                        }
+                        Err(e) => {
+                            self.toasts
+                                .error(format!("Error loading ROM: {e}"))
+                                .set_duration(Some(Duration::from_secs(5)));
+                            return;
+                        }
+                    }
 
                     self.audio_stream = crate::setup_cpal(self.core.clone());
 
