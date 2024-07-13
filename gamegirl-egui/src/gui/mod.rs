@@ -6,6 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+pub mod cheat;
 mod input;
 pub mod options;
 
@@ -47,10 +48,13 @@ const DEMO_APP_URLS: &[(&str, &str, &str)] = &[
 /// Function signature for an app window
 type AppFn = fn(&mut App, &Context, &mut Ui);
 /// Count of GUI windows that take the App as a parameter.
-pub const APP_WINDOW_COUNT: usize = 2;
+pub const APP_WINDOW_COUNT: usize = 3;
 /// GUI windows that take the App as a parameter.
-const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] =
-    [("Options", options::options), ("Replays", replays)];
+const APP_WINDOWS: [(&str, AppFn); APP_WINDOW_COUNT] = [
+    ("Options", options::options),
+    ("Replays", replays),
+    ("Cheat Engine", cheat::ui),
+];
 
 pub fn draw(app: &mut App, ctx: &Context, frame: &Frame, size: [usize; 2]) {
     ctx.style_mut(|s| s.spacing.item_spacing[1] = 5.);
@@ -161,10 +165,6 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             app.reset();
             ui.close_menu();
         }
-        if ui.button("⏪ Replays").clicked() {
-            app.app_window_states[1] ^= true;
-            ui.close_menu();
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -172,6 +172,18 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             if ui.button("🚪 Exit").clicked() {
                 ctx.send_viewport_cmd(ViewportCommand::Close)
             }
+        }
+    });
+
+    ui.menu_button("✨ Features", |ui| {
+        if ui.button("⏪ Replays").clicked() {
+            app.app_window_states[1] ^= true;
+            ui.close_menu();
+        }
+
+        if ui.button("🐲 Cheat Engine").clicked() {
+            app.app_window_states[2] ^= true;
+            ui.close_menu();
         }
     });
 

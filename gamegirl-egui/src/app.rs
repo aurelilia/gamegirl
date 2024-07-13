@@ -27,7 +27,7 @@ use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
     filter::{self, Filter},
-    gui::{self, options, APP_WINDOW_COUNT},
+    gui::{self, cheat::CheatEngineState, options, APP_WINDOW_COUNT},
     input::{self, File, Input, InputAction, InputSource},
     rewind::Rewinder,
     Colour,
@@ -81,6 +81,8 @@ pub struct App {
     pub app_window_states: [bool; APP_WINDOW_COUNT],
     /// Debugger window states.
     pub debugger_window_states: Vec<bool>,
+    /// Cheat engine state
+    pub cheat: CheatEngineState,
     /// State of OSI
     pub on_screen_input: bool,
     /// State of options window
@@ -360,6 +362,7 @@ impl App {
 
             app_window_states: [false; APP_WINDOW_COUNT],
             debugger_window_states: Vec::from([false; 10]),
+            cheat: CheatEngineState::default(),
             on_screen_input: false,
             open_option: options::Panel::About,
             toasts: Toasts::default().with_anchor(Anchor::BottomLeft),

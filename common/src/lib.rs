@@ -8,11 +8,12 @@
 
 #![feature(btree_cursors)]
 
-use std::any::Any;
+use std::{any::Any, cmp::Ordering};
 
 pub use components::scheduler::{Time, TimeS};
 use components::storage::GameSave;
 use misc::{EmulateOptions, SystemConfig};
+use numutil::NumExt;
 
 pub mod components;
 pub mod misc;
@@ -70,8 +71,18 @@ pub trait Core: Send + Sync {
     fn make_save(&self) -> Option<GameSave>;
 
     /// Get the value at the given memory address.
-    fn get_memory(&self, _addr: usize) -> u8 {
+    /// The width parameter specifies the size of the value to read.
+    /// Remaining bits are zero.
+    fn get_memory(&self, _addr: u32, _width: Width) -> u32 {
         unimplemented!("Not implemented for this core")
+    }
+    /// Search for the given value in memory.
+    /// The width parameter specifies the size of the value to search for.
+    /// Returns a list of matching addresses.
+    /// Note that unaligned values will not be checked; the exact meaning
+    /// of unaligned is platform-specific.
+    fn search_memory(&self, _value: u32, _width: Width, _kind: Ordering) -> Vec<u32> {
+        vec![]
     }
     /// Get the value of all registers. Exact meaning is platform-specific.
     fn get_registers(&self) -> Vec<usize> {
@@ -81,8 +92,62 @@ pub trait Core: Send + Sync {
     fn get_serial(&self) -> &[u8] {
         unimplemented!("Not implemented for this core")
     }
+    /// Get the ROM currently loaded.
+    fn get_rom(&self) -> Vec<u8>;
+
+    /// Set the value at the given memory address.
+    /// The width parameter specifies the size of the value to write.
+    /// Remaining bits are ignored.
+    fn set_memory(&mut self, _addr: u32, _value: u32, _width: Width) {
+        unimplemented!("Not implemented for this core")
+    }
 
     fn as_any(&mut self) -> &mut dyn Any;
+}
 
-    fn get_rom(&self) -> Vec<u8>;
+/// Width of a value to be read/written from memory.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Width {
+    #[default]
+    Byte,
+    Halfword,
+    Word,
+}
+
+impl Width {
+    pub fn size(&self) -> usize {
+        match self {
+            Width::Byte => 1,
+            Width::Halfword => 2,
+            Width::Word => 4,
+        }
+    }
+
+    pub fn mask(&self) -> u32 {
+        match self {
+            Width::Byte => 0xFF,
+            Width::Halfword => 0xFFFF,
+            Width::Word => 0xFFFFFFFF,
+        }
+    }
+}
+
+pub fn search_array(
+    matches: &mut Vec<u32>,
+    arr: &[u8],
+    offset: u32,
+    value: u32,
+    width: Width,
+    kind: Ordering,
+) {
+    for (i, chunk) in arr.chunks_exact(width.size()).enumerate() {
+        let chunk = match width {
+            Width::Byte => chunk[0].u32(),
+            Width::Halfword => u16::from_le_bytes([chunk[0], chunk[1]]).u32(),
+            Width::Word => u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+        };
+        if chunk.cmp(&value) == kind {
+            matches.push(offset + i.u32() * width.size().u32());
+        }
+    }
 }

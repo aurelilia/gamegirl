@@ -12,7 +12,7 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(trait_alias)]
 
-use std::{iter, mem, path::PathBuf};
+use std::{cmp::Ordering, iter, mem, path::PathBuf};
 
 use arm_cpu::{registers::Flag, Cpu};
 use audio::Apu;
@@ -26,7 +26,7 @@ use common::{
     },
     misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
-    produce_samples_buffered, Core, TimeS,
+    produce_samples_buffered, Core, TimeS, Width,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
@@ -113,8 +113,40 @@ impl Core for GameGirlAdv {
         self.cart.make_save()
     }
 
-    fn get_memory(&self, addr: usize) -> u8 {
-        self.get(addr as u32)
+    fn get_memory(&self, addr: u32, width: Width) -> u32 {
+        self.get::<u32>(addr) & width.mask()
+    }
+
+    fn search_memory(&self, value: u32, width: Width, kind: Ordering) -> Vec<u32> {
+        let mut values = Vec::new();
+        common::search_array(
+            &mut values,
+            &self.memory.iwram,
+            0x200_0000,
+            value,
+            width,
+            kind,
+        );
+        common::search_array(
+            &mut values,
+            &self.memory.ewram,
+            0x300_0000,
+            value,
+            width,
+            kind,
+        );
+        common::search_array(
+            &mut values,
+            &self.ppu.palette,
+            0x500_0000,
+            value,
+            width,
+            kind,
+        );
+        common::search_array(&mut values, &self.ppu.vram, 0x600_0000, value, width, kind);
+        common::search_array(&mut values, &self.ppu.oam, 0x700_0000, value, width, kind);
+        common::search_array(&mut values, &self.cart.ram, 0xE00_0000, value, width, kind);
+        values
     }
 
     fn get_registers(&self) -> Vec<usize> {
@@ -127,6 +159,14 @@ impl Core for GameGirlAdv {
 
     fn get_rom(&self) -> Vec<u8> {
         self.cart.rom.clone()
+    }
+
+    fn set_memory(&mut self, addr: u32, value: u32, width: Width) {
+        match width {
+            Width::Byte => self.set(addr, value.u8()),
+            Width::Halfword => self.set(addr, value.u16()),
+            Width::Word => self.set(addr, value),
+        }
     }
 }
 

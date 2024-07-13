@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{mem, path::PathBuf};
+use std::{cmp::Ordering, mem, path::PathBuf};
 
 use common::{
     common_functions,
@@ -17,8 +17,8 @@ use common::{
         storage::{GameSave, Storage},
     },
     misc::{EmulateOptions, SystemConfig},
-    numutil::NumExt,
-    produce_samples_buffered, Core, Time,
+    numutil::{hword, word, NumExt},
+    produce_samples_buffered, Core, Time, Width,
 };
 use io::addr::DIV;
 
@@ -111,8 +111,24 @@ impl Core for GameGirl {
         self.cart.make_save()
     }
 
-    fn get_memory(&self, addr: usize) -> u8 {
-        self.get(addr as u16)
+    fn get_memory(&self, addr: u32, width: Width) -> u32 {
+        match width {
+            Width::Byte => self.get(addr.u16()),
+            Width::Halfword => hword(self.get(addr.u16()), self.get(addr.u16() + 1)).u32(),
+            Width::Word => word(
+                hword(self.get(addr.u16()), self.get(addr.u16() + 1)),
+                hword(self.get(addr.u16() + 2), self.get(addr.u16() + 3)),
+            ),
+        }
+    }
+
+    fn search_memory(&self, value: u32, width: Width, kind: Ordering) -> Vec<u32> {
+        let mut values = Vec::new();
+        common::search_array(&mut values, &self.mem.vram, 0x8000, value, width, kind);
+        common::search_array(&mut values, &self.mem.wram, 0xC000, value, width, kind);
+        common::search_array(&mut values, &self.mem.oam, 0xFE00, value, width, kind);
+        common::search_array(&mut values, &self.mem.high, 0xFF00, value, width, kind);
+        values
     }
 
     fn get_registers(&self) -> Vec<usize> {

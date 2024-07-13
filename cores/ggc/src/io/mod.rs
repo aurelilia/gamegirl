@@ -50,12 +50,12 @@ pub struct Memory {
     pub vram: [u8; 2 * 8192],
     vram_bank: u8,
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    wram: [u8; 4 * 8192],
+    pub wram: [u8; 4 * 8192],
     wram_bank: u8,
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    oam: [u8; 160],
+    pub oam: [u8; 160],
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    high: [u8; 256],
+    pub high: [u8; 256],
     pending_dma: Option<u64>,
     dma_restarted: bool,
 
