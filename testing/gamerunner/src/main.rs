@@ -9,7 +9,10 @@ use std::{
 
 use clap::Parser;
 use gamegirl::{
-    common::common::{input::Button, options::SystemConfig},
+    common::common::{
+        input::Button,
+        options::{ConsoleBios, SystemConfig},
+    },
     Core,
 };
 use indicatif::{MultiProgress, ProgressBar};
@@ -35,6 +38,9 @@ struct Args {
     /// Do not run games which already have a screenshot
     #[arg(short, long)]
     only_new: bool,
+
+    /// BIOS file
+    bios: PathBuf,
 
     /// Directory to run roms from
     rom_path: PathBuf,
@@ -87,6 +93,11 @@ fn main() {
 
     let config = SystemConfig {
         threaded_ppu: false,
+        bioses: vec![ConsoleBios {
+            console_id: "agb".into(),
+            console_name: "AGB".into(),
+            bios: Some(fs::read(&args.bios).unwrap()),
+        }],
         ..SystemConfig::default()
     };
 
