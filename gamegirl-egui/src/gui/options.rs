@@ -196,6 +196,15 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 }
                 ui.label("Volume");
             });
+            ui.horizontal(|ui| {
+                if ui
+                    .add(Slider::new(&mut opt.sys.volume_ff, 0.0..=1.0))
+                    .changed()
+                {
+                    app.core.lock().unwrap().config_mut().volume_ff = opt.sys.volume_ff;
+                }
+                ui.label("Volume during Fast-Forward");
+            });
         }
 
         Panel::Input => {

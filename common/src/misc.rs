@@ -42,6 +42,7 @@ impl Default for EmulateOptions {
 /// These options don't change at runtime.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde_config", serde(default))]
 pub struct SystemConfig {
     /// How to handle CGB mode.
     pub mode: CgbMode,
@@ -55,6 +56,8 @@ pub struct SystemConfig {
     pub run_on_open: bool,
     /// Audio volume multiplier
     pub volume: f32,
+    /// Audio volume multiplier while fast forwarding
+    pub volume_ff: f32,
     /// If the interpreter should cache
     pub cached_interpreter: bool,
     /// If the PPU should run on a sepearate thread.
@@ -82,6 +85,7 @@ impl Default for SystemConfig {
             skip_bootrom: false,
             run_on_open: true,
             volume: 0.5,
+            volume_ff: 0.25,
             cached_interpreter: true,
             // WASM doesn't do threads
             threaded_ppu: !cfg!(target_arch = "wasm32"),

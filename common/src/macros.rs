@@ -127,7 +127,7 @@ macro_rules! produce_samples_buffered {
                 // If rewinding, truncate and get rid of any excess samples to prevent
                 // audio samples getting backed up
                 for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
-                    *dst = src * self.config.volume;
+                    *dst = src * self.config.volume_ff;
                 }
             } else {
                 // Otherwise, store any excess samples back in the buffer for next time
@@ -143,12 +143,17 @@ macro_rules! produce_samples_buffered {
                     self.apu.buffer.truncate(100);
                 }
 
+                let volume = if self.options.speed_multiplier == 1 {
+                    self.config.volume
+                } else {
+                    self.config.volume_ff
+                };
                 for (src, dst) in buffer
                     .into_iter()
                     .step_by(self.options.speed_multiplier)
                     .zip(samples.iter_mut())
                 {
-                    *dst = src * self.config.volume;
+                    *dst = src * volume;
                 }
             }
         }
