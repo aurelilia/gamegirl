@@ -1,4 +1,4 @@
-use gamegirl::common::misc::SystemConfig;
+use gamegirl::common::common::options::SystemConfig;
 
 fn main() {
     let mut core = gamegirl::load_cart(

@@ -20,7 +20,7 @@ use eframe::{
     CreationContext, Frame,
 };
 use gamegirl::{
-    common::components::input::{InputReplay, ReplayState},
+    common::common::input::{InputReplay, ReplayState},
     dummy_core,
     dynamic::DynamicContext,
 };
@@ -76,7 +76,12 @@ impl App {
             let elapsed = time.elapsed().as_micros() as f64;
             core.bench.add(now, elapsed / 1000.0);
 
-            let frame = core.c.last_frame().map(|p| unsafe { mem::transmute(p) });
+            let frame = core
+                .c
+                .c_mut()
+                .video_buffer
+                .pop_recent()
+                .map(|p| unsafe { mem::transmute(p) });
             if let Some(pixels) = frame {
                 let img = ImageDelta::full(
                     ImageData::Color(ColorImage { size, pixels }.into()),
@@ -104,7 +109,7 @@ impl App {
                     let replay = InputReplay::load(String::from_utf8(file.content).unwrap());
                     self.replay = Some(replay.clone());
                     for core in &mut self.cores {
-                        core.c.options().input.replay = ReplayState::Playback(replay.clone());
+                        core.c.c_mut().input.replay = ReplayState::Playback(replay.clone());
                     }
                 }
 
@@ -124,8 +129,7 @@ impl App {
                         }
                         if let Some(replay) = self.replay.as_ref() {
                             for core in &mut self.cores {
-                                core.c.options().input.replay =
-                                    ReplayState::Playback(replay.clone());
+                                core.c.c_mut().input.replay = ReplayState::Playback(replay.clone());
                             }
                         }
                         self.update_test_suites();

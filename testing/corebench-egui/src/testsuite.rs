@@ -65,7 +65,7 @@ impl TestSuite {
 
     pub fn screen_hash(gg: &mut Box<dyn Core>) -> u64 {
         let mut hasher = DefaultHasher::new();
-        if let Some(frame) = gg.last_frame() {
+        if let Some(frame) = gg.c_mut().video_buffer.pop_recent() {
             hasher.write(
                 &frame
                     .into_iter()

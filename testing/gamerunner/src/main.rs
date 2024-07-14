@@ -9,7 +9,7 @@ use std::{
 
 use clap::Parser;
 use gamegirl::{
-    common::{components::input::Button, misc::SystemConfig},
+    common::common::{input::Button, options::SystemConfig},
     Core,
 };
 use indicatif::{MultiProgress, ProgressBar};
@@ -157,13 +157,13 @@ fn run_game(
 
     for _ in 0..15 {
         core.advance_delta(1.5);
-        core.options().input.set(0, Button::Start, true);
+        core.c_mut().input.set(0, Button::Start, true);
         core.advance_delta(0.5);
-        core.options().input.set(0, Button::Start, false);
+        core.c_mut().input.set(0, Button::Start, false);
         core.advance_delta(0.5);
-        core.options().input.set(0, Button::A, true);
+        core.c_mut().input.set(0, Button::A, true);
         core.advance_delta(0.5);
-        core.options().input.set(0, Button::A, false);
+        core.c_mut().input.set(0, Button::A, false);
         bar.tick();
     }
     write_png(&args.output_path, &mut core, name, "astart");
@@ -174,7 +174,7 @@ fn run_game(
 }
 
 fn write_png(base_path: &Path, core: &mut Box<dyn Core>, name: &str, ext: &str) {
-    let Some(image) = core.last_frame() else {
+    let Some(image) = core.c_mut().video_buffer.pop_recent() else {
         return;
     };
     let size = core.screen_size();

@@ -6,12 +6,14 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use gamegirl::common::common::debugger::Width;
+
 use crate::testsuite::{TestStatus, TestSuite};
 
 pub fn blargg() -> TestSuite {
     TestSuite::new("blargg", 15, |gg| {
         let screen = TestSuite::screen_hash(gg);
-        let serial = String::from_utf8_lossy(gg.get_serial());
+        let serial = &gg.c().debugger.serial_output;
 
         // 2 tests don't properly write to serial
         if serial.contains("Passed") || [0xC595AEECEFF2C241, 0x115124ABCB508E19].contains(&screen) {
@@ -26,7 +28,7 @@ pub fn blargg() -> TestSuite {
 
 pub fn blargg_sound() -> TestSuite {
     TestSuite::new("blargg_sound", 30, |gg| {
-        if gg.get_memory(0xA000) == 0 {
+        if gg.get_memory(0xA000, Width::Byte) == 0 {
             TestStatus::Success
         } else {
             TestStatus::Running
@@ -55,9 +57,9 @@ pub fn mooneye(subdir: &str) -> TestSuite {
 
 pub fn gbmicrotest() -> TestSuite {
     TestSuite::new("c-sp/gbmicrotest", 5, |gg| {
-        if gg.get_memory(0xFF82) == 0x01 {
+        if gg.get_memory(0xFF82, Width::Byte) == 0x01 {
             TestStatus::Success
-        } else if gg.get_memory(0xFF82) == 0xFF {
+        } else if gg.get_memory(0xFF82, Width::Byte) == 0xFF {
             TestStatus::Failed
         } else {
             TestStatus::Running

@@ -30,6 +30,11 @@ impl FrameBuffer {
         self.buffer.pop_front()
     }
 
+    /// Get the newest framen in the buffer.
+    pub fn pop_recent(&mut self) -> Option<Vec<Colour>> {
+        self.buffer.pop_back()
+    }
+
     /// Notify the buffer that the system is starting to render the next frame.
     /// Returns true if the frame should be rendered, false if it is to be
     /// skipped.
