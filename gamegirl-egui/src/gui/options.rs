@@ -169,6 +169,14 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                     ui.selectable_value(&mut opt.screen_blend, Blend::Accumulate, "Accumulate")
                         .on_hover_text("Accumulatively blend past frames. Can fix flickering in some games.");
                 });
+            ui.horizontal(|ui| {
+                let mut core = app.core.lock().unwrap();
+                ui.add(Slider::new(
+                    &mut core.c_mut().video_buffer.frameskip,
+                    0..=10,
+                ));
+                ui.label("Frameskip");
+            });
 
             ui.checkbox(&mut opt.pixel_perfect, "Pixel perfect scaling")
             .on_hover_text("Will only scale the screen to integer multiples, preventing some scaling artifacts at the cost of screen size.\nMainly applicable with 'Nearest' filtering.");

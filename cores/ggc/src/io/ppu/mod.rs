@@ -42,7 +42,6 @@ const CGB_BANK: u16 = 3;
 
 /// PPU of the system, with differing ways of function depending on
 /// DMG/CGB mode.
-/// TODO support frameskip
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -72,7 +71,10 @@ impl Ppu {
             PpuEvent::OamScanEnd => (PpuEvent::UploadEnd, 176),
 
             PpuEvent::UploadEnd => {
-                Self::render_line(gg);
+                if gg.c.video_buffer.should_render_this_frame() {
+                    Self::render_line(gg);
+                }
+
                 gg.ppu.bg_occupied_pixels = [false; 160];
                 if gg.cgb && gg.hdma.hblank_transferring {
                     gg.scheduler.schedule(GGEvent::HdmaTransferStep, 2);
@@ -91,7 +93,12 @@ impl Ppu {
                 if gg.ppu.line == 144 {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
-                    gg.c.video_buffer.push(gg.ppu.pixels.to_vec());
+
+                    if gg.c.video_buffer.should_render_this_frame() {
+                        gg.c.video_buffer.push(gg.ppu.pixels.to_vec());
+                    }
+                    gg.c.video_buffer.start_next_frame();
+
                     (PpuEvent::VblankEnd, 456)
                 } else {
                     (PpuEvent::OamScanEnd, 80)
