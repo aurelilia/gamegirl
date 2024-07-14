@@ -26,7 +26,7 @@ use egui_notify::{Anchor, Toasts};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
-    filter::{self, Filter},
+    filter::{self, Blend, Filter, ScreenBuffer},
     gui::{self, cheat::CheatEngineState, options, APP_WINDOW_COUNT},
     input::{self, File, Input, InputAction, InputSource},
     rewind::Rewinder,
@@ -59,6 +59,8 @@ pub struct App {
 
     /// Rewinder state.
     pub rewinder: Rewinder,
+    /// Screen buffer state.
+    pub screen_buffer: ScreenBuffer,
     /// If the emulator is fast-forwarding using the toggle hotkey.
     pub fast_forward_toggled: bool,
     /// Dynamic loading state, to be used for debugging
@@ -117,10 +119,14 @@ impl App {
     fn update_gg(&mut self, ctx: &Context) -> [usize; 2] {
         let (frame, size) = self.get_frame(ctx);
         if let Some(pixels) = frame {
-            let (pixels, size, filter) =
-                filter::apply_filter(pixels, size, self.state.options.tex_filter);
+            let (img, filter) = self.screen_buffer.next_frame(
+                size,
+                pixels,
+                self.state.options.tex_filter,
+                self.state.options.screen_blend,
+            );
             let img = ImageDelta::full(
-                ImageData::Color(ColorImage { size, pixels }.into()), // todo meh
+                ImageData::Color(img), // todo meh
                 filter,
             );
             let manager = ctx.tex_manager();
@@ -170,7 +176,7 @@ impl App {
                     _ => (),
                 }
             }
-            i.unstable_dt.clamp(0.001, 0.016) - 0.0009
+            i.unstable_dt
         });
         let delta = raw_delta.clamp(0.001, 0.016) - 0.0009;
 
@@ -195,7 +201,7 @@ impl App {
         } else {
             core.advance_delta(delta);
             let frame = core.last_frame();
-            if frame.is_some() {
+            if frame.is_some() && self.state.options.enable_rewind {
                 let state = core.save_state();
                 self.rewinder.rewind_buffer.push(state);
             }
@@ -358,6 +364,7 @@ impl App {
             current_rom_path: None,
 
             rewinder: Rewinder::new(state.options.rewind_buffer_size),
+            screen_buffer: ScreenBuffer::default(),
             fast_forward_toggled: false,
             #[cfg(feature = "dynamic")]
             dyn_ctx: gamegirl::dynamic::DynamicContext::watch_dir(move |path| {
@@ -444,6 +451,8 @@ pub struct Options {
 
     /// Texture filter applied to the display.
     pub tex_filter: Filter,
+    /// Blending applied to the display.
+    pub screen_blend: Blend,
     /// Require pixel perfect scaling.
     pub pixel_perfect: bool,
     /// Always preserve aspect ratio.
@@ -462,6 +471,7 @@ impl Default for Options {
             enable_rewind: true,
             rewind_buffer_size: 10,
             tex_filter: Filter::Nearest,
+            screen_blend: Blend::None,
             pixel_perfect: false,
             preserve_aspect_ratio: true,
             #[cfg(target_arch = "wasm32")]

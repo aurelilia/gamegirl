@@ -15,7 +15,7 @@ use egui::{Color32, RichText, Separator};
 
 use crate::{
     app::{App, GuiStyle, Options},
-    filter::Filter,
+    filter::{Blend, Filter},
     input::{file_dialog, InputAction, HOTKEYS},
 };
 
@@ -158,6 +158,16 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                     ui.selectable_value(&mut opt.tex_filter, Filter::Hq2x, "hq2x");
                     ui.selectable_value(&mut opt.tex_filter, Filter::Hq3x, "hq3x");
                     ui.selectable_value(&mut opt.tex_filter, Filter::Hq4x, "hq4x");
+                });
+            ComboBox::from_label("Blending mode")
+                .selected_text(format!("{:?}", opt.screen_blend))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut opt.screen_blend, Blend::None, "None")
+                        .on_hover_text("No blending, just draw the current frame.");
+                    ui.selectable_value(&mut opt.screen_blend, Blend::Soften, "Soften")
+                        .on_hover_text("Blend the last 2 frames, simulating light ghosting. Can fix flickering in some games.");
+                    ui.selectable_value(&mut opt.screen_blend, Blend::Accumulate, "Accumulate")
+                        .on_hover_text("Accumulatively blend past frames. Can fix flickering in some games.");
                 });
 
             ui.checkbox(&mut opt.pixel_perfect, "Pixel perfect scaling")

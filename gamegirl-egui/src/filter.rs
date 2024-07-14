@@ -1,7 +1,8 @@
-use std::{iter, mem};
+use std::{iter, mem, sync::Arc};
 
 use common::Colour;
 use eframe::egui::{Color32, TextureOptions};
+use egui::ColorImage;
 
 macro_rules! hqx {
     ($mag:ident, $scale:expr, $size:expr, $input:expr) => {{
@@ -18,6 +19,63 @@ macro_rules! hqx {
     }};
 }
 
+#[derive(Default)]
+pub struct ScreenBuffer {
+    pub buffer: Vec<Arc<ColorImage>>,
+}
+
+impl ScreenBuffer {
+    pub fn next_frame(
+        &mut self,
+        size: [usize; 2],
+        next: Vec<Colour>,
+        filter: Filter,
+        blend: Blend,
+    ) -> (Arc<ColorImage>, TextureOptions) {
+        let (pixels, size, filter) = apply_filter(next, size, filter);
+        let new = ColorImage { pixels, size };
+        match (blend, self.buffer.last_mut()) {
+            (Blend::None, _) => (new.into(), filter),
+
+            (Blend::Soften, Some(last)) => {
+                let pixels = last
+                    .pixels
+                    .iter()
+                    .zip(new.pixels.iter())
+                    .map(|(a, b)| blend_pixel(*a, *b))
+                    .collect();
+                *last = new.into();
+                (ColorImage { pixels, size }.into(), filter)
+            }
+
+            (Blend::Accumulate, Some(last)) => {
+                let pixels = last
+                    .pixels
+                    .iter()
+                    .zip(new.pixels.iter())
+                    .map(|(a, b)| blend_pixel(*a, *b))
+                    .collect();
+                let img: Arc<ColorImage> = ColorImage { pixels, size }.into();
+                *last = img.clone();
+                (img, filter)
+            }
+
+            _ => {
+                let arc: Arc<ColorImage> = new.into();
+                self.buffer.push(arc.clone());
+                (arc, filter)
+            }
+        }
+    }
+}
+
+fn blend_pixel(mut a: Color32, b: Color32) -> Color32 {
+    for i in 0..3 {
+        a[i] = ((a[i] as u16 + b[i] as u16) / 2) as u8;
+    }
+    a
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum Filter {
     Nearest,
@@ -27,7 +85,7 @@ pub enum Filter {
     Hq4x,
 }
 
-pub fn apply_filter(
+fn apply_filter(
     input: Vec<Colour>,
     size: [usize; 2],
     filter: Filter,
@@ -52,4 +110,11 @@ pub fn apply_filter(
             TextureOptions::NEAREST,
         ),
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+pub enum Blend {
+    None,
+    Soften,
+    Accumulate,
 }
