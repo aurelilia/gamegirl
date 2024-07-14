@@ -49,7 +49,6 @@ impl Point {
     }
 }
 
-// TODO frameskip support
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
     // Registers
@@ -70,7 +69,10 @@ impl Ppu {
     pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: i64) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
-                gg.ppu.render_line();
+                if gg.c.video_buffer.should_render_this_frame() {
+                    gg.ppu.render_line();
+                }
+
                 Self::maybe_interrupt(gg, Interrupt::HBlank);
                 Dmas::update_all(gg, Reason::HBlank);
                 (PpuEvent::SetHblank, 46)
@@ -97,7 +99,11 @@ impl Ppu {
                     }
                     _ if vcount == VBLANK_END => {
                         gg.ppu.regs.vcount = 0;
-                        gg.ppu.end_frame(&mut gg.c.video_buffer);
+                        gg.ppu.end_frame();
+                        if gg.c.video_buffer.should_render_this_frame() {
+                            gg.ppu.push_output(&mut gg.c.video_buffer);
+                        }
+                        gg.c.video_buffer.start_next_frame();
                     }
                     _ => (),
                 }
@@ -139,11 +145,13 @@ impl Ppu {
         }
     }
 
-    fn end_frame(&mut self, buf: &mut FrameBuffer) {
+    fn end_frame(&mut self) {
         // Reload affine backgrounds
         self.regs.bg_scale[0].latch();
         self.regs.bg_scale[1].latch();
-        // That's it. Frame ready
+    }
+
+    fn push_output(&mut self, buf: &mut FrameBuffer) {
         if let Some(last_frame) = self.render.get_last() {
             buf.push(last_frame);
         }

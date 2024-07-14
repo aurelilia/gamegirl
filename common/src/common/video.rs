@@ -36,11 +36,18 @@ impl FrameBuffer {
     }
 
     /// Notify the buffer that the system is starting to render the next frame.
-    /// Returns true if the frame should be rendered, false if it is to be
-    /// skipped.
-    pub fn start_next_frame(&mut self) -> bool {
-        self.n_until_next = self.n_until_next.saturating_sub(1);
-        self.n_until_next == 0
+    pub fn start_next_frame(&mut self) {
+        if self.n_until_next == 0 {
+            self.n_until_next = self.frameskip;
+        } else {
+            self.n_until_next -= 1;
+        }
+    }
+
+    /// Returns true if the current frame should be rendered, false if it is to
+    /// be skipped.
+    pub fn should_render_this_frame(&self) -> bool {
+        self.frameskip == 0 || self.n_until_next == 0
     }
 
     /// Push a new frame to the buffer.
