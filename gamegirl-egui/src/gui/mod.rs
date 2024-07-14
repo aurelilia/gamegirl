@@ -195,39 +195,39 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             app.app_window_states[2] ^= true;
             ui.close_menu();
         }
-    });
 
-    ui.menu_button("🐛 Debugger", |ui| debug::menu(app, ui));
-
-    ui.menu_button("🖴 Savestates", |ui| {
-        for (i, state) in app.rewinder.save_states.iter_mut().enumerate() {
-            if ui.button(format!("↘ Save State {}", i + 1)).clicked() {
-                *state = Some(app.core.lock().unwrap().save_state());
-                app.toasts
-                    .info(format!("Saved state {}", i + 1))
-                    .set_duration(Some(Duration::from_secs(3)));
-                ui.close_menu();
+        ui.menu_button("🖴 Savestates", |ui| {
+            for (i, state) in app.rewinder.save_states.iter_mut().enumerate() {
+                if ui.button(format!("↘ Save State {}", i + 1)).clicked() {
+                    *state = Some(app.core.lock().unwrap().save_state());
+                    app.toasts
+                        .info(format!("Saved state {}", i + 1))
+                        .set_duration(Some(Duration::from_secs(3)));
+                    ui.close_menu();
+                }
             }
-        }
-        ui.separator();
+            ui.separator();
 
-        for (i, state) in app
-            .rewinder
-            .save_states
-            .iter()
-            .filter_map(|s| s.as_ref())
-            .enumerate()
-        {
-            if ui.button(format!("↗ Load State {}", i + 1)).clicked() {
-                let mut core = app.core.lock().unwrap();
-                app.rewinder.before_last_ss_load = Some(core.save_state());
-                core.load_state(state);
-                app.toasts
-                    .info(format!("Loaded state {}", i + 1))
-                    .set_duration(Some(Duration::from_secs(3)));
-                ui.close_menu();
+            for (i, state) in app
+                .rewinder
+                .save_states
+                .iter()
+                .filter_map(|s| s.as_ref())
+                .enumerate()
+            {
+                if ui.button(format!("↗ Load State {}", i + 1)).clicked() {
+                    let mut core = app.core.lock().unwrap();
+                    app.rewinder.before_last_ss_load = Some(core.save_state());
+                    core.load_state(state);
+                    app.toasts
+                        .info(format!("Loaded state {}", i + 1))
+                        .set_duration(Some(Duration::from_secs(3)));
+                    ui.close_menu();
+                }
             }
-        }
+        });
+
+        ui.menu_button("🐛 Debugger", |ui| debug::menu(app, ui));
     });
 
     ui.menu_button("☸ Options", |ui| {
