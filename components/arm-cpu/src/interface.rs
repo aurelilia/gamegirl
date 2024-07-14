@@ -11,7 +11,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use common::{components::debugger::Debugger, numutil::NumExt};
+use common::{common::debugger::Debugger, numutil::NumExt};
 
 use super::Exception;
 use crate::{inst_arm::ArmLut, inst_thumb::ThumbLut, Access, Cpu};
@@ -100,7 +100,7 @@ pub trait ArmSystem: Sized + 'static {
     }
 
     /// Get the debugger for this system.
-    fn debugger(&mut self) -> &mut Debugger<u32>;
+    fn debugger(&mut self) -> &mut Debugger;
     /// Check if the current instruction can be used to start creating an
     /// instruction cache block.
     fn can_cache_at(addr: u32) -> bool;

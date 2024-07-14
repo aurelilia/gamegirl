@@ -22,9 +22,9 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
     ("Fast Forward (Hold)", |app, pressed| {
         let mut core = app.core.lock().unwrap();
         if pressed {
-            core.options().speed_multiplier = app.state.options.fast_forward_hold_speed;
+            core.c_mut().options.speed_multiplier = app.state.options.fast_forward_hold_speed;
         } else {
-            core.options().speed_multiplier = 1;
+            core.c_mut().options.speed_multiplier = 1;
         }
     }),
     ("Fast Forward (Toggle)", |a, p| {
@@ -32,15 +32,20 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
             let mut core = app.core.lock().unwrap();
             app.fast_forward_toggled = !app.fast_forward_toggled;
             if app.fast_forward_toggled {
-                core.options().speed_multiplier = app.state.options.fast_forward_toggle_speed;
+                core.c_mut().options.speed_multiplier = app.state.options.fast_forward_toggle_speed;
             } else {
-                core.options().speed_multiplier = 1;
+                core.c_mut().options.speed_multiplier = 1;
             }
         });
     }),
     ("Rewind (Hold)", |app, pressed| {
         app.rewinder.rewinding = pressed;
-        app.core.lock().unwrap().options().invert_audio_samples = pressed;
+        app.core
+            .lock()
+            .unwrap()
+            .c_mut()
+            .options
+            .invert_audio_samples = pressed;
     }),
 ];
 

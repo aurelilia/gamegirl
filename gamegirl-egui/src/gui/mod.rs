@@ -12,7 +12,7 @@ pub mod options;
 
 use std::{fs, time::Duration};
 
-use common::components::input::{InputReplay, ReplayState};
+use common::common::input::{InputReplay, ReplayState};
 use eframe::{
     egui::{self, load::SizedTexture, vec2, widgets, Context, Image, Layout, Ui, ViewportCommand},
     emath::Align,
@@ -161,7 +161,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             ui.close_menu();
         }
 
-        let text = if *app.core.lock().unwrap().is_running() {
+        let text = if app.core.lock().unwrap().c().debugger.running {
             "⏸ Pause"
         } else {
             "▶ Resume"
@@ -258,7 +258,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
 
 fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
     let mut core = app.core.lock().unwrap();
-    match (&core.options().input.replay, app.current_rom_path.clone()) {
+    match (&core.c_mut().input.replay, app.current_rom_path.clone()) {
         (ReplayState::None, None) => {
             ui.label("Status: Not currently recording replay");
             ui.label("Hint: Load a ROM first.");
@@ -267,7 +267,7 @@ fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
         (ReplayState::None, Some(file)) => {
             ui.label("Status: Not currently recording replay");
             if ui.button("Restart system and start recording").clicked() {
-                core.options().input.replay = ReplayState::Recording(InputReplay::empty(file));
+                core.c_mut().input.replay = ReplayState::Recording(InputReplay::empty(file));
                 core.reset();
             }
             if ui.button("Load recording and restart").clicked() {
@@ -280,14 +280,14 @@ fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
             ui.label(&format!("Recorded {} states!", ir.states.len()));
             if ui.button("End & Save Replay").clicked() {
                 file_dialog::save_replay(ir.serialize());
-                core.options().input.replay = ReplayState::None;
+                core.c_mut().input.replay = ReplayState::None;
             }
         }
 
         (ReplayState::Playback(_), _) => {
             ui.label("Status: Playing back replay");
             if ui.button("End Playback").clicked() {
-                core.options().input.replay = ReplayState::None;
+                core.c_mut().input.replay = ReplayState::None;
             }
         }
     }

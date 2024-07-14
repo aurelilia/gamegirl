@@ -10,10 +10,8 @@ use std::ptr;
 
 use arm_cpu::{interface::RwType, Cpu};
 use common::{
-    components::{
-        debugger::Severity,
-        memory::{MemoryMappedSystem, MemoryMapper},
-    },
+    common::debugger::Severity,
+    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 
@@ -60,7 +58,7 @@ impl Nds {
             IF_H => ds.cpur().if_.high(),
 
             _ => {
-                ds.debugger.log(
+                ds.c.debugger.log(
                     "unknown-io-read",
                     format!("Read from unknown IO register {addr:08X}"),
                     Severity::Warning,
@@ -101,7 +99,7 @@ impl Nds {
             0xD2 => Dmas::ctrl_write(dsx, 2, value),
             0xDE => Dmas::ctrl_write(dsx, 3, value),
 
-            _ => ds.debugger.log(
+            _ => ds.c.debugger.log(
                 "unknown-io-write",
                 format!("Write to unknown IO register {addr:08X}"),
                 Severity::Warning,

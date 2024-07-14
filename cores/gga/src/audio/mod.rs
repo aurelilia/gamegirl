@@ -15,7 +15,7 @@ pub mod psg;
 use std::collections::VecDeque;
 
 use common::{
-    components::{memory::MemoryMapper, scheduler::Scheduler},
+    components::{memory_mapper::MemoryMapper, scheduler::Scheduler},
     numutil::{NumExt, U16Ext},
     TimeS,
 };
@@ -53,7 +53,7 @@ pub struct SoundControl {
 
 #[bitfield]
 #[repr(u16)]
-#[derive(Default, Copy, Clone)]
+#[derive(Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SoundBias {
     bias: B10,
@@ -61,6 +61,12 @@ pub struct SoundBias {
     __: B4,
     #[skip]
     amplitude: B2,
+}
+
+impl Default for SoundBias {
+    fn default() -> Self {
+        0x200.into()
+    }
 }
 
 /// APU of the GGA, which is a GG APU in addition to 2 DMA channels.
@@ -79,8 +85,6 @@ pub struct Apu {
     // DMA channels
     buffers: [VecDeque<i8>; 2],
     current_samples: [i16; 2],
-    // Output buffer
-    pub buffer: Vec<f32>,
 }
 
 impl Apu {
@@ -98,7 +102,8 @@ impl Apu {
             }
 
             ApuEvent::PushSample => {
-                gg.apu.push_output(&mut gg.memory.mapper);
+                gg.apu
+                    .push_output(&mut gg.memory.mapper, &mut gg.c.audio_buffer);
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
@@ -112,11 +117,11 @@ impl Apu {
         );
     }
 
-    fn push_output(&mut self, bus: &mut MemoryMapper<8192>) {
+    fn push_output(&mut self, bus: &mut MemoryMapper<8192>, out: &mut Vec<f32>) {
         if !self.cgb_chans.power {
             // Master enable, also applies to DMA channels
-            self.buffer.push(0.);
-            self.buffer.push(0.);
+            out.push(0.);
+            out.push(0.);
             return;
         }
         let mut left = 0;
@@ -161,8 +166,8 @@ impl Apu {
         left += (cgb_sample[1] * cgb_mul * 0.8) as i16;
 
         let bias = self.bias.bias() as i16;
-        self.buffer.push(Self::bias(right, bias) as f32 / 1024.0);
-        self.buffer.push(Self::bias(left, bias) as f32 / 1024.0);
+        out.push(Self::bias(right, bias) as f32 / 1024.0);
+        out.push(Self::bias(left, bias) as f32 / 1024.0);
     }
 
     fn bias(mut sample: i16, bias: i16) -> i16 {

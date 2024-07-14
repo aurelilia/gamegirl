@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use common::Width;
+use common::common::debugger::Width;
 use egui::{Button, Checkbox, Color32, Context, Separator, TextEdit, Ui};
 use egui_extras::{Column, TableBuilder};
 

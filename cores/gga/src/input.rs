@@ -28,7 +28,7 @@ pub struct KeyControl {
 impl GameGirlAdv {
     pub fn keyinput(&self) -> u16 {
         // GGA input is active low
-        0x3FF ^ self.options.input.state(self.scheduler.now()).0
+        0x3FF ^ self.c.input.state(self.scheduler.now()).0
     }
 
     /// Check if KEYCNT should cause a joypad IRQ.

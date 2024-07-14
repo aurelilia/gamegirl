@@ -6,8 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-pub mod debugger;
-pub mod input;
-pub mod memory;
+//! This module contains some components shared by multiple cores.
+
+pub mod memory_mapper;
 pub mod scheduler;
 pub mod storage;

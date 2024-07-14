@@ -28,11 +28,11 @@ use std::{
 
 use arm_cpu::{interface::ArmSystem, Cpu};
 use common::{
+    common::options::{EmulateOptions, SystemConfig},
     common_functions,
-    components::{debugger::Debugger, scheduler::Scheduler, storage::GameSave},
-    misc::{EmulateOptions, SystemConfig},
+    components::{scheduler::Scheduler, storage::GameSave},
     numutil::NumExt,
-    produce_samples_buffered, Colour, Core, Time,
+    Colour, Common, Core, Time,
 };
 
 use crate::{
@@ -106,15 +106,11 @@ pub struct Nds {
 
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
-    pub debugger: Debugger<u32>,
-    pub options: EmulateOptions,
-    pub config: SystemConfig,
-    ticking: bool,
+    pub c: Common,
 }
 
 impl Core for Nds {
     common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [240, 160 * 2]);
-    produce_samples_buffered!(48000);
 
     fn advance(&mut self) {
         // Run an instruction on the ARM9, then keep running the ARM7
@@ -137,6 +133,10 @@ impl Core for Nds {
             self.nds9()
                 .set(0x27FFE00 + addr as u32, self.cart.rom[addr])
         }
+    }
+
+    fn wanted_sample_rate(&self) -> u32 {
+        48000
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -162,15 +162,13 @@ impl Nds {
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {
-        self.options = old_self.options;
-        self.config = old_self.config;
-        self.debugger = old_self.debugger;
+        self.c.restore_from(old_self.c);
         self.init_memory();
     }
 
     pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
         let mut nds = Box::<Self>::default();
-        nds.config = config.clone();
+        nds.c.config = config.clone();
         nds.memory.bios7 = config.get_bios("nds7").unwrap().into();
         nds.memory.bios9 = config.get_bios("nds9").unwrap().into();
         nds.cart.load_rom(cart);
@@ -193,10 +191,7 @@ impl Default for Nds {
             timers: [Timers::default(), Timers::default()],
             scheduler: Scheduler::default(),
             time_7: 0,
-            debugger: Debugger::default(),
-            options: EmulateOptions::default(),
-            config: SystemConfig::default(),
-            ticking: false,
+            c: Common::default(),
         };
 
         // ARM9 has a different entry point compared to ARM7.

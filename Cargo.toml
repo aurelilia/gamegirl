@@ -2,7 +2,9 @@
 members = [
     "common",
     "components/*",
-    "cores/*",
+    "cores/ggc",
+    "cores/gga",
+    "cores/nds",
     "gamegirl",
     "gamegirl-egui",
     "testing/corebench-egui",

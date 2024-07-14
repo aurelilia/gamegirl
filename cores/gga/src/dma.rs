@@ -37,7 +37,6 @@ pub struct Dma {
 }
 
 /// GGA's 4 DMA channels.
-#[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dmas {
     pub channels: [Dma; 4],
@@ -229,6 +228,18 @@ impl Dmas {
             AddrControl::Increment => 2,
             AddrControl::Decrement => -2,
             _ => 0,
+        }
+    }
+}
+
+impl Default for Dmas {
+    fn default() -> Self {
+        Self {
+            channels: [Dma::default(); 4],
+            running: 99,
+            queued: ArrayVec::new(),
+            cache: 0,
+            pc_at_last_end: 0,
         }
     }
 }

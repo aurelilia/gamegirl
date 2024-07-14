@@ -8,14 +8,13 @@
 
 mod gga;
 mod ggc;
-#[cfg(not(target_arch = "wasm32"))]
-mod psx;
+// #[cfg(not(target_arch = "wasm32"))]
+// mod psx;
 
 use std::any::Any;
 
 use common::{
-    components::debugger::{Breakpoint, Debugger, Severity},
-    numutil::NumExt,
+    common::debugger::{Breakpoint, Debugger, Severity},
     Core,
 };
 use eframe::egui::{
@@ -35,8 +34,9 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
 
     maybe_system::<GameGirl>(core, |_| ggc::ui_menu(app, ui));
     maybe_system::<GameGirlAdv>(core, |_| gga::ui_menu(app, ui));
-    #[cfg(not(target_arch = "wasm32"))]
-    maybe_system::<gamegirl::psx::PlayStation>(core, |_| psx::ui_menu(app, ui));
+    // #[cfg(not(target_arch = "wasm32"))]
+    // maybe_system::<gamegirl::psx::PlayStation>(core, |_| psx::ui_menu(app,
+    // ui));
 }
 
 pub fn render(app: &mut App, ctx: &Context) {
@@ -46,10 +46,10 @@ pub fn render(app: &mut App, ctx: &Context) {
 
     maybe_system::<GameGirl>(core, |c| render_inner(ggc::get_windows(), c, app, ctx));
     maybe_system::<GameGirlAdv>(core, |c| render_inner(gga::get_windows(), c, app, ctx));
-    #[cfg(not(target_arch = "wasm32"))]
-    maybe_system::<gamegirl::psx::PlayStation>(core, |c| {
-        render_inner(psx::get_windows(), c, app, ctx)
-    });
+    // #[cfg(not(target_arch = "wasm32"))]
+    // maybe_system::<gamegirl::psx::PlayStation>(core, |c| {
+    //     render_inner(psx::get_windows(), c, app, ctx)
+    // });
 }
 
 fn render_inner<T: Core>(windows: Windows<T>, core: &mut T, app: &mut App, ctx: &Context) {
@@ -95,7 +95,7 @@ fn make_window<T>(
     }
 }
 
-fn debugger_footer<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
+fn debugger_footer(dbg: &mut Debugger, ui: &mut Ui) {
     ui.add_space(10.0);
     inst_dump(ui, dbg);
     ui.add_space(10.0);
@@ -104,7 +104,7 @@ fn debugger_footer<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
     event_log(dbg, ui);
 }
 
-fn inst_dump<T: NumExt>(ui: &mut Ui, debugger: &mut Debugger<T>) {
+fn inst_dump(ui: &mut Ui, debugger: &mut Debugger) {
     ui.horizontal(|ui| {
         ui.heading("CPU Logging");
         if let Some(string) = debugger.traced_instructions.as_ref() {
@@ -127,7 +127,7 @@ fn inst_dump<T: NumExt>(ui: &mut Ui, debugger: &mut Debugger<T>) {
     });
 }
 
-fn breakpoints<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
+fn breakpoints(dbg: &mut Debugger, ui: &mut Ui) {
     let bps = &mut dbg.breakpoints;
     ui.horizontal(|ui| {
         ui.heading("Breakpoints");
@@ -149,8 +149,7 @@ fn breakpoints<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
                     .add(TextEdit::singleline(&mut bp.value_text).desired_width(40.0))
                     .changed()
                 {
-                    let value = u32::from_str_radix(&bp.value_text, 16).ok();
-                    bp.value = value.map(T::from_u32);
+                    bp.value = u32::from_str_radix(&bp.value_text, 16).ok();
                 }
                 ui.checkbox(&mut bp.pc, "PC");
                 ui.checkbox(&mut bp.write, "Write");
@@ -173,7 +172,7 @@ fn breakpoints<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
     });
 }
 
-fn event_log<T: NumExt>(dbg: &mut Debugger<T>, ui: &mut Ui) {
+fn event_log(dbg: &mut Debugger, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.heading("Event Log");
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

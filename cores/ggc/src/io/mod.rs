@@ -12,8 +12,8 @@ use std::{
 };
 
 use common::{
-    components::memory::{MemoryMappedSystem, MemoryMapper},
-    misc::{CgbMode, SystemConfig},
+    common::options::{CgbMode, SystemConfig},
+    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
     numutil::{hword, NumExt},
     TimeS,
 };
@@ -77,7 +77,7 @@ impl GameGirl {
     }
 
     pub fn write8(&mut self, addr: u16, value: u8) {
-        self.debugger.write_occurred(addr);
+        self.c.debugger.write_occurred(addr.u32());
 
         // TODO Hack to pass another mooneye test
         if addr == (TMA + 0xFF00) {
@@ -233,7 +233,7 @@ impl GameGirl {
             BCPS..=OPRI => self.ppu.write_high(addr, value),
             NR10..=WAV_END => self.apu.write_register_gg(HIGH_START + addr, value),
 
-            SB => self.debugger.serial_output.push(value as char),
+            SB => self.c.debugger.serial_output.push(value as char),
 
             VRAM_SELECT if self.cgb => {
                 self.mem.vram_bank = value & 1;
@@ -384,13 +384,13 @@ impl MemoryMappedSystem<256> for GameGirl {
 
         match a {
             0x0000..=0x00FF if self.mem.bootrom_enable && self.cgb => {
-                offs(self.config.get_bios("cgb").unwrap_or(CGB_BOOTROM), a)
+                offs(self.c.config.get_bios("cgb").unwrap_or(CGB_BOOTROM), a)
             }
             0x0000..=0x00FF if self.mem.bootrom_enable => {
-                offs(self.config.get_bios("dmg").unwrap_or(BOOTIX_ROM), a)
+                offs(self.c.config.get_bios("dmg").unwrap_or(BOOTIX_ROM), a)
             }
             0x0200..=0x08FF if self.mem.bootrom_enable && self.cgb => offs(
-                self.config.get_bios("cgb").unwrap_or(CGB_BOOTROM),
+                self.c.config.get_bios("cgb").unwrap_or(CGB_BOOTROM),
                 a - 0x0100,
             ),
             0x0000..=0x3FFF => offs(&self.cart.rom, a),

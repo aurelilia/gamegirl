@@ -35,7 +35,7 @@ impl Joypad {
     }
 
     pub fn update(gg: &mut GameGirl) {
-        gg.joypad.key_states = gg.options.input.state(gg.scheduler.now()).0 as u8;
+        gg.joypad.key_states = gg.c.input.state(gg.scheduler.now()).0 as u8;
         gg.scheduler
             .schedule(GGEvent::UpdateKeypad, (T_CLOCK_HZ / 120) as TimeS);
         let read = gg.joypad.read(gg[JOYP]);

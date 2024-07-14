@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use common::{misc::SystemConfig, Colour as RColour, Core};
+use common::{common::options::SystemConfig, Colour as RColour, Core};
 use cpal::Stream;
 use eframe::{
     egui::{Context, Event, TextureOptions},
@@ -26,7 +26,7 @@ use egui_notify::{Anchor, Toasts};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
-    filter::{self, Blend, Filter, ScreenBuffer},
+    filter::{Blend, Filter, ScreenBuffer},
     gui::{self, cheat::CheatEngineState, options, APP_WINDOW_COUNT},
     input::{self, File, Input, InputAction, InputSource},
     rewind::Rewinder,
@@ -190,17 +190,17 @@ impl App {
                     .set_closable(false)
                     .set_duration(Some(Duration::from_millis(1)));
                 core.load_state(state);
-                core.options().invert_audio_samples = true;
+                core.c_mut().options.invert_audio_samples = true;
                 core.produce_frame()
             } else {
                 self.rewinder.rewinding = false;
-                core.options().invert_audio_samples = false;
-                core.last_frame()
+                core.c_mut().options.invert_audio_samples = false;
+                core.c_mut().video_buffer.pop()
             };
             (frame, size)
         } else {
             core.advance_delta(delta);
-            let frame = core.last_frame();
+            let frame = core.c_mut().video_buffer.pop();
             if frame.is_some() && self.state.options.enable_rewind {
                 let state = core.save_state();
                 self.rewinder.rewind_buffer.push(state);
@@ -219,7 +219,7 @@ impl App {
             Some(InputAction::Button(btn)) => {
                 let mut core = self.core.lock().unwrap();
                 let time = core.get_time();
-                core.options().input.set(time, btn, pressed);
+                core.c_mut().input.set(time, btn, pressed);
             }
             Some(InputAction::Hotkey(idx)) => input::HOTKEYS[idx as usize].1(self, pressed),
             None => (),
@@ -284,7 +284,7 @@ impl App {
                     self.save_game();
                     let mut core = self.core.lock().unwrap();
                     core.reset();
-                    core.options().input.load_replay(file.content);
+                    core.c_mut().input.load_replay(file.content);
                     self.toasts
                         .info("Loaded replay")
                         .set_duration(Some(Duration::from_secs(5)));
@@ -492,8 +492,9 @@ pub enum GuiStyle {
 impl App {
     pub fn pause(&mut self) {
         let mut core = self.core.lock().unwrap();
-        *core.is_running() = !*core.is_running() && core.options().rom_loaded;
-        if *core.is_running() {
+        let c = core.c_mut();
+        c.debugger.running = !c.debugger.running;
+        if c.debugger.running {
             self.toasts
                 .info("Resuming")
                 .set_duration(Some(Duration::from_secs(2)));

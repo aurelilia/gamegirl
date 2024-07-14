@@ -40,7 +40,7 @@ impl GGEvent {
     /// Handle the event by delegating to the appropriate handler.
     pub fn dispatch(&self, gg: &mut GameGirl, late_by: TimeS) {
         match self {
-            PauseEmulation => gg.ticking = false,
+            PauseEmulation => gg.c.in_tick = false,
             UpdateKeypad => Joypad::update(gg),
             PpuEvent(evt) => Ppu::handle_event(gg, *evt, late_by),
             DMAFinish => dma::do_oam_dma(gg),

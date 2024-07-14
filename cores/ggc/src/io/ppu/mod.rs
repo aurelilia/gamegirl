@@ -42,6 +42,7 @@ const CGB_BANK: u16 = 3;
 
 /// PPU of the system, with differing ways of function depending on
 /// DMG/CGB mode.
+/// TODO support frameskip
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -54,10 +55,6 @@ pub struct Ppu {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr"))]
     pixels: [Colour; 160 * 144],
-    /// The last frame finished by the PPU, ready for display.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub last_frame: Option<Vec<Colour>>,
 
     /// Info about what event to schedule in case of LCDC bit 7 being
     /// unset, disabling the PPU.
@@ -94,7 +91,7 @@ impl Ppu {
                 if gg.ppu.line == 144 {
                     Self::stat_interrupt(gg, 4);
                     gg.request_interrupt(Interrupt::VBlank);
-                    gg.ppu().last_frame = Some(gg.ppu.pixels.to_vec());
+                    gg.c.video_buffer.push(gg.ppu.pixels.to_vec());
                     (PpuEvent::VblankEnd, 456)
                 } else {
                     (PpuEvent::OamScanEnd, 80)
@@ -375,7 +372,6 @@ impl Ppu {
                 used_x_obj_coords: [None; 10],
             },
             pixels: [[0; 4]; 160 * 144],
-            last_frame: None,
             resume_data: None,
         }
     }

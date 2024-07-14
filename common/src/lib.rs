@@ -8,18 +8,24 @@
 
 #![feature(btree_cursors)]
 
-use std::{any::Any, cmp::Ordering};
+use std::{any::Any, cmp::Ordering, mem};
 
+use common::debugger::Width;
+pub use common::Common;
 pub use components::scheduler::{Time, TimeS};
 use components::storage::GameSave;
-use misc::{EmulateOptions, SystemConfig};
-use numutil::NumExt;
 
+pub mod common;
 pub mod components;
-pub mod misc;
 #[macro_use]
 pub mod macros;
 pub mod numutil;
+#[cfg(feature = "serde")]
+pub mod serialize;
+
+/// Maximum pointer size used by any system. This is used in some places, like
+/// the debugger, to avoid needing to use generic parameters.
+pub type Pointer = u32;
 
 /// Colour type used by the system's PPUs for image data.
 /// This type is analogus to egui's `Color32`, which allows the GUI to
@@ -29,37 +35,21 @@ pub mod numutil;
 pub type Colour = [u8; 4];
 
 pub trait Core: Send + Sync {
-    /// Advance the system clock by the given delta in seconds.
-    /// Might advance a few clocks more.
+    /// Advance by one step, where step is system-defined.
+    fn advance(&mut self);
+    /// Advance the system clock by _at least_ the given delta in seconds.
+    /// Might advance more.
     fn advance_delta(&mut self, delta: f32);
-    /// Step until the PPU has finished producing the current frame.
-    /// Only used for rewinding since it causes audio desync very easily.
-    fn produce_frame(&mut self) -> Option<Vec<Colour>>;
-    /// Produce the next audio samples and write them to the given buffer.
-    /// Writes zeroes if the system is not currently running
-    /// and no audio should be played.
-    fn produce_samples(&mut self, buffer: &mut [f32]);
+    /// Reset the console, while keeping the current cartridge inserted.
+    fn reset(&mut self);
+    /// Skip BIOS, bootroms, or similar; immediately boot inserted game.
+    fn skip_bootrom(&mut self);
 
     /// Create a save state that can be loaded with [load_state].
     fn save_state(&mut self) -> Vec<u8>;
     /// Load a state produced by [save_state].
     /// Will restore the current cartridge and debugger.
     fn load_state(&mut self, state: &[u8]);
-
-    /// Advance by one step, where step is system-defined.
-    fn advance(&mut self);
-    /// Reset the console, while keeping the current cartridge inserted.
-    fn reset(&mut self);
-    /// Get the running status of the console, and allow modifying it.
-    fn is_running(&mut self) -> &mut bool;
-    /// Skip BIOS, bootroms, or similar; immediately boot inserted game.
-    fn skip_bootrom(&mut self);
-
-    // Take the last frame output by the graphics hardware.
-    fn last_frame(&mut self) -> Option<Vec<Colour>>;
-    fn options(&mut self) -> &mut EmulateOptions;
-    fn config(&self) -> &SystemConfig;
-    fn config_mut(&mut self) -> &mut SystemConfig;
 
     /// Get the current system time.
     fn get_time(&self) -> Time;
@@ -88,13 +78,8 @@ pub trait Core: Send + Sync {
     fn get_registers(&self) -> Vec<usize> {
         unimplemented!("Not implemented for this core")
     }
-    /// Get values written to serial. Exact meaning is platform-specific.
-    fn get_serial(&self) -> &[u8] {
-        unimplemented!("Not implemented for this core")
-    }
     /// Get the ROM currently loaded.
     fn get_rom(&self) -> Vec<u8>;
-
     /// Set the value at the given memory address.
     /// The width parameter specifies the size of the value to write.
     /// Remaining bits are ignored.
@@ -102,52 +87,71 @@ pub trait Core: Send + Sync {
         unimplemented!("Not implemented for this core")
     }
 
+    fn c(&self) -> &Common;
+    fn c_mut(&mut self) -> &mut Common;
     fn as_any(&mut self) -> &mut dyn Any;
-}
 
-/// Width of a value to be read/written from memory.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum Width {
-    #[default]
-    Byte,
-    Halfword,
-    Word,
-}
-
-impl Width {
-    pub fn size(&self) -> usize {
-        match self {
-            Width::Byte => 1,
-            Width::Halfword => 2,
-            Width::Word => 4,
+    fn produce_frame(&mut self) -> Option<Vec<Colour>> {
+        while self.c().debugger.running && self.c_mut().video_buffer.pop().is_none() {
+            self.advance();
         }
+
+        // Do it twice: Color buffer will be empty after a save state load,
+        // we need to render one frame in full
+        while self.c().debugger.running && !self.c().video_buffer.has_frame() {
+            self.advance();
+        }
+        self.c_mut().video_buffer.pop()
     }
 
-    pub fn mask(&self) -> u32 {
-        match self {
-            Width::Byte => 0xFF,
-            Width::Halfword => 0xFFFF,
-            Width::Word => 0xFFFFFFFF,
+    fn produce_samples(&mut self, samples: &mut [f32]) {
+        if !self.c().debugger.running {
+            samples.fill(0.0);
+            return;
         }
-    }
-}
 
-pub fn search_array(
-    matches: &mut Vec<u32>,
-    arr: &[u8],
-    offset: u32,
-    value: u32,
-    width: Width,
-    kind: Ordering,
-) {
-    for (i, chunk) in arr.chunks_exact(width.size()).enumerate() {
-        let chunk = match width {
-            Width::Byte => chunk[0].u32(),
-            Width::Halfword => u16::from_le_bytes([chunk[0], chunk[1]]).u32(),
-            Width::Word => u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
-        };
-        if chunk.cmp(&value) == kind {
-            matches.push(offset + i.u32() * width.size().u32());
+        let target = samples.len() * self.c().options.speed_multiplier;
+        while self.c().audio_buffer.len() < target {
+            if !self.c().debugger.running {
+                samples.fill(0.0);
+                return;
+            }
+            self.advance();
+        }
+
+        let mut buffer = mem::take(&mut self.c_mut().audio_buffer);
+        if self.c().options.invert_audio_samples {
+            // If rewinding, truncate and get rid of any excess samples to prevent
+            // audio samples getting backed up
+            for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
+                *dst = src * self.c().config.volume_ff;
+            }
+        } else {
+            // Otherwise, store any excess samples back in the buffer for next time
+            // while again not storing too many to avoid backing up.
+            // This way can cause clipping if the console produces audio too fast,
+            // however this is preferred to audio falling behind and eating
+            // a lot of memory.
+            for sample in buffer.drain(target..) {
+                self.c_mut().audio_buffer.push(sample);
+            }
+            if self.c().audio_buffer.len() > self.wanted_sample_rate() as usize / 2 {
+                log::warn!("Audio samples are backing up! Truncating");
+                self.c_mut().audio_buffer.truncate(100);
+            }
+
+            let volume = if self.c().options.speed_multiplier == 1 {
+                self.c().config.volume
+            } else {
+                self.c().config.volume_ff
+            };
+            for (src, dst) in buffer
+                .into_iter()
+                .step_by(self.c().options.speed_multiplier)
+                .zip(samples.iter_mut())
+            {
+                *dst = src * volume;
+            }
         }
     }
 }

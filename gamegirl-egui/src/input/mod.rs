@@ -8,7 +8,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use common::components::input::{self, Button::*};
+use common::common::input::{self, Button::*};
 use eframe::egui::Key;
 pub use file_dialog::File;
 use InputAction::*;

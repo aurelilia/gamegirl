@@ -19,10 +19,8 @@ use arm_cpu::{
     Access, Cpu, Exception,
 };
 use common::{
-    components::{
-        debugger::Debugger,
-        memory::{MemoryMappedSystem, MemoryMapper},
-    },
+    common::debugger::Debugger,
+    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
     numutil::NumExt,
     Time,
 };
@@ -76,8 +74,8 @@ impl ArmSystem for Nds7 {
         1
     }
 
-    fn debugger(&mut self) -> &mut Debugger<u32> {
-        &mut self.debugger
+    fn debugger(&mut self) -> &mut Debugger {
+        &mut self.c.debugger
     }
 
     fn can_cache_at(_addr: u32) -> bool {
@@ -137,8 +135,8 @@ impl ArmSystem for Nds9 {
         1
     }
 
-    fn debugger(&mut self) -> &mut Debugger<u32> {
-        &mut self.debugger
+    fn debugger(&mut self) -> &mut Debugger {
+        &mut self.c.debugger
     }
 
     fn can_cache_at(_addr: u32) -> bool {

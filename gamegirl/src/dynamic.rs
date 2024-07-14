@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use common::{misc::SystemConfig, Core};
+use common::{common::options::SystemConfig, Core};
 use libloading::{Library, Symbol};
 use notify::{
     event::{AccessKind, AccessMode},

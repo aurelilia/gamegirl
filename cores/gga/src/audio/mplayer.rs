@@ -14,7 +14,7 @@
 use core::slice;
 use std::{cmp, mem, ptr};
 
-use common::components::memory::MemoryMapper;
+use common::components::memory_mapper::MemoryMapper;
 
 use crate::GameGirlAdv;
 

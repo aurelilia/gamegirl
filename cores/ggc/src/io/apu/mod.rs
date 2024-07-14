@@ -72,8 +72,6 @@ pub struct Apu {
 
     sample_counter: f64,
 
-    pub buffer: Vec<f32>,
-
     /// Stores the value of the 4th bit (5th in double speed mode) of the
     /// divider as sequencer clocks are controlled by the divider
     divider_sequencer_clock_bit: bool,
@@ -99,7 +97,6 @@ impl Apu {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
             power: false,
-            buffer: Vec::new(),
 
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
@@ -342,7 +339,7 @@ impl Apu {
     /// The APU is clocked by the divider, on the falling edge of the bit 12
     /// of the divider, this is needed since the divider can be clocked manually
     /// by resetting it to 0 on write
-    pub fn clock(&mut self, double_speed: bool, divider: u8) {
+    pub fn clock(&mut self, double_speed: bool, divider: u8, buf: &mut Vec<f32>) {
         // 2 in normal speed, 1 in double speed
         let clocks = (!double_speed) as u8 + 1;
 
@@ -359,7 +356,7 @@ impl Apu {
 
         self.sample_counter += 1.;
         if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
-            self.push_output();
+            self.push_output(buf);
             self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
 
@@ -409,7 +406,7 @@ impl Apu {
 }
 
 impl Apu {
-    fn push_output(&mut self) {
+    fn push_output(&mut self, buf: &mut Vec<f32>) {
         let right_vol = self.channels_control.vol_right() as f32 + 1.;
         let left_vol = self.channels_control.vol_left() as f32 + 1.;
 
@@ -494,8 +491,8 @@ impl Apu {
 
         let right_sample = right_pulse1 + right_pulse2 + right_wave + right_noise;
         let left_sample = left_pulse1 + left_pulse2 + left_wave + left_noise;
-        self.buffer.push(right_sample);
-        self.buffer.push(left_sample);
+        buf.push(right_sample);
+        buf.push(left_sample);
     }
 
     fn power_off(&mut self) {

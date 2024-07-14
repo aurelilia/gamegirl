@@ -9,16 +9,18 @@
 use std::{cmp::Ordering, mem, path::PathBuf};
 
 use common::{
+    common::{
+        debugger::{self, Width},
+        options::SystemConfig,
+    },
     common_functions,
     components::{
-        debugger::Debugger,
-        memory::MemoryMapper,
+        memory_mapper::MemoryMapper,
         scheduler::Scheduler,
         storage::{GameSave, Storage},
     },
-    misc::{EmulateOptions, SystemConfig},
     numutil::{hword, word, NumExt},
-    produce_samples_buffered, Core, Time, Width,
+    Common, Core, Time,
 };
 use io::addr::DIV;
 
@@ -42,19 +44,13 @@ pub mod io;
 
 const T_CLOCK_HZ: u32 = 4_194_304;
 
-pub type GGDebugger = Debugger<u16>;
-
 /// The system and it's state.
 /// Represents the entire console.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct GameGirl {
     pub cpu: Cpu,
     pub mem: Memory,
-
     pub cgb: bool,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub debugger: GGDebugger,
     scheduler: Scheduler<GGEvent>,
 
     pub cart: Cartridge,
@@ -70,19 +66,12 @@ pub struct GameGirl {
     /// Shift of m-cycles to t-clocks, which is different in CGB double speed
     /// mode. Regular: 2, CGB 2x: 1.
     t_shift: u8,
-    /// Temporary used by [advance_delta]. Will be true until the scheduled
-    /// PauseEmulation event fires.
-    ticking: bool,
 
-    /// System config.
-    pub config: SystemConfig,
-    /// Emulation options.
-    pub options: EmulateOptions,
+    pub c: Common,
 }
 
 impl Core for GameGirl {
     common_functions!(T_CLOCK_HZ, GGEvent::PauseEmulation, [160, 144]);
-    produce_samples_buffered!(48000);
 
     fn advance(&mut self) {
         Cpu::exec_next_inst(self);
@@ -91,20 +80,22 @@ impl Core for GameGirl {
     fn reset(&mut self) {
         let old_self = mem::take(self);
         let save = old_self.cart.make_save();
-        self.load_cart_mem(old_self.cart, &old_self.config);
+        self.load_cart_mem(old_self.cart, &old_self.c.config);
         if let Some(save) = save {
             self.cart.load_save(save);
         }
 
-        self.options = old_self.options;
-        self.config = old_self.config;
-        self.debugger = old_self.debugger;
+        self.c.restore_from(old_self.c);
         MemoryMapper::init_pages(self);
     }
 
     fn skip_bootrom(&mut self) {
         self.cpu.pc = 0x100;
         self.set(BOOTROM_DISABLE, 1u8);
+    }
+
+    fn wanted_sample_rate(&self) -> u32 {
+        48_000
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -124,19 +115,15 @@ impl Core for GameGirl {
 
     fn search_memory(&self, value: u32, width: Width, kind: Ordering) -> Vec<u32> {
         let mut values = Vec::new();
-        common::search_array(&mut values, &self.mem.vram, 0x8000, value, width, kind);
-        common::search_array(&mut values, &self.mem.wram, 0xC000, value, width, kind);
-        common::search_array(&mut values, &self.mem.oam, 0xFE00, value, width, kind);
-        common::search_array(&mut values, &self.mem.high, 0xFF00, value, width, kind);
+        debugger::search_array(&mut values, &self.mem.vram, 0x8000, value, width, kind);
+        debugger::search_array(&mut values, &self.mem.wram, 0xC000, value, width, kind);
+        debugger::search_array(&mut values, &self.mem.oam, 0xFE00, value, width, kind);
+        debugger::search_array(&mut values, &self.mem.high, 0xFF00, value, width, kind);
         values
     }
 
     fn get_registers(&self) -> Vec<usize> {
         self.cpu.regs.iter().map(|r| *r as usize).collect()
-    }
-
-    fn get_serial(&self) -> &[u8] {
-        self.debugger.serial_output.as_bytes()
     }
 
     fn get_rom(&self) -> Vec<u8> {
@@ -154,7 +141,11 @@ impl GameGirl {
 
         for _ in 0..m_cycles {
             Timer::step(self);
-            self.apu.clock(self.t_shift == 1, Timer::read(self, DIV))
+            self.apu.clock(
+                self.t_shift == 1,
+                Timer::read(self, DIV),
+                &mut self.c.audio_buffer,
+            )
         }
     }
 
@@ -183,9 +174,7 @@ impl GameGirl {
             self.cart.load_save(save);
         }
 
-        self.options = old_self.options;
-        self.config = old_self.config;
-        self.debugger = old_self.debugger;
+        self.c.restore_from(old_self.c);
         MemoryMapper::init_pages(self);
     }
 
@@ -194,10 +183,10 @@ impl GameGirl {
     pub fn load_cart(&mut self, cart: Cartridge, config: &SystemConfig, reset: bool) {
         if reset {
             let old_self = mem::take(self);
-            self.debugger = old_self.debugger;
+            self.c.debugger = old_self.c.debugger;
         }
         self.load_cart_mem(cart, config);
-        self.config = config.clone();
+        self.c.config = config.clone();
     }
 
     /// Create a system with a cart already loaded.
@@ -215,14 +204,11 @@ impl GameGirl {
 
 impl Default for GameGirl {
     fn default() -> Self {
-        let debugger = GGDebugger::default();
         Self {
             cpu: Cpu::default(),
             mem: Memory::new(),
-            config: SystemConfig::default(),
 
             cgb: false,
-            debugger,
             scheduler: Scheduler::default(),
 
             timer: Timer::default(),
@@ -235,8 +221,8 @@ impl Default for GameGirl {
 
             speed: 1,
             t_shift: 2,
-            ticking: true,
-            options: EmulateOptions::default(),
+
+            c: Common::default(),
         }
     }
 }

@@ -6,30 +6,30 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{
-    fmt::{Debug, UpperHex},
-    sync::Mutex,
-    time::Instant,
-};
+use std::{cmp::Ordering, fmt::Debug, sync::Mutex, time::Instant};
+
+use crate::{numutil::NumExt, Pointer};
 
 /// Debugger info that is required to be known by the system.
-/// Is generic over cores; generic type Ptr is pointer size
-/// on the current system (u16/u32)
+/// Is generic over cores.
 #[derive(Default)]
-pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
-    /// Contains the serial output that was written to IO register SB.
-    /// Currently only on GG.
+pub struct Debugger {
+    /// Contains the serial output of the console. Exact meaning depends on
+    /// the platform.
     pub serial_output: String,
-    /// If the system is running. If false, any calls to functions advancing
-    /// the system based on outside sources (time, sound) will do nothing.
-    pub running: bool,
-    /// A list of breakpoints the system should stop on.
-    pub breakpoints: Vec<Breakpoint<Ptr>>,
-    /// The hit breakpoint's index.
-    pub breakpoint_hit: Option<usize>,
     /// If instructions should be traced and printed to a file, this contains
     /// the instructions to be printed / file contents.
     pub traced_instructions: Option<String>,
+
+    /// If the system is running. If false, any calls to functions advancing
+    /// the system based on outside sources (time, sound) will do nothing.
+    pub running: bool,
+
+    /// A list of breakpoints the system should stop on.
+    pub breakpoints: Vec<Breakpoint>,
+    /// The hit breakpoint's index.
+    pub breakpoint_hit: Option<usize>,
+
     /// The diagnostic level that is currently enabled.
     /// Any diagnostic events with a severity lower than this will not be
     /// logged and discarded.
@@ -38,10 +38,10 @@ pub struct Debugger<Ptr: PartialEq + Clone + Copy> {
     pub diagnostic_events: Mutex<Vec<DiagnosticEvent>>,
 }
 
-impl<Ptr: PartialEq + Clone + Copy + UpperHex> Debugger<Ptr> {
+impl Debugger {
     /// Called before a memory write is executed, which might trigger a BP.
     /// Returns if emulation should continue.
-    pub fn write_occurred(&mut self, addr: Ptr) {
+    pub fn write_occurred(&mut self, addr: Pointer) {
         if !self.breakpoints.is_empty() {
             let bp = self
                 .breakpoints
@@ -57,7 +57,7 @@ impl<Ptr: PartialEq + Clone + Copy + UpperHex> Debugger<Ptr> {
 
     /// Called before an instruction is executed, which might trigger a BP.
     /// If it does, function returns false and inst should not be executed.
-    pub fn should_execute(&mut self, pc: Ptr) -> bool {
+    pub fn should_execute(&mut self, pc: Pointer) -> bool {
         if self.breakpoints.is_empty() {
             return true;
         }
@@ -110,9 +110,9 @@ impl<Ptr: PartialEq + Clone + Copy + UpperHex> Debugger<Ptr> {
 
 /// A breakpoint.
 #[derive(Clone, Debug, Default)]
-pub struct Breakpoint<Ptr> {
+pub struct Breakpoint {
     /// Address/value that this breakpoint is at.
-    pub value: Option<Ptr>,
+    pub value: Option<Pointer>,
     /// String representation of the address/value; used by egui as a text
     /// buffer. TODO: kinda unclean to have GUI state here...
     pub value_text: String,
@@ -154,5 +154,57 @@ pub enum Severity {
 impl PartialOrd for Severity {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some((*self as u32).cmp(&(*other as u32)))
+    }
+}
+
+/// Width of a value to be read/written from memory.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Width {
+    #[default]
+    Byte,
+    Halfword,
+    Word,
+}
+
+impl Width {
+    /// Returns the size of the values represented by this width.
+    pub fn size(&self) -> usize {
+        match self {
+            Width::Byte => 1,
+            Width::Halfword => 2,
+            Width::Word => 4,
+        }
+    }
+
+    /// Returns the mask for the width, to be applied when working with values
+    /// of this width.
+    pub fn mask(&self) -> u32 {
+        match self {
+            Width::Byte => 0xFF,
+            Width::Halfword => 0xFFFF,
+            Width::Word => 0xFFFFFFFF,
+        }
+    }
+}
+
+/// Search an array for a value.
+/// Adds found values to the matches vector with specified offset.
+pub fn search_array(
+    matches: &mut Vec<u32>,
+    arr: &[u8],
+    offset: u32,
+    value: u32,
+    width: Width,
+    kind: Ordering,
+) {
+    for (i, chunk) in arr.chunks_exact(width.size()).enumerate() {
+        let chunk = match width {
+            Width::Byte => chunk[0].u32(),
+            Width::Halfword => u16::from_le_bytes([chunk[0], chunk[1]]).u32(),
+            Width::Word => u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+        };
+        if chunk.cmp(&value) == kind {
+            matches.push(offset + i.u32() * width.size().u32());
+        }
     }
 }

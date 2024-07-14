@@ -10,7 +10,7 @@ use arm_cpu::{
     interface::{ArmSystem, RwType},
     Access, Cpu, Exception,
 };
-use common::{components::debugger::Debugger, Time};
+use common::{common::debugger::Debugger, Time};
 
 use crate::{addr, audio::mplayer::MusicPlayer, GameGirlAdv};
 
@@ -61,7 +61,7 @@ impl ArmSystem for GameGirlAdv {
 
     fn will_execute(&mut self, pc: u32) {
         if pc > 0x1000_0000 {
-            self.debugger.running = false;
+            self.c.debugger.running = false;
         }
         if self.apu.hle_hook == pc {
             MusicPlayer::pc_match(self);
@@ -84,8 +84,8 @@ impl ArmSystem for GameGirlAdv {
         self.wait_time::<T>(addr, access)
     }
 
-    fn debugger(&mut self) -> &mut Debugger<u32> {
-        &mut self.debugger
+    fn debugger(&mut self) -> &mut Debugger {
+        &mut self.c.debugger
     }
 
     fn can_cache_at(pc: u32) -> bool {

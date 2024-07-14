@@ -20,7 +20,7 @@ mod render;
 use std::sync::Arc;
 
 use arm_cpu::{Cpu, Interrupt};
-use common::{numutil::NumExt, Colour};
+use common::{common::video::FrameBuffer, numutil::NumExt, Colour};
 use registers::*;
 use render::{PpuRender, PpuRendererKind};
 
@@ -49,8 +49,10 @@ impl Point {
     }
 }
 
+// TODO frameskip support
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
+    // Registers
     pub regs: PpuRegisters,
 
     // Memory
@@ -58,10 +60,6 @@ pub struct Ppu {
     pub vram: Arc<[u8]>,
     pub oam: Arc<[u8]>,
 
-    // Last frame
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(skip))]
-    pub last_frame: Option<Vec<Colour>>,
     // Renderer
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -99,7 +97,7 @@ impl Ppu {
                     }
                     _ if vcount == VBLANK_END => {
                         gg.ppu.regs.vcount = 0;
-                        gg.ppu.end_frame();
+                        gg.ppu.end_frame(&mut gg.c.video_buffer);
                     }
                     _ => (),
                 }
@@ -141,12 +139,14 @@ impl Ppu {
         }
     }
 
-    fn end_frame(&mut self) {
+    fn end_frame(&mut self, buf: &mut FrameBuffer) {
         // Reload affine backgrounds
         self.regs.bg_scale[0].latch();
         self.regs.bg_scale[1].latch();
         // That's it. Frame ready
-        self.last_frame = self.render.get_last();
+        if let Some(last_frame) = self.render.get_last() {
+            buf.push(last_frame);
+        }
     }
 
     pub fn init_render(gg: &mut GameGirlAdv) {
@@ -155,7 +155,7 @@ impl Ppu {
             Arc::clone(&gg.ppu.vram),
             Arc::clone(&gg.ppu.oam),
         );
-        gg.ppu.render = PpuRendererKind::new(render, gg.config.threaded_ppu);
+        gg.ppu.render = PpuRendererKind::new(render, gg.c.config.threaded_ppu);
     }
 }
 
@@ -168,7 +168,6 @@ impl Default for Ppu {
             vram: Arc::new([0; 96 * KB]),
             oam: Arc::new([0; KB]),
 
-            last_frame: None,
             render: PpuRendererKind::Invalid,
         }
     }

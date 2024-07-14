@@ -14,9 +14,7 @@ pub const SAMPLE_EVERY_N_CLOCKS: TimeS = (NDS9_CLOCK / 48000) as TimeS;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Apu {
-    pub buffer: Vec<f32>,
-}
+pub struct Apu {}
 
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this
@@ -24,8 +22,8 @@ impl Apu {
     pub fn handle_event(ds: &mut Nds, event: ApuEvent, late_by: TimeS) -> TimeS {
         match event {
             ApuEvent::PushSample => {
-                ds.apu.buffer.push(0.0);
-                ds.apu.buffer.push(0.0);
+                ds.c.audio_buffer.push(0.0);
+                ds.c.audio_buffer.push(0.0);
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }

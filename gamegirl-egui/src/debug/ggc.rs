@@ -124,10 +124,10 @@ fn debugger(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
             gg.advance();
         }
 
-        ui.checkbox(&mut gg.debugger.running, "Running");
+        ui.checkbox(&mut gg.c.debugger.running, "Running");
     });
 
-    super::debugger_footer(&mut gg.debugger, ui);
+    super::debugger_footer(&mut gg.c.debugger, ui);
 }
 
 /// Memory viewer showing the entire GG's address space.
@@ -158,11 +158,6 @@ fn memory(gg: &mut GameGirl, ui: &mut Ui, _: &mut App, _: &Context) {
         ui.monospace("     0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F");
     });
     ScrollArea::vertical().show(ui, |ui| {
-        if !gg.options.rom_loaded {
-            ui.label("No ROM loaded yet!");
-            return;
-        }
-
         let mut buf = String::with_capacity(100);
         for row_start in 0..0x1000 {
             let row_start = row_start * 0x10;
@@ -260,11 +255,6 @@ fn bg_map_viewer(gg: &mut GameGirl, ui: &mut Ui, app: &mut App, ctx: &Context) {
             );
         }
         upload_texture(ctx, 32, 32, app, id, buf, TextureOptions::NEAREST)
-    }
-
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
     }
 
     let bg_id = render_tiles(ctx, gg, app, false, BG_TEX);

@@ -16,11 +16,7 @@ use std::{
 };
 
 pub use common::{self, Core};
-use common::{
-    components::storage::Storage,
-    misc::{EmulateOptions, SystemConfig},
-    Time,
-};
+use common::{common::options::SystemConfig, components::storage::Storage, Common, Time};
 #[cfg(feature = "gga")]
 pub use gga;
 #[cfg(feature = "ggc")]
@@ -28,8 +24,8 @@ pub use ggc;
 use glow::Context;
 #[cfg(feature = "nds")]
 pub use nds;
-#[cfg(feature = "psx")]
-pub use psx;
+// #[cfg(feature = "psx")]
+// pub use psx;
 use thiserror::Error;
 use zip::result::ZipError;
 
@@ -105,13 +101,13 @@ pub fn load_cart(
     // We detect iNES files by the header
     let _is_nes = cart[0] == b'N' && cart[1] == b'E' && cart[2] == b'S';
     // We detect PSX games by being ISOs
-    #[cfg(feature = "psx")]
-    use std::os::unix::prelude::OsStrExt;
-    #[cfg(feature = "psx")]
-    let _is_psx = path
-        .as_ref()
-        .map(|e| e.extension().unwrap().as_bytes() == b"iso")
-        .unwrap_or(false);
+    // #[cfg(feature = "psx")]
+    // use std::os::unix::prelude::OsStrExt;
+    // #[cfg(feature = "psx")]
+    // let _is_psx = path
+    //     .as_ref()
+    //     .map(|e| e.extension().unwrap().as_bytes() == b"iso")
+    //     .unwrap_or(false);
 
     let mut sys: Box<dyn Core> = match () {
         #[cfg(feature = "ggc")]
@@ -120,11 +116,10 @@ pub fn load_cart(
         _ if _is_gga => gga::GameGirlAdv::with_cart(cart, path, config),
         #[cfg(feature = "nds")]
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
-        #[cfg(feature = "psx")]
-        _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, _ogl_ctx, _ogl_tex_id),
-        #[cfg(feature = "nes")]
-        _ if _is_nes => nes::Nes::with_cart(cart, path, config),
-
+        // #[cfg(feature = "psx")]
+        // _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, _ogl_ctx, _ogl_tex_id),
+        // #[cfg(feature = "nes")]
+        // _ if _is_nes => nes::Nes::with_cart(cart, path, config),
         #[cfg(feature = "gga")]
         _ => {
             log::error!("Failed to detect cart! Guessing GGA.");
@@ -135,8 +130,7 @@ pub fn load_cart(
         _ => return Err(GamegirlError::AutodetectFailed),
     };
 
-    *sys.is_running() = config.run_on_open;
-    sys.options().rom_loaded = true;
+    sys.c_mut().debugger.running = config.run_on_open;
     if config.skip_bootrom {
         sys.skip_bootrom();
     }
@@ -149,19 +143,11 @@ pub fn dummy_core() -> Box<dyn Core> {
 
 #[derive(Default)]
 struct Dummy {
-    options: EmulateOptions,
-    config: SystemConfig,
-    running: bool,
+    c: Common,
 }
 
 impl Core for Dummy {
     fn advance_delta(&mut self, _: f32) {}
-
-    fn produce_frame(&mut self) -> Option<Vec<common::Colour>> {
-        None
-    }
-
-    fn produce_samples(&mut self, _: &mut [f32]) {}
 
     fn save_state(&mut self) -> Vec<u8> {
         vec![]
@@ -173,27 +159,7 @@ impl Core for Dummy {
 
     fn reset(&mut self) {}
 
-    fn is_running(&mut self) -> &mut bool {
-        &mut self.running
-    }
-
     fn skip_bootrom(&mut self) {}
-
-    fn last_frame(&mut self) -> Option<Vec<common::Colour>> {
-        None
-    }
-
-    fn options(&mut self) -> &mut common::misc::EmulateOptions {
-        &mut self.options
-    }
-
-    fn config(&self) -> &SystemConfig {
-        &self.config
-    }
-
-    fn config_mut(&mut self) -> &mut SystemConfig {
-        &mut self.config
-    }
 
     fn get_time(&self) -> Time {
         0
@@ -217,5 +183,13 @@ impl Core for Dummy {
 
     fn get_rom(&self) -> Vec<u8> {
         vec![]
+    }
+
+    fn c(&self) -> &Common {
+        &self.c
+    }
+
+    fn c_mut(&mut self) -> &mut Common {
+        &mut self.c
     }
 }

@@ -6,7 +6,9 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+/// Type for unsigned time, in system ticks
 pub type Time = u64;
+/// Type for signed time, in system ticks
 pub type TimeS = i64;
 
 /// A scheduler used by the emulation cores to schedule peripherals.

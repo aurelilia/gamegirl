@@ -97,7 +97,7 @@ pub(crate) fn get_next(gg: &mut GameGirl) -> Inst {
         _ => Inst(first, 0),
     };
 
-    gg.debugger.add_traced_instruction(|| {
+    gg.c.debugger.add_traced_instruction(|| {
         format!(
             "PC={:04X}, SP={:04X}, AF={:04X}, BC={:04X}, DE={:4X}, HL={:04X}, I={}",
             gg.cpu.pc,

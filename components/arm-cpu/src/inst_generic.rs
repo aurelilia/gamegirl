@@ -8,7 +8,7 @@
 
 use std::fmt::UpperHex;
 
-use common::{components::debugger::Severity, numutil::NumExt};
+use common::{common::debugger::Severity, numutil::NumExt};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{access::NONSEQ, Cpu, Exception};

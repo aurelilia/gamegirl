@@ -6,18 +6,11 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use common::Colour;
-use gga_ppu::threading::{new_ppu, GgaPpu};
-
-use crate::{Nds7, Nds9};
-
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct NdsEngines {
-    pub last_frame: Option<Vec<Colour>>,
-}
+pub struct NdsEngines {}
 
 impl Default for NdsEngines {
     fn default() -> Self {
-        Self { last_frame: None }
+        Self {}
     }
 }

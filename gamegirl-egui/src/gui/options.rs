@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use common::{components::input::Button, misc::CgbMode};
+use common::common::{input::Button, options::CgbMode};
 use eframe::{
     egui,
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, Ui},
@@ -207,7 +207,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                     .add(Slider::new(&mut opt.sys.volume, 0.0..=1.0))
                     .changed()
                 {
-                    app.core.lock().unwrap().config_mut().volume = opt.sys.volume;
+                    app.core.lock().unwrap().c_mut().config.volume = opt.sys.volume;
                 }
                 ui.label("Volume");
             });
@@ -216,7 +216,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                     .add(Slider::new(&mut opt.sys.volume_ff, 0.0..=1.0))
                     .changed()
                 {
-                    app.core.lock().unwrap().config_mut().volume_ff = opt.sys.volume_ff;
+                    app.core.lock().unwrap().c_mut().config.volume_ff = opt.sys.volume_ff;
                 }
                 ui.label("Volume during Fast-Forward");
             });

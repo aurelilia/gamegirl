@@ -53,11 +53,6 @@ pub fn get_windows() -> Windows<GameGirlAdv> {
 /// Debugger window with instruction view, stack inspection and register
 /// inspection. Allows for inst-by-inst advancing.
 fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
-    }
-
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.set_min_width(300.0);
@@ -133,7 +128,7 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         if ui.button("Advance").clicked() {
             gg.advance();
         }
-        ui.checkbox(&mut gg.debugger.running, "Running");
+        ui.checkbox(&mut gg.c.debugger.running, "Running");
         ui.checkbox(&mut gg.cpu.is_halted, "CPU Halted");
 
         if gg.cpu.ime {
@@ -141,15 +136,11 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
         }
     });
 
-    super::debugger_footer(&mut gg.debugger, ui);
+    super::debugger_footer(&mut gg.c.debugger, ui);
 }
 
 /// Window showing information about the loaded ROM/cart.
 pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
-    }
     ui.label(format!("Reported Title: {}", gg.cart.title()));
     ui.label(format!("Reported Game Code: AGB-{}", gg.cart.game_code()));
     ui.label(format!("Detected Save Type: {:?}", gg.cart.save_type));
@@ -249,11 +240,6 @@ fn bg_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Con
         });
     }
 
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
-    }
-
     let mode = gg.ppu.regs.dispcnt.bg_mode();
     ui.label(format!("Current PPU mode: {mode:?}"));
     if (mode as usize) < 3 {
@@ -320,11 +306,6 @@ fn obj_tileset_viewer(gg: &mut GameGirlAdv, ui: &mut Ui, app: &mut App, ctx: &Co
                 vec2(32. * 16., buffer_height as f32 * 16.),
             )));
         });
-    }
-
-    if !gg.options.rom_loaded {
-        ui.label("No ROM loaded yet!");
-        return;
     }
 
     let mode = gg.ppu.regs.dispcnt.bg_mode();

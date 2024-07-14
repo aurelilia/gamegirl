@@ -23,7 +23,7 @@ mod waitloop;
 use std::sync::Arc;
 
 use access::{CODE, NONSEQ, SEQ};
-use common::{components::debugger::Severity, numutil::NumExt};
+use common::{common::debugger::Severity, numutil::NumExt};
 use waitloop::WaitloopData;
 
 use crate::{

@@ -1606,9 +1606,7 @@ dependencies = [
  "libloading",
  "log",
  "nds",
- "nes",
  "notify",
- "psx",
  "thiserror",
  "web-sys",
  "zip",
@@ -1718,16 +1716,6 @@ dependencies = [
  "elf_rs",
  "log",
  "modular-bitfield",
- "serde",
- "serde_arrays",
-]
-
-[[package]]
-name = "gga-ppu"
-version = "0.1.0"
-dependencies = [
- "common",
- "log",
  "serde",
  "serde_arrays",
 ]
@@ -2388,18 +2376,6 @@ dependencies = [
  "arm-cpu",
  "arrayvec",
  "common",
- "gga-ppu",
- "log",
- "modular-bitfield",
- "serde",
- "serde_arrays",
-]
-
-[[package]]
-name = "nes"
-version = "0.1.0"
-dependencies = [
- "common",
  "log",
  "modular-bitfield",
  "serde",
@@ -2862,20 +2838,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "psx"
-version = "0.1.0"
-dependencies = [
- "arrayvec",
- "bitmatch",
- "common",
- "glow",
- "log",
- "modular-bitfield",
- "serde",
- "serde_arrays",
 ]
 
 [[package]]

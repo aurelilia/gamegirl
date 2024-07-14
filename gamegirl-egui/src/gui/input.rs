@@ -1,4 +1,4 @@
-use common::{components::input, Core};
+use common::{common::input, Core};
 use egui::{Button, Context, Frame, Margin, RichText, Sense, Ui};
 
 use crate::App;
@@ -53,9 +53,9 @@ fn button_ui(ui: &mut Ui, core: &mut Box<dyn Core>, button: input::Button, text:
     );
 
     if btn.drag_stopped() {
-        core.options().input.set(0, button, false);
+        core.c_mut().input.set(0, button, false);
     }
     if btn.drag_started() {
-        core.options().input.set(0, button, true);
+        core.c_mut().input.set(0, button, true);
     }
 }

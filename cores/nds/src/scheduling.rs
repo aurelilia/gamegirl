@@ -7,10 +7,12 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use common::{components::scheduler::Kind, TimeS};
-use gga_ppu::{scheduling::PpuEvent, Ppu};
 use NdsEvent::*;
 
 use crate::{audio::Apu, timer::Timers, Nds};
+
+// TODO
+type PpuEvent = ();
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -30,7 +32,7 @@ pub enum NdsEvent {
 impl NdsEvent {
     pub fn dispatch(self, ds: &mut Nds, late_by: TimeS) {
         match self {
-            PauseEmulation => ds.ticking = false,
+            PauseEmulation => ds.c.in_tick = false,
             PpuEvent(evt) => {
                 // Ppu::handle_event(&mut ds.nds7(), evt, late_by);
                 // Ppu::handle_event(&mut ds.nds9(), evt, late_by);

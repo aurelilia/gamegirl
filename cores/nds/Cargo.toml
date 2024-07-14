@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 common = { path = "../../common" }
 arm-cpu = { path = "../../components/arm-cpu" }
-gga-ppu = { path = "../../components/gga-ppu" }
 
 log.workspace = true
 serde = { workspace = true, optional = true }
@@ -18,11 +17,4 @@ modular-bitfield.workspace = true
 
 [features]
 default = []
-threaded-ppu = ["gga-ppu/threaded"]
-serde = [
-    "dep:serde",
-    "dep:serde_arrays",
-    "common/serde",
-    "arm-cpu/serde",
-    "gga-ppu/serde",
-]
+serde = ["dep:serde", "dep:serde_arrays", "common/serde", "arm-cpu/serde"]

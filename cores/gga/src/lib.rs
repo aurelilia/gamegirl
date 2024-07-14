@@ -18,15 +18,18 @@ use arm_cpu::{registers::Flag, Cpu};
 use audio::Apu;
 use cartridge::Cartridge;
 use common::{
+    common::{
+        debugger::{self, Width},
+        options::SystemConfig,
+        Common,
+    },
     common_functions,
     components::{
-        debugger::Debugger,
         scheduler::Scheduler,
         storage::{GameSave, Storage},
     },
-    misc::{EmulateOptions, SystemConfig},
     numutil::NumExt,
-    produce_samples_buffered, Core, TimeS, Width,
+    Core, TimeS,
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
@@ -54,8 +57,6 @@ mod scheduling;
 mod serial;
 pub mod timer;
 
-pub type GGADebugger = Debugger<u32>;
-
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -70,20 +71,11 @@ pub struct GameGirlAdv {
     pub serial: Serial,
 
     scheduler: Scheduler<AdvEvent>,
-    pub options: EmulateOptions,
-    pub config: SystemConfig,
-
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub debugger: GGADebugger,
-    /// Temporary used by [advance_delta]. Will be true until the scheduled
-    /// PauseEmulation event fires.
-    ticking: bool,
+    pub c: Common,
 }
 
 impl Core for GameGirlAdv {
     common_functions!(CPU_CLOCK, AdvEvent::PauseEmulation, [240, 160]);
-    produce_samples_buffered!(2u32.pow(16));
 
     fn advance(&mut self) {
         if self.cpu.is_halted {
@@ -109,6 +101,10 @@ impl Core for GameGirlAdv {
         self.cpu.sp[4] = 0x0300_7FA0;
     }
 
+    fn wanted_sample_rate(&self) -> u32 {
+        2u32.pow(16)
+    }
+
     fn make_save(&self) -> Option<GameSave> {
         self.cart.make_save()
     }
@@ -119,7 +115,7 @@ impl Core for GameGirlAdv {
 
     fn search_memory(&self, value: u32, width: Width, kind: Ordering) -> Vec<u32> {
         let mut values = Vec::new();
-        common::search_array(
+        debugger::search_array(
             &mut values,
             &self.memory.iwram,
             0x200_0000,
@@ -127,7 +123,7 @@ impl Core for GameGirlAdv {
             width,
             kind,
         );
-        common::search_array(
+        debugger::search_array(
             &mut values,
             &self.memory.ewram,
             0x300_0000,
@@ -135,7 +131,7 @@ impl Core for GameGirlAdv {
             width,
             kind,
         );
-        common::search_array(
+        debugger::search_array(
             &mut values,
             &self.ppu.palette,
             0x500_0000,
@@ -143,18 +139,14 @@ impl Core for GameGirlAdv {
             width,
             kind,
         );
-        common::search_array(&mut values, &self.ppu.vram, 0x600_0000, value, width, kind);
-        common::search_array(&mut values, &self.ppu.oam, 0x700_0000, value, width, kind);
-        common::search_array(&mut values, &self.cart.ram, 0xE00_0000, value, width, kind);
+        debugger::search_array(&mut values, &self.ppu.vram, 0x600_0000, value, width, kind);
+        debugger::search_array(&mut values, &self.ppu.oam, 0x700_0000, value, width, kind);
+        debugger::search_array(&mut values, &self.cart.ram, 0xE00_0000, value, width, kind);
         values
     }
 
     fn get_registers(&self) -> Vec<usize> {
         self.cpu.registers.into_iter().map(NumExt::us).collect()
-    }
-
-    fn get_serial(&self) -> &[u8] {
-        unimplemented!("Not implemented for this core")
     }
 
     fn get_rom(&self) -> Vec<u8> {
@@ -199,9 +191,7 @@ impl GameGirlAdv {
             self.cart.load_save(save);
         }
 
-        self.options = old_self.options;
-        self.config = old_self.config;
-        self.debugger = old_self.debugger;
+        self.c.restore_from(old_self.c);
         self.init_memory();
         Ppu::init_render(self);
     }
@@ -218,7 +208,7 @@ impl GameGirlAdv {
         cart.extend(iter::repeat(0).take(until_full_page));
 
         let mut gga = Box::<GameGirlAdv>::default();
-        gga.config = config.clone();
+        gga.c.config = config.clone();
         // gga.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO still buggy
         gga.cart.load_rom(cart);
         if let Some(save) = Storage::load(path, gga.cart.title()) {
@@ -260,6 +250,7 @@ impl GameGirlAdv {
     }
 }
 
+/// TODO default really doesn't make much sense, honestly
 impl Default for GameGirlAdv {
     fn default() -> Self {
         let mut gg = Self {
@@ -273,10 +264,7 @@ impl Default for GameGirlAdv {
             serial: Serial::default(),
 
             scheduler: Scheduler::default(),
-            options: EmulateOptions::default(),
-            config: SystemConfig::default(),
-            debugger: GGADebugger::default(),
-            ticking: true,
+            c: Common::default(),
         };
 
         // Initialize scheduler events
@@ -287,10 +275,6 @@ impl Default for GameGirlAdv {
             .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
         gg.scheduler
             .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
-
-        // Initialize various IO devices
-        gg.dma.running = 99;
-        gg.apu.bias = 0x200.into();
 
         gg
     }

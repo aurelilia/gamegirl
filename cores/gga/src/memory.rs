@@ -15,10 +15,8 @@ use arm_cpu::{
     Access, Cpu, Interrupt,
 };
 use common::{
-    components::{
-        debugger::Severity,
-        memory::{MemoryMappedSystem, MemoryMapper},
-    },
+    common::debugger::Severity,
+    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
     numutil::{hword, word, NumExt, U16Ext, U32Ext},
 };
 use modular_bitfield::{bitfield, specifiers::*};
@@ -207,7 +205,7 @@ impl GameGirlAdv {
             | 0x15C..=0x1FF
             | 0x304..=0x3FE
             | 0x100C => {
-                self.debugger.log(
+                self.c.debugger.log(
                     "invalid-mmio-read-known",
                     format!(
                         "Read from write-only/shadow IO register 0x{a:03X}, returning open bus"
@@ -218,7 +216,7 @@ impl GameGirlAdv {
             }
 
             _ => {
-                self.debugger.log(
+                self.c.debugger.log(
                     "invalid-mmio-read-unknown",
                     format!("Read from unknown IO register 0x{a:03X}, returning open bus"),
                     Severity::Warning,
@@ -524,7 +522,7 @@ impl GameGirlAdv {
             | 0xE0..=0xFF
             | 0x110..=0x12E
             | 0x140..=0x15E
-            | 0x20A..=0x21E => self.debugger.log(
+            | 0x20A..=0x21E => self.c.debugger.log(
                 "invalid-mmio-write-known",
                 format!(
                     "Write to known read-only IO register 0x{a:03X} (value {value:04X}), ignoring"
@@ -532,7 +530,7 @@ impl GameGirlAdv {
                 Severity::Info,
             ),
 
-            _ => self.debugger.log(
+            _ => self.c.debugger.log(
                 "invalid-mmio-write-unknown",
                 format!("Write to unknown IO register 0x{a:03X} (value {value:04X}), ignoring"),
                 Severity::Warning,
@@ -666,7 +664,7 @@ impl GameGirlAdv {
     pub fn init_memory(&mut self) {
         MemoryMapper::init_pages(self);
         self.update_wait_times();
-        if self.config.cached_interpreter {
+        if self.c.config.cached_interpreter {
             self.cpu.cache.init(self.cart.rom.len());
         }
     }
