@@ -326,6 +326,7 @@ fn make_screen_ui(app: &App, size: [usize; 2], avail_size: Vec2) -> Image {
             app.textures[0],
             vec2(size[0] as f32, size[1] as f32),
         )))
+        .maintain_aspect_ratio(app.state.options.preserve_aspect_ratio)
         .shrink_to_fit()
     }
 }

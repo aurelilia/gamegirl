@@ -446,6 +446,8 @@ pub struct Options {
     pub tex_filter: Filter,
     /// Require pixel perfect scaling.
     pub pixel_perfect: bool,
+    /// Always preserve aspect ratio.
+    pub preserve_aspect_ratio: bool,
     /// GUI mode.
     pub gui_style: GuiStyle,
 }
@@ -461,6 +463,7 @@ impl Default for Options {
             rewind_buffer_size: 10,
             tex_filter: Filter::Nearest,
             pixel_perfect: false,
+            preserve_aspect_ratio: true,
             #[cfg(target_arch = "wasm32")]
             gui_style: GuiStyle::OnTop,
             #[cfg(not(target_arch = "wasm32"))]

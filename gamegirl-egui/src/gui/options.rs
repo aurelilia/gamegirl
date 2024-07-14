@@ -149,6 +149,7 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
         }
 
         Panel::Gui => {
+            ui.heading("Graphics");
             ComboBox::from_label("Texture filter")
                 .selected_text(format!("{:?}", opt.tex_filter))
                 .show_ui(ui, |ui| {
@@ -159,6 +160,13 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                     ui.selectable_value(&mut opt.tex_filter, Filter::Hq4x, "hq4x");
                 });
 
+            ui.checkbox(&mut opt.pixel_perfect, "Pixel perfect scaling")
+            .on_hover_text("Will only scale the screen to integer multiples, preventing some scaling artifacts at the cost of screen size.\nMainly applicable with 'Nearest' filtering.");
+            ui.checkbox(&mut opt.preserve_aspect_ratio, "Preserve aspect ratio")
+                .on_hover_text("Will keep the aspect ratio of the original screen.");
+            ui.add(Separator::default().spacing(10.));
+
+            ui.heading("GUI");
             ComboBox::from_label("GUI Style")
                 .selected_text(format!("{:?}", opt.gui_style))
                 .show_ui(ui, |ui| {
@@ -179,9 +187,6 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                         "Multiple native windows",
                     );
                 });
-
-            ui.checkbox(&mut opt.pixel_perfect, "Pixel perfect scaling")
-            .on_hover_text("Will only scale the screen to integer multiples, preventing some scaling artifacts at the cost of screen size.\nMainly applicable with 'Nearest' filtering.");
 
             CollapsingHeader::new("egui Configuration").show(ui, |ui| ctx.settings_ui(ui));
         }
