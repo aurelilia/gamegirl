@@ -304,12 +304,7 @@ pub(super) fn execute(gg: &mut GameGirl, inst: Inst) -> bool {
         // 0x40 - 0x7F
         // -----------------------------------
         0x76 if !gg.cpu.ime && (gg[IF] & gg[IE] & 0x1F) != 0 => gg.cpu.halt_bug = true,
-        0x76 => {
-            // HALT: Advance until IF & IE != 0
-            while (gg[IF] & gg[IE] & 0x1F) == 0 {
-                gg.advance_clock(1);
-            }
-        }
+        0x76 => gg.cpu.halted = true,
         0x40..=0x7F => {
             let reg = (inst.0 - 0x40) >> 3;
             match reg {

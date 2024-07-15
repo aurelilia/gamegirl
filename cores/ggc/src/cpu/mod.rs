@@ -25,12 +25,22 @@ pub struct Cpu {
     pub sp: u16,
     pub ime: bool,
     pub regs: [u8; 8],
+    halted: bool,
     halt_bug: bool,
 }
 
 impl Cpu {
     /// Execute the next instruction, moving the entire system forward.
     pub(super) fn exec_next_inst(gg: &mut GameGirl) {
+        if gg.cpu.halted {
+            if gg[IE] & gg[IF] & 0x1F != 0 {
+                gg.cpu.halted = false;
+            } else {
+                gg.advance_clock(1);
+                return;
+            }
+        }
+
         if !gg.c.debugger.should_execute(gg.cpu.pc.u32()) {
             return;
         }
