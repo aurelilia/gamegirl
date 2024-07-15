@@ -21,21 +21,26 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
     ("Save", |a, p| pressed(a, p, |app| app.save_game())),
     ("Fast Forward (Hold)", |app, pressed| {
         let mut core = app.core.lock().unwrap();
+        let c = core.c_mut();
         if pressed {
-            core.c_mut().options.speed_multiplier = app.state.options.fast_forward_hold_speed;
+            c.options.speed_multiplier = app.state.options.fast_forward_hold_speed;
         } else {
-            core.c_mut().options.speed_multiplier = 1;
+            c.options.speed_multiplier = 1;
         }
+        c.video_buffer.frameskip = c.options.speed_multiplier - 1;
     }),
     ("Fast Forward (Toggle)", |a, p| {
         pressed(a, p, |app| {
             let mut core = app.core.lock().unwrap();
+            let c = core.c_mut();
+
             app.fast_forward_toggled = !app.fast_forward_toggled;
             if app.fast_forward_toggled {
-                core.c_mut().options.speed_multiplier = app.state.options.fast_forward_toggle_speed;
+                c.options.speed_multiplier = app.state.options.fast_forward_toggle_speed;
             } else {
-                core.c_mut().options.speed_multiplier = 1;
+                c.options.speed_multiplier = 1;
             }
+            c.video_buffer.frameskip = c.options.speed_multiplier - 1;
         });
     }),
     ("Rewind (Hold)", |app, pressed| {

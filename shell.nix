@@ -1,4 +1,4 @@
-let 
+let
   pkgs = import <nixpkgs> { };
   packages = with pkgs; [
   	# Build related
@@ -17,6 +17,7 @@ let
     cargo-edit
     cargo-flamegraph
     cargo-watch
+    gdb
 
     # Other emulators for ease of debugging
     mgba

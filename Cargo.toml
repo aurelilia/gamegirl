@@ -14,14 +14,19 @@ members = [
 resolver = "2"
 
 [profile.release]
-debug = true
-# lto = true
+lto = true
 panic = "abort"
-opt-level = 2
+opt-level = 3
 
 [profile.release-unwind]
 inherits = "release"
 panic = "unwind"
+
+[profile.release-fast]
+inherits = "release"
+debug = true
+lto = false
+opt-level = 2
 
 [profile.dev]
 opt-level = 1
