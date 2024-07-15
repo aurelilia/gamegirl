@@ -24,7 +24,6 @@ zip = { version = "2.1", default-features = false, features = [
     "deflate",
     "deflate64",
     "lzma",
-    "zstd",
 ] }
 thiserror = "1.0"
 
