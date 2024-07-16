@@ -185,10 +185,6 @@ impl App {
 
         if self.rewinder.rewinding {
             let frame = if let Some(state) = self.rewinder.rewind_buffer.pop() {
-                self.toasts
-                    .info("Rewinding")
-                    .set_closable(false)
-                    .set_duration(Some(Duration::from_millis(1)));
                 core.load_state(state);
                 core.c_mut().options.invert_audio_samples = true;
                 core.produce_frame()
