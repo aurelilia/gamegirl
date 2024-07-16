@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use common::common::{input::Button, options::CgbMode};
+use common::common::{audio::AudioSampler, input::Button, options::CgbMode};
 use eframe::{
     egui,
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, Ui},
@@ -228,6 +228,42 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
                 }
                 ui.label("Volume during Fast-Forward");
             });
+
+            ComboBox::from_label("Output Sample Rate")
+                .selected_text(format!("{:.1}kHz", opt.sys.sample_rate / 1000))
+                .show_ui(ui, |ui| {
+                    for sr in [22050, 44100, 48000, 96000, 192000].iter() {
+                        ui.selectable_value(
+                            &mut opt.sys.sample_rate,
+                            *sr,
+                            format!("{:.1}kHz", *sr as f32 / 1000.),
+                        );
+                    }
+                })
+                .response
+                .on_hover_text("Requires restart to apply changes.");
+
+            ComboBox::from_label("Resampling Algorithm")
+                .selected_text(format!("{}", opt.sys.resampler))
+                .show_ui(ui, |ui| {
+                    for sampler in AudioSampler::SAMPLERS.iter() {
+                        if ui
+                            .selectable_value(
+                                &mut opt.sys.resampler,
+                                *sampler,
+                                format!("{}", sampler),
+                            )
+                            .changed()
+                        {
+                            app.core
+                                .lock()
+                                .unwrap()
+                                .c_mut()
+                                .audio_buffer
+                                .set_sampling(*sampler);
+                        };
+                    }
+                });
         }
 
         Panel::Input => {

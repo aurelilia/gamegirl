@@ -26,7 +26,7 @@ use psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 use super::scheduling::AdvEvent;
 use crate::{addr::FIFO_A_L, dma::Dmas, scheduling::ApuEvent, GameGirlAdv, CPU_CLOCK};
 
-const SAMPLE_EVERY_N_CLOCKS: TimeS = CPU_CLOCK as TimeS / 2i64.pow(16);
+const SAMPLE_EVERY_N_CLOCKS: TimeS = CPU_CLOCK as TimeS / 2i64.pow(15);
 const GG_OFFS: TimeS = 4;
 
 #[bitfield]
@@ -103,7 +103,7 @@ impl Apu {
 
             ApuEvent::PushSample => {
                 gg.apu
-                    .push_output(&mut gg.memory.mapper, &mut gg.c.audio_buffer);
+                    .push_output(&mut gg.memory.mapper, &mut gg.c.audio_buffer.input);
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
@@ -117,11 +117,11 @@ impl Apu {
         );
     }
 
-    fn push_output(&mut self, bus: &mut MemoryMapper<8192>, out: &mut Vec<f32>) {
+    fn push_output(&mut self, bus: &mut MemoryMapper<8192>, out: &mut [Vec<f32>; 2]) {
         if !self.cgb_chans.power {
             // Master enable, also applies to DMA channels
-            out.push(0.);
-            out.push(0.);
+            out[0].push(0.);
+            out[1].push(0.);
             return;
         }
         let mut left = 0;
@@ -166,8 +166,8 @@ impl Apu {
         left += (cgb_sample[1] * cgb_mul * 0.8) as i16;
 
         let bias = self.bias.bias() as i16;
-        out.push(Self::bias(right, bias) as f32 / 1024.0);
-        out.push(Self::bias(left, bias) as f32 / 1024.0);
+        out[0].push(Self::bias(right, bias) as f32 / 1024.0);
+        out[1].push(Self::bias(left, bias) as f32 / 1024.0);
     }
 
     fn bias(mut sample: i16, bias: i16) -> i16 {

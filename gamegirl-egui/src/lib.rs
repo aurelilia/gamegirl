@@ -41,7 +41,7 @@ pub type Colour = Color32;
 pub fn setup_cpal(sys: Arc<Mutex<Box<dyn Core>>>) -> Option<Stream> {
     let sr = {
         let core = sys.lock().unwrap();
-        core.wanted_sample_rate()
+        core.c().config.sample_rate as u32
     };
     let device = cpal::default_host().default_output_device().unwrap();
     let stream = device

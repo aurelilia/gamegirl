@@ -11,6 +11,9 @@ use input::Input;
 use options::{EmulateOptions, SystemConfig};
 use video::FrameBuffer;
 
+use self::audio::AudioBuffer;
+
+pub mod audio;
 pub mod debugger;
 pub mod input;
 pub mod options;
@@ -30,13 +33,16 @@ pub struct Common {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub video_buffer: FrameBuffer,
-    pub audio_buffer: Vec<f32>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub audio_buffer: AudioBuffer,
     pub input: Input,
 }
 
 impl Common {
     pub fn with_config(config: SystemConfig) -> Self {
         Self {
+            audio_buffer: AudioBuffer::with_config(&config),
             config,
             ..Default::default()
         }
@@ -46,5 +52,7 @@ impl Common {
         self.debugger = old.debugger;
         self.options = old.options;
         self.config = old.config;
+        self.audio_buffer = old.audio_buffer;
+        self.audio_buffer.reinit_sampler();
     }
 }

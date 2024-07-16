@@ -8,6 +8,8 @@
 
 use std::vec;
 
+use super::audio::AudioSampler;
+
 /// Options that are used by the GUI and shared between all systems.
 /// These can be changed at runtime.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -50,6 +52,10 @@ pub struct SystemConfig {
     pub volume: f32,
     /// Audio volume multiplier while fast forwarding
     pub volume_ff: f32,
+    /// Audio output sample rate
+    pub sample_rate: usize,
+    /// Audio resampler
+    pub resampler: AudioSampler,
     /// If the interpreter should cache
     pub cached_interpreter: bool,
     /// If the PPU should run on a sepearate thread.
@@ -78,6 +84,8 @@ impl Default for SystemConfig {
             run_on_open: true,
             volume: 0.5,
             volume_ff: 0.25,
+            sample_rate: 48000,
+            resampler: AudioSampler::Cubic,
             cached_interpreter: true,
             // WASM doesn't do threads
             threaded_ppu: !cfg!(target_arch = "wasm32"),

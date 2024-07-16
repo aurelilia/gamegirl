@@ -449,7 +449,10 @@ impl GameGirlAdv {
             FIFO_A_L | FIFO_A_H => self.apu.push_samples::<0>(value),
             FIFO_B_L | FIFO_B_H => self.apu.push_samples::<1>(value),
             SOUNDCNT_H => self.apu.cnt = value.into(),
-            SOUNDBIAS_L => self.apu.bias = value.into(),
+            SOUNDBIAS_L => {
+                self.apu.bias = value.into();
+                // TODO update sample rate
+            }
 
             // PPU
             DISPCNT..=BLDY => self.ppu.regs.write_mmio(a, value),

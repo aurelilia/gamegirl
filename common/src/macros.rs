@@ -27,8 +27,9 @@ macro_rules! common_functions {
                 self.advance();
             }
 
-            if self.c.audio_buffer.len() > 100_000 {
-                self.c.audio_buffer.truncate(100);
+            if self.c.audio_buffer.input[0].len() > 100_000 {
+                self.c.audio_buffer.input[0].truncate(100);
+                self.c.audio_buffer.input[1].truncate(100);
             }
         }
 

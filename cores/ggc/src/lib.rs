@@ -94,10 +94,6 @@ impl Core for GameGirl {
         self.set(BOOTROM_DISABLE, 1u8);
     }
 
-    fn wanted_sample_rate(&self) -> u32 {
-        48_000
-    }
-
     fn make_save(&self) -> Option<GameSave> {
         self.cart.make_save()
     }
@@ -144,7 +140,7 @@ impl GameGirl {
             self.apu.clock(
                 self.t_shift == 1,
                 Timer::read(self, DIV),
-                &mut self.c.audio_buffer,
+                &mut self.c.audio_buffer.input,
             )
         }
     }

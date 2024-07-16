@@ -8,7 +8,7 @@
 
 #![feature(btree_cursors)]
 
-use std::{any::Any, cmp::Ordering, mem};
+use std::{any::Any, cmp::Ordering};
 
 use common::debugger::Width;
 pub use common::Common;
@@ -55,8 +55,6 @@ pub trait Core: Send + Sync {
     fn get_time(&self) -> Time;
     /// Returns the screen size for the current system.
     fn screen_size(&self) -> [usize; 2];
-    /// Returns the output audio sample rate for the current system.
-    fn wanted_sample_rate(&self) -> u32;
     /// Make a save for the game to be put to disk.
     fn make_save(&self) -> Option<GameSave>;
 
@@ -110,8 +108,18 @@ pub trait Core: Send + Sync {
             return;
         }
 
-        let target = samples.len() * self.c().options.speed_multiplier;
-        while self.c().audio_buffer.len() < target {
+        let skip = self.c().options.speed_multiplier;
+        let invert = self.c().options.invert_audio_samples;
+        let volume = if skip == 1 {
+            self.c().config.volume
+        } else {
+            self.c().config.volume_ff
+        };
+
+        self.c_mut()
+            .audio_buffer
+            .update_output_chunk_size(samples.len() / 2);
+        while !self.c().audio_buffer.can_fill_buffer(skip) {
             if !self.c().debugger.running {
                 samples.fill(0.0);
                 return;
@@ -119,39 +127,9 @@ pub trait Core: Send + Sync {
             self.advance();
         }
 
-        let mut buffer = mem::take(&mut self.c_mut().audio_buffer);
-        if self.c().options.invert_audio_samples {
-            // If rewinding, truncate and get rid of any excess samples to prevent
-            // audio samples getting backed up
-            for (src, dst) in buffer.into_iter().zip(samples.iter_mut().rev()) {
-                *dst = src * self.c().config.volume_ff;
-            }
-        } else {
-            // Otherwise, store any excess samples back in the buffer for next time
-            // while again not storing too many to avoid backing up.
-            // This way can cause clipping if the console produces audio too fast,
-            // however this is preferred to audio falling behind and eating
-            // a lot of memory.
-            for sample in buffer.drain(target..) {
-                self.c_mut().audio_buffer.push(sample);
-            }
-            if self.c().audio_buffer.len() > self.wanted_sample_rate() as usize / 2 {
-                log::warn!("Audio samples are backing up! Truncating");
-                self.c_mut().audio_buffer.truncate(100);
-            }
-
-            let volume = if self.c().options.speed_multiplier == 1 {
-                self.c().config.volume
-            } else {
-                self.c().config.volume_ff
-            };
-            for (src, dst) in buffer
-                .into_iter()
-                .step_by(self.c().options.speed_multiplier)
-                .zip(samples.iter_mut())
-            {
-                *dst = src * volume;
-            }
+        self.c_mut().audio_buffer.fill_buffer(samples, skip, volume);
+        if invert {
+            samples.reverse();
         }
     }
 }

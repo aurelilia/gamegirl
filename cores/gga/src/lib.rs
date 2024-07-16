@@ -101,10 +101,6 @@ impl Core for GameGirlAdv {
         self.cpu.sp[4] = 0x0300_7FA0;
     }
 
-    fn wanted_sample_rate(&self) -> u32 {
-        2u32.pow(16)
-    }
-
     fn make_save(&self) -> Option<GameSave> {
         self.cart.make_save()
     }
@@ -276,6 +272,7 @@ impl Default for GameGirlAdv {
         gg.scheduler
             .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
 
+        gg.c.audio_buffer.set_input_sr(2usize.pow(15));
         gg
     }
 }

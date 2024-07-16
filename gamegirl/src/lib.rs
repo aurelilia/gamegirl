@@ -177,10 +177,6 @@ impl Core for Dummy {
         self
     }
 
-    fn wanted_sample_rate(&self) -> u32 {
-        48000
-    }
-
     fn get_rom(&self) -> Vec<u8> {
         vec![]
     }

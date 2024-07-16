@@ -135,10 +135,6 @@ impl Core for Nds {
         }
     }
 
-    fn wanted_sample_rate(&self) -> u32 {
-        48000
-    }
-
     fn make_save(&self) -> Option<GameSave> {
         todo!();
     }

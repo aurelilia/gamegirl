@@ -339,7 +339,7 @@ impl Apu {
     /// The APU is clocked by the divider, on the falling edge of the bit 12
     /// of the divider, this is needed since the divider can be clocked manually
     /// by resetting it to 0 on write
-    pub fn clock(&mut self, double_speed: bool, divider: u8, buf: &mut Vec<f32>) {
+    pub fn clock(&mut self, double_speed: bool, divider: u8, buf: &mut [Vec<f32>; 2]) {
         // 2 in normal speed, 1 in double speed
         let clocks = (!double_speed) as u8 + 1;
 
@@ -406,7 +406,7 @@ impl Apu {
 }
 
 impl Apu {
-    fn push_output(&mut self, buf: &mut Vec<f32>) {
+    fn push_output(&mut self, buf: &mut [Vec<f32>; 2]) {
         let right_vol = self.channels_control.vol_right() as f32 + 1.;
         let left_vol = self.channels_control.vol_left() as f32 + 1.;
 
@@ -491,8 +491,8 @@ impl Apu {
 
         let right_sample = right_pulse1 + right_pulse2 + right_wave + right_noise;
         let left_sample = left_pulse1 + left_pulse2 + left_wave + left_noise;
-        buf.push(right_sample);
-        buf.push(left_sample);
+        buf[0].push(right_sample);
+        buf[1].push(left_sample);
     }
 
     fn power_off(&mut self) {

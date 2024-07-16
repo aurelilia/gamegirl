@@ -22,8 +22,8 @@ impl Apu {
     pub fn handle_event(ds: &mut Nds, event: ApuEvent, late_by: TimeS) -> TimeS {
         match event {
             ApuEvent::PushSample => {
-                ds.c.audio_buffer.push(0.0);
-                ds.c.audio_buffer.push(0.0);
+                ds.c.audio_buffer.input[0].push(0.0);
+                ds.c.audio_buffer.input[1].push(0.0);
                 SAMPLE_EVERY_N_CLOCKS - late_by
             }
         }
