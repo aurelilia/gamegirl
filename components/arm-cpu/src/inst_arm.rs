@@ -346,8 +346,9 @@ impl<S: ArmSystem> SysWrapper<S> {
         let pn = inst.reg(8);
         let cp = inst.0.bits(5, 3);
         let cm = inst.reg(0);
+        let cpopc = inst.0.bits(21, 3);
 
-        if inst.0.is_bit(4) && pn == 15 {
+        if inst.0.is_bit(4) && pn == 15 && cpopc == 0 {
             if mrc {
                 let value = self.get_cp15(cm, cp, cn);
                 if rd == 15 {

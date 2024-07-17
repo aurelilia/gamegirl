@@ -95,7 +95,7 @@ pub trait ArmSystem: Sized + 'static {
     /// Callback for setting CP15 register.
     /// This CPU implementation relies on the system to provide the CP15
     /// implementation. It is only used when `IS_V5 == true`
-    fn set_cp15(&self, _cm: u32, _cp: u32, _cn: u32, _rd: u32) {
+    fn set_cp15(&mut self, _cm: u32, _cp: u32, _cn: u32, _rd: u32) {
         panic!("CP15 unsupported!");
     }
 

@@ -9,10 +9,7 @@
 use common::{components::scheduler::Kind, TimeS};
 use NdsEvent::*;
 
-use crate::{audio::Apu, timer::Timers, Nds};
-
-// TODO
-type PpuEvent = ();
+use crate::{audio::Apu, graphics::Gpu, timer::Timers, Nds};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -34,8 +31,7 @@ impl NdsEvent {
         match self {
             PauseEmulation => ds.c.in_tick = false,
             PpuEvent(evt) => {
-                // Ppu::handle_event(&mut ds.nds7(), evt, late_by);
-                // Ppu::handle_event(&mut ds.nds9(), evt, late_by);
+                Gpu::handle_event(&mut ds.nds9(), evt, late_by);
             }
             ApuEvent(evt) => {
                 let time = Apu::handle_event(ds, evt, late_by);
@@ -66,4 +62,17 @@ impl Default for NdsEvent {
 pub enum ApuEvent {
     /// Push a sample to the output.
     PushSample,
+}
+
+/// Events the PPU generates.
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[repr(u16)]
+pub enum PpuEvent {
+    /// Start of HBlank.
+    HblankStart,
+    /// Set HBlank flag in DISPSTAT (this is delayed by 46 cycles)
+    SetHblank,
+    /// End of HBlank, which is the start of the next scanline.
+    HblankEnd,
 }

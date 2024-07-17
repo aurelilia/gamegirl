@@ -57,6 +57,10 @@ impl Nds {
             IF_L => ds.cpur().if_.low(),
             IF_H => ds.cpur().if_.high(),
 
+            // GPU
+            DISPSTAT => ds.gpu.dispstat.into(),
+            VCOUNT => ds.gpu.vcount,
+
             _ => {
                 ds.c.debugger.log(
                     "unknown-io-read",
@@ -98,6 +102,12 @@ impl Nds {
             0xC6 => Dmas::ctrl_write(dsx, 1, value),
             0xD2 => Dmas::ctrl_write(dsx, 2, value),
             0xDE => Dmas::ctrl_write(dsx, 3, value),
+
+            // Shared GPU stuff
+            DISPSTAT => {
+                let disp: u16 = ds.gpu.dispstat.into();
+                ds.gpu.dispstat = ((disp & 0b111) | (value & !0b1100_0111)).into();
+            }
 
             _ => ds.c.debugger.log(
                 "unknown-io-write",
@@ -201,6 +211,18 @@ impl Nds9 {
     fn get_mmio(&self, addr: u32) -> u16 {
         let addr = addr & 0x1FFE;
         match addr {
+            // PPUs
+            DISPCNT_L | DISPCNT_H | 0x08..0x60
+                if let Some(val) = self.gpu.ppus[0].regs.read_mmio(addr) =>
+            {
+                val
+            }
+            0x1000 | 0x1002 | 0x1008..0x1060
+                if let Some(val) = self.gpu.ppus[1].regs.read_mmio(addr & 0xFF) =>
+            {
+                val
+            }
+
             _ => Nds::try_get_mmio_shared(self, addr),
         }
     }
@@ -208,6 +230,12 @@ impl Nds9 {
     fn set_mmio(&mut self, addr: u32, value: u16) {
         let addr = addr & 0x1FFE;
         match addr {
+            // PPUs
+            DISPCNT_L | DISPCNT_H | 0x08..0x60 => self.gpu.ppus[0].regs.write_mmio(addr, value),
+            0x1000 | 0x1002 | 0x1008..0x1060 => {
+                self.gpu.ppus[1].regs.write_mmio(addr & 0xFF, value)
+            }
+
             _ => Nds::try_set_mmio_shared(self, addr, value),
         }
     }
@@ -326,20 +354,14 @@ impl MemoryMappedSystem<8192> for Nds9 {
             0x0200_0000..=0x02FF_FFFF => offs(&self.memory.psram, a - 0x200_0000),
             0x0300_0000..=0x03FF_FFFF => offs(&self.memory.wram, a - 0x300_0000),
 
-            // 0x0500_0000..=0x05FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-            //     offs(&self.ppu_a_nomut().palette, a - 0x500_0000)
-            // }
-            // 0x0500_0000..=0x05FF_FFFF => offs(&self.ppu_b_nomut().palette, a - 0x501_0000),
-            // 0x0600_0000..=0x061F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x600_0000),
-            // 0x0620_0000..=0x063F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x620_0000),
-            // // TODO not quite right...
-            // 0x0640_0000..=0x065F_FFFF => offs(&self.ppu_a_nomut().vram, a - 0x640_0000),
-            // 0x0660_0000..=0x067F_FFFF => offs(&self.ppu_b_nomut().vram, a - 0x660_0000),
-            // 0x0700_0000..=0x07FF_FFFF if (a & 0x1FFF) < 0x1000 => {
-            //     offs(&self.ppu_a_nomut().oam, a - 0x700_0000)
-            // }
-            // 0x0700_0000..=0x07FF_FFFF => offs(&self.ppu_b_nomut().oam, a - 0x701_0000),
-            0x0600_0000..=0x06FF_FFFF if false => todo!(),
+            0x0500_0000..=0x05FF_FFFF if (a & 0x1FFF) < 0x1000 => {
+                offs(&self.gpu.ppus[0].palette, a - 0x500_0000)
+            }
+            0x0500_0000..=0x05FF_FFFF => offs(&self.gpu.ppus[1].palette, a - 0x500_1000),
+            0x0700_0000..=0x07FF_FFFF if (a & 0x1FFF) < 0x1000 => {
+                offs(&self.gpu.ppus[0].oam, a - 0x700_0000)
+            }
+            0x0700_0000..=0x07FF_FFFF => offs(&self.gpu.ppus[1].oam, a - 0x701_0000),
 
             _ => ptr::null::<u8>() as *mut u8,
         }

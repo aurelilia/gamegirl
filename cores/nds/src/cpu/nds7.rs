@@ -6,13 +6,6 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-//! CPU implementations.
-//! Note that when it comes to timing, the ARM9 runs on the scheduler until
-//! the ARM7 is behind, which then runs outside the scheduler until the ARM9 is
-//! behind. This is repeated in a loop.
-//! Effectively, the ARM9 is the one handling the scheduling, with the ARM7
-//! being dragged along.
-
 use arm_cpu::{
     interface::{ArmSystem, RwType},
     registers::Flag::IrqDisable,
@@ -29,8 +22,6 @@ use crate::{
     addr::{IE_H, IE_L, IF_H, IF_L, IME},
     Nds7, Nds9, NdsCpu,
 };
-
-pub const NDS9_CLOCK: u32 = 67_027_964;
 
 impl ArmSystem for Nds7 {
     const IS_V5: bool = false;
@@ -82,68 +73,5 @@ impl ArmSystem for Nds7 {
         false
     }
 
-    fn will_execute(&mut self, pc: u32) {
-        todo!()
-    }
-}
-
-impl ArmSystem for Nds9 {
-    const IS_V5: bool = true;
-    const IF_ADDR: u32 = IF_L;
-
-    fn cpur(&self) -> &Cpu<Self> {
-        &self.cpu9
-    }
-
-    fn cpu(&mut self) -> &mut Cpu<Self> {
-        &mut self.cpu9
-    }
-
-    fn advance_clock(&mut self) {
-        if self.scheduler.has_events() {
-            while let Some(event) = self.scheduler.get_next_pending() {
-                event.kind.dispatch(self, event.late_by);
-            }
-        }
-    }
-
-    fn add_sn_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles as Time);
-    }
-
-    fn add_i_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles as Time);
-    }
-
-    fn exception_happened(&mut self, _kind: Exception) {}
-
-    fn pipeline_stalled(&mut self) {}
-
-    fn get<T: RwType>(&mut self, addr: u32) -> T {
-        self.memory.mapper[1]
-            .get::<Self, _>(addr)
-            .unwrap_or_else(|| self.get_slow(addr))
-    }
-
-    fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        if !self.memory.mapper[1].set::<Self, _>(addr, value) {
-            self.set_slow(addr, value)
-        }
-    }
-
-    fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {
-        1
-    }
-
-    fn debugger(&mut self) -> &mut Debugger {
-        &mut self.c.debugger
-    }
-
-    fn can_cache_at(_addr: u32) -> bool {
-        false
-    }
-
-    fn will_execute(&mut self, pc: u32) {
-        todo!()
-    }
+    fn will_execute(&mut self, _pc: u32) {}
 }

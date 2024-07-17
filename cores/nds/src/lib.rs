@@ -9,6 +9,7 @@
 #![allow(unused)]
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
+#![feature(if_let_guard)]
 
 mod addr;
 mod audio;
@@ -34,13 +35,14 @@ use common::{
     numutil::NumExt,
     Colour, Common, Core, Time,
 };
+use cpu::cp15::Cp15;
 
 use crate::{
     audio::Apu,
     cartridge::Cartridge,
     cpu::NDS9_CLOCK,
     dma::Dmas,
-    graphics::NdsEngines,
+    graphics::Gpu,
     memory::Memory,
     scheduling::{ApuEvent, NdsEvent},
     timer::Timers,
@@ -94,7 +96,9 @@ nds_wrapper!(Nds9, 1);
 pub struct Nds {
     cpu7: Cpu<Nds7>,
     cpu9: Cpu<Nds9>,
-    pub ppu: NdsEngines,
+    cp15: Cp15,
+
+    gpu: Gpu,
     apu: Apu,
     memory: Memory,
     pub cart: Cartridge,
@@ -179,7 +183,8 @@ impl Default for Nds {
         let mut nds = Self {
             cpu7: Cpu::default(),
             cpu9: Cpu::default(),
-            ppu: NdsEngines::default(),
+            cp15: Cp15::default(),
+            gpu: Gpu::default(),
             apu: Apu::default(),
             memory: Memory::default(),
             cart: Cartridge::default(),

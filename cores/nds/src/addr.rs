@@ -19,9 +19,35 @@ pub const WRAMCNT: u32 = 0x246;
 pub const VRAMCNTSTAT: u32 = 0x240;
 
 // PPU
-pub const DISPCNT: u32 = 0x0;
+pub const PPU_A: u32 = 0x0;
+pub const PPU_B: u32 = 0x1000;
+pub const DISPCNT_L: u32 = 0x0;
+pub const DISPCNT_H: u32 = 0x0;
 pub const DISPSTAT: u32 = 0x4;
 pub const VCOUNT: u32 = 0x6;
+pub const BG0CNT: u32 = 0x8;
+pub const BG1CNT: u32 = 0xA;
+pub const BG2CNT: u32 = 0xC;
+pub const BG3CNT: u32 = 0xE;
+pub const BG0HOFS: u32 = 0x10;
+pub const BG0VOFS: u32 = 0x12;
+pub const BG3VOFS: u32 = 0x1E;
+pub const BG2PA: u32 = 0x20;
+pub const BG3PA: u32 = 0x30;
+pub const WIN0H: u32 = 0x40;
+pub const WIN1H: u32 = 0x42;
+pub const WIN0V: u32 = 0x44;
+pub const WIN1V: u32 = 0x46;
+pub const WININ: u32 = 0x48;
+pub const WINOUT: u32 = 0x4A;
+pub const MOSAIC: u32 = 0x4C;
+pub const BLDCNT: u32 = 0x50;
+pub const BLDALPHA: u32 = 0x52;
+pub const BLDY: u32 = 0x54;
+pub const DISP3DCNT: u32 = 0x60;
+pub const DISPCAPCNT: u32 = 0x64;
+pub const DISP_MMEM_FIFO: u32 = 0x68;
+pub const MASTER_BRIGHT: u32 = 0x6C;
 
 // Timers
 pub const TM0CNT_L: u32 = 0x100;
