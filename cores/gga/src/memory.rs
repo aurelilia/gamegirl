@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with self file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::ptr;
+use std::mem;
 
 use arm_cpu::{
     access::{CODE, NONSEQ, SEQ},
@@ -16,8 +16,7 @@ use arm_cpu::{
 };
 use common::{
     common::debugger::Severity,
-    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
-    numutil::{hword, word, NumExt, U16Ext, U32Ext},
+    numutil::{hword, word, ByteArrayExt, NumExt, U16Ext, U32Ext},
 };
 use modular_bitfield::{bitfield, specifiers::*};
 
@@ -77,7 +76,6 @@ pub struct Memory {
     /// Value to return when trying to read BIOS outside of it
     pub(crate) bios_value: u32,
 
-    pub mapper: MemoryMapper<8192>,
     pub(crate) prefetch: Prefetch,
     wait_word: [u16; 32],
     wait_other: [u16; 32],
@@ -86,56 +84,86 @@ pub struct Memory {
 impl GameGirlAdv {
     pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
-        if addr >= 0x1000_0000 {
-            return T::from_u32(self.invalid_read::<false>(addr));
-        }
+        let region = addr >> 24;
+        let a = addr.us();
+        match region {
+            // Basic
+            0x00 => self.bios_read(a),
+            0x02 => self.memory.ewram.get_wrap(a),
+            0x03 => self.memory.iwram.get_wrap(a),
+            0x05 => self.ppu.palette.get_wrap(a),
+            0x07 => self.ppu.oam.get_wrap(a),
 
-        self.memory.mapper.get::<Self, _>(addr).unwrap_or_else(|| {
-            match addr {
-                // BIOS
-                0x0000_0000..=0x0000_3FFF if self.cpu.pc() < 0x0100_0000 => {
-                    Self::bios_read(&self.memory.bios, addr)
+            // MMIO
+            0x04 => match T::WIDTH {
+                1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
+                1 => T::from_u8(self.get_mmio(addr).low()),
+                2 => T::from_u16(self.get_mmio(addr)),
+                4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
+                _ => unreachable!(),
+            },
+            // VRAM with weird mirroring
+            0x06 => {
+                let a = a & 0x1_FFFF;
+                if a < 0x1_8000 {
+                    self.ppu.vram.get_exact(a)
+                } else {
+                    self.ppu.vram[0x1_0000..].get_exact(a - 0x1_8000)
                 }
-                0x0000_0000..=0x0000_3FFF => T::from_u32(self.memory.bios_value),
-
-                // MMIO
-                0x0400_0000..=0x04FF_FFFF => match T::WIDTH {
-                    1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
-                    1 => T::from_u8(self.get_mmio(addr).low()),
-                    2 => T::from_u16(self.get_mmio(addr)),
-                    4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
-                    _ => unreachable!(),
-                },
-
-                // Cart save
-                // Flash / SRAM
-                0x0E00_0000..=0x0FFF_FFFF => {
-                    // Reading [half]words causes the byte to be repeated
-                    let byte = self.cart.read_ram_byte(addr_unaligned.us() & 0xFFFF);
-                    match T::WIDTH {
-                        1 => T::from_u8(byte),
-                        2 => T::from_u16(hword(byte, byte)),
-                        4 => T::from_u32(word(hword(byte, byte), hword(byte, byte))),
-                        _ => unreachable!(),
-                    }
-                }
-                // EEPROM
-                0x0D00_0000..=0x0DFF_FFFF if T::WIDTH == 2 && self.cart.is_eeprom_at(addr) => {
-                    T::from_u16(self.cart.read_ram_hword())
-                }
-
-                // Account for unmapped last page due to EEPROM
-                0x0DFF_8000..=0x0DFF_FFFF
-                    if self.cart.rom.len() >= (addr.us() - 0x800_0001 + T::WIDTH.us()) =>
-                unsafe {
-                    let ptr = self.cart.rom.as_ptr().add(addr.us() - 0x800_0000);
-                    ptr.cast::<T>().read()
-                },
-
-                _ if T::WIDTH == 4 => T::from_u32(self.invalid_read::<true>(addr)),
-                _ => T::from_u32(self.invalid_read::<false>(addr)),
             }
+
+            // Cart save
+            // EEPROM
+            0x0D if T::WIDTH == 2 && self.cart.is_eeprom_at(addr) => {
+                T::from_u16(self.cart.read_ram_hword())
+            }
+            // Flash / SRAM
+            0x0E | 0x0F => {
+                // Reading [half]words causes the byte to be repeated
+                let byte = self.cart.read_ram_byte(addr_unaligned.us() & 0xFFFF);
+                match T::WIDTH {
+                    1 => T::from_u8(byte),
+                    2 => T::from_u16(hword(byte, byte)),
+                    4 => T::from_u32(word(hword(byte, byte), hword(byte, byte))),
+                    _ => unreachable!(),
+                }
+            }
+
+            // Cart
+            0x08..=0x0D if let Some(v) = self.cart.rom.try_get_exact(a & 0x1FF_FFFF) => v,
+            // 1MB carts are special and wrap
+            0x08..0x0D if self.cart.rom.len() == (2 << 19) => {
+                self.cart.rom.get_wrap(a & 0x1FF_FFFF)
+            }
+
+            _ if T::WIDTH == 4 => T::from_u32(self.invalid_read::<true>(addr)),
+            _ => T::from_u32(self.invalid_read::<false>(addr)),
+        }
+    }
+
+    pub fn get_any<T>(&self, addr_unaligned: u32) -> Option<T> {
+        let addr = addr_unaligned & !(mem::size_of::<T>().u32() - 1);
+        let region = addr >> 24;
+        let a = addr.us();
+        Some(match region {
+            0x02 => self.memory.ewram.get_wrap(a),
+            0x03 => self.memory.iwram.get_wrap(a),
+            0x05 => self.ppu.palette.get_wrap(a),
+            0x07 => self.ppu.oam.get_wrap(a),
+            _ => return None,
         })
+    }
+
+    pub fn get_raw_ram(&self, addr: u32) -> Option<*mut u8> {
+        let region = addr >> 24;
+        let a = addr.us();
+        unsafe {
+            Some(match region {
+                0x02 => self.memory.ewram.as_ptr().add(a & 0xFF_FFFF) as *mut u8,
+                0x03 => self.memory.iwram.as_ptr().add(a & 0xFF_FFFF) as *mut u8,
+                _ => return None,
+            })
+        }
     }
 
     fn get_mmio(&self, addr: u32) -> u16 {
@@ -272,40 +300,55 @@ impl GameGirlAdv {
         value >> shift
     }
 
-    /// Write a byte to the bus. Does no timing-related things; simply sets the
-    /// value.
     pub fn set<T: RwType>(&mut self, addr_unaligned: u32, value: T) {
         let addr = addr_unaligned & !(T::WIDTH - 1);
-        if addr >= 0x1000_0000 {
-            return;
-        }
+        let region = addr >> 24;
+        let a = addr.us();
+        match region {
+            // Basic
+            0x02 => self.memory.ewram.set_wrap(a, value),
+            0x03 => self.memory.iwram.set_wrap(a, value),
 
-        // Bytes only use the mapper later, since VRAM does weird behavior
-        // on byte writes
-        if T::WIDTH != 1 {
-            let success = self.memory.mapper.set::<Self, _>(addr, value);
-            if success {
-                self.cpu.cache.write(addr);
-                return;
-            }
-        }
-
-        match addr {
             // MMIO
-            0x0400_0000..=0x0400_0301 if T::WIDTH == 1 => self.set_mmio_byte(addr, value.u8()),
-            0x0400_0000..=0x0400_0300 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
-            0x0400_0000..=0x0400_0300 if T::WIDTH == 4 => {
+            0x04 if T::WIDTH == 1 => self.set_mmio_byte(addr, value.u8()),
+            0x04 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
+            0x04 if T::WIDTH == 4 => {
                 self.set_mmio(addr, value.u16());
                 self.set_mmio(addr + 2, value.u32().high());
             }
+            // VRAM with weird mirroring and byte write behavior
+            0x05..=0x07 if T::WIDTH == 1 => {
+                let value = value.u8();
+                match addr {
+                    0x0500_0000..=0x0600_FFFF if !self.ppu.regs.is_bitmap_mode() => {
+                        self.set(addr & !1, hword(value, value))
+                    }
+                    0x0500_0000..=0x0601_3FFF => self.set(addr & !1, hword(value, value)),
+                    0x0602_0000..=0x06FF_FFFF if addr & 0x1_FFFF < 0x1_0000 => {
+                        // Only BG VRAM gets written to, OBJ VRAM is ignored
+                        self.set(addr & !1, hword(value, value));
+                    }
+                    _ => (), // Ignored
+                };
+            }
+            0x05 => self.ppu.palette.set_wrap(a, value),
+            0x06 => {
+                let a = a & 0x1_FFFF;
+                if a < 0x1_8000 {
+                    self.ppu.vram.set_exact(a, value)
+                } else {
+                    self.ppu.vram[0x1_0000..].set_exact(a - 0x1_8000, value)
+                }
+            }
+            0x07 => self.ppu.oam.set_wrap(a, value),
 
-            // Maybe write EEPROM
-            0x0D00_0000..=0x0DFF_FFFF if T::WIDTH == 2 && self.cart.is_eeprom_at(addr) => {
+            // Cart save
+            // EEPROM
+            0x0D if T::WIDTH == 2 && self.cart.is_eeprom_at(addr) => {
                 self.cart.write_ram_hword(value.u16());
             }
-
-            // Other saves
-            0x0E00_0000..=0x0FFF_FFFF => {
+            // Flash / SRAM
+            0x0E | 0x0F => {
                 let byte = match T::WIDTH {
                     1 => value.u8(),
                     2 if addr_unaligned.is_bit(0) => value.u16().high(),
@@ -317,27 +360,6 @@ impl GameGirlAdv {
                     _ => unreachable!(),
                 };
                 self.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
-            }
-
-            // VRAM weirdness on byte writes
-            _ if T::WIDTH == 1 => {
-                let value = value.u8();
-                match addr {
-                    0x0500_0000..=0x0600_FFFF if !self.ppu.regs.is_bitmap_mode() => {
-                        self.set(addr & !1, hword(value, value))
-                    }
-                    0x0500_0000..=0x0601_3FFF => self.set(addr & !1, hword(value, value)),
-                    0x0602_0000..=0x06FF_FFFF if addr & 0x1_FFFF < 0x1_0000 => {
-                        // Only BG VRAM gets written to, OBJ VRAM is ignored
-                        self.set(addr & !1, hword(value, value));
-                    }
-                    0x0601_0000..=0x07FF_FFFF if !self.ppu.regs.is_bitmap_mode() => (), // Ignored
-                    0x0601_4000..=0x07FF_FFFF => (),                                    // Ignored
-
-                    _ => {
-                        self.memory.mapper.set::<Self, _>(addr, value);
-                    }
-                };
             }
 
             _ => (),
@@ -541,10 +563,11 @@ impl GameGirlAdv {
         }
     }
 
-    fn bios_read<T>(bios: &[u8], addr: u32) -> T {
-        unsafe {
-            let ptr = bios.as_ptr().add(addr.us() & 0x3FFF);
-            ptr.cast::<T>().read()
+    fn bios_read<T: NumExt>(&self, addr: usize) -> T {
+        if self.cpur().pc() < 0x100_0000 {
+            self.memory.bios.get_wrap(addr)
+        } else {
+            T::from_u32(self.memory.bios_value)
         }
     }
 
@@ -665,7 +688,6 @@ impl GameGirlAdv {
 
     /// Initialize page tables and wait times.
     pub fn init_memory(&mut self) {
-        MemoryMapper::init_pages(self);
         self.update_wait_times();
         if self.c.config.cached_interpreter {
             self.cpu.cache.init(self.cart.rom.len());
@@ -727,7 +749,6 @@ impl Default for Memory {
             keys_prev: 0,
             waitcnt: 0.into(),
             bios_value: 0xE129_F000,
-            mapper: MemoryMapper::default(),
             prefetch: Prefetch::default(),
             wait_word: [0; 32],
             wait_other: [0; 32],
@@ -736,73 +757,3 @@ impl Default for Memory {
 }
 
 unsafe impl Send for Memory {}
-
-impl MemoryMappedSystem<8192> for GameGirlAdv {
-    type Usize = u32;
-    const ADDR_MASK: &'static [usize] = &[
-        0,      // Unmapped
-        0,      // Unmapped
-        0x7FFF, // EWRAM
-        0x7FFF, // IWRAM
-        0,      // MMIO
-        0x3FF,  // Palette
-        0x7FFF, // VRAM
-        0x3FF,  // OAM
-        0x7FFF, // ROM
-        0x7FFF, // ROM
-        0x7FFF, // ROM
-        0x7FFF, // ROM
-        0x7FFF, // ROM
-        0x7FFF, // ROM
-        0,      // Unmapped
-        0,      // Unmapped
-    ];
-    const PAGE_POW: usize = 15;
-    const MASK_POW: usize = 24;
-
-    fn get_mapper(&self) -> &MemoryMapper<8192> {
-        &self.memory.mapper
-    }
-
-    fn get_mapper_mut(&mut self) -> &mut MemoryMapper<8192> {
-        &mut self.memory.mapper
-    }
-
-    unsafe fn get_page<const R: bool>(&self, a: usize) -> *mut u8 {
-        unsafe fn offs(reg: &[u8], offs: usize) -> *mut u8 {
-            let ptr = reg.as_ptr() as *mut u8;
-            ptr.add(offs % reg.len())
-        }
-
-        // 1MB ROMs (Classic NES) mirror
-        let rom_1mb = self.cart.rom.len() == (2 << 19);
-        match a {
-            0x0200_0000..=0x02FF_FFFF => offs(&self.memory.ewram, a - 0x200_0000),
-            0x0300_0000..=0x03FF_FFFF => offs(&self.memory.iwram, a - 0x300_0000),
-            0x0500_0000..=0x05FF_FFFF => offs(&self.ppu.palette, a - 0x500_0000),
-            0x0600_0000..=0x0601_7FFF => offs(&self.ppu.vram, a - 0x600_0000),
-            0x0700_0000..=0x07FF_FFFF => offs(&self.ppu.oam, a - 0x700_0000),
-            0x0800_0000..=0x09FF_FFFF
-                if R && (self.cart.rom.len() >= (a - 0x800_0000) || rom_1mb) =>
-            {
-                offs(&self.cart.rom, a - 0x800_0000)
-            }
-            0x0A00_0000..=0x0BFF_FFFF
-                if R && (self.cart.rom.len() >= (a - 0x800_0000) || rom_1mb) =>
-            {
-                offs(&self.cart.rom, a - 0xA00_0000)
-            }
-            // Does not go all the way due to EEPROM
-            0x0C00_0000..=0x0DFF_7FFF
-                if R && (self.cart.rom.len() >= (a - 0x800_0000) || rom_1mb) =>
-            {
-                offs(&self.cart.rom, a - 0xC00_0000)
-            }
-
-            // VRAM mirror weirdness
-            0x0601_8000..=0x0601_FFFF => offs(&self.ppu.vram, 0x1_0000 + (a - 0x600_0000)),
-            0x0602_0000..=0x06FF_FFFF => self.get_page::<R>(a & 0x601_FFFF),
-            _ => ptr::null::<u8>() as *mut u8,
-        }
-    }
-}

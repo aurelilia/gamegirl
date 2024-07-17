@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::ops::BitAnd;
+use std::{mem, ops::BitAnd};
 
 /// Trait for common number operations.
 pub trait NumExt: BitAnd<Output = Self> + Copy + PartialEq + Default {
@@ -213,4 +213,48 @@ impl U32Ext for u32 {
     fn i24(self) -> i32 {
         ((self.bits(0, 24) << 8) as i32) >> 8
     }
+}
+
+pub trait ByteArrayExt {
+    fn get_exact<T>(&self, addr: usize) -> T;
+    fn get_wrap<T>(&self, addr: usize) -> T;
+    fn try_get_exact<T: NumExt>(&self, addr: usize) -> Option<T>;
+    fn set_exact<T>(&self, addr: usize, value: T);
+    fn set_wrap<T>(&self, addr: usize, value: T);
+}
+
+impl ByteArrayExt for [u8] {
+    fn get_exact<T>(&self, addr: usize) -> T {
+        unsafe { inner_exact::<T>(self, addr).read() }
+    }
+
+    fn get_wrap<T>(&self, addr: usize) -> T {
+        unsafe { inner_wrap::<T>(self, addr).read() }
+    }
+
+    fn try_get_exact<T: NumExt>(&self, addr: usize) -> Option<T> {
+        if (addr + (T::WIDTH.us() - 1)) < self.len() {
+            Some(unsafe { inner_exact::<T>(self, addr).read() })
+        } else {
+            None
+        }
+    }
+
+    fn set_exact<T>(&self, addr: usize, value: T) {
+        unsafe { inner_exact::<T>(self, addr).write(value) }
+    }
+
+    fn set_wrap<T>(&self, addr: usize, value: T) {
+        unsafe { inner_wrap::<T>(self, addr).write(value) }
+    }
+}
+
+fn inner_exact<T>(arr: &[u8], addr: usize) -> *mut T {
+    assert!((addr + (mem::size_of::<T>() - 1)) < arr.len());
+    unsafe { arr.as_ptr().add(addr) as *const T as *mut T }
+}
+fn inner_wrap<T>(arr: &[u8], addr: usize) -> *mut T {
+    debug_assert!(arr.len().is_power_of_two());
+    let mask = arr.len() - 1;
+    unsafe { arr.as_ptr().add(addr & mask) as *const T as *mut T }
 }

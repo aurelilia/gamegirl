@@ -14,8 +14,6 @@
 use core::slice;
 use std::{cmp, mem, ptr};
 
-use common::components::memory_mapper::MemoryMapper;
-
 use crate::GameGirlAdv;
 
 const MAX_CH: usize = 12;
@@ -108,12 +106,13 @@ impl MusicPlayer {
     pub fn pc_match(gg: &mut GameGirlAdv) {
         let addr = gg.get(0x300_7FF0);
         if addr != 0 {
-            gg.apu.mplayer.sound_main_ram(&mut gg.memory.mapper, addr);
+            let player = gg.apu.mplayer.clone();
+            player.lock().unwrap().sound_main_ram(gg, addr);
         }
     }
 
-    pub fn sound_main_ram(&mut self, bus: &mut MemoryMapper<8192>, info_addr: u32) {
-        let Some(sound_info) = bus.get::<GameGirlAdv, SoundInfo>(info_addr) else {
+    pub fn sound_main_ram(&mut self, bus: &mut GameGirlAdv, info_addr: u32) {
+        let Some(sound_info): Option<SoundInfo> = bus.get_any(info_addr) else {
             return;
         };
         if sound_info.magic != 0x68736D54 {
@@ -156,7 +155,7 @@ impl MusicPlayer {
                 }
                 hq_envelope_volume[0] = u8_to_float(channel.envelope_attack);
 
-                let Some(wave_info) = bus.get::<GameGirlAdv, WaveInfo>(channel.wave_address) else {
+                let Some(wave_info): Option<WaveInfo> = bus.get_any(channel.wave_address) else {
                     log::warn!(
                         "Mplayer: Channel {i} had invalid wave address 0x{:08X}",
                         channel.wave_address
@@ -272,7 +271,7 @@ impl MusicPlayer {
         self.buffer.fill(0.0);
     }
 
-    fn render_frame(&mut self, bus: &mut MemoryMapper<8192>) {
+    fn render_frame(&mut self, bus: &mut GameGirlAdv) {
         const DIFFERENTIAL_LUT: &[f32] = &[
             i8_to_float(0x00u8 as i8),
             i8_to_float(0x01u8 as i8),
@@ -335,14 +334,16 @@ impl MusicPlayer {
                     wave_size = (wave_size + 63) / 64;
                 }
                 let wave_data_begin = channel.wave_address + mem::size_of::<WaveInfo>() as u32;
-                sampler.wave_data = bus.page::<GameGirlAdv, false>(wave_data_begin);
-                if (sampler.wave_data as usize) < 0x10_000 {
-                    log::warn!(
-                        "Mplayer: Channel {i} had invalid wave address 0x{:08X}",
-                        channel.wave_address
-                    );
-                    channel.status = 0; // Disable channel, there is no good way to deal with this.
-                    continue;
+                match bus.get_raw_ram(wave_data_begin) {
+                    Some(s) => sampler.wave_data = s,
+                    None => {
+                        log::warn!(
+                            "Mplayer: Channel {i} had invalid wave address 0x{:08X}",
+                            channel.wave_address
+                        );
+                        channel.status = 0; // Disable channel, there is no good way to deal with this.
+                        continue;
+                    }
                 }
                 sampler.compressed = compressed;
             }
@@ -480,7 +481,7 @@ impl MusicPlayer {
         }
     }
 
-    pub fn read_sample(&mut self, bus: &mut MemoryMapper<8192>) -> [f32; 2] {
+    pub fn read_sample(&mut self, bus: &mut GameGirlAdv) -> [f32; 2] {
         if self.buffer_read_index == 0 {
             self.render_frame(bus);
         }
