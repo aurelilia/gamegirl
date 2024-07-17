@@ -16,6 +16,7 @@ pub const IF_H: u32 = 0x216;
 // Memory control
 pub const EXMEM: u32 = 0x204;
 pub const WRAMCNT: u32 = 0x246;
+pub const WRAMSTAT: u32 = 0x240;
 pub const VRAMCNTSTAT: u32 = 0x240;
 
 // PPU

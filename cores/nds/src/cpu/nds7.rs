@@ -50,15 +50,11 @@ impl ArmSystem for Nds7 {
     fn pipeline_stalled(&mut self) {}
 
     fn get<T: RwType>(&mut self, addr: u32) -> T {
-        self.memory.mapper[0]
-            .get::<Self, _>(addr)
-            .unwrap_or_else(|| self.get_slow(addr))
+        Nds7::get(self, addr)
     }
 
     fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        if !self.memory.mapper[0].set::<Self, _>(addr, value) {
-            self.set_slow(addr, value)
-        }
+        Nds7::set(self, addr, value)
     }
 
     fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {

@@ -68,3 +68,9 @@ pub struct Cp15 {
     pub(crate) tcm_control: [TcmControl; 2],
     pub(crate) trace_process_id: u32,
 }
+
+impl Cp15 {
+    pub fn dtcm_region(&self) -> u32 {
+        self.tcm_control[1].region_base() >> 12
+    }
+}

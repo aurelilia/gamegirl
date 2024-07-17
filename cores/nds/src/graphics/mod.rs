@@ -15,7 +15,7 @@ use ppu::{registers::DisplayStatus, HEIGHT, VBLANK_END};
 use crate::{
     dma::{Dmas, Reason},
     scheduling::{NdsEvent, PpuEvent},
-    Nds9,
+    CpuDevice, Nds, Nds9, NdsCpu,
 };
 
 mod ppu;
@@ -47,26 +47,30 @@ pub struct Gpu {
     pub vram: Arc<Vram>,
     pub ppus: [ppu::Ppu; 2],
 
-    pub(super) dispstat: DisplayStatus,
+    pub(super) dispstat: CpuDevice<DisplayStatus>,
     pub(super) vcount: u16,
 }
 
 impl Gpu {
-    pub fn handle_event(ds: &mut Nds9, event: PpuEvent, late_by: i64) {
+    pub fn handle_event(ds: &mut Nds, event: PpuEvent, late_by: i64) {
+        // This is... ugly.
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 if ds.c.video_buffer.should_render_this_frame() {
                     ds.gpu.render_line();
                 }
 
-                Self::maybe_interrupt(ds, Interrupt::HBlank);
-                Dmas::update_all(ds, Reason::HBlank);
-                (PpuEvent::SetHblank, 46)
+                Self::maybe_interrupt(&mut ds.nds7(), Interrupt::HBlank);
+                Self::maybe_interrupt(&mut ds.nds9(), Interrupt::HBlank);
+                Dmas::update_all(&mut ds.nds7(), Reason::HBlank);
+                Dmas::update_all(&mut ds.nds9(), Reason::HBlank);
+                (PpuEvent::SetHblank, 46) // TODO timing here
             }
 
             PpuEvent::SetHblank => {
-                ds.gpu.dispstat.set_in_hblank(true);
-                (PpuEvent::HblankEnd, 226)
+                ds.gpu.dispstat[0].set_in_hblank(true);
+                ds.gpu.dispstat[1].set_in_hblank(true);
+                (PpuEvent::HblankEnd, 1142)
             }
 
             PpuEvent::HblankEnd => {
@@ -75,20 +79,23 @@ impl Gpu {
                 let vcount = ds.gpu.vcount;
                 match () {
                     _ if ds.gpu.vcount == HEIGHT.u16() => {
-                        ds.gpu.dispstat.set_in_vblank(true);
-                        Self::maybe_interrupt(ds, Interrupt::VBlank);
-                        Dmas::update_all(ds, Reason::VBlank);
+                        ds.gpu.dispstat[0].set_in_vblank(true);
+                        ds.gpu.dispstat[1].set_in_vblank(true);
+                        Self::maybe_interrupt(&mut ds.nds7(), Interrupt::VBlank);
+                        Self::maybe_interrupt(&mut ds.nds9(), Interrupt::VBlank);
+                        Dmas::update_all(&mut ds.nds7(), Reason::VBlank);
+                        Dmas::update_all(&mut ds.nds9(), Reason::VBlank);
                     }
                     // VBlank flag gets set one scanline early
                     _ if vcount == (VBLANK_END - 1) => {
-                        ds.gpu.dispstat.set_in_vblank(false);
+                        ds.gpu.dispstat[0].set_in_vblank(false);
+                        ds.gpu.dispstat[1].set_in_vblank(false);
                     }
                     _ if vcount == VBLANK_END => {
                         ds.gpu.vcount = 0;
                         ds.gpu.end_frame();
                         if ds.c.video_buffer.should_render_this_frame() {
                             // TODO
-                            let ds = &mut **ds;
                             ds.gpu.ppus[0].push_output(&mut ds.c.video_buffer);
                         }
                         ds.c.video_buffer.start_next_frame();
@@ -96,14 +103,20 @@ impl Gpu {
                     _ => (),
                 }
 
-                let vcount_match = ds.gpu.vcount.u8() == ds.gpu.dispstat.vcount();
-                ds.gpu.dispstat.set_vcounter_match(vcount_match);
+                let vcount_match = ds.gpu.vcount.u8() == ds.gpu.dispstat[0].vcount();
+                ds.gpu.dispstat[0].set_vcounter_match(vcount_match);
                 if vcount_match {
-                    Self::maybe_interrupt(ds, Interrupt::VCounter);
+                    Self::maybe_interrupt(&mut ds.nds7(), Interrupt::VCounter);
+                }
+                let vcount_match = ds.gpu.vcount.u8() == ds.gpu.dispstat[1].vcount();
+                ds.gpu.dispstat[1].set_vcounter_match(vcount_match);
+                if vcount_match {
+                    Self::maybe_interrupt(&mut ds.nds9(), Interrupt::VCounter);
                 }
 
-                ds.gpu.dispstat.set_in_hblank(false);
-                (PpuEvent::HblankStart, 960)
+                ds.gpu.dispstat[0].set_in_hblank(false);
+                ds.gpu.dispstat[1].set_in_hblank(false);
+                (PpuEvent::HblankStart, 3072)
             }
         };
 
@@ -111,8 +124,8 @@ impl Gpu {
             .schedule(NdsEvent::PpuEvent(next_event), cycles - late_by);
     }
 
-    fn maybe_interrupt(ds: &mut Nds9, int: Interrupt) {
-        if ds.gpu.dispstat.irq_enables().is_bit(int as u16) {
+    fn maybe_interrupt<DS: NdsCpu>(ds: &mut DS, int: Interrupt) {
+        if ds.gpu.dispstat[DS::I].irq_enables().is_bit(int as u16) {
             Cpu::request_interrupt(ds, int);
         }
     }
@@ -148,7 +161,7 @@ impl Default for Gpu {
                 i: [0; 16 * KB],
             }),
             ppus: [ppu::Ppu::default(), ppu::Ppu::default()],
-            dispstat: DisplayStatus::default(),
+            dispstat: [DisplayStatus::default(); 2],
             vcount: 0,
         };
 
