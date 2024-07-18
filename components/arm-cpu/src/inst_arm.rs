@@ -278,7 +278,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         let mut kind = NONSEQ;
         let mut set_n = false;
 
-        for reg in regs {
+        for reg in regs.iter().copied() {
             set_n |= reg == n.u16();
             if pre {
                 addr = addr.wrapping_add(4);
@@ -301,7 +301,8 @@ impl<S: ArmSystem> SysWrapper<S> {
             }
         }
 
-        if writeback && (!ldr || !set_n) {
+        let ldr_writeback = S::IS_V5 && (regs.len() == 1 || *regs.last().unwrap_or(&16) != n.u16());
+        if writeback && (!ldr || !set_n || ldr_writeback) {
             self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
         }
 
