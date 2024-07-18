@@ -266,6 +266,11 @@ impl Nds9 {
                 val
             }
 
+            // Graphics
+            DISP3DCNT => self.gpu.gpu.cnt.into(),
+            DISPCAPCNT_L => u32::from(self.gpu.capture.cnt).low(),
+            DISPCAPCNT_H => u32::from(self.gpu.capture.cnt).high(),
+
             // RAM control
             VRAMCNT_A => hword(self.gpu.vram.ctrls[A].into(), self.gpu.vram.ctrls[B].into()),
             VRAMCNT_C => hword(self.gpu.vram.ctrls[C].into(), self.gpu.vram.ctrls[D].into()),
@@ -328,6 +333,15 @@ impl Nds9 {
             DISPCNT_L | DISPCNT_H | 0x08..0x60 => self.gpu.ppus[0].regs.write_mmio(addr, value),
             0x1000 | 0x1002 | 0x1008..0x1060 => {
                 self.gpu.ppus[1].regs.write_mmio(addr & 0xFF, value)
+            }
+
+            // Graphics
+            DISP3DCNT => self.gpu.gpu.cnt = value.into(),
+            DISPCAPCNT_L => {
+                self.gpu.capture.cnt = word(value, u32::from(self.gpu.capture.cnt).high()).into()
+            }
+            DISPCAPCNT_H => {
+                self.gpu.capture.cnt = word(u32::from(self.gpu.capture.cnt).low(), value).into()
             }
 
             // RAM control

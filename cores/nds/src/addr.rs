@@ -14,8 +14,8 @@ pub const IF_L: u32 = 0x214;
 pub const IF_H: u32 = 0x216;
 
 // Memory control
-pub const EXMEM: u32 = 0x204;
 // NDS9
+pub const EXMEM: u32 = 0x204;
 pub const VRAMCNT_A: u32 = 0x240;
 pub const VRAMCNT_C: u32 = 0x242;
 pub const VRAMCNT_E: u32 = 0x244;
@@ -24,9 +24,7 @@ pub const VRAMCNT_H: u32 = 0x248;
 // NDS7
 pub const VRAMSTAT: u32 = 0x240;
 
-// PPU
-pub const PPU_A: u32 = 0x0;
-pub const PPU_B: u32 = 0x1000;
+// Graphics
 pub const DISPCNT_L: u32 = 0x0;
 pub const DISPCNT_H: u32 = 0x0;
 pub const DISPSTAT: u32 = 0x4;
@@ -51,8 +49,10 @@ pub const BLDCNT: u32 = 0x50;
 pub const BLDALPHA: u32 = 0x52;
 pub const BLDY: u32 = 0x54;
 pub const DISP3DCNT: u32 = 0x60;
-pub const DISPCAPCNT: u32 = 0x64;
-pub const DISP_MMEM_FIFO: u32 = 0x68;
+pub const DISPCAPCNT_L: u32 = 0x64;
+pub const DISPCAPCNT_H: u32 = 0x66;
+pub const DISP_MMEM_FIFO_L: u32 = 0x68;
+pub const DISP_MMEM_FIFO_H: u32 = 0x6A;
 pub const MASTER_BRIGHT: u32 = 0x6C;
 
 // Timers

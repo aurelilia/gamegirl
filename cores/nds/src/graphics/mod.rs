@@ -9,7 +9,9 @@
 use std::sync::Arc;
 
 use arm_cpu::{Cpu, Interrupt};
+use capture::CaptureUnit;
 use common::{numutil::NumExt, UnsafeArc};
+use engine3d::Engine3D;
 use ppu::{registers::DisplayStatus, HEIGHT, VBLANK_END};
 use vram::{Vram, VramCtrl};
 
@@ -20,6 +22,8 @@ use crate::{
     CpuDevice, Nds, Nds9, NdsCpu,
 };
 
+mod capture;
+mod engine3d;
 mod ppu;
 pub mod vram;
 
@@ -27,6 +31,8 @@ pub mod vram;
 pub struct Gpu {
     pub vram: UnsafeArc<Vram>,
     pub ppus: [ppu::Ppu; 2],
+    pub gpu: Engine3D,
+    pub capture: CaptureUnit,
 
     pub(super) dispstat: CpuDevice<DisplayStatus>,
     pub(super) vcount: u16,
@@ -133,6 +139,8 @@ impl Default for Gpu {
         let mut gpu = Self {
             vram: UnsafeArc::new(Vram::default()),
             ppus: [ppu::Ppu::default(), ppu::Ppu::default()],
+            gpu: Engine3D::default(),
+            capture: CaptureUnit::default(),
             dispstat: [DisplayStatus::default(); 2],
             vcount: 0,
         };
