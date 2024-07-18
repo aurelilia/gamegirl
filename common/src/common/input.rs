@@ -25,10 +25,12 @@ pub enum Button {
     Down = 7,
     R = 8,
     L = 9,
+    X = 10,
+    Y = 11,
 }
 
 impl Button {
-    pub const BUTTONS: [Self; 10] = [
+    pub const BUTTONS: [Self; 12] = [
         Self::A,
         Self::B,
         Self::Select,
@@ -39,6 +41,8 @@ impl Button {
         Self::Down,
         Self::R,
         Self::L,
+        Self::X,
+        Self::Y,
     ];
 }
 

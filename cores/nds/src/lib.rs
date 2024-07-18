@@ -29,6 +29,7 @@ mod cartridge;
 mod cpu;
 mod dma;
 mod graphics;
+mod input;
 mod memory;
 mod scheduling;
 mod timer;
@@ -52,6 +53,7 @@ use cpu::{
     fifo::CpuFifo,
     math::{Div, Sqrt},
 };
+use input::Input;
 
 use crate::{
     audio::Apu,
@@ -123,6 +125,7 @@ pub struct Nds {
     pub cart: Cartridge,
     dmas: CpuDevice<Dmas>,
     timers: CpuDevice<Timers>,
+    input: Input,
 
     scheduler: Scheduler<NdsEvent>,
     time_7: Time,
@@ -208,6 +211,7 @@ impl Default for Nds {
             fifo: [CpuFifo::default(), CpuFifo::default()],
             gpu: Gpu::default(),
             apu: Apu::default(),
+            input: Input::default(),
             memory: Memory::default(),
             cart: Cartridge::default(),
             dmas: [Dmas::default(), Dmas::default()],

@@ -83,3 +83,8 @@ pub const IPCSYNC: u32 = 0x180;
 pub const IPCFIFOCNT: u32 = 0x184;
 pub const IPCFIFOSEND: u32 = 0x188;
 pub const IPCFIFORECV: u32 = 0x100_0000;
+
+// Input
+pub const KEYINPUT: u32 = 0x130;
+pub const KEYCNT: u32 = 0x130;
+pub const EXTKEYIN: u32 = 0x136;

@@ -9,7 +9,7 @@
 use common::{components::scheduler::Kind, TimeS};
 use NdsEvent::*;
 
-use crate::{audio::Apu, graphics::Gpu, timer::Timers, Nds};
+use crate::{audio::Apu, cpu::NDS9_CLOCK, graphics::Gpu, timer::Timers, Nds};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -24,6 +24,8 @@ pub enum NdsEvent {
         timer: u8,
         is_arm9: bool,
     },
+    /// Update the keypad.
+    UpdateKeypad,
 }
 
 impl NdsEvent {
@@ -42,6 +44,12 @@ impl NdsEvent {
             }
             TimerOverflow { timer, .. } => {
                 Timers::handle_overflow_event(&mut ds.nds7(), timer, late_by)
+            }
+            UpdateKeypad => {
+                Nds::check_keycnt(&mut ds.nds7());
+                Nds::check_keycnt(&mut ds.nds9());
+                ds.scheduler
+                    .schedule(NdsEvent::UpdateKeypad, (NDS9_CLOCK as f64 / 120.0) as TimeS);
             }
         }
     }

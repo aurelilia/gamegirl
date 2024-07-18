@@ -56,6 +56,7 @@ impl Nds {
     pub fn init_memory(&mut self) {}
 
     pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &DS, addr: u32) -> u16 {
+        // TODO Timer and DMA reads...
         match addr & 0xFFFF {
             // Interrupt control
             IME => ds.cpur().ime as u16,
@@ -67,6 +68,10 @@ impl Nds {
             // GPU
             DISPSTAT => ds.gpu.dispstat[DS::I].into(),
             VCOUNT => ds.gpu.vcount,
+
+            // Input
+            KEYCNT => ds.input.cnt[DS::I].into(),
+            KEYINPUT => ds.keyinput(),
 
             _ => {
                 ds.c.debugger.log(
@@ -116,6 +121,9 @@ impl Nds {
                 ds.gpu.dispstat[DS::I] = ((disp & 0b111) | (value & !0b1100_0111)).into();
             }
 
+            // Input
+            KEYCNT => ds.input.cnt[DS::I] = value.into(),
+
             _ => ds.c.debugger.log(
                 "unknown-io-write",
                 format!("Write to unknown IO register {addr:08X}"),
@@ -164,6 +172,7 @@ impl Nds7 {
         let addr = addr & !1;
         match addr {
             VRAMSTAT => hword(self.gpu.vram.vram_stat(), self.memory.wram_status as u8),
+            EXTKEYIN => self.keyinput_ext(),
             _ => Nds::try_get_mmio_shared(self, addr),
         }
     }
