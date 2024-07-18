@@ -97,10 +97,8 @@ impl Ppu {
         self.regs.bg_scale[1].latch();
     }
 
-    pub(super) fn push_output(&mut self, buf: &mut FrameBuffer) {
-        if let Some(last_frame) = self.render.get_last() {
-            buf.push(last_frame);
-        }
+    pub(super) fn get_output(&mut self) -> Option<Vec<[u8; 4]>> {
+        self.render.get_last()
     }
 
     pub fn init_render(ds: &mut Nds) {

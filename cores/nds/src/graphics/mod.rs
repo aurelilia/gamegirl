@@ -82,8 +82,7 @@ impl Gpu {
                         ds.gpu.vcount = 0;
                         ds.gpu.end_frame();
                         if ds.c.video_buffer.should_render_this_frame() {
-                            // TODO
-                            ds.gpu.ppus[0].push_output(&mut ds.c.video_buffer);
+                            Self::push_output(ds);
                         }
                         ds.c.video_buffer.start_next_frame();
                     }
@@ -109,6 +108,17 @@ impl Gpu {
 
         ds.scheduler
             .schedule(NdsEvent::PpuEvent(next_event), cycles - late_by);
+    }
+
+    fn push_output(ds: &mut Nds) {
+        let Some(mut a) = ds.gpu.ppus[0].get_output() else {
+            return;
+        };
+        let Some(mut b) = ds.gpu.ppus[1].get_output() else {
+            return;
+        };
+        a.append(&mut b);
+        ds.c.video_buffer.push(a);
     }
 
     fn maybe_interrupt<DS: NdsCpu>(ds: &mut DS, int: Interrupt) {
