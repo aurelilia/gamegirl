@@ -77,3 +77,9 @@ pub const SQRTCNT_H: u32 = 0x2B2;
 pub const SQRT_RESULT_L: u32 = 0x2B4;
 pub const SQRT_RESULT_H: u32 = 0x2B6;
 pub const SQRT_INPUT: u32 = 0x2B8;
+
+// IPC FIFO
+pub const IPCSYNC: u32 = 0x180;
+pub const IPCFIFOCNT: u32 = 0x184;
+pub const IPCFIFOSEND: u32 = 0x188;
+pub const IPCFIFORECV: u32 = 0x100_0000;

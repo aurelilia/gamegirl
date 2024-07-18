@@ -193,7 +193,7 @@ impl Nds7 {
                 2 => self.set_mmio(addr, value.u16()),
                 4 => {
                     self.set_mmio(addr, value.u16());
-                    self.set_mmio(addr, value.u32().high());
+                    self.set_mmio(addr + 2, value.u32().high());
                 }
                 _ => unreachable!(),
             },
@@ -319,14 +319,11 @@ impl Nds9 {
             // MMIO
             0x04 => match T::WIDTH {
                 1 if addr.is_bit(0) => {
-                    self.set_mmio(addr, hword(self.get_mmio(addr).low(), value.u8()))
+                    self.set_mmio_hword(addr, hword(self.get_mmio(addr).low(), value.u8()))
                 }
-                1 => self.set_mmio(addr, hword(value.u8(), self.get_mmio(addr).high())),
-                2 => self.set_mmio(addr, value.u16()),
-                4 => {
-                    self.set_mmio(addr, value.u16());
-                    self.set_mmio(addr, value.u32().high());
-                }
+                1 => self.set_mmio_hword(addr, hword(value.u8(), self.get_mmio(addr).high())),
+                2 => self.set_mmio_hword(addr, value.u16()),
+                4 => self.set_mmio_word(addr, value.u32()),
                 _ => unreachable!(),
             },
 
@@ -337,7 +334,7 @@ impl Nds9 {
         }
     }
 
-    fn set_mmio(&mut self, addr: u32, value: u16) {
+    fn set_mmio_hword(&mut self, addr: u32, value: u16) {
         let addr = addr & 0x1FFE;
         match addr {
             // PPUs
@@ -387,6 +384,16 @@ impl Nds9 {
             SQRT_INPUT..0x2C0 => self.sqrt.input = set_u64(self.sqrt.input, addr & 6, value),
 
             _ => Nds::try_set_mmio_shared(self, addr, value),
+        }
+    }
+
+    fn set_mmio_word(&mut self, addr: u32, value: u32) {
+        let addr = addr & 0x1FFE;
+        match addr {
+            _ => {
+                self.set_mmio_hword(addr, value.u16());
+                self.set_mmio_hword(addr, value.u32().high());
+            }
         }
     }
 }

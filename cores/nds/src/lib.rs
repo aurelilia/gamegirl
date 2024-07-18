@@ -6,6 +6,18 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+// Things left to do:
+// - IPC FIFO implementation
+// - Video stuff
+// - Audio
+// - Math registers implementation
+// - Link port
+// - Touchscreen
+// - RTC
+// - SPI
+// - Power management
+// - Cartridge
+
 #![allow(unused)]
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
@@ -37,6 +49,7 @@ use common::{
 };
 use cpu::{
     cp15::Cp15,
+    fifo::CpuFifo,
     math::{Div, Sqrt},
 };
 
@@ -102,6 +115,7 @@ pub struct Nds {
     cp15: Cp15,
     div: Div,
     sqrt: Sqrt,
+    fifo: CpuDevice<CpuFifo>,
 
     gpu: Gpu,
     apu: Apu,
@@ -191,6 +205,7 @@ impl Default for Nds {
             cp15: Cp15::default(),
             div: Div::default(),
             sqrt: Sqrt::default(),
+            fifo: [CpuFifo::default(), CpuFifo::default()],
             gpu: Gpu::default(),
             apu: Apu::default(),
             memory: Memory::default(),
