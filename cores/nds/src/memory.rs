@@ -55,6 +55,7 @@ impl Nds {
     /// Initialize page tables and wait times.
     pub fn init_memory(&mut self) {}
 
+    #[allow(invalid_reference_casting)]
     pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &DS, addr: u32) -> u16 {
         // TODO Timer and DMA reads...
         match addr & 0xFFFF {
@@ -257,7 +258,10 @@ impl Nds9 {
             // DTCM
             _ if region == self.cp15.dtcm_region() => self.memory.data_tcm.get_wrap(a),
 
-            _ => T::from_u32(0),
+            _ => {
+                log::error!("Invalid read: {addr:X}");
+                T::from_u32(0)
+            }
         }
     }
 
@@ -341,7 +345,9 @@ impl Nds9 {
             // DTCM
             _ if region == self.cp15.dtcm_region() => self.memory.data_tcm.set_wrap(a, value),
 
-            _ => (),
+            _ => {
+                log::error!("Invalid write: {addr:X}");
+            }
         }
     }
 

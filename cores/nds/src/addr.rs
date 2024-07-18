@@ -86,5 +86,5 @@ pub const IPCFIFORECV: u32 = 0x100_0000;
 
 // Input
 pub const KEYINPUT: u32 = 0x130;
-pub const KEYCNT: u32 = 0x130;
+pub const KEYCNT: u32 = 0x132;
 pub const EXTKEYIN: u32 = 0x136;

@@ -40,7 +40,7 @@ use std::{
     path::PathBuf,
 };
 
-use arm_cpu::{interface::ArmSystem, Cpu};
+use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu};
 use common::{
     common::options::{EmulateOptions, SystemConfig},
     common_functions,
@@ -54,6 +54,7 @@ use cpu::{
     math::{Div, Sqrt},
 };
 use input::Input;
+use memory::WramStatus;
 use scheduling::PpuEvent;
 
 use crate::{
@@ -75,7 +76,7 @@ macro_rules! nds_wrapper {
         /// Wrapper for one of the CPUs.
         /// Raw pointer was chosen to avoid lifetimes.
         #[repr(transparent)]
-        struct $name(*mut Nds);
+        pub struct $name(*mut Nds);
 
         impl Deref for $name {
             type Target = Nds;
@@ -114,7 +115,7 @@ nds_wrapper!(Nds9, 1);
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Nds {
     cpu7: Cpu<Nds7>,
-    cpu9: Cpu<Nds9>,
+    pub cpu9: Cpu<Nds9>,
     cp15: Cp15,
     div: Div,
     sqrt: Sqrt,
@@ -164,7 +165,7 @@ impl Core for Nds {
             )
         }
 
-        // Write binaries and set PC
+        // Write binaries and set registers
         let header = self.cart.header();
         {
             let mut ds = self.nds7();
@@ -174,6 +175,13 @@ impl Core for Nds {
                     self.cart.rom[header.arm7_offset.us() + i.us()],
                 )
             }
+
+            ds.cpu().sp[0] = 0x0380_FD80;
+            ds.cpu().sp[2] = 0x0380_FFC0;
+            ds.cpu().sp[4] = 0x0380_FF80;
+            ds.cpu().set_cpsr(0x1F);
+
+            ds.cpu().registers[14] = header.arm7_entry_addr;
             ds.cpu().registers[15] = header.arm7_entry_addr + 4;
         }
         {
@@ -184,8 +192,18 @@ impl Core for Nds {
                     self.cart.rom[header.arm9_offset.us() + i.us()],
                 )
             }
+
+            ds.cpu().sp[0] = 0x0300_2F7C;
+            ds.cpu().sp[2] = 0x0300_2FC0;
+            ds.cpu().sp[4] = 0x0300_2F80;
+            ds.cpu().set_cpsr(0x1F);
+
+            ds.cpu().registers[14] = header.arm9_entry_addr;
             ds.cpu().registers[15] = header.arm9_entry_addr + 4;
         }
+
+        // Setup system state
+        self.memory.wram_status = WramStatus::All7;
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -205,8 +223,19 @@ impl Nds {
     }
 
     #[inline]
-    fn nds9(&mut self) -> Nds9 {
+    pub fn nds9(&mut self) -> Nds9 {
         Nds9(self as *mut Nds)
+    }
+
+    pub fn get_inst9_mnemonic(&mut self, ptr: u32) -> String {
+        let ds = self.nds9();
+        if ds.cpu9.flag(Flag::Thumb) {
+            let inst = ds.get(ptr);
+            Cpu::<Nds9>::get_mnemonic_thumb(inst)
+        } else {
+            let inst = ds.get(ptr);
+            Cpu::<Nds9>::get_mnemonic_arm(inst)
+        }
     }
 
     /// Restore state after a savestate load. `old_self` should be the

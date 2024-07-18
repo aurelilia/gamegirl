@@ -8,6 +8,7 @@
 
 mod gga;
 mod ggc;
+mod nds;
 // #[cfg(not(target_arch = "wasm32"))]
 // mod psx;
 
@@ -20,7 +21,7 @@ use common::{
 use eframe::egui::{
     self, Align, Color32, ComboBox, Context, Layout, RichText, ScrollArea, TextEdit, Ui,
 };
-use gamegirl::{gga::GameGirlAdv, ggc::GameGirl};
+use gamegirl::{gga::GameGirlAdv, ggc::GameGirl, nds::Nds};
 
 use crate::app::{App, GuiStyle};
 
@@ -34,6 +35,7 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
 
     maybe_system::<GameGirl>(core, |_| ggc::ui_menu(app, ui));
     maybe_system::<GameGirlAdv>(core, |_| gga::ui_menu(app, ui));
+    maybe_system::<Nds>(core, |_| nds::ui_menu(app, ui));
     // #[cfg(not(target_arch = "wasm32"))]
     // maybe_system::<gamegirl::psx::PlayStation>(core, |_| psx::ui_menu(app,
     // ui));
@@ -46,6 +48,7 @@ pub fn render(app: &mut App, ctx: &Context) {
 
     maybe_system::<GameGirl>(core, |c| render_inner(ggc::get_windows(), c, app, ctx));
     maybe_system::<GameGirlAdv>(core, |c| render_inner(gga::get_windows(), c, app, ctx));
+    maybe_system::<Nds>(core, |c| render_inner(nds::get_windows(), c, app, ctx));
     // #[cfg(not(target_arch = "wasm32"))]
     // maybe_system::<gamegirl::psx::PlayStation>(core, |c| {
     //     render_inner(psx::get_windows(), c, app, ctx)

@@ -78,7 +78,7 @@ impl Cp15 {
 impl Default for Cp15 {
     fn default() -> Self {
         Self {
-            control: Control::default(),
+            control: Control::default().with_dtcm_enable(true),
             cache_bits: [0; 2],
             data_bufferable_bits: 0,
             access_protection_bits: [0; 2],
