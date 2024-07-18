@@ -26,7 +26,7 @@ pub const VRAMSTAT: u32 = 0x240;
 
 // Graphics
 pub const DISPCNT_L: u32 = 0x0;
-pub const DISPCNT_H: u32 = 0x0;
+pub const DISPCNT_H: u32 = 0x2;
 pub const DISPSTAT: u32 = 0x4;
 pub const VCOUNT: u32 = 0x6;
 pub const BG0CNT: u32 = 0x8;

@@ -242,6 +242,7 @@ impl Nds9 {
             // PPU
             // TODO verify the bit is right
             0x05 => self.gpu.ppus[a.bit(12)].palette.get_wrap(a),
+            0x06 if let Some(vram) = self.gpu.vram.get9(a) => vram.get_exact(0),
             0x07 => self.gpu.ppus[a.bit(12)].oam.get_wrap(a),
 
             // MMIO
@@ -323,6 +324,7 @@ impl Nds9 {
             // PPU
             // TODO verify the bit is right
             0x05 => self.gpu.ppus[a.bit(12)].palette.set_wrap(a, value),
+            0x06 if let Some(vram) = self.gpu.vram.get9_mut(a) => vram.set_exact(0, value),
             0x07 => self.gpu.ppus[a.bit(12)].oam.set_wrap(a, value),
 
             // MMIO
@@ -401,7 +403,7 @@ impl Nds9 {
         match addr {
             _ => {
                 self.set_mmio_hword(addr, value.u16());
-                self.set_mmio_hword(addr, value.u32().high());
+                self.set_mmio_hword(addr + 2, value.u32().high());
             }
         }
     }

@@ -87,7 +87,7 @@ pub fn load_cart(
     _ogl_ctx: Option<Arc<Context>>,
     _ogl_tex_id: u32,
 ) -> Result<Box<dyn Core>, GamegirlError> {
-    if cart.len() < 0x1000 {
+    if cart.len() < 0x120 {
         return Err(GamegirlError::RomTooSmall);
     }
 
@@ -112,10 +112,10 @@ pub fn load_cart(
     let mut sys: Box<dyn Core> = match () {
         #[cfg(feature = "ggc")]
         _ if _is_ggc => ggc::GameGirl::with_cart(cart, path, config),
-        #[cfg(feature = "gga")]
-        _ if _is_gga => gga::GameGirlAdv::with_cart(cart, path, config),
         #[cfg(feature = "nds")]
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
+        #[cfg(feature = "gga")]
+        _ if _is_gga => gga::GameGirlAdv::with_cart(cart, path, config),
         // #[cfg(feature = "psx")]
         // _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, _ogl_ctx, _ogl_tex_id),
         // #[cfg(feature = "nes")]

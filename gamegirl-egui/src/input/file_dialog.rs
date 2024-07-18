@@ -25,7 +25,10 @@ pub struct File {
 pub fn open_rom(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
         .set_title("Open ROM")
-        .add_filter("GameGirl games", &["gb", "gbc", "gba", "elf", "iso", "zip"])
+        .add_filter(
+            "GameGirl games",
+            &["gb", "gbc", "gba", "nds", "elf", "iso", "zip"],
+        )
         .pick_file();
 
     execute(async move {

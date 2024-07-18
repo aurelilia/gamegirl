@@ -46,7 +46,7 @@ use common::{
     common_functions,
     components::{scheduler::Scheduler, storage::GameSave},
     numutil::NumExt,
-    Colour, Common, Core, Time,
+    Colour, Common, Core, Time, TimeS,
 };
 use cpu::{
     cp15::Cp15,
@@ -54,6 +54,7 @@ use cpu::{
     math::{Div, Sqrt},
 };
 use input::Input;
+use scheduling::PpuEvent;
 
 use crate::{
     audio::Apu,
@@ -136,7 +137,7 @@ pub struct Nds {
 }
 
 impl Core for Nds {
-    common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [240, 160 * 2]);
+    common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [256, 192 * 2]);
 
     fn advance(&mut self) {
         // Run an instruction on the ARM9, then keep running the ARM7
@@ -155,14 +156,41 @@ impl Core for Nds {
 
     fn skip_bootrom(&mut self) {
         /// Really HLE init on NDS
+        // Write out header
         for addr in 0..0x200 {
-            self.nds9()
-                .set(0x27FFE00 + addr as u32, self.cart.rom[addr])
+            self.nds9().set(
+                0x27FFE00 + addr as u32,
+                self.cart.rom[addr % self.cart.rom.len()],
+            )
+        }
+
+        // Write binaries and set PC
+        let header = self.cart.header();
+        {
+            let mut ds = self.nds7();
+            for i in 0..header.arm7_size {
+                ds.set(
+                    header.arm7_entry_addr + i,
+                    self.cart.rom[header.arm7_offset.us() + i.us()],
+                )
+            }
+            ds.cpu().registers[15] = header.arm7_entry_addr + 4;
+        }
+        {
+            let mut ds = self.nds9();
+            for i in 0..header.arm9_size {
+                ds.set(
+                    header.arm9_entry_addr + i,
+                    self.cart.rom[header.arm9_offset.us() + i.us()],
+                )
+            }
+            ds.cpu().registers[15] = header.arm9_entry_addr + 4;
         }
     }
 
     fn make_save(&self) -> Option<GameSave> {
-        todo!();
+        // TODO
+        None
     }
 
     fn get_rom(&self) -> Vec<u8> {
@@ -194,7 +222,11 @@ impl Nds {
         nds.memory.bios7 = config.get_bios("nds7").unwrap().into();
         nds.memory.bios9 = config.get_bios("nds9").unwrap().into();
         nds.cart.load_rom(cart);
+
+        log::error!("{:#?}", nds.cart.header());
         nds.init_memory();
+        Gpu::init_render(&mut nds);
+
         nds.skip_bootrom();
         nds
     }
@@ -229,6 +261,10 @@ impl Default for Nds {
             NdsEvent::ApuEvent(ApuEvent::PushSample),
             audio::SAMPLE_EVERY_N_CLOCKS,
         );
+        nds.scheduler
+            .schedule(NdsEvent::PpuEvent(PpuEvent::HblankStart), 3072);
+        nds.scheduler
+            .schedule(NdsEvent::UpdateKeypad, (NDS9_CLOCK as f64 / 120.0) as TimeS);
 
         nds
     }

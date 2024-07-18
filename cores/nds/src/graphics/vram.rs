@@ -65,13 +65,13 @@ impl Vram {
         if old.enable() {
             let start = self.calc_range_for(r, old);
             if let Some(start) = start {
-                self.set_mapping_range(start, EMPTY.u8())
+                self.set_mapping_range(start, EMPTY.u8(), r.u8())
             }
         }
         if new.enable() {
             let start = self.calc_range_for(r, new);
             if let Some(start) = start {
-                self.set_mapping_range(start, r.u8())
+                self.set_mapping_range(start, r.u8(), r.u8())
             }
         }
     }
@@ -115,8 +115,8 @@ impl Vram {
         (mapping, (offset.us() * 0x4000) + (addr & 0x3FFF))
     }
 
-    fn set_mapping_range(&mut self, start: usize, mapping: u8) {
-        let end = start + self.v[mapping.us()].len();
+    fn set_mapping_range(&mut self, start: usize, mapping: u8, size_of: u8) {
+        let end = start + self.v[size_of.us()].len();
         debug_assert!(start & 0x3FFF == 0);
         debug_assert!(start & 0x3FFF == 0);
 

@@ -12,7 +12,7 @@ use arm_cpu::{Cpu, Interrupt};
 use capture::CaptureUnit;
 use common::{numutil::NumExt, UnsafeArc};
 use engine3d::Engine3D;
-use ppu::{registers::DisplayStatus, HEIGHT, VBLANK_END};
+use ppu::{registers::DisplayStatus, Ppu, HEIGHT, VBLANK_END};
 use vram::{Vram, VramCtrl};
 
 use crate::{
@@ -108,6 +108,10 @@ impl Gpu {
 
         ds.scheduler
             .schedule(NdsEvent::PpuEvent(next_event), cycles - late_by);
+    }
+
+    pub fn init_render(ds: &mut Nds) {
+        Ppu::init_render(ds);
     }
 
     fn push_output(ds: &mut Nds) {
