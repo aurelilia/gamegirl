@@ -201,10 +201,14 @@ impl PpuRender {
             top_layer.pixel
         };
 
+        self.pixels[xy2d(x, y)] = Self::bit5_to_bit8(pixel);
+    }
+
+    pub fn bit5_to_bit8(mut pixel: [u8; 4]) -> [u8; 4] {
         for col in pixel.iter_mut().take(3) {
             *col = (*col << 3) | (*col >> 2);
         }
-        self.pixels[xy2d(x, y)] = pixel;
+        pixel
     }
 
     #[inline]

@@ -257,9 +257,7 @@ pub struct DisplayStatus {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct BgControl {
     pub priority: B2,
-    pub character_base_block: B2,
-    #[skip]
-    __: B2,
+    pub character_base_block: B4,
     pub mosaic_en: bool,
     pub palette_mode: PaletteMode,
     pub screen_base_block: B5,

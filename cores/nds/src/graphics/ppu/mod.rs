@@ -17,6 +17,15 @@
 //! This PPU implementation is a hard fork of the PPU of the GGA core.
 //! This decision was made due to the DS diverging enough that trying to keep
 //! the code generic would be more trouble than it's worth.
+//!
+//! TODO: Missing features:
+//! - Main Memory Display, Video Capture
+//! - Extended Palettes
+//! - Extended BG modes
+//! - Bitmap transparency
+//! - OBJ priority changes
+//! - OBJ tile mappings not on the GBA
+//! - Bitmap OBJs
 
 pub mod registers;
 mod render;
@@ -24,7 +33,7 @@ mod render;
 use std::sync::Arc;
 
 use arm_cpu::{Cpu, Interrupt};
-use common::{common::video::FrameBuffer, numutil::NumExt, Colour};
+use common::{common::video::FrameBuffer, numutil::NumExt, Colour, UnsafeArc};
 use registers::*;
 use render::{PpuRender, PpuRendererKind};
 
@@ -98,7 +107,7 @@ impl Ppu {
         for ppu in 0..2 {
             let render = PpuRender::new(
                 Arc::clone(&ds.gpu.ppus[ppu].palette),
-                Arc::clone(&ds.gpu.vram),
+                UnsafeArc::clone(&ds.gpu.vram),
                 Arc::clone(&ds.gpu.ppus[ppu].oam),
             );
             ds.gpu.ppus[ppu].render = PpuRendererKind::new(render, ds.c.config.threaded_ppu);

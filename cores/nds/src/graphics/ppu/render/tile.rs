@@ -24,8 +24,13 @@ impl PpuRender {
             self.r.bg_offsets[(bg.us() * 2) + 1],
         );
         let cnt = self.r.bg_cnt[bg.us()];
-        let screen_block_base = cnt.screen_base_block().us() * 0x800;
-        let char_block_base = cnt.character_base_block().us() * 0x4000;
+
+        let is_a = (self.r.is_a as usize);
+        let screen_base = is_a * self.r.dispcnt.screen_base_block().us() * 0x1_0000;
+        let char_base = is_a * self.r.dispcnt.character_base_block().us() * 0x1_0000;
+        let screen_block_base = screen_base + cnt.screen_base_block().us() * 0x800;
+        let char_block_base = char_base + cnt.character_base_block().us() * 0x4000;
+
         let size = cnt.screen_size();
         let bg_y = self.r.vcount.wrapping_add(vofs);
         let bg_y = Self::maybe_mosaic(bg_y as i32, cnt.mosaic_en(), self.r.mosaic.bg_v()) as u16;

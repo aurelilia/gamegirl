@@ -15,9 +15,14 @@ pub const IF_H: u32 = 0x216;
 
 // Memory control
 pub const EXMEM: u32 = 0x204;
-pub const WRAMCNT: u32 = 0x246;
-pub const WRAMSTAT: u32 = 0x240;
-pub const VRAMCNTSTAT: u32 = 0x240;
+// NDS9
+pub const VRAMCNT_A: u32 = 0x240;
+pub const VRAMCNT_C: u32 = 0x242;
+pub const VRAMCNT_E: u32 = 0x244;
+pub const VRAMCNT_G: u32 = 0x246;
+pub const VRAMCNT_H: u32 = 0x248;
+// NDS7
+pub const VRAMSTAT: u32 = 0x240;
 
 // PPU
 pub const PPU_A: u32 = 0x0;

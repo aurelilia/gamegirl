@@ -8,7 +8,7 @@
 
 #![feature(btree_cursors)]
 
-use std::{any::Any, cmp::Ordering};
+use std::{any::Any, cmp::Ordering, sync::Arc};
 
 use common::debugger::Width;
 pub use common::Common;
@@ -131,5 +131,48 @@ pub trait Core: Send + Sync {
         if invert {
             samples.reverse();
         }
+    }
+}
+
+/// Unsafe, mutable Arc.
+/// Terrible idea, but sometimes...
+#[repr(transparent)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct UnsafeArc<T>(Arc<T>);
+
+impl<T> UnsafeArc<T> {
+    pub fn new(t: T) -> UnsafeArc<T> {
+        UnsafeArc(Arc::new(t))
+    }
+}
+
+impl<T> std::ops::Deref for UnsafeArc<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &(*self.0)
+    }
+}
+
+impl<T> std::ops::DerefMut for UnsafeArc<T> {
+    #[allow(invalid_reference_casting)] // aaaa.
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *(self.0.as_ref() as *const _ as *mut T) }
+    }
+}
+
+impl<T> Clone for UnsafeArc<T> {
+    fn clone(&self) -> UnsafeArc<T> {
+        UnsafeArc(self.0.clone())
+    }
+}
+
+impl<T> Default for UnsafeArc<T>
+where
+    T: Default,
+{
+    fn default() -> UnsafeArc<T> {
+        UnsafeArc::new(Default::default())
     }
 }

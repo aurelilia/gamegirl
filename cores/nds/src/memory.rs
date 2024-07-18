@@ -16,7 +16,7 @@ use common::{
 };
 
 use super::{Nds7, Nds9};
-use crate::{addr::*, dma::Dmas, timer::Timers, CpuDevice, Nds, NdsCpu};
+use crate::{addr::*, dma::Dmas, graphics::vram::*, timer::Timers, CpuDevice, Nds, NdsCpu};
 
 pub const KB: usize = 1024;
 pub const MB: usize = KB * KB;
@@ -153,6 +153,9 @@ impl Nds7 {
                 _ => unreachable!(),
             },
 
+            // VRAM-as-WRAM
+            0x06 if let Some(ram) = self.gpu.vram.get7(a) => ram.get_wrap(a & 0x3_FFFF),
+
             _ => T::from_u8(0),
         }
     }
@@ -160,7 +163,7 @@ impl Nds7 {
     fn get_mmio(&self, addr: u32) -> u16 {
         let addr = addr & !1;
         match addr {
-            WRAMSTAT => hword(0, self.memory.wram_status as u8),
+            VRAMSTAT => hword(self.gpu.vram.vram_stat(), self.memory.wram_status as u8),
             _ => Nds::try_get_mmio_shared(self, addr),
         }
     }
@@ -194,6 +197,9 @@ impl Nds7 {
                 }
                 _ => unreachable!(),
             },
+
+            // VRAM-as-WRAM
+            0x06 if let Some(ram) = self.gpu.vram.get7_mut(a) => ram.set_wrap(a & 0x3_FFFF, value),
 
             _ => (),
         }
@@ -260,7 +266,12 @@ impl Nds9 {
                 val
             }
 
-            WRAMCNT => hword(0, self.memory.wram_status as u8),
+            // RAM control
+            VRAMCNT_A => hword(self.gpu.vram.ctrls[A].into(), self.gpu.vram.ctrls[B].into()),
+            VRAMCNT_C => hword(self.gpu.vram.ctrls[C].into(), self.gpu.vram.ctrls[D].into()),
+            VRAMCNT_E => hword(self.gpu.vram.ctrls[E].into(), self.gpu.vram.ctrls[F].into()),
+            VRAMCNT_G => hword(self.gpu.vram.ctrls[G].into(), self.memory.wram_status as u8),
+            VRAMCNT_H => hword(self.gpu.vram.ctrls[H].into(), self.gpu.vram.ctrls[I].into()),
 
             _ => Nds::try_get_mmio_shared(self, addr),
         }
@@ -319,7 +330,27 @@ impl Nds9 {
                 self.gpu.ppus[1].regs.write_mmio(addr & 0xFF, value)
             }
 
-            WRAMCNT => self.memory.wram_status = unsafe { mem::transmute(value.high() & 3) },
+            // RAM control
+            VRAMCNT_A => {
+                self.gpu.vram.update_ctrl(A, value.low());
+                self.gpu.vram.update_ctrl(B, value.high());
+            }
+            VRAMCNT_C => {
+                self.gpu.vram.update_ctrl(C, value.low());
+                self.gpu.vram.update_ctrl(D, value.high());
+            }
+            VRAMCNT_E => {
+                self.gpu.vram.update_ctrl(E, value.low());
+                self.gpu.vram.update_ctrl(F, value.high());
+            }
+            VRAMCNT_G => {
+                self.gpu.vram.update_ctrl(G, value.low());
+                self.memory.wram_status = unsafe { mem::transmute(value.high() & 3) };
+            }
+            VRAMCNT_H => {
+                self.gpu.vram.update_ctrl(H, value.low());
+                self.gpu.vram.update_ctrl(I, value.high());
+            }
 
             _ => Nds::try_set_mmio_shared(self, addr, value),
         }

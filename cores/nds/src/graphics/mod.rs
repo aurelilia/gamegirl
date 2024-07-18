@@ -9,42 +9,23 @@
 use std::sync::Arc;
 
 use arm_cpu::{Cpu, Interrupt};
-use common::numutil::NumExt;
+use common::{numutil::NumExt, UnsafeArc};
 use ppu::{registers::DisplayStatus, HEIGHT, VBLANK_END};
+use vram::{Vram, VramCtrl};
 
 use crate::{
     dma::{Dmas, Reason},
+    memory::KB,
     scheduling::{NdsEvent, PpuEvent},
     CpuDevice, Nds, Nds9, NdsCpu,
 };
 
 mod ppu;
-
-const KB: usize = 1024;
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Vram {
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub a: [u8; 128 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub b: [u8; 128 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub c: [u8; 128 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub d: [u8; 128 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub e: [u8; 64 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub g: [u8; 16 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub h: [u8; 32 * KB],
-    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    pub i: [u8; 16 * KB],
-}
+pub mod vram;
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Gpu {
-    pub vram: Arc<Vram>,
+    pub vram: UnsafeArc<Vram>,
     pub ppus: [ppu::Ppu; 2],
 
     pub(super) dispstat: CpuDevice<DisplayStatus>,
@@ -150,16 +131,7 @@ impl Gpu {
 impl Default for Gpu {
     fn default() -> Self {
         let mut gpu = Self {
-            vram: Arc::new(Vram {
-                a: [0; 128 * KB],
-                b: [0; 128 * KB],
-                c: [0; 128 * KB],
-                d: [0; 128 * KB],
-                e: [0; 64 * KB],
-                g: [0; 16 * KB],
-                h: [0; 32 * KB],
-                i: [0; 16 * KB],
-            }),
+            vram: UnsafeArc::new(Vram::default()),
             ppus: [ppu::Ppu::default(), ppu::Ppu::default()],
             dispstat: [DisplayStatus::default(); 2],
             vcount: 0,

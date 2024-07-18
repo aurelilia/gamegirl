@@ -113,7 +113,7 @@ impl PpuRender {
         if self.r.dispcnt.forced_blank_enable() {
             let start = self.r.vcount.us() * WIDTH;
             for pixel in 0..WIDTH {
-                self.pixels[start + pixel] = [31, 31, 31, 255];
+                self.pixels[start + pixel] = [255, 255, 255, 255];
             }
             return;
         }

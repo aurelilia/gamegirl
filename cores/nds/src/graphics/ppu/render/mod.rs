@@ -15,10 +15,13 @@ use std::{
     thread,
 };
 
-use common::{numutil::NumExt, Colour};
+use common::{
+    numutil::{hword, NumExt},
+    Colour, UnsafeArc,
+};
 use objects::ObjPixel;
 
-use super::{BackgroundMode, PpuRegisters, HEIGHT, TRANS, WIDTH};
+use super::{BackgroundMode, DisplayMode, PpuRegisters, HEIGHT, TRANS, WIDTH};
 use crate::graphics::Vram;
 
 mod modes;
@@ -98,7 +101,7 @@ pub struct PpuRender {
     // PPU state
     r: PpuRegisters,
     pub palette: Arc<[u8]>,
-    pub vram: Arc<Vram>,
+    pub vram: UnsafeArc<Vram>,
     pub oam: Arc<[u8]>,
 
     /// Pixels of the frame currently being constructed.
@@ -112,26 +115,58 @@ pub struct PpuRender {
 impl PpuRender {
     fn render_line(&mut self) {
         if self.r.dispcnt.forced_blank_enable() {
-            let start = self.r.vcount.us() * WIDTH;
-            for pixel in 0..WIDTH {
-                self.pixels[start + pixel] = [31, 31, 31, 255];
-            }
+            self.forced_blank();
             return;
         }
 
-        if self.r.dispcnt.obj_en() {
-            self.render_objs();
-        }
+        match self.r.dispcnt.display_mode() {
+            DisplayMode::DisplayOff => self.forced_blank(),
 
-        match self.r.dispcnt.bg_mode() {
-            BackgroundMode::Mode0 => self.render_mode0(),
-            BackgroundMode::Mode1 => self.render_mode1(),
-            BackgroundMode::Mode2 => self.render_mode2(),
-            BackgroundMode::Mode3 => self.render_mode3(),
-            BackgroundMode::Mode4 => self.render_mode4(),
-            BackgroundMode::Mode5 => self.render_mode5(),
-            inv => log::warn!("Invalid PPU mode {inv:?}"),
+            DisplayMode::Normal => {
+                if self.r.dispcnt.obj_en() {
+                    self.render_objs();
+                }
+
+                match self.r.dispcnt.bg_mode() {
+                    BackgroundMode::Mode0 => self.render_mode0(),
+                    BackgroundMode::Mode1 => self.render_mode1(),
+                    BackgroundMode::Mode2 => self.render_mode2(),
+                    BackgroundMode::Mode3 => self.render_mode3(),
+                    BackgroundMode::Mode4 => self.render_mode4(),
+                    BackgroundMode::Mode5 => self.render_mode5(),
+                    BackgroundMode::Mode6 if self.r.is_a => self.render_mode6(),
+                    inv => log::warn!("Invalid PPU mode {inv:?}"),
+                }
+            }
+
+            DisplayMode::VramDisplay => {
+                let block = self.r.dispcnt.vram_block();
+                let ram = &self.vram.v[block.us()];
+                let start = self.r.vcount.us() * WIDTH;
+                for pixel in 0..WIDTH {
+                    let idx = start + pixel;
+                    let vram_addr = idx << 1;
+                    let color = hword(ram[vram_addr], ram[vram_addr + 1]);
+                    let color = [
+                        color.bits(0, 5).u8(),
+                        color.bits(5, 5).u8(),
+                        color.bits(10, 5).u8(),
+                        255,
+                    ];
+                    self.pixels[start + pixel] = Self::bit5_to_bit8(color);
+                }
+            }
+
+            DisplayMode::MemoryDisplay => todo!(),
         }
+    }
+
+    fn forced_blank(&mut self) {
+        let start = self.r.vcount.us() * WIDTH;
+        for pixel in 0..WIDTH {
+            self.pixels[start + pixel] = [255, 255, 255, 255];
+        }
+        return;
     }
 
     fn clean_buffers(&mut self, bgs: RangeInclusive<usize>) {
@@ -141,14 +176,20 @@ impl PpuRender {
         self.obj_layer = serde_obj_arr();
     }
 
-    fn bg_vram<T: NumExt>(&self, addr: usize) -> T {
-        todo!()
-    }
-    fn obj_vram<T: NumExt>(&self, addr: usize) -> T {
-        todo!()
+    fn bg_vram(&self, addr: usize) -> u8 {
+        let offs = (!self.r.is_a) as usize * 0x20_0000;
+        self.vram.get9(offs + addr).map(|v| v[0]).unwrap_or(0)
     }
 
-    pub fn new(palette: Arc<[u8]>, vram: Arc<Vram>, oam: Arc<[u8]>) -> Self {
+    fn obj_vram(&self, addr: usize) -> u8 {
+        let offs = (!self.r.is_a) as usize * 0x20_0000;
+        self.vram
+            .get9(0x40_0000 + offs + addr)
+            .map(|v| v[0])
+            .unwrap_or(0)
+    }
+
+    pub fn new(palette: Arc<[u8]>, vram: UnsafeArc<Vram>, oam: Arc<[u8]>) -> Self {
         Self {
             r: PpuRegisters::default(),
             palette,
