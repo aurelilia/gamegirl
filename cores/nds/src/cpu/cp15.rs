@@ -53,7 +53,7 @@ pub struct TcmControl {
     pub region_base: B20,
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cp15 {
     pub(crate) control: Control,
@@ -72,5 +72,24 @@ pub struct Cp15 {
 impl Cp15 {
     pub fn dtcm_region(&self) -> u32 {
         self.tcm_control[1].region_base() >> 12
+    }
+}
+
+impl Default for Cp15 {
+    fn default() -> Self {
+        Self {
+            control: Control::default(),
+            cache_bits: [0; 2],
+            data_bufferable_bits: 0,
+            access_protection_bits: [0; 2],
+            access_protection_bits_ext: [0; 2],
+            protection_unit_regions: [[0; 8]; 2],
+            cache_lockdown: [0; 2],
+            tcm_control: [
+                TcmControl::default(),
+                TcmControl::default().with_region_base(0x27C0),
+            ],
+            trace_process_id: 0,
+        }
     }
 }

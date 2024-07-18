@@ -35,7 +35,10 @@ use common::{
     numutil::NumExt,
     Colour, Common, Core, Time,
 };
-use cpu::cp15::Cp15;
+use cpu::{
+    cp15::Cp15,
+    math::{Div, Sqrt},
+};
 
 use crate::{
     audio::Apu,
@@ -97,6 +100,8 @@ pub struct Nds {
     cpu7: Cpu<Nds7>,
     cpu9: Cpu<Nds9>,
     cp15: Cp15,
+    div: Div,
+    sqrt: Sqrt,
 
     gpu: Gpu,
     apu: Apu,
@@ -184,6 +189,8 @@ impl Default for Nds {
             cpu7: Cpu::default(),
             cpu9: Cpu::default(),
             cp15: Cp15::default(),
+            div: Div::default(),
+            sqrt: Sqrt::default(),
             gpu: Gpu::default(),
             apu: Apu::default(),
             memory: Memory::default(),

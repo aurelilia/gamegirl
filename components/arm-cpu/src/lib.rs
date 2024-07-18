@@ -410,6 +410,17 @@ pub enum Interrupt {
     Dma3,
     Joypad,
     GamePak,
+    Unused1,
+    Unused2,
+    IpcSync,
+    IpcSendFifoEmpty,
+    IpcRecvFifoNotEmpty,
+    CardTransferComplete,
+    CardIreqMc,
+    GeometryFifo,
+    ScreensOpen,
+    SpiBus,
+    Wifi,
 }
 
 /// Possible exceptions.

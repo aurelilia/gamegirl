@@ -64,3 +64,16 @@ pub const TM0CNT_H: u32 = 0x102;
 pub const TM1CNT_H: u32 = 0x106;
 pub const TM2CNT_H: u32 = 0x10A;
 pub const TM3CNT_H: u32 = 0x10E;
+
+// Math
+pub const DIVCNT_L: u32 = 0x280;
+pub const DIVCNT_H: u32 = 0x282;
+pub const DIV_NUMER: u32 = 0x290;
+pub const DIV_DENOM: u32 = 0x298;
+pub const DIV_RESULT: u32 = 0x2A0;
+pub const DIV_REM: u32 = 0x2A8;
+pub const SQRTCNT_L: u32 = 0x2B0;
+pub const SQRTCNT_H: u32 = 0x2B2;
+pub const SQRT_RESULT_L: u32 = 0x2B4;
+pub const SQRT_RESULT_H: u32 = 0x2B6;
+pub const SQRT_INPUT: u32 = 0x2B8;

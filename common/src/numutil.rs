@@ -258,3 +258,18 @@ fn inner_wrap<T>(arr: &[u8], addr: usize) -> *mut T {
     let mask = arr.len() - 1;
     unsafe { arr.as_ptr().add(addr & mask) as *const T as *mut T }
 }
+
+pub fn set_u64(dword: u64, idx: u32, hword: u16) -> u64 {
+    let mut bytes_in = dword.to_le_bytes();
+    let bytes_h = hword.to_le_bytes();
+    let idx = idx.us() << 1;
+    bytes_in[idx] = bytes_h[0];
+    bytes_in[idx + 1] = bytes_h[1];
+    u64::from_le_bytes(bytes_in)
+}
+
+pub fn get_u64(dword: u64, idx: u32) -> u16 {
+    let bytes_in = dword.to_le_bytes();
+    let idx = idx.us() << 1;
+    u16::from_le_bytes([bytes_in[idx], bytes_in[idx + 1]])
+}

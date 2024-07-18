@@ -12,7 +12,7 @@ use arm_cpu::{interface::RwType, Cpu};
 use common::{
     common::debugger::Severity,
     components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
-    numutil::{hword, word, ByteArrayExt, NumExt, U16Ext, U32Ext},
+    numutil::{get_u64, hword, set_u64, word, ByteArrayExt, NumExt, U16Ext, U32Ext},
 };
 
 use super::{Nds7, Nds9};
@@ -218,7 +218,7 @@ impl Nds9 {
         let a = addr.us();
         match region {
             // Basic
-            0x00 | 0x01 => self.memory.inst_tcm.get_wrap(a), // TODO does this always wrap actually
+            0x00 | 0x01 => self.memory.inst_tcm.get_wrap(a), // TODO accurate wrap
             0x02 => self.memory.psram.get_wrap(a),
             0xFF if addr >= 0xFFFF_0000 => self.memory.bios9.get_exact(a & 0xFFFF),
 
@@ -278,6 +278,19 @@ impl Nds9 {
             VRAMCNT_G => hword(self.gpu.vram.ctrls[G].into(), self.memory.wram_status as u8),
             VRAMCNT_H => hword(self.gpu.vram.ctrls[H].into(), self.gpu.vram.ctrls[I].into()),
 
+            // Math
+            DIVCNT_L => self.div.ctrl.into(),
+            DIVCNT_H => 0,
+            DIV_NUMER..DIV_DENOM => get_u64(self.div.numer, addr & 6),
+            DIV_DENOM..DIV_RESULT => get_u64(self.div.denom, addr & 6),
+            DIV_RESULT..DIV_REM => get_u64(self.div.result, addr & 6),
+            DIV_REM..SQRTCNT_L => get_u64(self.div.rem, addr & 6),
+            SQRTCNT_L => self.sqrt.ctrl.into(),
+            SQRTCNT_H => 0,
+            SQRT_RESULT_L => self.sqrt.result.low(),
+            SQRT_RESULT_H => self.sqrt.result.high(),
+            SQRT_INPUT..0x2C0 => get_u64(self.sqrt.input, addr & 6),
+
             _ => Nds::try_get_mmio_shared(self, addr),
         }
     }
@@ -287,8 +300,7 @@ impl Nds9 {
         let a = addr.us();
         match region {
             // Basic
-            0x00 | 0x01 => self.memory.inst_tcm.set_wrap(a, value), // TODO does this always
-            // wrap actually
+            0x00 | 0x01 => self.memory.inst_tcm.set_wrap(a, value), // TODO accurate wrap
             0x02 => self.memory.psram.set_wrap(a, value),
 
             // WRAM
@@ -365,6 +377,14 @@ impl Nds9 {
                 self.gpu.vram.update_ctrl(H, value.low());
                 self.gpu.vram.update_ctrl(I, value.high());
             }
+
+            // Math
+            // TODO React to writes.
+            DIVCNT_L => self.div.ctrl = value.into(),
+            DIV_NUMER..DIV_DENOM => self.div.numer = set_u64(self.div.numer, addr & 6, value),
+            DIV_DENOM..DIV_RESULT => self.div.denom = set_u64(self.div.denom, addr & 6, value),
+            SQRTCNT_L => self.sqrt.ctrl = value.into(),
+            SQRT_INPUT..0x2C0 => self.sqrt.input = set_u64(self.sqrt.input, addr & 6, value),
 
             _ => Nds::try_set_mmio_shared(self, addr, value),
         }

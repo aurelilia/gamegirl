@@ -97,12 +97,12 @@ impl Dmas {
                 match (ctrl.timing_ext(), ctrl.timing()) {
                     (false, Timing::Now) => reason == Reason::CtrlWrite,
                     (true, Timing::Now) => reason == Reason::VBlank,
-                    (false, Timing::VBlank) => reason == Reason::HBlank, // && ds[VCOUNT] < 160,
-                    (true, Timing::VBlank) => reason == Reason::HBlank,  // && ds[VCOUNT] == 0,
-                    (false, Timing::HBlank) => false,                    // TODO
-                    (true, Timing::HBlank) => reason == Reason::CartridgeReady,
-                    (false, Timing::Special) => false,
-                    (true, Timing::Special) => false, // TODO
+                    (false, Timing::VBlank) => reason == Reason::HBlank && ds.gpu.vcount < 160,
+                    (true, Timing::VBlank) => reason == Reason::HBlank && ds.gpu.vcount == 0,
+                    (false, Timing::HBlank) => false, // TODO main memory display
+                    (true, Timing::HBlank) => reason == Reason::CartridgeReady, // DS cart
+                    (false, Timing::Special) => false, // GBA cart
+                    (true, Timing::Special) => false, // TODO geometry FIFO
                 }
             };
         if !on {
