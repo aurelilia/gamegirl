@@ -32,10 +32,10 @@ impl<S: ArmSystem> SysWrapper<S> {
         lut[0b000_0101_0] = Self::arm_alu_mul_psr_reg::<0b0101, false>;
         lut[0b000_0110_0] = Self::arm_alu_mul_psr_reg::<0b0110, false>;
         lut[0b000_0111_0] = Self::arm_alu_mul_psr_reg::<0b0111, false>;
-        lut[0b000_1000_0] = Self::arm_alu_mul_psr_reg::<0b1000, false>;
-        lut[0b000_1001_0] = Self::arm_alu_mul_psr_reg::<0b1001, false>;
-        lut[0b000_1010_0] = Self::arm_alu_mul_psr_reg::<0b1010, false>;
-        lut[0b000_1011_0] = Self::arm_alu_mul_psr_reg::<0b1011, false>;
+        lut[0b000_1000_0] = Self::arm_alu_gap::<0b1000>;
+        lut[0b000_1001_0] = Self::arm_alu_gap::<0b1001>;
+        lut[0b000_1010_0] = Self::arm_alu_gap::<0b1010>;
+        lut[0b000_1011_0] = Self::arm_alu_gap::<0b1011>;
         lut[0b000_1100_0] = Self::arm_alu_mul_psr_reg::<0b1100, false>;
         lut[0b000_1101_0] = Self::arm_alu_mul_psr_reg::<0b1101, false>;
         lut[0b000_1110_0] = Self::arm_alu_mul_psr_reg::<0b1110, false>;

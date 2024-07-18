@@ -14,7 +14,10 @@ use common::numutil::{NumExt, U32Ext};
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{
     access::*,
-    registers::{Flag::*, Mode},
+    registers::{
+        Flag::{self, *},
+        Mode,
+    },
     Cpu,
 };
 
@@ -90,26 +93,26 @@ impl<S: ArmSystem> SysWrapper<S> {
         self.swi();
     }
 
-    pub fn arm_alu_mul_psr_reg<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
-        // ALU with register OR mul OR psr OR SWP OR BX OR LDR/STR
-        // ARM please... what is this instruction encoding
+    pub fn arm_alu_gap<const OP: u16>(&mut self, inst: ArmInst) {
         if S::IS_V5 && (inst.0 & 0x0FFF_0FF0) == 0x016F_0F10 {
             // ARMv5: CLZ
             let d = inst.reg(12);
             let m = inst.reg(0);
             let rm = self.reg(m);
             self.set_reg(d, rm.leading_zeros());
-        } else if S::IS_V5 && !CPSR && (0x8..=0xB).contains(&OP) && inst.0.bits(4, 8) == 0x05 {
+        } else if S::IS_V5 && inst.0.bits(4, 8) == 0x05 {
             // ARMv5: QADD/QSUB
-            self.armv5_alu_q::<OP, CPSR>(inst);
+            self.armv5_alu_q::<OP, false>(inst);
         } else if OP == 0b1001 && inst.0.bits(8, 13) == 0xFFF {
             // BX
             self.arm_bx(inst);
-        } else if !CPSR && (0x8..=0xB).contains(&OP) {
-            // MRS/MSR/SWP/LDRSTR
+        } else if !inst.0.is_bit(4) && inst.0.is_bit(7) {
+            // ARMv5: SH MULs
+            self.armv5_sh_mul::<OP>(inst);
+        } else {
+            // MRS/MSR/SWP/LDRSTR/MUL
             let bit_1 = OP.is_bit(1);
             let is_msr = OP.is_bit(0);
-
             if is_msr {
                 let m = inst.reg(0);
                 self.msr(self.reg(m), inst.0.is_bit(19), inst.0.is_bit(16), bit_1);
@@ -129,10 +132,15 @@ impl<S: ArmSystem> SysWrapper<S> {
                     self.arm_swp(inst, n, d, bit_1);
                 } else {
                     // STRH/LDRH
-                    self.arm_strh_ldr::<OP, CPSR>(inst);
+                    self.arm_strh_ldr::<OP, false>(inst);
                 }
             }
-        } else if inst.0.bits(4, 4) == 0b1001 {
+        }
+    }
+
+    pub fn arm_alu_mul_psr_reg<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+        // ALU with register OR mul OR psr OR SWP OR BX OR LDR/STR
+        if inst.0.bits(4, 4) == 0b1001 {
             // MUL
             self.arm_mul::<OP, CPSR>(inst);
         } else if inst.0.is_bit(4) && inst.0.is_bit(7) {
@@ -162,22 +170,25 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     fn armv5_alu_q<const OP: u16, const CPSR: bool>(&mut self, inst: ArmInst) {
+        let op = OP & 0b111;
         let rm = self.reg(inst.reg(0)) as i32;
         let rn = self.reg(inst.reg(16)) as i32;
         let d = inst.reg(12);
-        let value = match OP {
-            9 => rm.saturating_add(rn),
-            10 => rm.saturating_sub(rn),
-            11 => rm.saturating_add(rn.saturating_mul(2)),
+        let value = match op {
+            0b000 => rm.saturating_add(rn),
+            0b001 => rm.saturating_sub(rn),
+            0b100 => rm.saturating_add(rn.saturating_mul(2)),
             _ => rm.saturating_sub(rn.saturating_mul(2)),
         };
-        let checked = match OP {
-            9 => rm.checked_add(rn),
-            10 => rm.checked_sub(rn),
-            11 => rm.checked_add(rn.saturating_mul(2)),
+        let checked = match op {
+            0b000 => rm.checked_add(rn),
+            0b001 => rm.checked_sub(rn),
+            0b100 => rm.checked_add(rn.saturating_mul(2)),
             _ => rm.checked_sub(rn.saturating_mul(2)),
         };
-        self.cpu().set_flag(QClamped, checked.is_none());
+        if checked.is_none() {
+            self.cpu().set_flag(QClamped, true);
+        }
         self.set_reg(d, value as u32);
     }
 
@@ -233,21 +244,31 @@ impl<S: ArmSystem> SysWrapper<S> {
         } else {
             self.cpu().reg(inst.reg(0))
         };
-        match inst.0.bits(5, 2) {
-            1 => {
+        match (inst.0.bits(5, 2), LDR) {
+            (1, _) => {
                 // LDRH/STRH
                 self.ldrstr::<true>(!pre, up, 2, writeback, !LDR, n, d, offs);
             }
-            2 => {
+            (2, true) => {
                 // LDRSB
                 self.ldrstr::<true>(!pre, up, 1, writeback, !LDR, n, d, offs);
                 self.set_reg(d, self.reg(d).u8() as i8 as i32 as u32);
             }
-            _ => {
+            (3, true) => {
                 // LDRSH
                 self.ldrstr::<false>(!pre, up, 2, writeback, !LDR, n, d, offs);
                 self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
             }
+            (2, false) if S::IS_V5 => {
+                // LDRD
+                self.ldrstr::<true>(!pre, up, 8, writeback, false, n, d, offs);
+            }
+            (3, false) if S::IS_V5 => {
+                // STRD
+                self.ldrstr::<false>(!pre, up, 8, writeback, true, n, d, offs);
+                self.set_reg(d, self.reg(d).u16() as i16 as i32 as u32);
+            }
+            _ => self.und_inst(inst.0),
         }
     }
 
@@ -525,6 +546,73 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     #[inline]
+    fn armv5_sh_mul<const OP: u16>(&mut self, inst: ArmInst) {
+        let rm = self.cpu().reg(inst.reg(0));
+        let rs = self.cpu().reg(inst.reg(8));
+        let rn = self.cpu().reg(inst.reg(12)) as i64;
+
+        let a = if inst.0.is_bit(5) {
+            rm.high()
+        } else {
+            rm.low()
+        } as i64;
+        let b = if inst.0.is_bit(6) {
+            rs.high()
+        } else {
+            rs.low()
+        } as i64;
+        let dhi = self.reg(inst.reg(16)) as i64;
+        let dlo = rn as i64;
+
+        let out: i64 = match OP {
+            0b1000 => {
+                // SMLA
+                let r = a.wrapping_mul(b);
+                let res = r.wrapping_add(rn);
+                if TryInto::<i32>::try_into(res).is_err() {
+                    self.cpu().set_flag(Flag::QClamped, true);
+                }
+                res
+            }
+            0b1001 if !inst.0.is_bit(5) => {
+                // SMULW
+                let r = (rm as i64).wrapping_mul(b);
+                r / 0x1_0000
+            }
+            0b1001 => {
+                // SMLAW
+                let r = (rm as i64).wrapping_mul(b);
+                let r = r / 0x1_0000;
+                let res = r.wrapping_add(rn);
+                if TryInto::<i32>::try_into(res).is_err() {
+                    self.cpu().set_flag(Flag::QClamped, true);
+                }
+                res
+            }
+            0b1010 => {
+                // SMLAL
+                let r = dlo | (dhi << 32);
+                r.wrapping_add(a.wrapping_mul(b))
+            }
+            _ => {
+                // SMUL
+                a.wrapping_mul(b)
+            }
+        };
+
+        if OP == 0b1010 {
+            // Don't set high reg on any but SMLAL
+            self.set_reg(inst.reg(16), (out >> 32) as u32);
+            self.set_reg(inst.reg(12), out as u32);
+        } else {
+            self.set_reg(inst.reg(16), out as u32);
+        }
+
+        // TODO wrong
+        self.mul_wait_cycles(b as u32, OP.is_bit(1));
+    }
+
+    #[inline]
     #[allow(clippy::too_many_arguments)]
     fn ldrstr<const ALIGN: bool>(
         &mut self,
@@ -543,6 +631,12 @@ impl<S: ArmSystem> SysWrapper<S> {
         }
 
         match (str, width) {
+            (true, 8) => {
+                let val = self.cpur().reg_pc4(d);
+                self.write::<u32>(addr, val, NONSEQ);
+                let val = self.cpur().reg_pc4((d + 1) & 15);
+                self.write::<u32>(addr + 4, val, SEQ);
+            }
             (true, 4) => {
                 let val = self.cpur().reg_pc4(d);
                 self.write::<u32>(addr, val, NONSEQ);
@@ -554,6 +648,12 @@ impl<S: ArmSystem> SysWrapper<S> {
             (true, _) => {
                 let val = (self.cpur().reg_pc4(d) & 0xFF).u8();
                 self.write::<u8>(addr, val, NONSEQ);
+            }
+            (false, 8) => {
+                let val = self.read::<u32>(addr, NONSEQ);
+                self.set_reg(d, val);
+                let val = self.read::<u32>(addr + 4, SEQ);
+                self.set_reg((d + 1) & 15, val);
             }
             (false, 4) if ALIGN => {
                 let val = self.read::<u32>(addr, NONSEQ);
