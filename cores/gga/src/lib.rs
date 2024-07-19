@@ -27,6 +27,7 @@ use common::{
     components::{
         scheduler::Scheduler,
         storage::{GameSave, Storage},
+        thin_pager::ThinPager,
     },
     numutil::NumExt,
     Core, TimeS,
@@ -199,13 +200,10 @@ impl GameGirlAdv {
             (cart, false)
         };
 
-        // Paging implementation requires this to prevent reading unallocated memory
-        let until_full_page = 0x4000 - (cart.len() & 0x3FFF);
-        cart.extend(iter::repeat(0).take(until_full_page));
-
         let mut gga = Box::<GameGirlAdv>::default();
         gga.c.config = config.clone();
         // gga.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO still buggy
+        ThinPager::normalize(&mut cart);
         gga.cart.load_rom(cart);
         if let Some(save) = Storage::load(path, gga.cart.title()) {
             gga.cart.load_save(save);

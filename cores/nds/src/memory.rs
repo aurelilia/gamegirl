@@ -11,7 +11,10 @@ use std::{mem, ptr};
 use arm_cpu::{interface::RwType, Cpu};
 use common::{
     common::debugger::Severity,
-    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
+    components::{
+        memory_mapper::{MemoryMappedSystem, MemoryMapper},
+        thin_pager::{ThinPager, RO, RW},
+    },
     numutil::{get_u64, hword, set_u64, word, ByteArrayExt, NumExt, U16Ext, U32Ext},
 };
 
@@ -45,15 +48,68 @@ pub struct Memory {
 
     wram7: Box<[u8]>,
     inst_tcm: Box<[u8]>,
-    data_tcm: Box<[u8]>,
+    pub(crate) data_tcm: Box<[u8]>,
 
     wait_word: CpuDevice<[u16; 32]>,
     wait_other: CpuDevice<[u16; 32]>,
+    pub(crate) pager7: ThinPager,
+    pub(crate) pager9: ThinPager,
 }
 
 impl Nds {
     /// Initialize page tables and wait times.
-    pub fn init_memory(&mut self) {}
+    pub fn init_memory(&mut self) {
+        // Init 7
+        let p7 = &mut self.memory.pager7;
+        p7.init(0xFFF_FFFF);
+        p7.map(&self.memory.bios7, 0x000_0000..0x100_0000, RO);
+        p7.map(&self.memory.psram, 0x200_0000..0x300_0000, RW);
+        p7.map(&self.memory.wram7, 0x380_0000..0x400_0000, RW);
+
+        // Init 9
+        let p9 = &mut self.memory.pager9;
+        p9.init(0xFFF_FFFF);
+        p9.map(&self.memory.inst_tcm, 0x000_0000..0x200_0000, RW);
+        p9.map(&self.memory.psram, 0x200_0000..0x300_0000, RW);
+        p9.map(&self.memory.data_tcm, self.cp15.dtcm_range(), RW);
+
+        // Init V/WRAM
+        self.gpu.vram.init_mappings(p7, p9);
+        self.update_wram();
+    }
+
+    fn update_wram(&mut self) {
+        self.memory.pager7.evict(0x300_0000..0x380_0000);
+        self.memory.pager9.evict(0x300_0000..0x400_0000);
+        match self.memory.wram_status {
+            WramStatus::All7 => {
+                self.memory
+                    .pager7
+                    .map(&self.memory.wram, 0x300_0000..0x380_0000, RW)
+            }
+            WramStatus::First9 => {
+                self.memory
+                    .pager9
+                    .map(&self.memory.wram[..(16 * KB)], 0x300_0000..0x400_0000, RW);
+                self.memory
+                    .pager7
+                    .map(&self.memory.wram[(16 * KB)..], 0x300_0000..0x380_0000, RW);
+            }
+            WramStatus::First7 => {
+                self.memory
+                    .pager7
+                    .map(&self.memory.wram[..(16 * KB)], 0x300_0000..0x380_0000, RW);
+                self.memory
+                    .pager9
+                    .map(&self.memory.wram[(16 * KB)..], 0x300_0000..0x400_0000, RW);
+            }
+            WramStatus::All9 => {
+                self.memory
+                    .pager9
+                    .map(&self.memory.wram, 0x300_0000..0x400_0000, RW)
+            }
+        }
+    }
 
     #[allow(invalid_reference_casting)]
     pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &DS, addr: u32) -> u16 {
@@ -137,22 +193,16 @@ impl Nds {
 impl Nds7 {
     pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
+        if addr > 0xFFF_FFFF {
+            return T::from_u32(0);
+        }
+        if let Some(read) = self.memory.pager7.read(addr) {
+            return read;
+        }
+
         let region = addr >> 24;
         let a = addr.us();
         match addr {
-            // Basic
-            0x00 => self.memory.bios7.get_wrap(a),
-            0x02 => self.memory.psram.get_wrap(a),
-
-            // WRAM
-            0x03 if a > 0x380_0000 => self.memory.wram7.get_wrap(a),
-            0x03 => match self.memory.wram_status {
-                WramStatus::All7 => self.memory.wram.get_wrap(a),
-                WramStatus::First9 => self.memory.wram[(16 * KB)..].get_wrap(a),
-                WramStatus::First7 => self.memory.wram[..(16 * KB)].get_wrap(a),
-                WramStatus::All9 => T::from_u32(0),
-            },
-
             // MMIO
             0x04 => match T::WIDTH {
                 1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
@@ -163,6 +213,7 @@ impl Nds7 {
             },
 
             // VRAM-as-WRAM
+            // TODO mapper
             0x06 if let Some(ram) = self.gpu.vram.get7(a) => ram.get_wrap(a & 0x3_FFFF),
 
             _ => T::from_u8(0),
@@ -179,21 +230,17 @@ impl Nds7 {
     }
 
     pub fn set<T: RwType>(&mut self, addr: u32, value: T) {
+        if addr > 0xFFF_FFFF {
+            return;
+        }
+        if let Some(write) = self.memory.pager7.write(addr) {
+            *write = value;
+            return;
+        }
+
         let region = addr >> 24;
         let a = addr.us();
         match region {
-            // Basic
-            0x02 => self.memory.psram.set_wrap(a, value), // does this wrap actually
-
-            // WRAM
-            0x03 if a > 0x380_0000 => self.memory.wram7.set_wrap(a, value),
-            0x03 => match self.memory.wram_status {
-                WramStatus::All7 => self.memory.wram.set_wrap(a, value),
-                WramStatus::First9 => self.memory.wram[(16 * KB)..].set_wrap(a, value),
-                WramStatus::First7 => self.memory.wram[..(16 * KB)].set_wrap(a, value),
-                WramStatus::All9 => (),
-            },
-
             // MMIO
             0x04 => match T::WIDTH {
                 1 if addr.is_bit(0) => {
@@ -224,26 +271,22 @@ impl Nds7 {
 impl Nds9 {
     pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
+        if addr > 0xFFF_FFFF {
+            return T::from_u32(0);
+        }
+        if let Some(read) = self.memory.pager9.read(addr) {
+            return read;
+        }
+
         let region = addr >> 24;
         let a = addr.us();
         match region {
             // Basic
-            0x00 | 0x01 => self.memory.inst_tcm.get_wrap(a), // TODO accurate wrap
-            0x02 => self.memory.psram.get_wrap(a),
             0xFF if addr >= 0xFFFF_0000 => self.memory.bios9.get_exact(a & 0xFFFF),
-
-            // WRAM
-            0x03 => match self.memory.wram_status {
-                WramStatus::All9 => self.memory.wram.get_wrap(a),
-                WramStatus::First7 => self.memory.wram[(16 * KB)..].get_wrap(a),
-                WramStatus::First9 => self.memory.wram[..(16 * KB)].get_wrap(a),
-                WramStatus::All7 => T::from_u32(0),
-            },
 
             // PPU
             // TODO verify the bit is right
             0x05 => self.gpu.ppus[a.bit(12)].palette.get_wrap(a),
-            0x06 if let Some(vram) = self.gpu.vram.get9(a) => vram.get_exact(0),
             0x07 => self.gpu.ppus[a.bit(12)].oam.get_wrap(a),
 
             // MMIO
@@ -254,9 +297,6 @@ impl Nds9 {
                 4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
                 _ => unreachable!(),
             },
-
-            // DTCM
-            _ if region == self.cp15.dtcm_region() => self.memory.data_tcm.get_wrap(a),
 
             _ => {
                 log::error!("Invalid read: {addr:X}");
@@ -310,25 +350,20 @@ impl Nds9 {
     }
 
     pub fn set<T: RwType>(&mut self, addr: u32, value: T) {
+        if addr > 0xFFF_FFFF {
+            return;
+        }
+        if let Some(write) = self.memory.pager9.write(addr) {
+            *write = value;
+            return;
+        }
+
         let region = addr >> 24;
         let a = addr.us();
         match region {
-            // Basic
-            0x00 | 0x01 => self.memory.inst_tcm.set_wrap(a, value), // TODO accurate wrap
-            0x02 => self.memory.psram.set_wrap(a, value),
-
-            // WRAM
-            0x03 => match self.memory.wram_status {
-                WramStatus::All9 => self.memory.wram.set_wrap(a, value),
-                WramStatus::First7 => self.memory.wram[(16 * KB)..].set_wrap(a, value),
-                WramStatus::First9 => self.memory.wram[..(16 * KB)].set_wrap(a, value),
-                WramStatus::All7 => (),
-            },
-
             // PPU
             // TODO verify the bit is right
             0x05 => self.gpu.ppus[a.bit(12)].palette.set_wrap(a, value),
-            0x06 if let Some(vram) = self.gpu.vram.get9_mut(a) => vram.set_exact(0, value),
             0x07 => self.gpu.ppus[a.bit(12)].oam.set_wrap(a, value),
 
             // MMIO
@@ -342,9 +377,6 @@ impl Nds9 {
                 _ => unreachable!(),
             },
 
-            // DTCM
-            _ if region == self.cp15.dtcm_region() => self.memory.data_tcm.set_wrap(a, value),
-
             _ => {
                 log::error!("Invalid write: {addr:X}");
             }
@@ -353,6 +385,7 @@ impl Nds9 {
 
     fn set_mmio_hword(&mut self, addr: u32, value: u16) {
         let addr = addr & 0x1FFE;
+        let dsx: &mut Nds = &mut *self;
         match addr {
             // PPUs
             // TODO handle byte writes right
@@ -372,24 +405,70 @@ impl Nds9 {
 
             // RAM control
             VRAMCNT_A => {
-                self.gpu.vram.update_ctrl(A, value.low());
-                self.gpu.vram.update_ctrl(B, value.high());
+                dsx.gpu.vram.update_ctrl(
+                    A,
+                    value.low(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
+                dsx.gpu.vram.update_ctrl(
+                    B,
+                    value.high(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
             }
             VRAMCNT_C => {
-                self.gpu.vram.update_ctrl(C, value.low());
-                self.gpu.vram.update_ctrl(D, value.high());
+                dsx.gpu.vram.update_ctrl(
+                    C,
+                    value.low(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
+                dsx.gpu.vram.update_ctrl(
+                    D,
+                    value.high(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
             }
             VRAMCNT_E => {
-                self.gpu.vram.update_ctrl(E, value.low());
-                self.gpu.vram.update_ctrl(F, value.high());
+                dsx.gpu.vram.update_ctrl(
+                    E,
+                    value.low(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
+                dsx.gpu.vram.update_ctrl(
+                    F,
+                    value.high(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
             }
             VRAMCNT_G => {
-                self.gpu.vram.update_ctrl(G, value.low());
-                self.memory.wram_status = unsafe { mem::transmute(value.high() & 3) };
+                dsx.gpu.vram.update_ctrl(
+                    G,
+                    value.low(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
+                dsx.memory.wram_status = unsafe { mem::transmute(value.high() & 3) };
+                dsx.update_wram();
             }
             VRAMCNT_H => {
-                self.gpu.vram.update_ctrl(H, value.low());
-                self.gpu.vram.update_ctrl(I, value.high());
+                dsx.gpu.vram.update_ctrl(
+                    H,
+                    value.low(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
+                dsx.gpu.vram.update_ctrl(
+                    I,
+                    value.high(),
+                    &mut dsx.memory.pager7,
+                    &mut dsx.memory.pager9,
+                );
             }
 
             // Math
@@ -430,6 +509,8 @@ impl Default for Memory {
 
             wait_word: [[0; 32]; 2],
             wait_other: [[0; 32]; 2],
+            pager7: ThinPager::default(),
+            pager9: ThinPager::default(),
         }
     }
 }

@@ -6,26 +6,26 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{ops::Range, ptr, vec};
+use std::{iter, ops::Range, ptr, vec};
 
-use crate::numutil::NumExt;
+use crate::{numutil::NumExt, UnsafeArc};
 
 pub const RW: u8 = 0;
 pub const DIRTY: u8 = 1 << 0;
 pub const RO: u8 = 1 << 1;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThinPager {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "serde", serde(default))]
-    pub pages: Vec<Page>,
+    pub pages: UnsafeArc<Vec<Page>>,
 }
 
 impl ThinPager {
     pub fn init(&mut self, max_addr: u32) {
         let len = Self::addr_to_page(max_addr) + 1;
-        self.pages = vec![Page::default(); len];
+        *self.pages = vec![Page::default(); len];
     }
 
     pub fn map(&mut self, slice: &[u8], range: Range<u32>, flags: u8) {
@@ -89,6 +89,11 @@ impl ThinPager {
 
     pub fn get_raw(&mut self, addr: u32) -> &mut Page {
         &mut self.pages[Self::addr_to_page(addr)]
+    }
+
+    pub fn normalize(v: &mut Vec<u8>) {
+        let until_full_page = 0x4000 - (v.len() & 0x3FFF);
+        v.extend(iter::repeat(0).take(until_full_page));
     }
 
     fn addr_to_page(addr: u32) -> usize {

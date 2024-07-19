@@ -9,6 +9,8 @@
 //! Inner implementation of CP15 for the ARMv5.
 //! Note that getters and setters are in `nds9.rs`, as part of the ARM
 //! interface.
+use std::ops::Range;
+
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
 #[bitfield]
@@ -70,8 +72,9 @@ pub struct Cp15 {
 }
 
 impl Cp15 {
-    pub fn dtcm_region(&self) -> u32 {
-        self.tcm_control[1].region_base() >> 12
+    pub fn dtcm_range(&self) -> Range<u32> {
+        let base = self.tcm_control[1].region_base() << 12;
+        base..(base + 0x100_0000)
     }
 }
 

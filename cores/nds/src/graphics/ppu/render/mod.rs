@@ -178,15 +178,12 @@ impl PpuRender {
 
     fn bg_vram(&self, addr: usize) -> u8 {
         let offs = (!self.r.is_a) as usize * 0x20_0000;
-        self.vram.get9(offs + addr).map(|v| v[0]).unwrap_or(0)
+        self.vram.get9(offs + addr).unwrap_or(0)
     }
 
     fn obj_vram(&self, addr: usize) -> u8 {
         let offs = (!self.r.is_a) as usize * 0x20_0000;
-        self.vram
-            .get9(0x40_0000 + offs + addr)
-            .map(|v| v[0])
-            .unwrap_or(0)
+        self.vram.get9(0x40_0000 + offs + addr).unwrap_or(0)
     }
 
     pub fn new(palette: Arc<[u8]>, vram: UnsafeArc<Vram>, oam: Arc<[u8]>) -> Self {

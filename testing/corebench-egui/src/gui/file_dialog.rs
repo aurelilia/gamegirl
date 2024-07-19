@@ -22,7 +22,7 @@ pub struct File {
 /// sending a [Message] once the user has picked a file.
 pub fn open_rom(sender: mpsc::Sender<Message>) {
     let task = rfd::AsyncFileDialog::new()
-        .add_filter("GameGirl games", &["gb", "gbc", "gba", "elf", "iso"])
+        .add_filter("GameGirl games", &["gb", "gbc", "gba", "nds", "elf", "iso"])
         .pick_file();
 
     execute(async move {

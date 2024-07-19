@@ -8,7 +8,10 @@
 
 use std::{mem, ops::Range};
 
-use common::numutil::NumExt;
+use common::{
+    components::thin_pager::{ThinPager, RW},
+    numutil::NumExt,
+};
 use modular_bitfield::{bitfield, specifiers::*};
 
 use crate::memory::KB;
@@ -24,7 +27,7 @@ pub const H: usize = 7;
 pub const I: usize = 8;
 const EMPTY: usize = 9;
 
-const LCDC_ADDRS: [usize; 9] = [
+const LCDC_ADDRS: [u32; 9] = [
     0x80_0000, 0x82_0000, 0x84_0000, 0x86_0000, 0x88_0000, 0x89_0000, 0x89_4000, 0x89_8000,
     0x8A_0000,
 ];
@@ -45,7 +48,7 @@ pub struct VramCtrl {
 pub struct Vram {
     pub ctrls: [VramCtrl; 9],
     pub v: [Box<[u8]>; 9],
-    pub arm9_map: Box<[(u8, u8)]>,
+    pub pager: ThinPager,
 }
 
 impl Vram {
@@ -55,7 +58,7 @@ impl Vram {
         c as u8 | ((d as u8) << 1)
     }
 
-    pub fn update_ctrl(&mut self, r: usize, new: u8) {
+    pub fn update_ctrl(&mut self, r: usize, new: u8, p7: &mut ThinPager, p9: &mut ThinPager) {
         let new: VramCtrl = new.into();
         let old = mem::replace(&mut self.ctrls[r], new);
         if new == old || (!new.enable() && !old.enable()) {
@@ -65,19 +68,36 @@ impl Vram {
         if old.enable() {
             let start = self.calc_range_for(r, old);
             if let Some(start) = start {
-                self.set_mapping_range(start, EMPTY.u8(), r.u8())
+                p9.evict(self.get_range(start, r.u8()));
             }
         }
         if new.enable() {
             let start = self.calc_range_for(r, new);
             if let Some(start) = start {
-                self.set_mapping_range(start, r.u8(), r.u8())
+                let range = self.get_range(start, r.u8());
+                p9.map(&self.v[r], range, RW);
             }
         }
     }
 
-    fn calc_range_for(&self, r: usize, ctrl: VramCtrl) -> Option<usize> {
-        let ofs = ctrl.ofs().us();
+    pub fn init_mappings(&mut self, p7: &mut ThinPager, p9: &mut ThinPager) {
+        self.pager = p9.clone();
+        for i in 0..9 {
+            let c = self.ctrls[i];
+            if !c.enable() {
+                continue;
+            }
+
+            let start = self.calc_range_for(i, c);
+            if let Some(start) = start {
+                let range = self.get_range(start, i.u8());
+                p9.map(&self.v[i], range, RW);
+            }
+        }
+    }
+
+    fn calc_range_for(&self, r: usize, ctrl: VramCtrl) -> Option<u32> {
+        let ofs = ctrl.ofs().u32();
         Some(match (r, ctrl.mst()) {
             // LCDC
             (_, 0) => LCDC_ADDRS[r],
@@ -110,21 +130,12 @@ impl Vram {
         })
     }
 
-    fn get_mapping(&self, addr: usize) -> (u8, usize) {
-        let (mapping, offset) = self.arm9_map[(addr & 0xFF_FFFF) >> 14];
-        (mapping, (offset.us() * 0x4000) + (addr & 0x3FFF))
-    }
-
-    fn set_mapping_range(&mut self, start: usize, mapping: u8, size_of: u8) {
-        let end = start + self.v[size_of.us()].len();
+    fn get_range(&mut self, start: u32, size_of: u8) -> Range<u32> {
+        let start = start + 0x600_0000;
+        let end = start + self.v[size_of.us()].len().u32();
         debug_assert!(start & 0x3FFF == 0);
-        debug_assert!(start & 0x3FFF == 0);
-
-        let start = start >> 14;
-        let end = end >> 14;
-        for (offs, entry) in self.arm9_map[start..end].iter_mut().enumerate() {
-            *entry = (mapping, offs.u8());
-        }
+        debug_assert!(end & 0x3FFF == 0);
+        start..end
     }
 
     pub fn get7(&self, addr: usize) -> Option<&[u8]> {
@@ -149,14 +160,8 @@ impl Vram {
         None
     }
 
-    pub fn get9(&self, addr: usize) -> Option<&[u8]> {
-        let (mapping, offs) = self.get_mapping(addr);
-        self.v.get(mapping.us()).map(|v| &v[offs..])
-    }
-
-    pub fn get9_mut(&mut self, addr: usize) -> Option<&mut [u8]> {
-        let (mapping, offs) = self.get_mapping(addr);
-        self.v.get_mut(mapping.us()).map(|v| &mut v[offs..])
+    pub fn get9(&self, addr: usize) -> Option<u8> {
+        self.pager.read(0x600_0000 | (addr.u32() & 0xFF_FFFF))
     }
 
     fn is_mst(&self, ctrl: usize, mst: u8) -> bool {
@@ -185,7 +190,7 @@ impl Default for Vram {
                 Box::new([0; 32 * KB]),
                 Box::new([0; 16 * KB]),
             ],
-            arm9_map: Box::new([(0, EMPTY as u8); 1024]),
+            pager: ThinPager::default(),
         }
     }
 }

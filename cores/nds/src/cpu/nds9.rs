@@ -13,14 +13,17 @@ use arm_cpu::{
 };
 use common::{
     common::debugger::Debugger,
-    components::memory_mapper::{MemoryMappedSystem, MemoryMapper},
+    components::{
+        memory_mapper::{MemoryMappedSystem, MemoryMapper},
+        thin_pager::RW,
+    },
     numutil::NumExt,
     Time,
 };
 
 use crate::{
     addr::{IE_H, IE_L, IF_H, IF_L, IME},
-    Nds7, Nds9, NdsCpu,
+    Nds, Nds7, Nds9, NdsCpu,
 };
 
 impl ArmSystem for Nds9 {
@@ -119,7 +122,15 @@ impl ArmSystem for Nds9 {
             (7, 0, 4) => self.cpu9.halt_on_irq(),
             // TODO Cache control stuff?
             (9, 0, 0 | 1) => self.cp15.cache_lockdown[cp.us()] = rd,
-            (9, 1, 0 | 1) => self.cp15.tcm_control[cp.us()] = rd.into(),
+            (9, 1, 0) => self.cp15.tcm_control[0] = rd.into(),
+            (9, 1, 1) => {
+                let dsx: &mut Nds = &mut *self;
+                dsx.memory.pager9.evict(dsx.cp15.dtcm_range());
+                dsx.cp15.tcm_control[0] = rd.into();
+                dsx.memory
+                    .pager9
+                    .map(&dsx.memory.data_tcm, dsx.cp15.dtcm_range(), RW);
+            }
 
             (13, 0 | 1, 1) => self.cp15.trace_process_id = rd,
 
