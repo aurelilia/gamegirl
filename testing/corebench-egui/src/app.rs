@@ -76,12 +76,11 @@ impl App {
             let elapsed = time.elapsed().as_micros() as f64;
             core.bench.add(now, elapsed / 1000.0);
 
-            let frame = core
-                .c
-                .c_mut()
-                .video_buffer
-                .pop_recent()
-                .map(|p| unsafe { mem::transmute(p) });
+            let frame = core.c.c_mut().video_buffer.pop_recent().map(|p| {
+                p.into_iter()
+                    .map(|c| Color32::from_rgb(c[0], c[1], c[2]))
+                    .collect::<Vec<_>>()
+            });
             if let Some(pixels) = frame {
                 let img = ImageDelta::full(
                     ImageData::Color(ColorImage { size, pixels }.into()),

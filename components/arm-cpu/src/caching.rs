@@ -94,7 +94,7 @@ impl<S: ArmSystem> Cache<S> {
             return;
         }
         let len = self.rom.len();
-        unsafe { self.rom.set_len(0) };
+        self.rom.clear();
         self.rom.resize(len, None);
         log::trace!("ROM cache invalidated: WAITCNT changed.");
     }
