@@ -240,23 +240,27 @@ impl ByteArrayExt for [u8] {
         }
     }
 
+    #[inline(always)]
     fn set_exact<T>(&self, addr: usize, value: T) {
         unsafe { inner_exact::<T>(self, addr).write(value) }
     }
 
+    #[inline(always)]
     fn set_wrap<T>(&self, addr: usize, value: T) {
         unsafe { inner_wrap::<T>(self, addr).write(value) }
     }
 }
 
+#[inline(always)]
 fn inner_exact<T>(arr: &[u8], addr: usize) -> *mut T {
     assert!((addr + (mem::size_of::<T>() - 1)) < arr.len());
-    unsafe { arr.as_ptr().add(addr) as *const T as *mut T }
+    unsafe { arr.as_ptr().byte_add(addr) as *const T as *mut T }
 }
+#[inline(always)]
 fn inner_wrap<T>(arr: &[u8], addr: usize) -> *mut T {
     debug_assert!(arr.len().is_power_of_two());
     let mask = arr.len() - 1;
-    unsafe { arr.as_ptr().add(addr & mask) as *const T as *mut T }
+    unsafe { arr.as_ptr().byte_add(addr & mask) as *const T as *mut T }
 }
 
 pub fn set_u64(dword: u64, idx: u32, hword: u16) -> u64 {

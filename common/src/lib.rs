@@ -8,12 +8,13 @@
 
 #![feature(btree_cursors)]
 
-use std::{any::Any, cmp::Ordering, sync::Arc};
+use std::{any::Any, cell::UnsafeCell, cmp::Ordering, sync::Arc};
 
 use common::debugger::Width;
 pub use common::Common;
 pub use components::scheduler::{Time, TimeS};
 use components::storage::GameSave;
+use serde::Deserialize;
 
 pub mod common;
 pub mod components;
@@ -135,15 +136,12 @@ pub trait Core: Send + Sync {
 }
 
 /// Unsafe, mutable Arc.
-/// Terrible idea, but sometimes...
 #[repr(transparent)]
-#[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct UnsafeArc<T>(Arc<T>);
+pub struct UnsafeArc<T>(Arc<UnsafeCell<T>>);
 
 impl<T> UnsafeArc<T> {
     pub fn new(t: T) -> UnsafeArc<T> {
-        UnsafeArc(Arc::new(t))
+        UnsafeArc(Arc::new(UnsafeCell::new(t)))
     }
 }
 
@@ -151,14 +149,13 @@ impl<T> std::ops::Deref for UnsafeArc<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &(*self.0)
+        unsafe { &(*self.0.get()) }
     }
 }
 
 impl<T> std::ops::DerefMut for UnsafeArc<T> {
-    #[allow(invalid_reference_casting)] // aaaa.
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *(self.0.as_ref() as *const _ as *mut T) }
+        unsafe { &mut (*self.0.get()) }
     }
 }
 
@@ -176,3 +173,28 @@ where
         UnsafeArc::new(Default::default())
     }
 }
+
+#[cfg(feature = "serde")]
+mod imp {
+    impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for super::UnsafeArc<T> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(Self::new(T::deserialize(deserializer)?))
+        }
+    }
+
+    impl<T: serde::Serialize> serde::Serialize for super::UnsafeArc<T> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let s: &T = &(*self);
+            s.serialize(serializer)
+        }
+    }
+}
+
+unsafe impl<T: Send> Send for UnsafeArc<T> {}
+unsafe impl<T: Sync> Sync for UnsafeArc<T> {}

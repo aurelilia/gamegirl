@@ -574,7 +574,7 @@ impl GameGirlAdv {
         pager.map(&self.memory.ewram, 0x200_0000..0x300_0000, RW);
         pager.map(&self.memory.iwram, 0x300_0000..0x400_0000, RW);
         // PAL, OAM, Writes and VRAM mirroring are in the slow path
-        pager.map(&self.ppu.vram, 0x600_0000..0x601_8000, RO);
+        pager.map(&self.ppu.vram, 0x600_0000..0x601_8000, RW);
         // Cap at end due to EEPROM
         let rom_len = self.cart.rom.len().u32();
         pager.map(&self.cart.rom, 0x800_0000..(0x800_0000 + rom_len), RO);
