@@ -11,3 +11,4 @@
 pub mod memory_mapper;
 pub mod scheduler;
 pub mod storage;
+pub mod thin_pager;

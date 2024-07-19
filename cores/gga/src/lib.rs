@@ -200,7 +200,7 @@ impl GameGirlAdv {
         };
 
         // Paging implementation requires this to prevent reading unallocated memory
-        let until_full_page = 0x7FFF - (cart.len() & 0x7FFF);
+        let until_full_page = 0x4000 - (cart.len() & 0x3FFF);
         cart.extend(iter::repeat(0).take(until_full_page));
 
         let mut gga = Box::<GameGirlAdv>::default();

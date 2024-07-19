@@ -93,7 +93,6 @@ impl Debugger {
     /// Log a diagnostic event that occured, if the corresponding level
     /// is enabled.
     pub fn log(&self, evt_type: &str, event: String, severity: Severity) {
-        log::error!("{evt_type}: {event} ({severity:?})");
         if severity >= self.diagnostic_level {
             self.diagnostic_events
                 .lock()

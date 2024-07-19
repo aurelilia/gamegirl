@@ -16,6 +16,7 @@ use arm_cpu::{
 };
 use common::{
     common::debugger::Severity,
+    components::thin_pager::{ThinPager, RO, RW},
     numutil::{hword, word, ByteArrayExt, NumExt, U16Ext, U32Ext},
 };
 use modular_bitfield::{bitfield, specifiers::*};
@@ -77,6 +78,7 @@ pub struct Memory {
     pub(crate) bios_value: u32,
 
     pub(crate) prefetch: Prefetch,
+    pager: ThinPager,
     wait_word: [u16; 32],
     wait_other: [u16; 32],
 }
@@ -84,13 +86,18 @@ pub struct Memory {
 impl GameGirlAdv {
     pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
+        if addr > 0xFFF_FFFF {
+            return T::from_u32(self.invalid_read::<false>(addr));
+        }
+        if let Some(read) = self.memory.pager.read(addr) {
+            return read;
+        }
+
         let region = addr >> 24;
         let a = addr.us();
         match region {
             // Basic
             0x00 => self.bios_read(a),
-            0x02 => self.memory.ewram.get_wrap(a),
-            0x03 => self.memory.iwram.get_wrap(a),
             0x05 => self.ppu.palette.get_wrap(a),
             0x07 => self.ppu.oam.get_wrap(a),
 
@@ -129,9 +136,7 @@ impl GameGirlAdv {
                 }
             }
 
-            // Cart
-            0x08..=0x0D if let Some(v) = self.cart.rom.try_get_exact(a & 0x1FF_FFFF) => v,
-            // 1MB carts are special and wrap
+            // Cart: 1MB carts are special and wrap
             0x08..0x0D if self.cart.rom.len() == (2 << 19) => {
                 self.cart.rom.get_wrap(a & 0x1FF_FFFF)
             }
@@ -141,29 +146,14 @@ impl GameGirlAdv {
         }
     }
 
-    pub fn get_any<T>(&self, addr_unaligned: u32) -> Option<T> {
+    pub fn get_fastmem<T: Copy>(&self, addr_unaligned: u32) -> Option<T> {
         let addr = addr_unaligned & !(mem::size_of::<T>().u32() - 1);
-        let region = addr >> 24;
-        let a = addr.us();
-        Some(match region {
-            0x02 => self.memory.ewram.get_wrap(a),
-            0x03 => self.memory.iwram.get_wrap(a),
-            0x05 => self.ppu.palette.get_wrap(a),
-            0x07 => self.ppu.oam.get_wrap(a),
-            _ => return None,
-        })
+        self.memory.pager.read(addr)
     }
 
-    pub fn get_raw_ram(&self, addr: u32) -> Option<*mut u8> {
-        let region = addr >> 24;
-        let a = addr.us();
-        unsafe {
-            Some(match region {
-                0x02 => self.memory.ewram.as_ptr().add(a & 0xFF_FFFF) as *mut u8,
-                0x03 => self.memory.iwram.as_ptr().add(a & 0xFF_FFFF) as *mut u8,
-                _ => return None,
-            })
-        }
+    pub fn get_fastmem_raw(&mut self, addr: u32) -> Option<*mut u8> {
+        let ptr = self.memory.pager.get_raw(addr).ptr;
+        (!ptr.is_null()).then_some(ptr)
     }
 
     fn get_mmio(&self, addr: u32) -> u16 {
@@ -302,13 +292,17 @@ impl GameGirlAdv {
 
     pub fn set<T: RwType>(&mut self, addr_unaligned: u32, value: T) {
         let addr = addr_unaligned & !(T::WIDTH - 1);
+        if addr > 0xFFF_FFFF {
+            return;
+        }
+        if let Some(write) = self.memory.pager.write(addr) {
+            *write = value;
+            return;
+        }
+
         let region = addr >> 24;
         let a = addr.us();
         match region {
-            // Basic
-            0x02 => self.memory.ewram.set_wrap(a, value),
-            0x03 => self.memory.iwram.set_wrap(a, value),
-
             // MMIO
             0x04 if T::WIDTH == 1 => self.set_mmio_byte(addr, value.u8()),
             0x04 if T::WIDTH == 2 => self.set_mmio(addr, value.u16()),
@@ -571,6 +565,31 @@ impl GameGirlAdv {
         }
     }
 
+    /// Initialize page tables and wait times.
+    pub fn init_memory(&mut self) {
+        self.update_wait_times();
+
+        let pager = &mut self.memory.pager;
+        pager.init(0xFFF_FFFF);
+        pager.map(&self.memory.ewram, 0x200_0000..0x300_0000, RW);
+        pager.map(&self.memory.iwram, 0x300_0000..0x400_0000, RW);
+        // PAL, OAM, Writes and VRAM mirroring are in the slow path
+        pager.map(&self.ppu.vram, 0x600_0000..0x601_8000, RO);
+        // Cap at end due to EEPROM
+        let rom_len = self.cart.rom.len().u32();
+        pager.map(&self.cart.rom, 0x800_0000..(0x800_0000 + rom_len), RO);
+        pager.map(&self.cart.rom, 0xA00_0000..(0xA00_0000 + rom_len), RO);
+        pager.map(
+            &self.cart.rom,
+            0xC00_0000..(0xC00_0000 + rom_len).min(0x0DFF_B000),
+            RO,
+        );
+
+        if self.c.config.cached_interpreter {
+            self.cpu.cache.init(self.cart.rom.len());
+        }
+    }
+
     /// Get wait time for a given address.
     #[inline]
     pub fn wait_time<T: NumExt + 'static>(&mut self, addr: u32, ty: Access) -> u16 {
@@ -686,14 +705,6 @@ impl GameGirlAdv {
         }
     }
 
-    /// Initialize page tables and wait times.
-    pub fn init_memory(&mut self) {
-        self.update_wait_times();
-        if self.c.config.cached_interpreter {
-            self.cpu.cache.init(self.cart.rom.len());
-        }
-    }
-
     fn update_wait_times(&mut self) {
         for i in 0..16 {
             let addr = i.u32() * 0x100_0000;
@@ -750,6 +761,7 @@ impl Default for Memory {
             waitcnt: 0.into(),
             bios_value: 0xE129_F000,
             prefetch: Prefetch::default(),
+            pager: ThinPager::default(),
             wait_word: [0; 32],
             wait_other: [0; 32],
         }

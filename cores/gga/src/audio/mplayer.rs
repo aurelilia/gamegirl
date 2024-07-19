@@ -112,7 +112,7 @@ impl MusicPlayer {
     }
 
     pub fn sound_main_ram(&mut self, bus: &mut GameGirlAdv, info_addr: u32) {
-        let Some(sound_info): Option<SoundInfo> = bus.get_any(info_addr) else {
+        let Some(sound_info): Option<SoundInfo> = bus.get_fastmem(info_addr) else {
             return;
         };
         if sound_info.magic != 0x68736D54 {
@@ -155,7 +155,8 @@ impl MusicPlayer {
                 }
                 hq_envelope_volume[0] = u8_to_float(channel.envelope_attack);
 
-                let Some(wave_info): Option<WaveInfo> = bus.get_any(channel.wave_address) else {
+                let Some(wave_info): Option<WaveInfo> = bus.get_fastmem(channel.wave_address)
+                else {
                     log::warn!(
                         "Mplayer: Channel {i} had invalid wave address 0x{:08X}",
                         channel.wave_address
@@ -334,7 +335,7 @@ impl MusicPlayer {
                     wave_size = (wave_size + 63) / 64;
                 }
                 let wave_data_begin = channel.wave_address + mem::size_of::<WaveInfo>() as u32;
-                match bus.get_raw_ram(wave_data_begin) {
+                match bus.get_fastmem_raw(wave_data_begin) {
                     Some(s) => sampler.wave_data = s,
                     None => {
                         log::warn!(
@@ -498,7 +499,7 @@ impl MusicPlayer {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(C)]
 struct SoundInfo {
@@ -515,7 +516,7 @@ struct SoundInfo {
 }
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct SoundChannel {
     status: u8,
@@ -572,7 +573,7 @@ impl Default for Sampler {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct WaveInfo {
     type_: u16,
