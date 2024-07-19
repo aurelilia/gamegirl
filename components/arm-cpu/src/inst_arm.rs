@@ -81,6 +81,12 @@ impl<S: ArmSystem> SysWrapper<S> {
 
     pub fn arm_bx(&mut self, inst: ArmInst) {
         let rn = self.reg(inst.reg(0));
+        if S::IS_V5 && inst.0.is_bit(5) {
+            // BLX
+            let lr = self.cpur().pc() - 4;
+            self.cpu().set_lr(lr);
+        }
+
         if rn.is_bit(0) {
             self.cpu().set_flag(Thumb, true);
             self.set_pc(rn - 1);
@@ -177,14 +183,14 @@ impl<S: ArmSystem> SysWrapper<S> {
         let value = match op {
             0b000 => rm.saturating_add(rn),
             0b001 => rm.saturating_sub(rn),
-            0b100 => rm.saturating_add(rn.saturating_mul(2)),
+            0b010 => rm.saturating_add(rn.saturating_mul(2)),
             _ => rm.saturating_sub(rn.saturating_mul(2)),
         };
         let checked = match op {
             0b000 => rm.checked_add(rn),
             0b001 => rm.checked_sub(rn),
-            0b100 => rm.checked_add(rn.saturating_mul(2)),
-            _ => rm.checked_sub(rn.saturating_mul(2)),
+            0b010 => rn.checked_mul(2).and_then(|rn| rm.checked_add(rn)),
+            _ => rn.checked_mul(2).and_then(|rn| rm.checked_sub(rn)),
         };
         if checked.is_none() {
             self.cpu().set_flag(QClamped, true);
@@ -549,20 +555,20 @@ impl<S: ArmSystem> SysWrapper<S> {
     fn armv5_sh_mul<const OP: u16>(&mut self, inst: ArmInst) {
         let rm = self.cpu().reg(inst.reg(0));
         let rs = self.cpu().reg(inst.reg(8));
-        let rn = self.cpu().reg(inst.reg(12)) as i64;
+        let rn = self.cpu().reg(inst.reg(12)) as i32 as i64;
 
         let a = if inst.0.is_bit(5) {
             rm.high()
         } else {
             rm.low()
-        } as i64;
+        } as i16 as i64;
         let b = if inst.0.is_bit(6) {
             rs.high()
         } else {
             rs.low()
-        } as i64;
-        let dhi = self.reg(inst.reg(16)) as i64;
-        let dlo = rn as i64;
+        } as i16 as i64;
+        let dhi = self.reg(inst.reg(16)) as i32 as i64;
+        let dlo = rn;
 
         let out: i64 = match OP {
             0b1000 => {
@@ -574,17 +580,17 @@ impl<S: ArmSystem> SysWrapper<S> {
                 }
                 res
             }
-            0b1001 if !inst.0.is_bit(5) => {
+            0b1001 if inst.0.is_bit(5) => {
                 // SMULW
-                let r = (rm as i64).wrapping_mul(b);
-                r / 0x1_0000
+                let r = (rm as i32 as i64).wrapping_mul(b);
+                r >> 16
             }
             0b1001 => {
                 // SMLAW
-                let r = (rm as i64).wrapping_mul(b);
-                let r = r / 0x1_0000;
-                let res = r.wrapping_add(rn);
-                if TryInto::<i32>::try_into(res).is_err() {
+                let r = (rm as i32 as i64).wrapping_mul(b);
+                let r = r >> 16;
+                let res = r.saturating_add(rn);
+                if (r as i32).checked_add(rn as i32).is_none() {
                     self.cpu().set_flag(Flag::QClamped, true);
                 }
                 res

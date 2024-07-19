@@ -1,6 +1,6 @@
 # GameGirl
-A Gameboy (Color/Advance) emulator and debugger written in Rust, whose GG/GGC core is a rewrite of 
-[gamelin](https://git.elia.garden/ellie/gamelin).  
+A Gameboy (Color/Advance) emulator and debugger written in Rust, whose GG/GGC core is a rewrite of
+[gamelin](https://git.elia.garden/ellie/gamelin).
 NDS support is in the works!
 
 [Try it in your browser!](https://gamegirl.elia.garden)
@@ -16,9 +16,9 @@ NDS support is in the works!
 
 
 ## Status
-The AGB (GameBoy Advance) emulator is in a good and usable state.  
+The AGB (GameBoy Advance) emulator is in a good and usable state.
 Automated testing of most commercial games shows that most of them are playable,
-and work without any major glitches.  
+and work without any major glitches.
 The core is well optimized and ready to be used.
 
 The CGB/DMG (GameBoy [Color]) core is fairly accurate, but still has some bugs
@@ -56,7 +56,7 @@ The NDS core is still very early and unable to boot anything at this time.
 
 ### System emulation
 - [ ] DMG/CGB
-  - [x] Most commercial games running glitch-free 
+  - [x] Most commercial games running glitch-free
   - [ ] Full SM83 CPU
     - [ ] Highly accurate interrupts (Pinball Fantasy)
   - [ ] PPU
@@ -80,7 +80,7 @@ The NDS core is still very early and unable to boot anything at this time.
   - [x] Full ARM7DTMI CPU
   - [x] Open bus behavior
   - [ ] PPU
-    - [ ] Passing precise visual tests 
+    - [ ] Passing precise visual tests
     - [x] Everything else
   - [x] APU
   - [x] DMAs
@@ -185,6 +185,19 @@ if you do not plan on using those cores, simply supply empty files.
 - [x] ladystarbreeze's GBA test collection
 - [x] [FuzzARM](https://github.com/DenSinH/FuzzARM), all 5 precompiled tests
 - [x] ARMWrestler
+
+### NDS
+- [x] ARMWrestler
+- [ ] rockwrestler
+  - [x] ARMv4
+  - [ ] ARMv5
+    - [x] Almost everything
+    - [ ] ldr/ldm/pop State Bit
+    - [ ] LDM/STM
+  - [ ] IPC
+  - [ ] DS Math
+  - [ ] Memory
+
 
 ## Thanks To
 ### General
