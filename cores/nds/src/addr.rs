@@ -81,8 +81,10 @@ pub const SQRT_INPUT: u32 = 0x2B8;
 // IPC FIFO
 pub const IPCSYNC: u32 = 0x180;
 pub const IPCFIFOCNT: u32 = 0x184;
-pub const IPCFIFOSEND: u32 = 0x188;
-pub const IPCFIFORECV: u32 = 0x100_0000;
+pub const IPCFIFOSEND_L: u32 = 0x188;
+pub const IPCFIFOSEND_H: u32 = 0x18A;
+pub const IPCFIFORECV_L: u32 = 0x10_0000;
+pub const IPCFIFORECV_H: u32 = 0x10_0002;
 
 // Input
 pub const KEYINPUT: u32 = 0x130;

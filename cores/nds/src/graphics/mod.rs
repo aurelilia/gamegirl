@@ -16,7 +16,7 @@ use ppu::{registers::DisplayStatus, Ppu, HEIGHT, VBLANK_END};
 use vram::{Vram, VramCtrl};
 
 use crate::{
-    dma::{Dmas, Reason},
+    hw::dma::{Dmas, Reason},
     memory::KB,
     scheduling::{NdsEvent, PpuEvent},
     CpuDevice, Nds, Nds9, NdsCpu,

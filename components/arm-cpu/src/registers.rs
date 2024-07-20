@@ -185,7 +185,7 @@ impl<S: ArmSystem> Cpu<S> {
 
     /// Get a register based on current CPSR. Slower than regular access;
     /// only done on mode change.
-    fn get_cpsr_reg(&self, idx: u32) -> u32 {
+    pub fn get_cpsr_reg(&self, idx: u32) -> u32 {
         match idx {
             8..=12 if self.mode() == Mode::Fiq => self.fiqs[(idx - 8).us()].fiq,
             8..=12 => self.fiqs[(idx - 8).us()].reg,
@@ -232,6 +232,19 @@ impl<S: ArmSystem> SysWrapper<S> {
     /// Set a register. Needs special behavior due to PC.
     pub fn set_reg(&mut self, idx: u32, val: u32) {
         if idx == 15 {
+            self.set_pc(val);
+        } else {
+            self.cpu().registers[idx.us()] = val;
+        }
+    }
+
+    /// Set a register. Needs special behavior due to PC.
+    /// Additionally allows a mode switch when setting PC.
+    pub fn set_reg_allow_switch(&mut self, idx: u32, val: u32) {
+        if idx == 15 {
+            if S::IS_V5 {
+                self.cpu().set_flag(Flag::Thumb, val.is_bit(0));
+            }
             self.set_pc(val);
         } else {
             self.cpu().registers[idx.us()] = val;

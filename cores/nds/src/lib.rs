@@ -24,15 +24,11 @@
 #![feature(if_let_guard)]
 
 mod addr;
-mod audio;
-mod cartridge;
 mod cpu;
-mod dma;
 mod graphics;
-mod input;
+mod hw;
 mod memory;
 mod scheduling;
-mod timer;
 
 use std::{
     mem,
@@ -50,22 +46,18 @@ use common::{
 };
 use cpu::{
     cp15::Cp15,
-    fifo::CpuFifo,
     math::{Div, Sqrt},
 };
-use input::Input;
+use hw::{input::Input, ipc::IpcFifo};
 use memory::WramStatus;
 use scheduling::PpuEvent;
 
 use crate::{
-    audio::Apu,
-    cartridge::Cartridge,
     cpu::NDS9_CLOCK,
-    dma::Dmas,
     graphics::Gpu,
+    hw::{audio::Apu, cartridge::Cartridge, dma::Dmas, timer::Timers},
     memory::Memory,
     scheduling::{ApuEvent, NdsEvent},
-    timer::Timers,
 };
 
 /// Macro for creating a wrapper of the system, specifically with
@@ -119,7 +111,7 @@ pub struct Nds {
     cp15: Cp15,
     div: Div,
     sqrt: Sqrt,
-    fifo: CpuDevice<CpuFifo>,
+    fifo: IpcFifo,
 
     gpu: Gpu,
     apu: Apu,
@@ -218,7 +210,7 @@ impl Core for Nds {
 
 impl Nds {
     #[inline]
-    fn nds7(&mut self) -> Nds7 {
+    pub fn nds7(&mut self) -> Nds7 {
         Nds7(self as *mut Nds)
     }
 
@@ -227,8 +219,8 @@ impl Nds {
         Nds9(self as *mut Nds)
     }
 
-    pub fn get_inst9_mnemonic(&mut self, ptr: u32) -> String {
-        Cpu::<Nds9>::get_inst(&mut self.nds9(), ptr)
+    pub fn get_inst_mnemonic<DS: NdsCpu>(ds: &mut DS, ptr: u32) -> String {
+        Cpu::<DS>::get_inst(ds, ptr)
     }
 
     /// Restore state after a savestate load. `old_self` should be the
@@ -262,7 +254,7 @@ impl Default for Nds {
             cp15: Cp15::default(),
             div: Div::default(),
             sqrt: Sqrt::default(),
-            fifo: [CpuFifo::default(), CpuFifo::default()],
+            fifo: IpcFifo::default(),
             gpu: Gpu::default(),
             apu: Apu::default(),
             input: Input::default(),
@@ -281,7 +273,7 @@ impl Default for Nds {
         // Initialize scheduler
         nds.scheduler.schedule(
             NdsEvent::ApuEvent(ApuEvent::PushSample),
-            audio::SAMPLE_EVERY_N_CLOCKS,
+            hw::audio::SAMPLE_EVERY_N_CLOCKS,
         );
         nds.scheduler
             .schedule(NdsEvent::PpuEvent(PpuEvent::HblankStart), 3072);

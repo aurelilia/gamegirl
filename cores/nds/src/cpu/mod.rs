@@ -14,7 +14,6 @@
 //! being dragged along.
 
 pub mod cp15;
-pub mod fifo;
 pub mod math;
 mod nds7;
 mod nds9;

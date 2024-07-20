@@ -290,13 +290,13 @@ impl<S: ArmSystem> SysWrapper<S> {
         let n = inst.reg(16);
         let regs = inst.0 & 0xFFFF;
 
+        // TODO meh, this entire implementation is not great
+        let mut addr = self.reg(n);
         let cpsr = self.cpu().cpsr;
         if user {
             self.cpu().set_mode(Mode::System);
         }
 
-        // TODO mehhh, this entire implementation is terrible
-        let mut addr = self.reg(n);
         let initial_addr = addr;
         let regs = (0..=15).filter(|b| regs.is_bit(*b)).collect::<Vec<u16>>();
         let first_reg = *regs.first().unwrap_or(&12323);
@@ -313,13 +313,13 @@ impl<S: ArmSystem> SysWrapper<S> {
             if pre {
                 addr = addr.wrapping_add(4);
             }
-            if !ldr && reg == n.u16() && reg != first_reg {
+            if !ldr && reg == n.u16() && (!S::IS_V5 && reg != first_reg) {
                 self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
             }
 
             if ldr {
                 let val = self.read::<u32>(addr, kind);
-                self.set_reg(reg.u32(), val);
+                self.set_reg_allow_switch(reg.u32(), val);
             } else {
                 let val = self.cpur().reg_pc4(reg.u32());
                 self.write::<u32>(addr, val, kind);
@@ -331,14 +331,15 @@ impl<S: ArmSystem> SysWrapper<S> {
             }
         }
 
+        if user {
+            self.cpu().set_cpsr(cpsr);
+        }
+
         let ldr_writeback = S::IS_V5 && (regs.len() == 1 || *regs.last().unwrap_or(&16) != n.u16());
         if writeback && (!ldr || !set_n || ldr_writeback) {
             self.set_reg(n, Self::mod_with_offs(initial_addr, end_offs, up));
         }
 
-        if user {
-            self.cpu().set_cpsr(cpsr);
-        }
         if kind == NONSEQ {
             self.on_empty_rlist(n, !ldr, up, pre);
         }
@@ -666,11 +667,11 @@ impl<S: ArmSystem> SysWrapper<S> {
             }
             (false, 4) if ALIGN => {
                 let val = self.read::<u32>(addr, NONSEQ);
-                self.set_reg(d, val);
+                self.set_reg_allow_switch(d, val);
             }
             (false, 4) => {
                 let val = self.read_word_ldrswp(addr, NONSEQ);
-                self.set_reg(d, val);
+                self.set_reg_allow_switch(d, val);
             }
             (false, 2) if ALIGN => {
                 let val = self.read::<u16>(addr, NONSEQ);

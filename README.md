@@ -190,11 +190,11 @@ if you do not plan on using those cores, simply supply empty files.
 - [x] ARMWrestler
 - [ ] rockwrestler
   - [x] ARMv4
-  - [ ] ARMv5
-    - [x] Almost everything
-    - [ ] ldr/ldm/pop State Bit
-    - [ ] LDM/STM
+  - [x] ARMv5
   - [ ] IPC
+    - [ ] IPC Sync: Blank screen
+    - [x] IPC FIFO
+    - [ ] IPC FIFO IRQ: Blank screen
   - [ ] DS Math
   - [ ] Memory
 

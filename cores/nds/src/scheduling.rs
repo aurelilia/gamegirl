@@ -9,7 +9,12 @@
 use common::{components::scheduler::Kind, TimeS};
 use NdsEvent::*;
 
-use crate::{audio::Apu, cpu::NDS9_CLOCK, graphics::Gpu, timer::Timers, Nds};
+use crate::{
+    cpu::NDS9_CLOCK,
+    graphics::Gpu,
+    hw::{audio::Apu, timer::Timers},
+    Nds,
+};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]

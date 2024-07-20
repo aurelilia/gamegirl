@@ -8,7 +8,7 @@
 
 use std::{mem, ptr};
 
-use arm_cpu::{interface::RwType, Cpu};
+use arm_cpu::{interface::RwType, Cpu, Interrupt};
 use common::{
     common::debugger::Severity,
     components::{
@@ -19,7 +19,12 @@ use common::{
 };
 
 use super::{Nds7, Nds9};
-use crate::{addr::*, dma::Dmas, graphics::vram::*, timer::Timers, CpuDevice, Nds, NdsCpu};
+use crate::{
+    addr::*,
+    graphics::vram::*,
+    hw::{dma::Dmas, timer::Timers},
+    CpuDevice, Nds, NdsCpu,
+};
 
 pub const KB: usize = 1024;
 pub const MB: usize = KB * KB;
@@ -112,15 +117,30 @@ impl Nds {
     }
 
     #[allow(invalid_reference_casting)]
-    pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &DS, addr: u32) -> u16 {
-        // TODO Timer and DMA reads...
-        match addr & 0xFFFF {
+    pub fn try_get_mmio_shared<DS: NdsCpu>(ds: &mut DS, addr: u32) -> u16 {
+        match addr & 0xFF_FFFF {
             // Interrupt control
             IME => ds.cpur().ime as u16,
             IE_L => ds.cpur().ie.low(),
             IE_H => ds.cpur().ie.high(),
             IF_L => ds.cpur().if_.low(),
             IF_H => ds.cpur().if_.high(),
+
+            // FIFO
+            IPCSYNC => ds.fifo.sync_read(DS::I),
+            IPCFIFOCNT => ds.fifo.cnt_read(DS::I),
+            IPCFIFORECV_L => ds.fifo.receive(DS::I).low(),
+            IPCFIFORECV_H => ds.fifo.receive(DS::I).high(),
+
+            // Timers
+            TM0CNT_L => ds.timers[DS::I].time_read(0, ds.scheduler.now()),
+            TM1CNT_L => ds.timers[DS::I].time_read(1, ds.scheduler.now()),
+            TM2CNT_L => ds.timers[DS::I].time_read(2, ds.scheduler.now()),
+            TM3CNT_L => ds.timers[DS::I].time_read(3, ds.scheduler.now()),
+            TM0CNT_H => ds.timers[DS::I].control[0].into(),
+            TM1CNT_H => ds.timers[DS::I].control[1].into(),
+            TM2CNT_H => ds.timers[DS::I].control[2].into(),
+            TM3CNT_H => ds.timers[DS::I].control[3].into(),
 
             // GPU
             DISPSTAT => ds.gpu.dispstat[DS::I].into(),
@@ -130,6 +150,13 @@ impl Nds {
             KEYCNT => ds.input.cnt[DS::I].into(),
             KEYINPUT => ds.keyinput(),
 
+            // DMA
+            0xBA => Into::<u16>::into(ds.dmas[DS::I].channels[0].ctrl),
+            0xC6 => Into::<u16>::into(ds.dmas[DS::I].channels[1].ctrl),
+            0xD2 => Into::<u16>::into(ds.dmas[DS::I].channels[2].ctrl),
+            0xDE => Into::<u16>::into(ds.dmas[DS::I].channels[3].ctrl),
+
+            // Timers
             _ => {
                 ds.c.debugger.log(
                     "unknown-io-read",
@@ -143,7 +170,7 @@ impl Nds {
 
     pub fn try_set_mmio_shared<DS: NdsCpu>(dsx: &mut DS, addr: u32, value: u16) {
         let ds = dsx.deref_mut();
-        match addr & 0xFFFF {
+        match addr & 0xFF_FFFF {
             // Interrupts
             IME => {
                 dsx.cpu().ime = value.is_bit(0);
@@ -159,6 +186,17 @@ impl Nds {
             }
             IF_L => dsx.cpu().if_ &= (!value).u32() | 0xFFFF_0000,
             IF_H => dsx.cpu().if_ &= ((!value).u32() << 16) | 0x0000_FFFF,
+
+            // FIFO
+            IPCSYNC => {
+                let send_irq = ds.fifo.sync_write(DS::I, value);
+                if send_irq {
+                    ds.send_irq(DS::I ^ 1, Interrupt::IpcSync);
+                }
+            }
+            IPCFIFOCNT => ds.fifo.cnt_write(DS::I, value),
+            IPCFIFOSEND_L => ds.fifo.send_low(DS::I, value),
+            IPCFIFOSEND_H => ds.fifo.send_high(DS::I, value),
 
             // Timers
             TM0CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 0, value),
@@ -188,10 +226,24 @@ impl Nds {
             ),
         }
     }
+
+    fn advance_fifo(&mut self, cpu: usize) {
+        if let Some(intr) = self.fifo.advance(cpu) {
+            self.send_irq(cpu ^ 1, intr);
+        }
+    }
+
+    pub fn send_irq(&mut self, cpu: usize, irq: Interrupt) {
+        if cpu == 0 {
+            Cpu::request_interrupt(&mut self.nds7(), irq);
+        } else {
+            Cpu::request_interrupt(&mut self.nds9(), irq);
+        }
+    }
 }
 
 impl Nds7 {
-    pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
+    pub fn get<T: RwType>(&mut self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
         if addr > 0xFFF_FFFF {
             return T::from_u32(0);
@@ -202,15 +254,19 @@ impl Nds7 {
 
         let region = addr >> 24;
         let a = addr.us();
-        match addr {
+        match region {
             // MMIO
-            0x04 => match T::WIDTH {
-                1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
-                1 => T::from_u8(self.get_mmio(addr).low()),
-                2 => T::from_u16(self.get_mmio(addr)),
-                4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
-                _ => unreachable!(),
-            },
+            0x04 => {
+                let v = match T::WIDTH {
+                    1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
+                    1 => T::from_u8(self.get_mmio(addr).low()),
+                    2 => T::from_u16(self.get_mmio(addr)),
+                    4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
+                    _ => unreachable!(),
+                };
+                self.advance_fifo(Self::I);
+                v
+            }
 
             // VRAM-as-WRAM
             // TODO mapper
@@ -220,7 +276,7 @@ impl Nds7 {
         }
     }
 
-    fn get_mmio(&self, addr: u32) -> u16 {
+    fn get_mmio(&mut self, addr: u32) -> u16 {
         let addr = addr & !1;
         match addr {
             VRAMSTAT => hword(self.gpu.vram.vram_stat(), self.memory.wram_status as u8),
@@ -242,23 +298,32 @@ impl Nds7 {
         let a = addr.us();
         match region {
             // MMIO
-            0x04 => match T::WIDTH {
-                1 if addr.is_bit(0) => {
-                    self.set_mmio(addr, hword(self.get_mmio(addr).low(), value.u8()))
+            0x04 => {
+                match T::WIDTH {
+                    1 if addr.is_bit(0) => {
+                        let l = self.get_mmio(addr).low();
+                        self.set_mmio(addr, hword(l, value.u8()))
+                    }
+                    1 => {
+                        let h = self.get_mmio(addr).high();
+                        self.set_mmio(addr, hword(value.u8(), h));
+                    }
+                    2 => self.set_mmio(addr, value.u16()),
+                    4 => {
+                        self.set_mmio(addr, value.u16());
+                        self.set_mmio(addr + 2, value.u32().high());
+                    }
+                    _ => unreachable!(),
                 }
-                1 => self.set_mmio(addr, hword(value.u8(), self.get_mmio(addr).high())),
-                2 => self.set_mmio(addr, value.u16()),
-                4 => {
-                    self.set_mmio(addr, value.u16());
-                    self.set_mmio(addr + 2, value.u32().high());
-                }
-                _ => unreachable!(),
-            },
+                self.advance_fifo(Self::I);
+            }
 
             // VRAM-as-WRAM
             0x06 if let Some(ram) = self.gpu.vram.get7_mut(a) => ram.set_wrap(a & 0x3_FFFF, value),
 
-            _ => (),
+            _ => {
+                log::error!("Invalid write: {addr:X}");
+            }
         }
     }
 
@@ -269,7 +334,7 @@ impl Nds7 {
 }
 
 impl Nds9 {
-    pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
+    pub fn get<T: RwType>(&mut self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
         if addr > 0xFFF_FFFF {
             return T::from_u32(0);
@@ -290,13 +355,17 @@ impl Nds9 {
             0x07 => self.gpu.ppus[a.bit(12)].oam.get_wrap(a),
 
             // MMIO
-            0x04 => match T::WIDTH {
-                1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
-                1 => T::from_u8(self.get_mmio(addr).low()),
-                2 => T::from_u16(self.get_mmio(addr)),
-                4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
-                _ => unreachable!(),
-            },
+            0x04 => {
+                let v = match T::WIDTH {
+                    1 if addr.is_bit(0) => T::from_u8(self.get_mmio(addr).high()),
+                    1 => T::from_u8(self.get_mmio(addr).low()),
+                    2 => T::from_u16(self.get_mmio(addr)),
+                    4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
+                    _ => unreachable!(),
+                };
+                self.advance_fifo(Self::I);
+                v
+            }
 
             _ => {
                 log::error!("Invalid read: {addr:X}");
@@ -305,8 +374,8 @@ impl Nds9 {
         }
     }
 
-    fn get_mmio(&self, addr: u32) -> u16 {
-        let addr = addr & 0x1FFE;
+    fn get_mmio(&mut self, addr: u32) -> u16 {
+        let addr = addr & 0xFF_FFFE;
         match addr {
             // PPUs
             DISPCNT_L | DISPCNT_H | 0x08..0x60
@@ -367,15 +436,22 @@ impl Nds9 {
             0x07 => self.gpu.ppus[a.bit(12)].oam.set_wrap(a, value),
 
             // MMIO
-            0x04 => match T::WIDTH {
-                1 if addr.is_bit(0) => {
-                    self.set_mmio_hword(addr, hword(self.get_mmio(addr).low(), value.u8()))
+            0x04 => {
+                match T::WIDTH {
+                    1 if addr.is_bit(0) => {
+                        let l = self.get_mmio(addr).low();
+                        self.set_mmio_hword(addr, hword(l, value.u8()))
+                    }
+                    1 => {
+                        let h = self.get_mmio(addr).high();
+                        self.set_mmio_hword(addr, hword(value.u8(), h));
+                    }
+                    2 => self.set_mmio_hword(addr, value.u16()),
+                    4 => self.set_mmio_word(addr, value.u32()),
+                    _ => unreachable!(),
                 }
-                1 => self.set_mmio_hword(addr, hword(value.u8(), self.get_mmio(addr).high())),
-                2 => self.set_mmio_hword(addr, value.u16()),
-                4 => self.set_mmio_word(addr, value.u32()),
-                _ => unreachable!(),
-            },
+                self.advance_fifo(Self::I);
+            }
 
             _ => {
                 log::error!("Invalid write: {addr:X}");
@@ -384,7 +460,7 @@ impl Nds9 {
     }
 
     fn set_mmio_hword(&mut self, addr: u32, value: u16) {
-        let addr = addr & 0x1FFE;
+        let addr = addr & 0xFF_FFFE;
         let dsx: &mut Nds = &mut *self;
         match addr {
             // PPUs
