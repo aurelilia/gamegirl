@@ -228,14 +228,7 @@ impl Nds {
     }
 
     pub fn get_inst9_mnemonic(&mut self, ptr: u32) -> String {
-        let ds = self.nds9();
-        if ds.cpu9.flag(Flag::Thumb) {
-            let inst = ds.get(ptr);
-            Cpu::<Nds9>::get_mnemonic_thumb(inst)
-        } else {
-            let inst = ds.get(ptr);
-            Cpu::<Nds9>::get_mnemonic_arm(inst)
-        }
+        Cpu::<Nds9>::get_inst(&mut self.nds9(), ptr)
     }
 
     /// Restore state after a savestate load. `old_self` should be the

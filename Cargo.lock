@@ -196,6 +196,8 @@ dependencies = [
  "bitmatch",
  "common",
  "log",
+ "num-derive",
+ "num-traits",
  "serde",
 ]
 

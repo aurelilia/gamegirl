@@ -12,9 +12,9 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(trait_alias)]
 
-use std::{cmp::Ordering, iter, mem, path::PathBuf};
+use std::{cmp::Ordering, mem, path::PathBuf};
 
-use arm_cpu::{registers::Flag, Cpu};
+use arm_cpu::Cpu;
 use audio::Apu;
 use cartridge::Cartridge;
 use common::{
@@ -169,14 +169,8 @@ impl GameGirlAdv {
         }
     }
 
-    pub fn get_inst_mnemonic(&self, ptr: u32) -> String {
-        if self.cpu.flag(Flag::Thumb) {
-            let inst = self.get(ptr);
-            Cpu::<Self>::get_mnemonic_thumb(inst)
-        } else {
-            let inst = self.get(ptr);
-            Cpu::<Self>::get_mnemonic_arm(inst)
-        }
+    pub fn get_inst_mnemonic(&mut self, ptr: u32) -> String {
+        Cpu::<Self>::get_inst(self, ptr)
     }
 
     /// Restore state after a savestate load. `old_self` should be the

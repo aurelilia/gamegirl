@@ -14,28 +14,29 @@ mod alu;
 mod caching;
 pub mod inst_arm;
 mod inst_generic;
-pub mod inst_thumb;
 pub mod interface;
 mod lut;
 pub mod registers;
+mod thumb;
 mod waitloop;
 
 use std::sync::Arc;
 
 use access::{CODE, NONSEQ, SEQ};
 use common::{common::debugger::Severity, numutil::NumExt};
+use registers::Flag;
 use waitloop::WaitloopData;
 
 use crate::{
     caching::{Cache, CacheEntry, CachedInst},
     inst_arm::ArmInst,
-    inst_thumb::ThumbInst,
     interface::{ArmSystem, RwType, SysWrapper},
     registers::{
         FiqReg,
         Flag::{FiqDisable, IrqDisable, Thumb},
         Mode, ModeReg,
     },
+    thumb::ThumbInst,
 };
 
 /// Represents the CPU of the console - an ARM7TDMI.
@@ -138,7 +139,7 @@ impl<S: ArmSystem> Cpu<S> {
                     let pc = gg.cpu().inc_pc_by(2);
                     gg.will_execute(pc);
                     gg.add_sn_cycles(inst.sn_cycles);
-                    (inst.handler)(gg, ThumbInst(inst.inst));
+                    (inst.handler)(gg, ThumbInst::of(inst.inst));
                 }
             }
 
@@ -170,7 +171,7 @@ impl<S: ArmSystem> Cpu<S> {
                 let inst = inst.u16();
                 let handler = SysWrapper::<S>::get_handler_thumb(inst);
 
-                handler(gg, ThumbInst(inst));
+                handler(gg, ThumbInst::of(inst));
                 block.push(CachedInst {
                     inst,
                     handler,
@@ -236,7 +237,7 @@ impl<S: ArmSystem> Cpu<S> {
         if gg.debugger().tracing() {
             let cpsr = gg.cpu().cpsr;
             let mnem = if TY::WIDTH == 2 {
-                Self::get_mnemonic_thumb(inst.u16())
+                ThumbInst::of(inst.u16()).to_string()
             } else {
                 Self::get_mnemonic_arm(inst)
             };
@@ -258,6 +259,16 @@ impl<S: ArmSystem> Cpu<S> {
                     format!("{buf}cpsr: {cpsr:08X} | {inst:08X}: {mnem}")
                 });
             }
+        }
+    }
+
+    pub fn get_inst(gg: &mut S, ptr: u32) -> String {
+        if gg.cpur().flag(Flag::Thumb) {
+            let inst = gg.get(ptr);
+            ThumbInst::of(inst).to_string()
+        } else {
+            let inst = gg.get(ptr);
+            Cpu::<S>::get_mnemonic_arm(inst)
         }
     }
 

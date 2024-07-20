@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::fmt::UpperHex;
+use std::fmt::Display;
 
 use common::{common::debugger::Severity, numutil::NumExt};
 
@@ -18,10 +18,10 @@ impl<S: ArmSystem> SysWrapper<S> {
         Cpu::exception_occurred(self, Exception::Swi);
     }
 
-    pub fn und_inst<T: UpperHex>(&mut self, code: T) {
+    pub fn und_inst<T: Display>(&mut self, code: T) {
         self.debugger().log(
             "unknown-opcode",
-            format!("Unknown opcode '{:08X}'", code),
+            format!("Unknown opcode '{code}'"),
             Severity::Error,
         );
         Cpu::exception_occurred(self, Exception::Undefined);
@@ -119,25 +119,25 @@ impl<S: ArmSystem> Cpu<S> {
         let flags = self.cpsr >> 28;
         (COND_MASKS[cond.us()] & (1 << flags)) != 0
     }
+}
 
-    pub fn condition_mnemonic(cond: u16) -> &'static str {
-        match cond {
-            0x0 => "eq",
-            0x1 => "ne",
-            0x2 => "cs",
-            0x3 => "cc",
-            0x4 => "mi",
-            0x5 => "pl",
-            0x6 => "vs",
-            0x7 => "vc",
-            0x8 => "hi",
-            0x9 => "ls",
-            0xA => "ge",
-            0xB => "lt",
-            0xC => "gt",
-            0xD => "le",
-            0xE => "",
-            _ => "nv",
-        }
+pub fn condition_mnemonic(cond: u16) -> &'static str {
+    match cond {
+        0x0 => "eq",
+        0x1 => "ne",
+        0x2 => "cs",
+        0x3 => "cc",
+        0x4 => "mi",
+        0x5 => "pl",
+        0x6 => "vs",
+        0x7 => "vc",
+        0x8 => "hi",
+        0x9 => "ls",
+        0xA => "ge",
+        0xB => "lt",
+        0xC => "gt",
+        0xD => "le",
+        0xE => "",
+        _ => "nv",
     }
 }
