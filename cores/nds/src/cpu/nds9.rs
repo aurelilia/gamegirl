@@ -108,10 +108,11 @@ impl ArmSystem for Nds9 {
     }
 
     fn set_cp15(&mut self, cm: u32, cp: u32, cn: u32, rd: u32) {
+        log::error!("{cn} {cm} {cp}: {rd:X}");
         match (cn, cm, cp) {
             (0, 0, _) => (),
 
-            (1, 0, 0) => self.cp15.control = rd.into(),
+            (1, 0, 0) => self.cp15.control_update(rd),
 
             // PU
             (2, 0, 0 | 1) => self.cp15.cache_bits[cp.us()] = rd.u8(),
@@ -123,14 +124,14 @@ impl ArmSystem for Nds9 {
             (7, 0, 4) => self.cpu9.halt_on_irq(),
             // TODO Cache control stuff?
             (9, 0, 0 | 1) => self.cp15.cache_lockdown[cp.us()] = rd,
-            (9, 1, 0) => self.cp15.tcm_control[0] = rd.into(),
-            (9, 1, 1) => {
+            (9, 1, 0) => {
                 let dsx: &mut Nds = &mut *self;
-                dsx.memory.pager9.evict(dsx.cp15.dtcm_range());
                 dsx.cp15.tcm_control[0] = rd.into();
-                dsx.memory
-                    .pager9
-                    .map(&dsx.memory.data_tcm, dsx.cp15.dtcm_range(), RW);
+                dsx.cp15.dtcm_map_update();
+            }
+            (9, 1, 1) => {
+                self.cp15.tcm_control[1] = rd.into();
+                self.cp15.itcm_map_update();
             }
 
             (13, 0 | 1, 1) => self.cp15.trace_process_id = rd,

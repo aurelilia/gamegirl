@@ -78,6 +78,17 @@ impl Vram {
                 p9.map(&self.v[r], range, RW);
             }
         }
+
+        if r == C || r == D {
+            if old.enable() && old.mst() == 2 && old.ofs() < 2 {
+                let start = 0x600_0000 + (0x2_0000 * old.ofs().u32());
+                p7.evict(start..(start + 0x2_0000));
+            }
+            if new.enable() && new.mst() == 2 && new.ofs() < 2 {
+                let start = 0x600_0000 + (0x2_0000 * new.ofs().u32());
+                p7.map(&self.v[r], start..(start + 0x2_0000), RW);
+            }
+        }
     }
 
     pub fn init_mappings(&mut self, p7: &mut ThinPager, p9: &mut ThinPager) {
@@ -138,40 +149,8 @@ impl Vram {
         start..end
     }
 
-    pub fn get7(&self, addr: usize) -> Option<&[u8]> {
-        let a = addr & 0x3_FFFF;
-        let ofs = (a >= 0x2_000) as u8;
-        for i in C..=D {
-            if self.is_mst_ofs(i, 2, ofs) {
-                return Some(&self.v[i]);
-            }
-        }
-        None
-    }
-
-    pub fn get7_mut(&mut self, addr: usize) -> Option<&mut [u8]> {
-        let a = addr & 0x3_FFFF;
-        let ofs = (a >= 0x2_000) as u8;
-        for i in C..=D {
-            if self.is_mst_ofs(i, 2, ofs) {
-                return Some(&mut self.v[i]);
-            }
-        }
-        None
-    }
-
     pub fn get9(&self, addr: usize) -> Option<u8> {
         self.pager.read(0x600_0000 | (addr.u32() & 0xFF_FFFF))
-    }
-
-    fn is_mst(&self, ctrl: usize, mst: u8) -> bool {
-        let c = self.ctrls[ctrl];
-        c.enable() && c.mst() == mst
-    }
-
-    fn is_mst_ofs(&self, ctrl: usize, mst: u8, ofs: u8) -> bool {
-        let c = self.ctrls[ctrl];
-        c.enable() && c.mst() == mst && c.ofs() == ofs
     }
 }
 

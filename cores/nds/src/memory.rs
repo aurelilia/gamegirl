@@ -21,6 +21,7 @@ use common::{
 use super::{Nds7, Nds9};
 use crate::{
     addr::*,
+    cpu::cp15::TcmState,
     graphics::vram::*,
     hw::{dma::Dmas, timer::Timers},
     CpuDevice, Nds, NdsCpu,
@@ -52,8 +53,7 @@ pub struct Memory {
     pub bios9: Box<[u8]>,
 
     wram7: Box<[u8]>,
-    inst_tcm: Box<[u8]>,
-    pub(crate) data_tcm: Box<[u8]>,
+    pub(crate) tcm: [Box<[u8]>; 2],
 
     wait_word: CpuDevice<[u16; 32]>,
     wait_other: CpuDevice<[u16; 32]>,
@@ -74,9 +74,8 @@ impl Nds {
         // Init 9
         let p9 = &mut self.memory.pager9;
         p9.init(0xFFF_FFFF);
-        p9.map(&self.memory.inst_tcm, 0x000_0000..0x200_0000, RW);
+        p9.map(&self.memory.tcm[1], 0x000_0000..0x200_0000, RW);
         p9.map(&self.memory.psram, 0x200_0000..0x300_0000, RW);
-        p9.map(&self.memory.data_tcm, self.cp15.dtcm_range(), RW);
 
         // Init V/WRAM
         self.gpu.vram.init_mappings(p7, p9);
@@ -111,7 +110,11 @@ impl Nds {
             WramStatus::All9 => {
                 self.memory
                     .pager9
-                    .map(&self.memory.wram, 0x300_0000..0x400_0000, RW)
+                    .map(&self.memory.wram, 0x300_0000..0x400_0000, RW);
+                // When the shared WRAM isn't mapped, the ARM7 WRAM takes over
+                self.memory
+                    .pager7
+                    .map(&self.memory.wram7, 0x300_0000..0x380_0000, RW)
             }
         }
     }
@@ -268,17 +271,13 @@ impl Nds7 {
                 v
             }
 
-            // VRAM-as-WRAM
-            // TODO mapper
-            0x06 if let Some(ram) = self.gpu.vram.get7(a) => ram.get_wrap(a & 0x3_FFFF),
-
             _ => T::from_u8(0),
         }
     }
 
     fn get_mmio(&mut self, addr: u32) -> u16 {
         let addr = addr & !1;
-        match addr {
+        match addr & 0xFF_FFFF {
             VRAMSTAT => hword(self.gpu.vram.vram_stat(), self.memory.wram_status as u8),
             EXTKEYIN => self.keyinput_ext(),
             _ => Nds::try_get_mmio_shared(self, addr),
@@ -318,9 +317,6 @@ impl Nds7 {
                 self.advance_fifo(Self::I);
             }
 
-            // VRAM-as-WRAM
-            0x06 if let Some(ram) = self.gpu.vram.get7_mut(a) => ram.set_wrap(a & 0x3_FFFF, value),
-
             _ => {
                 log::error!("Invalid write: {addr:X}");
             }
@@ -337,6 +333,15 @@ impl Nds9 {
     pub fn get<T: RwType>(&mut self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
         if addr <= 0xFFF_FFFF {
+            for tcm in 0..2 {
+                if self.cp15.tcm_state[tcm] == TcmState::Rw
+                    && self.cp15.tcm_range[tcm].contains(&addr)
+                {
+                    return self.memory.tcm[tcm]
+                        .get_wrap(addr.us() - self.cp15.tcm_range[tcm].start.us());
+                }
+            }
+
             if let Some(read) = self.memory.pager9.read(addr) {
                 return read;
             }
@@ -418,6 +423,14 @@ impl Nds9 {
     }
 
     pub fn set<T: RwType>(&mut self, addr: u32, value: T) {
+        for tcm in 0..2 {
+            if self.cp15.tcm_state[tcm] != TcmState::None
+                && self.cp15.tcm_range[tcm].contains(&addr)
+            {
+                return self.memory.tcm[tcm]
+                    .set_wrap(addr.us() - self.cp15.tcm_range[tcm].start.us(), value);
+            }
+        }
         if addr > 0xFFF_FFFF {
             return;
         }
@@ -579,8 +592,7 @@ impl Default for Memory {
             bios9: Box::new([]),
 
             wram7: Box::new([0; 64 * KB]),
-            inst_tcm: Box::new([0; 32 * KB]),
-            data_tcm: Box::new([0; 16 * KB]),
+            tcm: [Box::new([0; 16 * KB]), Box::new([0; 32 * KB])],
 
             wait_word: [[0; 32]; 2],
             wait_other: [[0; 32]; 2],

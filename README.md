@@ -193,7 +193,7 @@ if you do not plan on using those cores, simply supply empty files.
   - [x] ARMv5
   - [x] IPC
   - [ ] DS Math
-  - [ ] Memory
+  - [x] Memory
 
 
 ## Thanks To
