@@ -6,11 +6,14 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use common::numutil::{hword, NumExt};
+use common::{
+    numutil::{hword, NumExt},
+    Colour,
+};
 
 use super::{
     super::{OverflowMode, PaletteMode, Point},
-    PpuRender, WIDTH,
+    xy2dw, PpuRender, WIDTH,
 };
 use crate::graphics::ppu::{
     render::{pixels::affine_transform_point, xy2d},
@@ -155,24 +158,27 @@ impl PpuRender {
     }
 
     pub(super) fn render_bg_ext(&mut self, bg: u16) {
-        // TODO
+        // TODO Text+Affine
         if !self.r.bg_enabled(bg) {
             return;
         }
 
         let cnt = self.r.bg_cnt[bg.us()];
+        let pi = bg.us() - 2;
         let bit7 = cnt.palette_mode() as usize == 1;
         let bit2 = cnt.character_base_block() & 1 == 1;
+        let screen_block_base = cnt.screen_base_block().us() * 0x4000;
 
-        if bit2 && bit7 {
-            let idx = bg.us() - 2;
-            let wrap = self.r.bg_cnt[bg.us()].overflow_mode() == OverflowMode::Wraparound;
+        let mut bitmap_mode = |map: fn(&mut PpuRender, usize, usize) -> Colour| {
+            let wrap = cnt.overflow_mode() == OverflowMode::Wraparound;
+            let (width, height) =
+                [(128, 128), (256, 256), (512, 256), (512, 512)][cnt.screen_size().us()];
             for x in 0..WIDTH {
                 let mut point = affine_transform_point(
-                    self.r.bg_scale[idx].latched,
+                    self.r.bg_scale[pi].latched,
                     x as i32,
-                    self.r.bg_scale[idx].pa as i32,
-                    self.r.bg_scale[idx].pc as i32,
+                    self.r.bg_scale[pi].pa as i32,
+                    self.r.bg_scale[pi].pc as i32,
                 );
 
                 if !point.inbounds(WIDTH, HEIGHT) {
@@ -184,16 +190,29 @@ impl PpuRender {
                     }
                 }
 
-                let pixel = xy2d(point.0 as usize, point.1 as usize);
-                let color = hword(self.bg_vram(pixel << 1), self.bg_vram((pixel << 1) + 1));
-                let color = [
+                let pixel = xy2dw(point.0 as usize, point.1 as usize, width);
+                let color = map(self, screen_block_base, pixel);
+                self.bg_layers[bg.us()][x] = color;
+            }
+        };
+
+        if bit2 && bit7 {
+            bitmap_mode(|m, base, pixel| {
+                let vram_addr = base + (pixel << 1);
+                let color = hword(m.bg_vram(vram_addr), m.bg_vram(vram_addr + 1));
+                [
                     color.bits(0, 5).u8(),
                     color.bits(5, 5).u8(),
                     color.bits(10, 5).u8(),
                     255,
-                ];
-                self.bg_layers[bg.us()][x] = color;
-            }
+                ]
+            })
+        } else if bit7 {
+            bitmap_mode(|m, base, pixel| {
+                let vram_addr = base + pixel;
+                let palette = m.bg_vram(vram_addr);
+                m.idx_to_palette::<false>(palette)
+            })
         }
     }
 }

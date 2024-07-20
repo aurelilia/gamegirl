@@ -150,7 +150,7 @@ impl Vram {
     }
 
     pub fn get9(&self, addr: usize) -> Option<u8> {
-        self.pager.read(0x600_0000 | (addr.u32() & 0xFF_FFFF))
+        self.pager.read(0x600_0000 + addr.u32())
     }
 }
 
