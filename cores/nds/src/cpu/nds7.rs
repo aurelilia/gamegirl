@@ -26,6 +26,7 @@ use crate::{
 impl ArmSystem for Nds7 {
     const IS_V5: bool = false;
     const IF_ADDR: u32 = IF_L;
+    const EXCEPTION_VECTOR_BASE: u32 = 0;
 
     fn cpur(&self) -> &Cpu<Self> {
         &self.cpu7

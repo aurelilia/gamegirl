@@ -26,6 +26,8 @@ pub trait ArmSystem: Sized + 'static {
     const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumb_lut();
     /// Address of the lowest byte of IF; used when raising interrupts
     const IF_ADDR: u32;
+    /// Starting address of exception vectors.
+    const EXCEPTION_VECTOR_BASE: u32;
 
     /// Get the CPU.
     fn cpur(&self) -> &Cpu<Self>;

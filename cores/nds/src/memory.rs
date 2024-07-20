@@ -336,11 +336,10 @@ impl Nds7 {
 impl Nds9 {
     pub fn get<T: RwType>(&mut self, addr_unaligned: u32) -> T {
         let addr = addr_unaligned & !(T::WIDTH - 1);
-        if addr > 0xFFF_FFFF {
-            return T::from_u32(0);
-        }
-        if let Some(read) = self.memory.pager9.read(addr) {
-            return read;
+        if addr <= 0xFFF_FFFF {
+            if let Some(read) = self.memory.pager9.read(addr) {
+                return read;
+            }
         }
 
         let region = addr >> 24;

@@ -29,6 +29,7 @@ use crate::{
 impl ArmSystem for Nds9 {
     const IS_V5: bool = true;
     const IF_ADDR: u32 = IF_L;
+    const EXCEPTION_VECTOR_BASE: u32 = 0xFFFF_0000;
 
     fn cpur(&self) -> &Cpu<Self> {
         &self.cpu9

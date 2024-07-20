@@ -55,7 +55,7 @@ impl<S: ArmSystem> Cpu<S> {
         let lr = gg.cpur().pc() - gg.cpur().inst_size();
         gg.cpu().set_lr(lr);
         gg.cpu().set_spsr(cpsr);
-        gg.set_pc(kind.vector());
+        gg.set_pc(S::EXCEPTION_VECTOR_BASE + kind.vector());
     }
 
     /// Request an interrupt. Will check if the CPU will service it right away.

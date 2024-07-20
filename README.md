@@ -191,10 +191,7 @@ if you do not plan on using those cores, simply supply empty files.
 - [ ] rockwrestler
   - [x] ARMv4
   - [x] ARMv5
-  - [ ] IPC
-    - [ ] IPC Sync: Blank screen
-    - [x] IPC FIFO
-    - [ ] IPC FIFO IRQ: Blank screen
+  - [x] IPC
   - [ ] DS Math
   - [ ] Memory
 

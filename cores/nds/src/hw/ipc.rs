@@ -125,13 +125,11 @@ impl IpcFifo {
 
     pub fn receive(&mut self, cpu: usize) -> u32 {
         self.state = IpcFifoState::Popped;
-        let result = self.cpu[cpu]
+        self.cpu[cpu]
             .fifo
             .front()
             .copied()
-            .unwrap_or(self.cpu[cpu].last);
-        log::error!("CPU{cpu} read FIFO and got {result:X}");
-        result
+            .unwrap_or(self.cpu[cpu].last)
     }
 
     pub fn send_low(&mut self, cpu: usize, v: u16) {

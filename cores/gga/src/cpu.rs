@@ -19,6 +19,7 @@ pub const CPU_CLOCK: f32 = 2u32.pow(24) as f32;
 impl ArmSystem for GameGirlAdv {
     const IS_V5: bool = false;
     const IF_ADDR: u32 = addr::IF;
+    const EXCEPTION_VECTOR_BASE: u32 = 0;
 
     fn cpur(&self) -> &Cpu<Self> {
         &self.cpu
