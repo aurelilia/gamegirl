@@ -15,8 +15,8 @@ use num_traits::FromPrimitive;
 
 use super::ThumbLut;
 use crate::{
-    inst_generic,
     interface::{ArmSystem, SysWrapper},
+    misc,
 };
 
 #[derive(Copy, Clone)]
@@ -298,7 +298,7 @@ impl Display for ThumbInst {
             "1101_ccccnnnnnnnn" => write!(
                 f,
                 "b{} 0x{:X}",
-                inst_generic::condition_mnemonic(c).to_ascii_lowercase(),
+                misc::condition_mnemonic(c).to_ascii_lowercase(),
                 ((n as i8 as i16) * 2) + 2
             ),
             "11100_nnnnnnnnnnn" => write!(f, "b 0x{:X}", (n.i10() << 1) + 2),

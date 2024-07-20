@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use common::numutil::NumExt;
 
-use crate::{inst_arm::ArmHandler, interface::ArmSystem, thumb::ThumbHandler};
+use crate::{arm::ArmHandler, interface::ArmSystem, thumb::ThumbHandler};
 
 /// Size of pages in IWRAM, since it might need clearing
 const IWRAM_PAGE_SIZE: u32 = 128;

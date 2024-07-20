@@ -14,7 +14,7 @@ use std::{
 use common::{common::debugger::Debugger, numutil::NumExt};
 
 use super::Exception;
-use crate::{inst_arm::ArmLut, thumb::ThumbLut, Access, Cpu};
+use crate::{arm::ArmLut, thumb::ThumbLut, Access, Cpu};
 
 /// Trait for a system that contains this CPU.
 pub trait ArmSystem: Sized + 'static {

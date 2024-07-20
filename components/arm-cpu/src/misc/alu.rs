@@ -8,7 +8,7 @@
 
 use common::numutil::NumExt;
 
-use super::interface::ArmSystem;
+use super::super::interface::ArmSystem;
 use crate::{registers::Flag, Cpu};
 
 impl<S: ArmSystem> Cpu<S> {

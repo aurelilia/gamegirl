@@ -8,13 +8,15 @@
 
 //! Handlers for ARM instructions.
 
+mod lut;
+
 use bitmatch::bitmatch;
 use common::numutil::{NumExt, U32Ext};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{
     access::*,
-    inst_generic,
+    misc,
     registers::{
         Flag::{self, *},
         Mode,
@@ -723,7 +725,7 @@ impl<S: ArmSystem> Cpu<S> {
     #[bitmatch]
     #[allow(unused_variables)]
     pub fn get_mnemonic_arm(inst: u32) -> String {
-        let co = inst_generic::condition_mnemonic(inst.bits(28, 4).u16());
+        let co = misc::condition_mnemonic(inst.bits(28, 4).u16());
         #[bitmatch]
         match inst {
             "101_0nnnnnnnnnnnnnnnnnnnnnnnn" => format!("b{co} +0x{:X}", (n.i24() << 2) + 8),

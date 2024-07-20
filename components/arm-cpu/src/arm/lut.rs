@@ -8,8 +8,10 @@
 
 //! Lookup tables for instructions, both ARM and THUMB.
 
-use super::interface::{ArmSystem, SysWrapper};
-use crate::inst_arm::ArmLut;
+use super::{
+    super::interface::{ArmSystem, SysWrapper},
+    ArmLut,
+};
 
 impl<S: ArmSystem> SysWrapper<S> {
     #[allow(clippy::unusual_byte_groupings)]
