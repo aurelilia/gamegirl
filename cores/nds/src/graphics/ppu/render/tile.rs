@@ -12,6 +12,10 @@ use super::{
     super::{OverflowMode, PaletteMode, Point},
     PpuRender, WIDTH,
 };
+use crate::graphics::ppu::{
+    render::{pixels::affine_transform_point, xy2d},
+    HEIGHT,
+};
 
 impl PpuRender {
     pub(super) fn render_bg_text(&mut self, bg: u16) {
@@ -152,6 +156,44 @@ impl PpuRender {
 
     pub(super) fn render_bg_ext(&mut self, bg: u16) {
         // TODO
-        self.render_bg_affine(bg);
+        if !self.r.bg_enabled(bg) {
+            return;
+        }
+
+        let cnt = self.r.bg_cnt[bg.us()];
+        let bit7 = cnt.palette_mode() as usize == 1;
+        let bit2 = cnt.character_base_block() & 1 == 1;
+
+        if bit2 && bit7 {
+            let idx = bg.us() - 2;
+            let wrap = self.r.bg_cnt[bg.us()].overflow_mode() == OverflowMode::Wraparound;
+            for x in 0..WIDTH {
+                let mut point = affine_transform_point(
+                    self.r.bg_scale[idx].latched,
+                    x as i32,
+                    self.r.bg_scale[idx].pa as i32,
+                    self.r.bg_scale[idx].pc as i32,
+                );
+
+                if !point.inbounds(WIDTH, HEIGHT) {
+                    if wrap {
+                        point.0 = point.0.rem_euclid(WIDTH as i32);
+                        point.1 = point.1.rem_euclid(HEIGHT as i32);
+                    } else {
+                        continue;
+                    }
+                }
+
+                let pixel = xy2d(point.0 as usize, point.1 as usize);
+                let color = hword(self.bg_vram(pixel << 1), self.bg_vram((pixel << 1) + 1));
+                let color = [
+                    color.bits(0, 5).u8(),
+                    color.bits(5, 5).u8(),
+                    color.bits(10, 5).u8(),
+                    255,
+                ];
+                self.bg_layers[bg.us()][x] = color;
+            }
+        }
     }
 }

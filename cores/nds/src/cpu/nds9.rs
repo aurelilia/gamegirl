@@ -108,7 +108,6 @@ impl ArmSystem for Nds9 {
     }
 
     fn set_cp15(&mut self, cm: u32, cp: u32, cn: u32, rd: u32) {
-        log::error!("{cn} {cm} {cp}: {rd:X}");
         match (cn, cm, cp) {
             (0, 0, _) => (),
 
