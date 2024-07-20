@@ -109,7 +109,7 @@ impl GameGirlAdv {
                 4 => T::from_u32(word(self.get_mmio(addr), self.get_mmio(addr + 2))),
                 _ => unreachable!(),
             },
-            // VRAM with weird mirroring
+            // VRAM with weird mirroring, TODO in mapper
             0x06 => {
                 let a = a & 0x1_FFFF;
                 if a < 0x1_8000 {
@@ -136,7 +136,7 @@ impl GameGirlAdv {
                 }
             }
 
-			// Cart
+            // Cart
             0x08..=0x0D if let Some(v) = self.cart.rom.try_get_exact(a & 0x1FF_FFFF) => v,
             // 1MB carts are special and wrap
             0x08..0x0D if self.cart.rom.len() == (2 << 19) => {
@@ -297,6 +297,8 @@ impl GameGirlAdv {
         if addr > 0xFFF_FFFF {
             return;
         }
+
+        self.cpu.cache.write(addr);
         if let Some(write) = self.memory.pager.write(addr) {
             *write = value;
             return;
@@ -360,7 +362,6 @@ impl GameGirlAdv {
 
             _ => (),
         }
-        self.cpu.cache.write(addr);
     }
 
     fn set_mmio_byte(&mut self, addr: u32, value: u8) {
