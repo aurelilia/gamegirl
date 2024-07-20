@@ -14,6 +14,7 @@ pub const IF_L: u32 = 0x214;
 pub const IF_H: u32 = 0x216;
 
 // Memory control
+pub const POSTFLG: u32 = 0x300;
 // NDS9
 pub const EXMEM: u32 = 0x204;
 pub const VRAMCNT_A: u32 = 0x240;

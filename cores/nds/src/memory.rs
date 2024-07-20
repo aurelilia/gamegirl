@@ -159,7 +159,17 @@ impl Nds {
             0xD2 => Into::<u16>::into(ds.dmas[DS::I].channels[2].ctrl),
             0xDE => Into::<u16>::into(ds.dmas[DS::I].channels[3].ctrl),
 
-            // Timers
+            // Cart SPI
+            0x1A0 | 0x1A2 => {
+                log::error!("!!!");
+                0
+            }
+
+            POSTFLG => 1,
+
+            // Commonly read empty regs?
+            0x20A => 0,
+
             _ => {
                 ds.c.debugger.log(
                     "unknown-io-read",
@@ -208,10 +218,21 @@ impl Nds {
             TM3CNT_H => ds.timers[DS::I].hi_write(DS::I == 1, &mut ds.scheduler, 3, value),
 
             // DMAs
-            0xBA => Dmas::ctrl_write(dsx, 0, value),
-            0xC6 => Dmas::ctrl_write(dsx, 1, value),
-            0xD2 => Dmas::ctrl_write(dsx, 2, value),
-            0xDE => Dmas::ctrl_write(dsx, 3, value),
+            0xB0..0xE0 => {
+                let idx = (addr.us() - 0xB0) / 12;
+                let reg = (addr - 0xB0) % 12;
+
+                let dma = &mut dsx.dmas[DS::I].channels[idx];
+                match reg {
+                    0x0 => dma.sad = dma.sad.set_low(value),
+                    0x2 => dma.sad = dma.sad.set_high(value),
+                    0x4 => dma.dad = dma.dad.set_low(value),
+                    0x6 => dma.dad = dma.dad.set_high(value),
+                    0x8 => dma.count = value,
+                    0xA => Dmas::ctrl_write(dsx, idx, value),
+                    _ => unreachable!(),
+                }
+            }
 
             // Shared GPU stuff
             DISPSTAT => {
@@ -221,6 +242,14 @@ impl Nds {
 
             // Input
             KEYCNT => ds.input.cnt[DS::I] = value.into(),
+
+            // Cart SPI
+            0x1A0 | 0x1A2 => {
+                log::error!("!!!");
+            }
+
+            // Commonly written empty regs?
+            0x20A | POSTFLG => (),
 
             _ => ds.c.debugger.log(
                 "unknown-io-write",

@@ -157,50 +157,30 @@ impl Dmas {
         dst_mod: i32,
     ) {
         ds.add_i_cycles(2);
-        if channel.dst < 0x200_0000 {
-            return;
+        let mut kind = NONSEQ | DMA;
+
+        // First, align SRC/DST
+        let align = T::WIDTH - 1;
+        channel.src &= !align;
+        channel.dst &= !align;
+
+        for _ in 0..count {
+            let value = ds.read::<T>(channel.src, kind).u32();
+            ds.write::<T>(channel.dst, T::from_u32(value), kind);
+
+            channel.src = channel.src.wrapping_add_signed(src_mod);
+            channel.dst = channel.dst.wrapping_add_signed(dst_mod);
+            // Only first is NonSeq
+            kind = SEQ;
+            ds.advance_clock();
         }
 
-        let mut kind = NONSEQ | DMA;
-        if channel.src >= 0x200_0000 {
-            // First, align SRC/DST
-            let align = T::WIDTH - 1;
-            channel.src &= !align;
-            channel.dst &= !align;
-
-            for _ in 0..count {
-                let value = ds.read::<T>(channel.src, kind).u32();
-                ds.write::<T>(channel.dst, T::from_u32(value), kind);
-
-                channel.src = channel.src.wrapping_add_signed(src_mod);
-                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
-                // Only first is NonSeq
-                kind = SEQ;
-                ds.advance_clock();
-            }
-
-            // Put last value into cache
-            if T::WIDTH == 4 {
-                ds.dmas[DS::I].cache = ds.get::<u32>(channel.src.wrapping_add_signed(-src_mod));
-            } else {
-                let value = ds.get::<u16>(channel.src.wrapping_add_signed(-src_mod));
-                ds.dmas[DS::I].cache = word(value, value);
-            }
+        // Put last value into cache
+        if T::WIDTH == 4 {
+            ds.dmas[DS::I].cache = ds.get::<u32>(channel.src.wrapping_add_signed(-src_mod));
         } else {
-            for _ in 0..count {
-                if T::WIDTH == 4 {
-                    ds.write::<u32>(channel.dst, ds.dmas[DS::I].cache, kind);
-                } else if channel.dst.is_bit(1) {
-                    ds.write::<u16>(channel.dst, (ds.dmas[DS::I].cache >> 16).u16(), kind);
-                } else {
-                    ds.write::<u16>(channel.dst, ds.dmas[DS::I].cache.u16(), kind);
-                }
-                channel.src = channel.src.wrapping_add_signed(src_mod);
-                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
-                // Only first is NonSeq
-                kind = SEQ;
-                ds.advance_clock();
-            }
+            let value = ds.get::<u16>(channel.src.wrapping_add_signed(-src_mod));
+            ds.dmas[DS::I].cache = word(value, value);
         }
     }
 
