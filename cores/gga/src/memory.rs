@@ -136,7 +136,9 @@ impl GameGirlAdv {
                 }
             }
 
-            // Cart: 1MB carts are special and wrap
+			// Cart
+            0x08..=0x0D if let Some(v) = self.cart.rom.try_get_exact(a & 0x1FF_FFFF) => v,
+            // 1MB carts are special and wrap
             0x08..0x0D if self.cart.rom.len() == (2 << 19) => {
                 self.cart.rom.get_wrap(a & 0x1FF_FFFF)
             }
@@ -581,7 +583,7 @@ impl GameGirlAdv {
         pager.map(&self.cart.rom, 0xA00_0000..(0xA00_0000 + rom_len), RO);
         pager.map(
             &self.cart.rom,
-            0xC00_0000..(0xC00_0000 + rom_len).min(0x0DFF_B000),
+            0xC00_0000..(0xC00_0000 + rom_len).min(0x0DFF_C000),
             RO,
         );
 
