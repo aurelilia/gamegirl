@@ -7,6 +7,7 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 pub mod audio;
+pub mod bios;
 pub mod cartridge;
 pub mod dma;
 pub mod input;

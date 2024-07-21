@@ -23,7 +23,11 @@ use crate::{
     addr::*,
     cpu::cp15::TcmState,
     graphics::vram::*,
-    hw::{dma::Dmas, timer::Timers},
+    hw::{
+        bios::{FREEBIOS7, FREEBIOS9},
+        dma::Dmas,
+        timer::Timers,
+    },
     CpuDevice, Nds, NdsCpu,
 };
 
@@ -383,9 +387,8 @@ impl Nds9 {
             0xFF if addr >= 0xFFFF_0000 => self.memory.bios9.get_exact(a & 0xFFFF),
 
             // PPU
-            // TODO verify the bit is right
-            0x05 => self.gpu.ppus[a.bit(12)].palette.get_wrap(a),
-            0x07 => self.gpu.ppus[a.bit(12)].oam.get_wrap(a),
+            0x05 => self.gpu.ppus[a.bit(10)].palette.get_wrap(a),
+            0x07 => self.gpu.ppus[a.bit(10)].oam.get_wrap(a),
 
             // MMIO
             0x04 => {
@@ -472,9 +475,8 @@ impl Nds9 {
         let a = addr.us();
         match region {
             // PPU
-            // TODO verify the bit is right
-            0x05 => self.gpu.ppus[a.bit(12)].palette.set_wrap(a, value),
-            0x07 => self.gpu.ppus[a.bit(12)].oam.set_wrap(a, value),
+            0x05 => self.gpu.ppus[a.bit(10)].palette.set_wrap(a, value),
+            0x07 => self.gpu.ppus[a.bit(10)].oam.set_wrap(a, value),
 
             // MMIO
             0x04 => {
@@ -617,8 +619,8 @@ impl Default for Memory {
             psram: Box::new([0; 4 * MB]),
             wram: Box::new([0; 32 * KB]),
             wram_status: WramStatus::All9,
-            bios7: Box::new([]),
-            bios9: Box::new([]),
+            bios7: FREEBIOS7.into(),
+            bios9: FREEBIOS9.into(),
 
             wram7: Box::new([0; 64 * KB]),
             tcm: [Box::new([0; 16 * KB]), Box::new([0; 32 * KB])],

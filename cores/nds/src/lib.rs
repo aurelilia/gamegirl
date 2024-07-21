@@ -233,8 +233,12 @@ impl Nds {
     pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
         let mut nds = Box::<Self>::default();
         nds.c.config = config.clone();
-        nds.memory.bios7 = config.get_bios("nds7").unwrap().into();
-        nds.memory.bios9 = config.get_bios("nds9").unwrap().into();
+        if let Some(bios) = config.get_bios("nds7") {
+            nds.memory.bios7 = bios.into();
+        }
+        if let Some(bios) = config.get_bios("nds9") {
+            nds.memory.bios9 = bios.into();
+        }
         nds.cart.load_rom(cart);
 
         log::error!("{:#?}", nds.cart.header());
