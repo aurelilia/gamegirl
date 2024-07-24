@@ -58,6 +58,7 @@ pub struct Memory {
 
     pub bios7: Box<[u8]>,
     pub bios9: Box<[u8]>,
+    pub firm: Box<[u8]>,
 
     wram7: Box<[u8]>,
     pub(crate) tcm: [Box<[u8]>; 2],
@@ -204,7 +205,9 @@ impl Nds9 {
         let a = addr.us();
         match region {
             // Basic
-            0xFF if addr >= 0xFFFF_0000 => self.memory.bios9.get_exact(a & 0xFFFF),
+            0xFF if (0xFFFF_0000..0xFFFF_1000).contains(&addr) => {
+                self.memory.bios9.get_exact(a & 0xFFFF)
+            }
 
             // PPU
             0x05 => self.gpu.ppus[a.bit(10)].palette.get_wrap(a),
@@ -262,6 +265,7 @@ impl Default for Memory {
             wram_status: WramStatus::All9,
             bios7: FREEBIOS7.into(),
             bios9: FREEBIOS9.into(),
+            firm: Box::new([]),
 
             wram7: Box::new([0; 64 * KB]),
             tcm: [Box::new([0; 16 * KB]), Box::new([0; 32 * KB])],

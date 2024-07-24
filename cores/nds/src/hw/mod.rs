@@ -12,4 +12,5 @@ pub mod cartridge;
 pub mod dma;
 pub mod input;
 pub mod ipc;
+pub mod spi;
 pub mod timer;

@@ -116,6 +116,11 @@ impl Default for SystemConfig {
                     bios: None,
                 },
                 ConsoleBios {
+                    console_id: "ndsfw".into(),
+                    console_name: "DS (Firmware)".into(),
+                    bios: None,
+                },
+                ConsoleBios {
                     console_id: "psx".into(),
                     console_name: "PlayStation".into(),
                     bios: None,

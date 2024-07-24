@@ -140,6 +140,10 @@ impl Nds7 {
             io08!(a, VRAMSTAT, self.gpu.vram.vram_stat());
             io08!(a, WRAMSTAT, self.memory.wram_status as u8);
 
+            // SPI
+            io16!(a, SPICNT, self.spi.ctrl.into());
+            io16!(a, SPIDATA, self.spi.data_out);
+
             self.get_mmio_shared::<Self>(a)
         })
     }
@@ -164,6 +168,10 @@ impl Nds7 {
                 Cpu::check_if_interrupt(self);
             });
             iow08!(a, HALTCNT, self.cpu7.halt_on_irq());
+
+            // SPI
+            iow16!(a, SPICNT, s16.apply_io(&mut self.spi.ctrl));
+            iow16!(a, SPIDATA, self.spi.data_write(s16.raw()));
 
             self.set_mmio_shared::<Self>(a, v, m)
         })

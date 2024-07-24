@@ -13,7 +13,10 @@ use std::{
     time::Duration,
 };
 
-use common::{common::options::SystemConfig, Colour as RColour, Core};
+use common::{
+    common::options::{ConsoleBios, SystemConfig},
+    Colour as RColour, Core,
+};
 use cpal::Stream;
 use eframe::{
     egui::{Context, Event, TextureOptions},

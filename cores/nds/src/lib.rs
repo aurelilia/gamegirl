@@ -49,7 +49,7 @@ use cpu::{
     cp15::Cp15,
     math::{Div, Sqrt},
 };
-use hw::{input::Input, ipc::IpcFifo};
+use hw::{input::Input, ipc::IpcFifo, spi::SpiBus};
 use memory::WramStatus;
 use scheduling::PpuEvent;
 
@@ -121,6 +121,7 @@ pub struct Nds {
     dmas: CpuDevice<Dmas>,
     timers: CpuDevice<Timers>,
     input: Input,
+    spi: SpiBus,
 
     scheduler: Scheduler<NdsEvent>,
     time_7: Time,
@@ -240,6 +241,9 @@ impl Nds {
         if let Some(bios) = config.get_bios("nds9") {
             nds.memory.bios9 = bios.into();
         }
+        if let Some(fw) = config.get_bios("ndsfw") {
+            nds.memory.firm = fw.into();
+        }
         nds.cart.load_rom(cart);
 
         log::error!("{:#?}", nds.cart.header());
@@ -267,6 +271,7 @@ impl Default for Nds {
             cart: Cartridge::default(),
             dmas: [Dmas::default(), Dmas::default()],
             timers: [Timers::default(), Timers::default()],
+            spi: SpiBus::default(),
             scheduler: Scheduler::default(),
             time_7: 0,
             c: Common::default(),

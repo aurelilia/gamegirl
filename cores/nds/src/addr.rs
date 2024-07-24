@@ -109,3 +109,7 @@ pub const IPCFIFORECV_H: u32 = 0x10_0002;
 pub const KEYINPUT: u32 = 0x130;
 pub const KEYCNT: u32 = 0x132;
 pub const EXTKEYIN: u32 = 0x136;
+
+// SPI
+pub const SPICNT: u32 = 0x1C0;
+pub const SPIDATA: u32 = 0x1C2;
