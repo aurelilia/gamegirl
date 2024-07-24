@@ -13,7 +13,7 @@ use arrayvec::ArrayVec;
 use common::numutil::U32Ext;
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use crate::CpuDevice;
+use crate::{io::IoSection, CpuDevice};
 
 #[bitfield]
 #[repr(u16)]
@@ -83,71 +83,44 @@ pub struct CpuFifo {
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct IpcFifo {
-    state: IpcFifoState,
     cpu: CpuDevice<CpuFifo>,
 }
 
 impl IpcFifo {
-    pub fn advance(&mut self, cpu: usize) -> Option<Interrupt> {
-        if self.cpu[cpu].fifo_en {
-            match mem::replace(&mut self.state, IpcFifoState::Clean) {
-                IpcFifoState::Clean => None,
+    pub fn receive(&mut self, cpu: usize) -> (u32, Option<Interrupt>) {
+        if !self.cpu[cpu].fifo_en {
+            return (self.cpu[cpu].last, None);
+        }
 
-                IpcFifoState::Pushed(v) if self.cpu[cpu ^ 1].fifo.len() < 16 => {
-                    self.cpu[cpu ^ 1].fifo.push_back(v);
-                    let recv_irq =
-                        self.cpu[cpu ^ 1].irqs.recv_not_empty && self.cpu[cpu ^ 1].fifo.len() == 1;
-                    recv_irq.then_some(Interrupt::IpcRecvFifoNotEmpty)
-                }
-                IpcFifoState::Pushed(_) => {
-                    self.cpu[cpu].error = true;
-                    None
-                }
-
-                IpcFifoState::Popped => match self.cpu[cpu].fifo.pop_front() {
-                    Some(v) => {
-                        self.cpu[cpu].last = v;
-                        let send_irq =
-                            self.cpu[cpu ^ 1].irqs.send_empty && self.cpu[cpu].fifo.is_empty();
-                        send_irq.then_some(Interrupt::IpcSendFifoEmpty)
-                    }
-                    None => {
-                        self.cpu[cpu].error = true;
-                        None
-                    }
-                },
+        let value = self.cpu[cpu].fifo.pop_front();
+        let intr = match value {
+            Some(v) => {
+                self.cpu[cpu].last = v;
+                let send_irq = self.cpu[cpu ^ 1].irqs.send_empty && self.cpu[cpu].fifo.is_empty();
+                send_irq.then_some(Interrupt::IpcSendFifoEmpty)
             }
+            None => {
+                self.cpu[cpu].error = true;
+                None
+            }
+        };
+        (self.cpu[cpu].last, intr)
+    }
+
+    pub fn send(&mut self, cpu: usize, v: u32) -> Option<Interrupt> {
+        if !self.cpu[cpu].fifo_en {
+            return None;
+        }
+
+        if self.cpu[cpu ^ 1].fifo.len() < 16 {
+            self.cpu[cpu ^ 1].fifo.push_back(v);
+            let recv_irq =
+                self.cpu[cpu ^ 1].irqs.recv_not_empty && self.cpu[cpu ^ 1].fifo.len() == 1;
+            recv_irq.then_some(Interrupt::IpcRecvFifoNotEmpty)
         } else {
-            self.state = IpcFifoState::Clean;
+            self.cpu[cpu].error = true;
             None
         }
-    }
-
-    pub fn receive(&mut self, cpu: usize) -> u32 {
-        self.state = IpcFifoState::Popped;
-        self.cpu[cpu]
-            .fifo
-            .front()
-            .copied()
-            .unwrap_or(self.cpu[cpu].last)
-    }
-
-    pub fn send_low(&mut self, cpu: usize, v: u16) {
-        let pre = if let IpcFifoState::Pushed(v) = self.state {
-            v
-        } else {
-            0
-        };
-        self.state = IpcFifoState::Pushed(pre.set_low(v));
-    }
-
-    pub fn send_high(&mut self, cpu: usize, v: u16) {
-        let pre = if let IpcFifoState::Pushed(v) = self.state {
-            v
-        } else {
-            0
-        };
-        self.state = IpcFifoState::Pushed(pre.set_high(v));
     }
 
     pub(crate) fn sync_read(&mut self, i: usize) -> u16 {
@@ -175,8 +148,8 @@ impl IpcFifo {
             .into()
     }
 
-    pub(crate) fn sync_write(&mut self, i: usize, value: u16) -> bool {
-        let new = SyncRegister::from(value);
+    pub(crate) fn sync_write(&mut self, i: usize, value: IoSection<u16>) -> bool {
+        let new = SyncRegister::from(value.with(self.sync_read(i)));
         let (a, b) = self.cpu.split_at_mut(1);
         let (local, remote) = if i == 0 {
             (&mut a[0], &mut b[0])
@@ -189,8 +162,8 @@ impl IpcFifo {
         new.send_irq()
     }
 
-    pub(crate) fn cnt_write(&mut self, i: usize, value: u16) {
-        let new = ControlRegister::from(value);
+    pub(crate) fn cnt_write(&mut self, i: usize, value: IoSection<u16>) {
+        let new = ControlRegister::from(value.with(self.sync_read(i)));
         let (a, b) = self.cpu.split_at_mut(1);
         let (local, remote) = if i == 0 {
             (&mut a[0], &mut b[0])
@@ -208,13 +181,4 @@ impl IpcFifo {
             remote.last = 0;
         }
     }
-}
-
-#[derive(Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub enum IpcFifoState {
-    #[default]
-    Clean,
-    Pushed(u32),
-    Popped,
 }

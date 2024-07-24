@@ -8,6 +8,8 @@
 
 //! This module contains some components shared by multiple cores.
 
+#[macro_use]
+pub mod io;
 pub mod memory_mapper;
 pub mod scheduler;
 pub mod storage;

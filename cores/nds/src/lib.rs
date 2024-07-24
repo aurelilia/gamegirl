@@ -27,6 +27,7 @@ mod addr;
 mod cpu;
 mod graphics;
 mod hw;
+mod io;
 mod memory;
 mod scheduling;
 

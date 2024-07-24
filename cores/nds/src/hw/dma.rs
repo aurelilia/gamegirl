@@ -15,7 +15,7 @@ use arrayvec::ArrayVec;
 use common::numutil::{word, NumExt};
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use crate::{addr::VCOUNT, NdsCpu};
+use crate::{addr::VCOUNT, io::IoSection, NdsCpu};
 
 const SRC_MASK_7: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
 const DST_MASK_7: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
@@ -58,10 +58,10 @@ impl Dmas {
     }
 
     /// Update a given DMA after it's control register was written.
-    pub fn ctrl_write<DS: NdsCpu>(ds: &mut DS, idx: usize, new_ctrl: u16) {
+    pub fn ctrl_write<DS: NdsCpu>(ds: &mut DS, idx: usize, new_ctrl: IoSection<u16>) {
         let channel = &mut ds.dmas[DS::I].channels[idx];
         let old_ctrl = channel.ctrl;
-        let mut new_ctrl: DmaControl = new_ctrl.into();
+        let mut new_ctrl = new_ctrl.apply_io_ret(&mut channel.ctrl);
 
         if !old_ctrl.dma_en() && new_ctrl.dma_en() {
             // Reload SRC/DST
@@ -74,7 +74,6 @@ impl Dmas {
             }
         }
 
-        ds.dmas[DS::I].channels[idx].ctrl = new_ctrl;
         Self::step_dma(ds, idx, Reason::CtrlWrite);
     }
 

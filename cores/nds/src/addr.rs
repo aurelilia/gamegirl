@@ -18,12 +18,19 @@ pub const POSTFLG: u32 = 0x300;
 // NDS9
 pub const EXMEM: u32 = 0x204;
 pub const VRAMCNT_A: u32 = 0x240;
+pub const VRAMCNT_B: u32 = 0x241;
 pub const VRAMCNT_C: u32 = 0x242;
+pub const VRAMCNT_D: u32 = 0x243;
 pub const VRAMCNT_E: u32 = 0x244;
+pub const VRAMCNT_F: u32 = 0x245;
 pub const VRAMCNT_G: u32 = 0x246;
+pub const WRAMCNT: u32 = 0x247;
 pub const VRAMCNT_H: u32 = 0x248;
+pub const VRAMCNT_I: u32 = 0x249;
 // NDS7
 pub const VRAMSTAT: u32 = 0x240;
+pub const WRAMSTAT: u32 = 0x241;
+pub const HALTCNT: u32 = 0x301;
 
 // Graphics
 pub const DISPCNT_L: u32 = 0x0;
@@ -38,6 +45,13 @@ pub const BG0HOFS: u32 = 0x10;
 pub const BG0VOFS: u32 = 0x12;
 pub const BG3VOFS: u32 = 0x1E;
 pub const BG2PA: u32 = 0x20;
+pub const BG2PB: u32 = 0x22;
+pub const BG2PC: u32 = 0x24;
+pub const BG2PD: u32 = 0x26;
+pub const BG2XL: u32 = 0x28;
+pub const BG2XH: u32 = 0x2A;
+pub const BG2YL: u32 = 0x2C;
+pub const BG2YH: u32 = 0x2E;
 pub const BG3PA: u32 = 0x30;
 pub const WIN0H: u32 = 0x40;
 pub const WIN1H: u32 = 0x42;
@@ -70,9 +84,13 @@ pub const TM3CNT_H: u32 = 0x10E;
 pub const DIVCNT_L: u32 = 0x280;
 pub const DIVCNT_H: u32 = 0x282;
 pub const DIV_NUMER: u32 = 0x290;
+pub const DIV_NUMER_H: u32 = 0x294;
 pub const DIV_DENOM: u32 = 0x298;
+pub const DIV_DENOM_H: u32 = 0x29C;
 pub const DIV_RESULT: u32 = 0x2A0;
+pub const DIV_RESULT_H: u32 = 0x2A4;
 pub const DIV_REM: u32 = 0x2A8;
+pub const DIV_REM_H: u32 = 0x2AC;
 pub const SQRTCNT_L: u32 = 0x2B0;
 pub const SQRTCNT_H: u32 = 0x2B2;
 pub const SQRT_RESULT_L: u32 = 0x2B4;

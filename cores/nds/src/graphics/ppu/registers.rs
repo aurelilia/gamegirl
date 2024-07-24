@@ -8,7 +8,11 @@
 
 use std::cmp;
 
-use common::numutil::{hword, word, NumExt, U16Ext, U32Ext};
+use common::{
+    components::io::IoSection,
+    io16, io32, iow08, iow16, iow32,
+    numutil::{hword, word, NumExt, U16Ext, U32Ext},
+};
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
 use super::{Point, WIDTH};
@@ -44,121 +48,98 @@ impl PpuRegisters {
         self.dispcnt.bg_mode() as usize >= 3
     }
 
-    pub fn read_mmio(&self, addr: u32) -> Option<u16> {
-        Some(match addr {
-            DISPCNT_L => u32::from(self.dispcnt).low(),
-            DISPCNT_H => u32::from(self.dispcnt).high(),
+    pub fn read(&self, a: u32) -> (u32, u32, u32) {
+        io32!(a, DISPCNT_L, self.dispcnt.into());
 
-            BG0CNT => self.bg_cnt[0].into(),
-            BG1CNT => self.bg_cnt[1].into(),
-            BG2CNT => self.bg_cnt[2].into(),
-            BG3CNT => self.bg_cnt[3].into(),
+        io16!(a, BG0CNT, self.bg_cnt[0].into());
+        io16!(a, BG1CNT, self.bg_cnt[1].into());
+        io16!(a, BG2CNT, self.bg_cnt[2].into());
+        io16!(a, BG3CNT, self.bg_cnt[3].into());
 
-            WININ => hword(
+        io16!(
+            a,
+            WININ,
+            hword(
                 self.windows[0].control.into(),
                 self.windows[1].control.into(),
-            ),
-            WINOUT => hword(self.win_out.into(), self.win_obj.into()),
-            BLDCNT => self.bldcnt.into(),
-            BLDALPHA => self.bldalpha.into(),
+            )
+        );
+        io16!(a, WINOUT, hword(self.win_out.into(), self.win_obj.into()));
+        io16!(a, BLDCNT, self.bldcnt.into());
+        io16!(a, BLDALPHA, self.bldalpha.into());
 
-            _ => return None,
-        })
+        log::error!("Read from unknown PPU IO register 0x{a:X}");
+        (0, 0, 1)
     }
 
-    pub fn get_mmio_inner(&mut self, addr: u32) -> u16 {
-        match addr {
-            BG0HOFS..=BG3VOFS => self.bg_offsets[(addr.us() & 0xF) >> 1],
-            BG2PA..WIN0H => match addr & 0xF {
-                0x0 => self.bg_scale[addr.bit(4).us()].pa as u16,
-                0x2 => self.bg_scale[addr.bit(4).us()].pb as u16,
-                0x4 => self.bg_scale[addr.bit(4).us()].pc as u16,
-                0x6 => self.bg_scale[addr.bit(4).us()].pd as u16,
-                0x8 => self.bg_scale[addr.bit(4).us()].xl,
-                0xA => self.bg_scale[addr.bit(4).us()].xh,
-                0xC => self.bg_scale[addr.bit(4).us()].yl,
-                0xE => self.bg_scale[addr.bit(4).us()].yh,
-                _ => unreachable!(),
-            },
+    pub fn write(
+        &mut self,
+        a: u32,
+        s8: IoSection<u8>,
+        s16: IoSection<u16>,
+        s32: IoSection<u32>,
+    ) -> (u32, u32) {
+        iow32!(a, DISPCNT_L, s32.apply_io(&mut self.dispcnt));
 
-            WIN0H => hword(self.windows[0].right, self.windows[0].left),
-            WIN1H => hword(self.windows[1].right, self.windows[1].left),
-            WIN0V => hword(self.windows[0].bottom, self.windows[0].top),
-            WIN1V => hword(self.windows[1].bottom, self.windows[1].top),
+        iow16!(a, BG0CNT, s16.mask(0xDFFF).apply_io(&mut self.bg_cnt[0]));
+        iow16!(a, BG1CNT, s16.mask(0xDFFF).apply_io(&mut self.bg_cnt[1]));
+        iow16!(a, BG2CNT, s16.apply_io(&mut self.bg_cnt[2]));
+        iow16!(a, BG3CNT, s16.apply_io(&mut self.bg_cnt[3]));
 
-            MOSAIC => self.mosaic.into(),
-            BLDY => self.bldy,
-
-            _ => self.read_mmio(addr).unwrap_or(0),
+        if matches!(a, 0x10..=0x1F) {
+            s16.apply(&mut self.bg_offsets[(a.us() & 0xF) >> 1]);
+            return (a & 1, 2);
         }
-    }
 
-    pub fn write_mmio_byte(&mut self, addr_unalign: u32, value: u8) {
-        let addr = addr_unalign & !1;
-        let var = self.get_mmio_inner(addr);
-        if addr_unalign.is_bit(0) {
-            self.write_mmio(addr, var.set_high(value));
-        } else {
-            self.write_mmio(addr, var.set_low(value));
+        for i in 0..2 {
+            let offs = (i * 0x10);
+            let mut scale = &mut self.bg_scale[i.us()];
+            iow16!(a, BG2PA + offs, scale.pa = s16.with(scale.pa as u16) as i16);
+            iow16!(a, BG2PB + offs, scale.pa = s16.with(scale.pb as u16) as i16);
+            iow16!(a, BG2PC + offs, scale.pa = s16.with(scale.pc as u16) as i16);
+            iow16!(a, BG2PD + offs, scale.pa = s16.with(scale.pd as u16) as i16);
+            iow16!(a, BG2XL + offs, s16.apply(&mut scale.xl));
+            iow16!(a, BG2XH + offs, s16.apply(&mut scale.xh));
+            iow16!(a, BG2YL + offs, s16.apply(&mut scale.yl));
+            iow16!(a, BG2YH + offs, s16.apply(&mut scale.yh));
         }
+
+        iow08!(a, WIN0H, s8.apply(&mut self.windows[0].right));
+        iow08!(a, WIN0H + 1, s8.apply(&mut self.windows[0].left));
+        iow08!(a, WIN0V, s8.apply(&mut self.windows[0].bottom));
+        iow08!(a, WIN0V + 1, s8.apply(&mut self.windows[0].top));
+        iow08!(a, WIN1H, s8.apply(&mut self.windows[1].right));
+        iow08!(a, WIN1H + 1, s8.apply(&mut self.windows[1].left));
+        iow08!(a, WIN1V, s8.apply(&mut self.windows[1].bottom));
+        iow08!(a, WIN1V + 1, s8.apply(&mut self.windows[1].top));
+
+        iow08!(
+            a,
+            WININ,
+            s8.mask(0x3F).apply_io(&mut self.windows[0].control)
+        );
+        iow08!(
+            a,
+            WININ + 1,
+            s8.mask(0x3F).apply_io(&mut self.windows[1].control)
+        );
+        iow08!(a, WINOUT, s8.mask(0x3F).apply_io(&mut self.win_out));
+        iow08!(a, WINOUT + 1, s8.mask(0x3F).apply_io(&mut self.win_obj));
+        iow16!(a, MOSAIC, s16.apply_io(&mut self.mosaic));
+
+        iow16!(a, BLDCNT, s16.mask(0x3FFF).apply_io(&mut self.bldcnt));
+        iow16!(a, BLDALPHA, s16.mask(0x1F1F).apply_io(&mut self.bldalpha));
+        iow08!(a, BLDY, self.bldy = cmp::min(16, s8.raw() & 0x1F).u16());
+
+        log::error!(
+            "Write to unknown PPU IO register 0x{a:X} with 0x{:X}",
+            s32.with(0)
+        );
+        (0, 1)
     }
 
     pub fn write_mmio(&mut self, addr: u32, value: u16) {
         match addr {
-            DISPCNT_L => {
-                self.dispcnt = (u32::from(self.dispcnt) & 0xFFFF_0000 | value.u32()).into()
-            }
-            DISPCNT_H => {
-                self.dispcnt = (u32::from(self.dispcnt) & 0x0000_FFFF | (value.u32() << 16)).into()
-            }
-
-            BG0CNT => self.bg_cnt[0] = (value & 0xDFFF).into(),
-            BG1CNT => self.bg_cnt[1] = (value & 0xDFFF).into(),
-            BG2CNT => self.bg_cnt[2] = value.into(),
-            BG3CNT => self.bg_cnt[3] = value.into(),
-
-            BG0HOFS..=BG3VOFS => self.bg_offsets[(addr.us() & 0xF) >> 1] = value & 0x1FF,
-
-            BG2PA..WIN0H => match addr & 0xF {
-                0x0 => self.bg_scale[addr.bit(4).us()].pa = value as i16,
-                0x2 => self.bg_scale[addr.bit(4).us()].pb = value as i16,
-                0x4 => self.bg_scale[addr.bit(4).us()].pc = value as i16,
-                0x6 => self.bg_scale[addr.bit(4).us()].pd = value as i16,
-                0x8 => {
-                    self.bg_scale[addr.bit(4).us()].xl = value;
-                    self.bg_scale[addr.bit(4).us()].latch_x();
-                }
-                0xA => {
-                    self.bg_scale[addr.bit(4).us()].xh = value;
-                    self.bg_scale[addr.bit(4).us()].latch_x();
-                }
-                0xC => {
-                    self.bg_scale[addr.bit(4).us()].yl = value;
-                    self.bg_scale[addr.bit(4).us()].latch_y();
-                }
-                0xE => {
-                    self.bg_scale[addr.bit(4).us()].yh = value;
-                    self.bg_scale[addr.bit(4).us()].latch_y();
-                }
-                _ => (),
-            },
-
-            WIN0H => {
-                self.windows[0].right = value.low();
-                self.windows[0].left = value.high();
-            }
-            WIN1H => {
-                self.windows[1].right = value.low();
-                self.windows[1].left = value.high();
-            }
-            WIN0V => {
-                self.windows[0].bottom = value.low();
-                self.windows[0].top = value.high();
-            }
-            WIN1V => {
-                self.windows[1].bottom = value.low();
-                self.windows[1].top = value.high();
-            }
             WININ => {
                 self.windows[0].control = (value.low() & 0x3F).into();
                 self.windows[1].control = (value.high() & 0x3F).into();

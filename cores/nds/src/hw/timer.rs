@@ -10,7 +10,7 @@ use arm_cpu::{Cpu, Interrupt};
 use common::{components::scheduler::Scheduler, numutil::NumExt, Time, TimeS};
 use modular_bitfield::{bitfield, specifiers::*};
 
-use crate::{addr::TM0CNT_H, scheduling::NdsEvent, NdsCpu};
+use crate::{addr::TM0CNT_H, io::IoSection, scheduling::NdsEvent, NdsCpu};
 
 /// All 2x to account for the ARM9's double clock speed,
 /// which also affects the scheduler
@@ -93,14 +93,14 @@ impl Timers {
         is_arm9: bool,
         sched: &mut Scheduler<NdsEvent>,
         timer: usize,
-        new_ctrl: u16,
+        new_ctrl: IoSection<u16>,
     ) {
         let now = sched.now();
         // Update current counter value first
         self.counters[timer] = self.time_read(timer, now);
 
         let old_ctrl = self.control[timer];
-        let new_ctrl: TimerCtrl = new_ctrl.into();
+        let new_ctrl = new_ctrl.apply_io_ret(&mut self.control[timer]);
         let was_scheduled = old_ctrl.enable() && (timer == 0 || !old_ctrl.count_up());
         let is_scheduled = new_ctrl.enable() && (timer == 0 || !new_ctrl.count_up());
 
@@ -128,8 +128,6 @@ impl Timers {
                 until_ov as TimeS,
             );
         }
-
-        self.control[timer] = new_ctrl;
     }
 
     /// Handle an overflow and return time until next.
