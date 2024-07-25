@@ -53,9 +53,9 @@ impl Nds {
         io16!(a, KEYINPUT, self.keyinput());
 
         // Misc
-        io08!(a, POSTFLG, 1);
+        io08!(a, POSTFLG, self.memory.postflg as u8);
 
-        log::error!("Read from unknown IO register 0x{a:X}");
+        log::info!("Read from unknown IO register 0x{a:X}");
         FAILED_READ
     }
 
@@ -125,7 +125,10 @@ impl Nds {
         // Input
         iow16!(a, KEYCNT, s16.apply_io(&mut self.input.cnt[DS::I]));
 
-        log::error!("Write to unknown IO register 0x{a:X}, value 0x{v:X}");
+        // Misc
+        iow08!(a, POSTFLG, self.memory.postflg = true);
+
+        log::info!("Write to unknown IO register 0x{a:X}, value 0x{v:X}");
         FAILED_WRITE
     }
 }

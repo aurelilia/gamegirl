@@ -55,6 +55,7 @@ pub struct Memory {
     pub psram: Box<[u8]>,
     wram: Box<[u8]>,
     pub wram_status: WramStatus,
+    pub(super) postflg: bool,
 
     pub bios7: Box<[u8]>,
     pub bios9: Box<[u8]>,
@@ -177,7 +178,7 @@ impl Nds7 {
             // MMIO
             0x04 => self.set_mmio(addr, value),
             _ => {
-                log::error!("Invalid write: {addr:X}");
+                log::info!("Invalid write: {addr:X}");
             }
         }
     }
@@ -217,7 +218,7 @@ impl Nds9 {
             0x04 => self.get_mmio(addr),
 
             _ => {
-                log::error!("Invalid read: {addr:X}");
+                log::info!("Invalid read: {addr:X}");
                 T::from_u32(0)
             }
         }
@@ -251,7 +252,7 @@ impl Nds9 {
             0x04 => self.set_mmio(addr, value),
 
             _ => {
-                log::error!("Invalid write: {addr:X}");
+                log::info!("Invalid write: {addr:X}");
             }
         }
     }
@@ -263,6 +264,7 @@ impl Default for Memory {
             psram: Box::new([0; 4 * MB]),
             wram: Box::new([0; 32 * KB]),
             wram_status: WramStatus::All9,
+            postflg: false,
             bios7: FREEBIOS7.into(),
             bios9: FREEBIOS9.into(),
             firm: Box::new([]),

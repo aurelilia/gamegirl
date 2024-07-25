@@ -104,22 +104,22 @@ impl<S: ArmSystem> SysWrapper<S> {
 
     pub fn arm_alu_gap<const OP: u16>(&mut self, inst: ArmInst) {
         if S::IS_V5 && (inst.0 & 0x0FFF_0FF0) == 0x016F_0F10 {
-            // ARMv5: CLZ
+ // ARMv5: CLZ
             let d = inst.reg(12);
             let m = inst.reg(0);
             let rm = self.reg(m);
             self.set_reg(d, rm.leading_zeros());
         } else if S::IS_V5 && inst.0.bits(4, 8) == 0x05 {
-            // ARMv5: QADD/QSUB
+// ARMv5: QADD/QSUB
             self.armv5_alu_q::<OP, false>(inst);
-        } else if OP == 0b1001 && inst.0.bits(8, 13) == 0xFFF {
+        } else if OP == 0b1001 && inst.0.bits(8, 12) == 0xFFF {
             // BX
             self.arm_bx(inst);
         } else if !inst.0.is_bit(4) && inst.0.is_bit(7) {
-            // ARMv5: SH MULs
+// ARMv5: SH MULs
             self.armv5_sh_mul::<OP>(inst);
         } else {
-            // MRS/MSR/SWP/LDRSTR/MUL
+ // MRS/MSR/SWP/LDRSTR/MUL
             let bit_1 = OP.is_bit(1);
             let is_msr = OP.is_bit(0);
             if is_msr {

@@ -198,6 +198,7 @@ impl Core for Nds {
 
         // Setup system state
         self.memory.wram_status = WramStatus::All7;
+        self.memory.postflg = true;
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -250,7 +251,7 @@ impl Nds {
         nds.init_memory();
         Gpu::init_render(&mut nds);
 
-        nds.skip_bootrom();
+        // nds.skip_bootrom();
         nds
     }
 }

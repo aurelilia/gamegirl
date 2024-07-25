@@ -19,6 +19,7 @@ pub mod registers;
 mod thumb;
 
 use std::sync::Arc;
+use std::fmt::Write;
 
 use access::{CODE, NONSEQ, SEQ};
 use common::numutil::NumExt;
@@ -238,11 +239,11 @@ impl<S: ArmSystem> Cpu<S> {
             };
 
             let mut buf = String::with_capacity(100);
+            let num = ('4' as u8 + S::IS_V5 as u8 ) as char;
+            buf.push(num);
             for reg in gg.cpu().registers.iter().enumerate() {
                 let reg = reg.1;
-                let reg = format!("{reg:08X}");
-                buf.push_str(&reg);
-                buf.push(' ');
+                write!(buf, "{reg:08X} ").ok();
             }
 
             if TY::WIDTH == 2 {
