@@ -25,7 +25,7 @@ use registers::*;
 use render::{PpuRender, PpuRendererKind};
 
 use crate::{
-    dma::{Dmas, Reason},
+    hw::dma::{Dmas, Reason},
     memory::KB,
     scheduling::{AdvEvent, PpuEvent},
     GameGirlAdv,

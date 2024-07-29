@@ -16,7 +16,6 @@ use std::{cmp::Ordering, mem, path::PathBuf};
 
 use arm_cpu::Cpu;
 use audio::Apu;
-use cartridge::Cartridge;
 use common::{
     common::{
         debugger::{self, Width},
@@ -34,29 +33,23 @@ use common::{
 };
 use cpu::CPU_CLOCK;
 use elf_rs::{Elf, ElfFile};
+use hw::{cartridge::Cartridge, serial::Serial};
 use memory::Memory;
 use ppu::Ppu;
 use scheduling::PpuEvent;
-use serial::Serial;
 
 use crate::{
-    dma::Dmas,
+    hw::{dma::Dmas, timer::Timers},
     scheduling::{AdvEvent, ApuEvent},
-    timer::Timers,
 };
 
 pub mod addr;
 mod audio;
-mod bios;
-mod cartridge;
 mod cpu;
-mod dma;
-mod input;
+pub mod hw;
 mod memory;
 pub mod ppu;
 mod scheduling;
-mod serial;
-pub mod timer;
 
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.

@@ -23,7 +23,6 @@ panic = "unwind"
 
 [profile.release-fast]
 inherits = "release"
-debug = true
 lto = false
 opt-level = 2
 incremental = true

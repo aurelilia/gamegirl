@@ -22,7 +22,11 @@ use common::{
 use modular_bitfield::{bitfield, specifiers::*};
 
 use super::audio;
-use crate::{addr::*, bios::BIOS, dma::Dmas, input::KeyControl, Apu, GameGirlAdv};
+use crate::{
+    addr::*,
+    hw::{bios::BIOS, dma::Dmas, input::KeyControl},
+    Apu, GameGirlAdv,
+};
 
 pub const KB: usize = 1024;
 

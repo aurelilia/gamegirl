@@ -11,8 +11,8 @@ use AdvEvent::*;
 
 use crate::{
     audio::{psg::GenApuEvent, Apu},
+    hw::timer::Timers,
     ppu::Ppu,
-    timer::Timers,
     GameGirlAdv,
 };
 

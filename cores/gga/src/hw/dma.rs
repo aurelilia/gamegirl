@@ -17,7 +17,7 @@ use arrayvec::ArrayVec;
 use common::numutil::{word, NumExt};
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use crate::{cartridge::SaveType, GameGirlAdv};
+use crate::{hw::cartridge::SaveType, GameGirlAdv};
 
 const SRC_MASK: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
 const DST_MASK: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
@@ -41,13 +41,13 @@ pub struct Dma {
 pub struct Dmas {
     pub channels: [Dma; 4],
     /// Internal cache shared between DMAs
-    pub(super) cache: u32,
+    pub(crate) cache: u32,
     /// Currently running DMA, or 99
-    pub(super) running: u16,
+    pub(crate) running: u16,
     /// DMAs waiting to run after current.
     queued: ArrayVec<(u16, Reason), 3>,
     /// PC when the last DMA finished (for lingering bus behavior)
-    pub(super) pc_at_last_end: u32,
+    pub(crate) pc_at_last_end: u32,
 }
 
 impl Dmas {

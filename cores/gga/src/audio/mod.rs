@@ -27,7 +27,7 @@ use mplayer::MusicPlayer;
 use psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use super::scheduling::AdvEvent;
-use crate::{addr::FIFO_A_L, dma::Dmas, scheduling::ApuEvent, GameGirlAdv, CPU_CLOCK};
+use crate::{addr::FIFO_A_L, hw::dma::Dmas, scheduling::ApuEvent, GameGirlAdv, CPU_CLOCK};
 
 const SAMPLE_EVERY_N_CLOCKS: TimeS = CPU_CLOCK as TimeS / 2i64.pow(15);
 const GG_OFFS: TimeS = 4;

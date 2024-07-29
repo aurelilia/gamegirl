@@ -14,8 +14,8 @@ use eframe::{
     epaint::{vec2, ColorImage, ImageData, ImageDelta, TextureId},
 };
 use gamegirl::gga::{
+    hw::timer::{self},
     ppu::registers::{Window, WindowCtrl},
-    timer::{self},
     GameGirlAdv,
 };
 
