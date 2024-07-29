@@ -14,7 +14,9 @@ pub const SAMPLE_EVERY_N_CLOCKS: TimeS = (NDS9_CLOCK / 48000) as TimeS;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Apu {}
+pub struct Apu {
+    pub bias: u16,
+}
 
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this

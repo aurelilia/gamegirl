@@ -8,10 +8,8 @@
 
 // Interrupts
 pub const IME: u32 = 0x208;
-pub const IE_L: u32 = 0x210;
-pub const IE_H: u32 = 0x212;
-pub const IF_L: u32 = 0x214;
-pub const IF_H: u32 = 0x216;
+pub const IE: u32 = 0x210;
+pub const IF: u32 = 0x214;
 
 // Memory control
 pub const POSTFLG: u32 = 0x300;
@@ -113,3 +111,12 @@ pub const EXTKEYIN: u32 = 0x136;
 // SPI
 pub const SPICNT: u32 = 0x1C0;
 pub const SPIDATA: u32 = 0x1C2;
+pub const AUXSPICNT: u32 = 0x1A0;
+pub const AUXSPIDATA: u32 = 0x1A2;
+pub const ROMCTRL: u32 = 0x1A4;
+pub const AUXSPICMD_L: u32 = 0x1A8;
+pub const AUXSPICMD_H: u32 = 0x1AC;
+pub const AUXSPIIN: u32 = 0x100010;
+
+// Audio
+pub const SOUNDBIAS: u32 = 0x504;

@@ -108,9 +108,9 @@ fn debugger(ds: &mut impl NdsCpu, ui: &mut Ui, _: &mut App, _: &Context) {
         });
         ui.separator();
         ui.vertical(|ui| {
-            ui.monospace("       GKDDDDSTTTTCHV");
-            ui.monospace(format!("IF = {:016b}", ds.cpu().if_));
-            ui.monospace(format!("IE = {:016b}", ds.cpu().ie));
+            ui.monospace("            WSSGCCIII  GKDDDDSTTTTCHV");
+            ui.monospace(format!("IF = {:032b}", ds.cpu().if_));
+            ui.monospace(format!("IE = {:032b}", ds.cpu().ie));
         });
     });
     ui.separator();

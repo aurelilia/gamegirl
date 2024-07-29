@@ -26,6 +26,7 @@ inherits = "release"
 debug = true
 lto = false
 opt-level = 2
+incremental = true
 
 [profile.dev]
 opt-level = 1

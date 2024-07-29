@@ -6,10 +6,10 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{mem, ops::BitAnd};
+use std::{fmt::UpperHex, mem, ops::BitAnd};
 
 /// Trait for common number operations.
-pub trait NumExt: BitAnd<Output = Self> + Copy + PartialEq + Default {
+pub trait NumExt: BitAnd<Output = Self> + Copy + PartialEq + Default + UpperHex {
     const WIDTH: u32;
 
     /// Get the state of the given bit. Returns 0/1.
@@ -139,6 +139,11 @@ pub fn hword(lo: u8, hi: u8) -> u16 {
 #[inline(always)]
 pub fn word(lo: u16, hi: u16) -> u32 {
     ((hi as u32) << 16) | lo as u32
+}
+
+#[inline(always)]
+pub fn dword(lo: u32, hi: u32) -> u64 {
+    ((hi as u64) << 32) | lo as u64
 }
 
 pub trait U16Ext {

@@ -12,7 +12,11 @@ use NdsEvent::*;
 use crate::{
     cpu::NDS9_CLOCK,
     graphics::Gpu,
-    hw::{audio::Apu, timer::Timers},
+    hw::{
+        audio::Apu,
+        dma::{Dma, Dmas},
+        timer::Timers,
+    },
     Nds,
 };
 
@@ -31,6 +35,8 @@ pub enum NdsEvent {
     },
     /// Update the keypad.
     UpdateKeypad,
+    /// Event handled by the cart.
+    CartEvent(CartEvent),
 }
 
 impl NdsEvent {
@@ -55,6 +61,12 @@ impl NdsEvent {
                 Nds::check_keycnt(&mut ds.nds9());
                 ds.scheduler
                     .schedule(NdsEvent::UpdateKeypad, (NDS9_CLOCK as f64 / 120.0) as TimeS);
+            }
+            CartEvent(evt) => {
+                if ds.cart.handle_evt(evt) {
+                    Dmas::update_all(&mut ds.nds7(), crate::hw::dma::Reason::CartridgeReady);
+                    Dmas::update_all(&mut ds.nds9(), crate::hw::dma::Reason::CartridgeReady);
+                }
             }
         }
     }
@@ -88,4 +100,15 @@ pub enum PpuEvent {
     SetHblank,
     /// End of HBlank, which is the start of the next scanline.
     HblankEnd,
+}
+
+/// Events the cart generates.
+#[derive(Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[repr(u16)]
+pub enum CartEvent {
+    /// AUXSPIDATA transfer completed
+    SpiDataComplete,
+    /// ROM is ready
+    RomTransferReady,
 }

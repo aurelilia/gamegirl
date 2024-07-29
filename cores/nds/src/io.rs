@@ -12,7 +12,12 @@ use arm_cpu::{Cpu, Interrupt};
 pub use common::components::io::*;
 use common::{io08, io16, io32, iow08, iow16, iow32, numutil::NumExt};
 
-use crate::{addr::*, graphics::vram::*, hw::dma::Dmas, Nds, Nds7, Nds9, NdsCpu};
+use crate::{
+    addr::*,
+    graphics::vram::*,
+    hw::{cartridge::Cartridge, dma::Dmas},
+    Nds, Nds7, Nds9, NdsCpu,
+};
 
 impl Nds {
     pub fn get_mmio_shared<DS: NdsCpu>(&mut self, a: u32) -> (u32, u32, u32) {
@@ -52,6 +57,12 @@ impl Nds {
         io16!(a, KEYCNT, self.input.cnt[DS::I].into());
         io16!(a, KEYINPUT, self.keyinput());
 
+        // SPI / Cart
+        io16!(a, AUXSPICNT, self.cart.spictrl.into());
+        io16!(a, AUXSPIDATA, self.cart.spidata);
+        io32!(a, ROMCTRL, self.cart.romctrl.set_bit(23, true));
+        io32!(a, AUXSPIIN, Cartridge::data_in_read(&mut DS::mk(self)));
+
         // Misc
         io08!(a, POSTFLG, self.memory.postflg as u8);
 
@@ -81,9 +92,12 @@ impl Nds {
         for idx in 0..4 {
             iow16!(
                 a,
-                TM0CNT_H + (idx.u32() * 4),
-                self.timers[DS::I].hi_write(DS::I == 1, &mut self.scheduler, idx, s16)
+                TM0CNT_L + (idx.u32() * 4),
+                s16.apply(&mut self.timers[DS::I].reload[idx])
             );
+            iow16!(a, TM0CNT_H + (idx.u32() * 4), {
+                self.timers[DS::I].hi_write(DS::I == 1, &mut self.scheduler, idx, s16)
+            });
 
             iow32!(
                 a,
@@ -125,6 +139,28 @@ impl Nds {
         // Input
         iow16!(a, KEYCNT, s16.apply_io(&mut self.input.cnt[DS::I]));
 
+        // SPI / Cart
+        iow16!(
+            a,
+            AUXSPICNT,
+            s16.mask(0xE0C3).apply_io(&mut self.cart.spictrl)
+        );
+        iow16!(
+            a,
+            AUXSPIDATA,
+            self.cart.data_write(&mut self.scheduler, s16.raw())
+        );
+        iow32!(
+            a,
+            ROMCTRL,
+            self.cart.romctrl_write(&mut self.scheduler, s32)
+        );
+        iow32!(a, AUXSPICMD_L, {
+            self.send_irq(DS::I, Interrupt::CardTransferComplete);
+            self.cart.cmd_write(s32, true)
+        });
+        iow32!(a, AUXSPICMD_H, self.cart.cmd_write(s32, false));
+
         // Misc
         iow08!(a, POSTFLG, self.memory.postflg = true);
 
@@ -138,14 +174,17 @@ impl Nds7 {
         get_mmio_apply(addr, |a| {
             // Memory / IRQ control
             io32!(a, IME, self.cpu7.ime as u32);
-            io32!(a, IE_L, self.cpu7.ie);
-            io32!(a, IF_L, self.cpu7.if_);
+            io32!(a, IE, self.cpu7.ie);
+            io32!(a, IF, self.cpu7.if_);
             io08!(a, VRAMSTAT, self.gpu.vram.vram_stat());
             io08!(a, WRAMSTAT, self.memory.wram_status as u8);
 
             // SPI
             io16!(a, SPICNT, self.spi.ctrl.into());
             io16!(a, SPIDATA, self.spi.data_out);
+
+            // Sound
+            io16!(a, SOUNDBIAS, self.apu.bias);
 
             self.get_mmio_shared::<Self>(a)
         })
@@ -162,19 +201,25 @@ impl Nds7 {
                 self.cpu7.ime = s32.with(0).is_bit(0);
                 Cpu::check_if_interrupt(self);
             });
-            iow32!(a, IE_L, {
+            iow32!(a, IE, {
                 s32.apply(&mut self.cpu7.ie);
                 Cpu::check_if_interrupt(self);
             });
-            iow32!(a, IF_L, {
-                s32.apply(&mut self.cpu7.if_);
+            iow32!(a, IF, {
+                self.cpu7.if_ &= !s32.raw();
                 Cpu::check_if_interrupt(self);
             });
             iow08!(a, HALTCNT, self.cpu7.halt_on_irq());
 
             // SPI
-            iow16!(a, SPICNT, s16.apply_io(&mut self.spi.ctrl));
-            iow16!(a, SPIDATA, self.spi.data_write(s16.raw()));
+            iow16!(a, SPICNT, self.spi.ctrl_write(s16));
+            iow16!(a, SPIDATA, {
+                self.spi.data_write(s16.raw());
+                Cpu::request_interrupt(self, Interrupt::SpiBus)
+            });
+
+            // Sound
+            iow16!(a, SOUNDBIAS, s16.apply(&mut self.apu.bias));
 
             self.set_mmio_shared::<Self>(a, v, m)
         })
@@ -186,8 +231,8 @@ impl Nds9 {
         get_mmio_apply(addr, |a| {
             // Memory / IRQ control
             io32!(a, IME, self.cpu9.ime as u32);
-            io32!(a, IE_L, self.cpu9.ie);
-            io32!(a, IF_L, self.cpu9.if_);
+            io32!(a, IE, self.cpu9.ie);
+            io32!(a, IF, self.cpu9.if_);
 
             // Graphics
             if matches!(a, 0x00..=0x03 | 0x08..0x60) {
@@ -242,12 +287,12 @@ impl Nds9 {
                 self.cpu9.ime = s32.with(0).is_bit(0);
                 Cpu::check_if_interrupt(self);
             });
-            iow32!(a, IE_L, {
+            iow32!(a, IE, {
                 s32.apply(&mut self.cpu9.ie);
                 Cpu::check_if_interrupt(self);
             });
-            iow32!(a, IF_L, {
-                s32.apply(&mut self.cpu9.if_);
+            iow32!(a, IF, {
+                self.cpu9.if_ &= !s32.raw();
                 Cpu::check_if_interrupt(self);
             });
 

@@ -59,7 +59,6 @@ pub struct Memory {
 
     pub bios7: Box<[u8]>,
     pub bios9: Box<[u8]>,
-    pub firm: Box<[u8]>,
 
     wram7: Box<[u8]>,
     pub(crate) tcm: [Box<[u8]>; 2],
@@ -178,6 +177,7 @@ impl Nds7 {
             // MMIO
             0x04 => self.set_mmio(addr, value),
             _ => {
+                self.debugger().running = false;
                 log::info!("Invalid write: {addr:X}");
             }
         }
@@ -267,7 +267,6 @@ impl Default for Memory {
             postflg: false,
             bios7: FREEBIOS7.into(),
             bios9: FREEBIOS9.into(),
-            firm: Box::new([]),
 
             wram7: Box::new([0; 64 * KB]),
             tcm: [Box::new([0; 16 * KB]), Box::new([0; 32 * KB])],

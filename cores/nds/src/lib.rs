@@ -37,7 +37,7 @@ use std::{
     path::PathBuf,
 };
 
-use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu};
+use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu, Interrupt};
 use common::{
     common::options::{EmulateOptions, SystemConfig},
     common_functions,
@@ -89,6 +89,9 @@ macro_rules! nds_wrapper {
 
         impl NdsCpu for $name {
             const I: usize = $idx;
+            fn mk(ds: &mut Nds) -> Self {
+                $name(ds as *mut Nds)
+            }
         }
 
         unsafe impl Send for $name {}
@@ -140,6 +143,7 @@ impl Core for Nds {
         Cpu::continue_running(&mut self.nds9());
         let mut nds7 = self.nds7();
         while self.time_7 < self.scheduler.now() {
+            Cpu::request_interrupt_idx(&mut nds7, Interrupt::Timer0 as u16);
             Cpu::continue_running(&mut nds7);
         }
     }
@@ -243,7 +247,7 @@ impl Nds {
             nds.memory.bios9 = bios.into();
         }
         if let Some(fw) = config.get_bios("ndsfw") {
-            nds.memory.firm = fw.into();
+            nds.spi.firm_data = fw.into();
         }
         nds.cart.load_rom(cart);
 
@@ -302,6 +306,7 @@ impl Default for Nds {
 /// access with I.
 pub trait NdsCpu: ArmSystem + DerefMut<Target = Nds> {
     const I: usize;
+    fn mk(ds: &mut Nds) -> Self;
 }
 
 /// Type for devices that both CPUs have.

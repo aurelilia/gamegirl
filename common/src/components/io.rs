@@ -116,6 +116,7 @@ pub fn section<T: NumExt>(addr: u32, new: u32, mask: u32) -> IoSection<T> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct IoSection<T> {
     value: u32,
     mask: u32,

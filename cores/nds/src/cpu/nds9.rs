@@ -22,13 +22,13 @@ use common::{
 };
 
 use crate::{
-    addr::{IE_H, IE_L, IF_H, IF_L, IME},
+    addr::{IE, IF, IME},
     Nds, Nds7, Nds9, NdsCpu,
 };
 
 impl ArmSystem for Nds9 {
     const IS_V5: bool = true;
-    const IF_ADDR: u32 = IF_L;
+    const IF_ADDR: u32 = IF;
     const EXCEPTION_VECTOR_BASE: u32 = 0xFFFF_0000;
 
     fn cpur(&self) -> &Cpu<Self> {

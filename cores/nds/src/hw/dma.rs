@@ -35,6 +35,7 @@ pub struct Dma {
 }
 
 /// NDS's 8 DMA channels, separated by CPU.
+/// TODO: Fill registers
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Dmas {
