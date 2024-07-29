@@ -10,6 +10,7 @@
 pub const IE: u32 = 0x200;
 pub const IF: u32 = 0x202;
 pub const WAITCNT: u32 = 0x204;
+pub const HALTCNT: u32 = 0x301;
 pub const IME: u32 = 0x208;
 pub const POSTFLG: u32 = 0x300;
 
@@ -26,6 +27,13 @@ pub const BG0HOFS: u32 = 0x10;
 pub const BG0VOFS: u32 = 0x12;
 pub const BG3VOFS: u32 = 0x1E;
 pub const BG2PA: u32 = 0x20;
+pub const BG2PB: u32 = 0x22;
+pub const BG2PC: u32 = 0x24;
+pub const BG2PD: u32 = 0x26;
+pub const BG2XL: u32 = 0x28;
+pub const BG2XH: u32 = 0x2A;
+pub const BG2YL: u32 = 0x2C;
+pub const BG2YH: u32 = 0x2E;
 pub const BG3PA: u32 = 0x30;
 pub const WIN0H: u32 = 0x40;
 pub const WIN1H: u32 = 0x42;

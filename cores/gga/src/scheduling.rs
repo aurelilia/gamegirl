@@ -19,7 +19,6 @@ use crate::{
 /// All scheduler events on the GGA.
 #[derive(Copy, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[repr(u16)]
 pub enum AdvEvent {
     /// Pause the emulation. Used by `advance_delta` to advance by a certain
     /// amount.
@@ -56,7 +55,6 @@ impl Kind for AdvEvent {}
 /// Events the APU generates.
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[repr(u16)]
 pub enum ApuEvent {
     /// Event from the generic CGB APU.
     Gen(GenApuEvent),
@@ -69,7 +67,6 @@ pub enum ApuEvent {
 /// Events the PPU generates.
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[repr(u16)]
 pub enum PpuEvent {
     /// Start of HBlank.
     HblankStart,

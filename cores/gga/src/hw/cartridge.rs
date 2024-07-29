@@ -8,10 +8,14 @@
 
 use std::{
     iter,
+    path::PathBuf,
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use common::{components::storage::GameSave, numutil::NumExt};
+use common::{
+    components::storage::{GameSave, Storage},
+    numutil::NumExt,
+};
 use FlashCmdStage::*;
 use SaveType::*;
 
@@ -144,6 +148,16 @@ impl Cartridge {
             buf.push(ch);
         }
         buf
+    }
+
+    pub fn with_rom_and_stored_ram(rom: Vec<u8>, path: Option<PathBuf>) -> Self {
+        let mut this = Self::default();
+        this.load_rom(rom);
+        let Some(ram) = Storage::load(path, this.title()) else {
+            return this;
+        };
+        this.load_save(ram);
+        this
     }
 }
 

@@ -87,21 +87,34 @@ impl PpuRegisters {
         iow16!(a, BG3CNT, s16.apply_io(&mut self.bg_cnt[3]));
 
         if matches!(a, 0x10..=0x1F) {
-            s16.apply(&mut self.bg_offsets[(a.us() & 0xF) >> 1]);
+            s16.mask(0x1FF)
+                .apply(&mut self.bg_offsets[(a.us() & 0xF) >> 1]);
             return (a & 1, 2);
         }
 
         for i in 0..2 {
-            let offs = (i * 0x10);
-            let mut scale = &mut self.bg_scale[i.us()];
+            let offs = i * 0x10;
+            let scale = &mut self.bg_scale[i.us()];
             iow16!(a, BG2PA + offs, scale.pa = s16.with(scale.pa as u16) as i16);
-            iow16!(a, BG2PB + offs, scale.pa = s16.with(scale.pb as u16) as i16);
-            iow16!(a, BG2PC + offs, scale.pa = s16.with(scale.pc as u16) as i16);
-            iow16!(a, BG2PD + offs, scale.pa = s16.with(scale.pd as u16) as i16);
-            iow16!(a, BG2XL + offs, s16.apply(&mut scale.xl));
-            iow16!(a, BG2XH + offs, s16.apply(&mut scale.xh));
-            iow16!(a, BG2YL + offs, s16.apply(&mut scale.yl));
-            iow16!(a, BG2YH + offs, s16.apply(&mut scale.yh));
+            iow16!(a, BG2PB + offs, scale.pb = s16.with(scale.pb as u16) as i16);
+            iow16!(a, BG2PC + offs, scale.pc = s16.with(scale.pc as u16) as i16);
+            iow16!(a, BG2PD + offs, scale.pd = s16.with(scale.pd as u16) as i16);
+            iow16!(a, BG2XL + offs, {
+                s16.apply(&mut scale.xl);
+                scale.latch_x();
+            });
+            iow16!(a, BG2XH + offs, {
+                s16.apply(&mut scale.xh);
+                scale.latch_x();
+            });
+            iow16!(a, BG2YL + offs, {
+                s16.apply(&mut scale.yl);
+                scale.latch_y();
+            });
+            iow16!(a, BG2YH + offs, {
+                s16.apply(&mut scale.yh);
+                scale.latch_y();
+            });
         }
 
         iow08!(a, WIN0H, s8.apply(&mut self.windows[0].right));
@@ -136,26 +149,6 @@ impl PpuRegisters {
             s32.with(0)
         );
         (0, 1)
-    }
-
-    pub fn write_mmio(&mut self, addr: u32, value: u16) {
-        match addr {
-            WININ => {
-                self.windows[0].control = (value.low() & 0x3F).into();
-                self.windows[1].control = (value.high() & 0x3F).into();
-            }
-            WINOUT => {
-                self.win_out = (value.low() & 0x3F).into();
-                self.win_obj = (value.high() & 0x3F).into();
-            }
-            MOSAIC => self.mosaic = value.into(),
-
-            BLDCNT => self.bldcnt = (value & 0x3FFF).into(),
-            BLDALPHA => self.bldalpha = (value & 0x1F1F).into(),
-            BLDY => self.bldy = cmp::min(16, value & 0x1F),
-
-            _ => (),
-        }
     }
 }
 

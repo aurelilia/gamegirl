@@ -23,11 +23,7 @@ use common::{
         Common,
     },
     common_functions,
-    components::{
-        scheduler::Scheduler,
-        storage::{GameSave, Storage},
-        thin_pager::ThinPager,
-    },
+    components::{scheduler::Scheduler, storage::GameSave, thin_pager::ThinPager},
     numutil::NumExt,
     Core, TimeS,
 };
@@ -40,13 +36,14 @@ use scheduling::PpuEvent;
 
 use crate::{
     hw::{dma::Dmas, timer::Timers},
-    scheduling::{AdvEvent, ApuEvent},
+    scheduling::AdvEvent,
 };
 
 pub mod addr;
 mod audio;
 mod cpu;
 pub mod hw;
+mod io;
 mod memory;
 pub mod ppu;
 mod scheduling;
@@ -176,36 +173,57 @@ impl GameGirlAdv {
         }
 
         self.c.restore_from(old_self.c);
-        self.init_memory();
-        Ppu::init_render(self);
+        self.setup_host_state();
     }
 
-    pub fn with_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
-        let (mut cart, is_elf) = if let Some(elf_read) = Self::decode_elf(&cart) {
-            (elf_read, true)
+    pub fn setup_host_state(&mut self) {
+        self.init_memory();
+        Ppu::init_render(self);
+        if let Some(bios) = self.c.config.get_bios("agb") {
+            self.memory.bios = bios.into();
+        }
+    }
+
+    pub fn initialize(&mut self) {
+        Apu::init_scheduler(self);
+        self.scheduler
+            .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
+        self.scheduler
+            .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
+        self.c.audio_buffer.set_input_sr(2usize.pow(15));
+        self.setup_host_state();
+        // self.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO
+        // still buggy
+    }
+
+    pub fn new(cart: Option<Vec<u8>>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
+        let cart = if let Some(cart) = cart {
+            let mut cart = if let Some(elf_read) = Self::decode_elf(&cart) {
+                elf_read
+            } else {
+                cart
+            };
+            ThinPager::normalize(&mut cart);
+            Cartridge::with_rom_and_stored_ram(cart, path)
         } else {
-            (cart, false)
+            Cartridge::default()
         };
 
-        let mut gga = Box::<GameGirlAdv>::default();
-        gga.c.config = config.clone();
-        // gga.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO still buggy
-        ThinPager::normalize(&mut cart);
-        gga.cart.load_rom(cart);
-        if let Some(save) = Storage::load(path, gga.cart.title()) {
-            gga.cart.load_save(save);
-        }
-        if let Some(bios) = config.get_bios("agb") {
-            gga.memory.bios = bios.into();
-        }
-        gga.init_memory();
-        Ppu::init_render(&mut gga);
+        let mut gg = Box::<GameGirlAdv>::new(GameGirlAdv {
+            cpu: Cpu::default(),
+            memory: Memory::default(),
+            ppu: Ppu::default(),
+            apu: Apu::default(),
+            dma: Dmas::default(),
+            timers: Timers::default(),
+            cart,
+            serial: Serial::default(),
 
-        if is_elf {
-            gga.skip_bootrom();
-        }
-
-        gga
+            scheduler: Scheduler::default(),
+            c: Common::with_config(config.clone()),
+        });
+        gg.initialize();
+        gg
     }
 
     fn decode_elf(cart: &[u8]) -> Option<Vec<u8>> {
@@ -231,7 +249,6 @@ impl GameGirlAdv {
     }
 }
 
-/// TODO default really doesn't make much sense, honestly
 impl Default for GameGirlAdv {
     fn default() -> Self {
         let mut gg = Self {
@@ -247,17 +264,7 @@ impl Default for GameGirlAdv {
             scheduler: Scheduler::default(),
             c: Common::default(),
         };
-
-        // Initialize scheduler events
-        gg.scheduler
-            .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
-        Apu::init_scheduler(&mut gg);
-        gg.scheduler
-            .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
-        gg.scheduler
-            .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
-
-        gg.c.audio_buffer.set_input_sr(2usize.pow(15));
+        gg.initialize();
         gg
     }
 }

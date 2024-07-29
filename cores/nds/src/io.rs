@@ -131,10 +131,11 @@ impl Nds {
         }
 
         // Shared GPU stuff
-        iow16!(a, DISPSTAT, {
-            let disp: u16 = self.gpu.dispstat[DS::I].into();
-            self.gpu.dispstat[DS::I] = ((disp & 0b111) | (s16.raw() & !0b1100_0111)).into();
-        });
+        iow16!(
+            a,
+            DISPSTAT,
+            s16.mask(0xFF_38).apply_io(&mut self.gpu.dispstat[DS::I])
+        );
 
         // Input
         iow16!(a, KEYCNT, s16.apply_io(&mut self.input.cnt[DS::I]));

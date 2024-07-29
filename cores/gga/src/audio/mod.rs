@@ -117,6 +117,8 @@ impl Apu {
             AdvEvent::ApuEvent(ApuEvent::PushSample),
             SAMPLE_EVERY_N_CLOCKS,
         );
+        gg.scheduler
+            .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
     }
 
     fn push_output(gg: &mut GameGirlAdv) {

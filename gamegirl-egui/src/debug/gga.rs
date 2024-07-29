@@ -29,7 +29,7 @@ pub fn ui_menu(app: &mut App, ui: &mut eframe::egui::Ui) {
         app.debugger_window_states[2] ^= ui.button("Remote Debugger").clicked();
     }
     ui.separator();
-    app.debugger_window_states[8] ^= ui.button("PPU Register Viewer").clicked();
+    app.debugger_window_states[7] ^= ui.button("PPU Register Viewer").clicked();
     app.debugger_window_states[3] ^= ui.button("BG Tileset Viewer").clicked();
     app.debugger_window_states[4] ^= ui.button("OBJ Tileset Viewer").clicked();
     ui.separator();

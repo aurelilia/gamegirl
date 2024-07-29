@@ -7,7 +7,11 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use arm_cpu::{Cpu, Interrupt};
-use common::{components::scheduler::Scheduler, numutil::NumExt, Time, TimeS};
+use common::{
+    components::{io::IoSection, scheduler::Scheduler},
+    numutil::NumExt,
+    Time, TimeS,
+};
 use modular_bitfield::{bitfield, specifiers::*};
 
 use crate::{audio::Apu, scheduling::AdvEvent, GameGirlAdv};
@@ -76,13 +80,18 @@ impl Timers {
     }
 
     /// Handle CTRL write by scheduling timer as appropriate.
-    pub fn hi_write(&mut self, sched: &mut Scheduler<AdvEvent>, timer: usize, new_ctrl: u16) {
+    pub fn hi_write(
+        &mut self,
+        sched: &mut Scheduler<AdvEvent>,
+        timer: usize,
+        new_ctrl: IoSection<u16>,
+    ) {
         let now = sched.now();
         // Update current counter value first
         self.counters[timer] = self.time_read(timer, now);
 
         let old_ctrl = self.control[timer];
-        let new_ctrl: TimerCtrl = new_ctrl.into();
+        let new_ctrl = new_ctrl.apply_io_ret(&mut self.control[timer]);
         let was_scheduled = old_ctrl.enable() && (timer == 0 || !old_ctrl.count_up());
         let is_scheduled = new_ctrl.enable() && (timer == 0 || !new_ctrl.count_up());
 

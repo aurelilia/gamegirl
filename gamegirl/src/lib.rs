@@ -115,7 +115,7 @@ pub fn load_cart(
         #[cfg(feature = "nds")]
         _ if _is_nds => nds::Nds::with_cart(cart, path, config),
         #[cfg(feature = "gga")]
-        _ if _is_gga => gga::GameGirlAdv::with_cart(cart, path, config),
+        _ if _is_gga => gga::GameGirlAdv::new(Some(cart), path, config),
         // #[cfg(feature = "psx")]
         // _ if _is_psx => psx::PlayStation::with_iso(cart, path, config, _ogl_ctx, _ogl_tex_id),
         // #[cfg(feature = "nes")]
@@ -123,7 +123,7 @@ pub fn load_cart(
         #[cfg(feature = "gga")]
         _ => {
             log::error!("Failed to detect cart! Guessing GGA.");
-            gga::GameGirlAdv::with_cart(cart, path, config)
+            gga::GameGirlAdv::new(Some(cart), path, config)
         }
 
         #[cfg(not(feature = "gga"))]

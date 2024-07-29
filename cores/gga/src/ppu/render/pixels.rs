@@ -124,7 +124,7 @@ impl PpuRender {
         }
 
         // Consider green swap
-        if self.r.greepswap.green_swap_en() {
+        if self.r.greenswap.green_swap_en() {
             for x in (0..WIDTH).step_by(2) {
                 let a = self.pixels[xy2d(x, y)][1];
                 let b = self.pixels[xy2d(x + 1, y)][1];
