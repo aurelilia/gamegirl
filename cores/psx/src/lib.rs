@@ -56,8 +56,7 @@ pub struct PlayStation {
     pub memory: Memory,
     pub iso: Iso,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub debugger: PsxDebugger,
     scheduler: Scheduler<PsxEvent>,
 

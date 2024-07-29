@@ -7,7 +7,7 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 use std::{
-    fs, mem,
+    fs,
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
     time::Instant,

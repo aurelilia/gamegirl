@@ -1,14 +1,15 @@
-use std::{iter, mem, sync::Arc};
+use std::{mem, sync::Arc};
 
 use common::Colour;
 use eframe::egui::{Color32, TextureOptions};
 use egui::ColorImage;
 
+#[cfg(feature = "hqx")]
 macro_rules! hqx {
     ($mag:ident, $scale:expr, $size:expr, $input:expr) => {{
         let src: Vec<u32> = unsafe { mem::transmute($input) };
         let mut dst = Vec::with_capacity(src.len() * $scale * $scale);
-        dst.extend(iter::repeat(0).take(src.len() * $scale * $scale));
+        dst.extend(std::iter::repeat(0).take(src.len() * $scale * $scale));
 
         hqx::$mag(&src, &mut dst, $size[0], $size[1]);
         (

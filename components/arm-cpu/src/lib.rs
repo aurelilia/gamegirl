@@ -18,8 +18,7 @@ mod optimizations;
 pub mod registers;
 mod thumb;
 
-use std::sync::Arc;
-use std::fmt::Write;
+use std::{fmt::Write, sync::Arc};
 
 use access::{CODE, NONSEQ, SEQ};
 use common::numutil::NumExt;
@@ -56,11 +55,9 @@ pub struct Cpu<S: ArmSystem + 'static> {
 
     block_ended: bool,
     pipeline_valid: bool,
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub cache: Cache<S>,
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     waitloop: WaitloopData,
 }
 
@@ -239,7 +236,7 @@ impl<S: ArmSystem> Cpu<S> {
             };
 
             let mut buf = String::with_capacity(100);
-            let num = ('4' as u8 + S::IS_V5 as u8 ) as char;
+            let num = ('4' as u8 + S::IS_V5 as u8) as char;
             buf.push(num);
             for reg in gg.cpu().registers.iter().enumerate() {
                 let reg = reg.1;

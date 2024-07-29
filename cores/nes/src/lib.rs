@@ -49,8 +49,7 @@ pub struct Nes {
     pub cart: Cartridge,
     pub joypad: Joypad,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub debugger: NesDebugger,
     scheduler: Scheduler<NesEvent>,
 

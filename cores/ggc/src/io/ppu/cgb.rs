@@ -27,11 +27,9 @@ pub struct Cgb {
     pub(super) obj_palettes: [CgbColour; 32],
 
     pub(super) colour_correction: bool,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub(super) dmg_used_x_obj_cords: Option<[Option<u8>; 10]>,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "super::serde_bool_arr"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "super::serde_bool_arr"))]
     pub unavailable_pixels: [bool; 160],
 }
 

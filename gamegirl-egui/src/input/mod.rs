@@ -22,8 +22,7 @@ pub use hotkeys::HOTKEYS;
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Input {
     mappings: HashMap<InputSource, InputAction>,
-    #[serde(skip)]
-    #[serde(default)]
+    #[serde(skip, default)]
     pub(crate) pending: Option<InputAction>,
 }
 

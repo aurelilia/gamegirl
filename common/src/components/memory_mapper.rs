@@ -39,11 +39,9 @@ pub trait MemoryMappedSystem<const SIZE: usize>: Sized {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryMapper<const SIZE: usize> {
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_pages::<SIZE>"))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     read_pages: Box<[*mut u8]>,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_pages::<SIZE>"))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     write_pages: Box<[*mut u8]>,
 }
 

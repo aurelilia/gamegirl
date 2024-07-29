@@ -6,13 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::iter;
-
-use common::{numutil::NumExt, Core};
-use eframe::{
-    egui::{load::SizedTexture, Context, Label, RichText, TextureOptions, Ui},
-    epaint::{vec2, ColorImage, ImageData, ImageDelta, TextureId},
-};
+use common::Core;
+use eframe::egui::{Context, Label, RichText, Ui};
 use gamegirl::nds::{Nds, NdsCpu};
 
 use super::Windows;

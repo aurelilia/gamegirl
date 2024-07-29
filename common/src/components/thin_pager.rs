@@ -17,8 +17,7 @@ pub const RO: u8 = 1 << 1;
 #[derive(Default, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThinPager {
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub pages: UnsafeArc<Vec<Page>>,
 }
 

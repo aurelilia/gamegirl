@@ -78,7 +78,8 @@ impl Debugger {
 
     #[inline]
     pub fn tracing(&self) -> bool {
-        self.traced_instructions.is_some() && self.traced_instructions.as_ref().unwrap().len() <= 20_000_000
+        self.traced_instructions.is_some()
+            && self.traced_instructions.as_ref().unwrap().len() <= 20_000_000
     }
 
     /// Add another instruction to trace.

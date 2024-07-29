@@ -44,15 +44,13 @@ const CGB_BANK: u16 = 3;
 /// DMG/CGB mode.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Ppu {
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_bool_arr"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "serde_bool_arr"))]
     bg_occupied_pixels: [bool; 160],
     window_line: u8,
     line: u8,
     kind: PpuKind,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default = "serde_colour_arr"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "serde_colour_arr"))]
     pixels: [Colour; 160 * 144],
 
     /// Info about what event to schedule in case of LCDC bit 7 being

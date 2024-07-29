@@ -17,4 +17,10 @@ modular-bitfield.workspace = true
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_arrays", "common/serde", "arm-cpu/serde"]
+serde = [
+    "dep:serde",
+    "dep:serde_arrays",
+    "arrayvec/serde",
+    "common/serde",
+    "arm-cpu/serde",
+]

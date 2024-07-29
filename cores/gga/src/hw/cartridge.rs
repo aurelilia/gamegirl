@@ -24,8 +24,7 @@ const FLASH128_ID: [u8; 2] = [0xC2, 0x09];
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cartridge {
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub rom: Vec<u8>,
     pub ram: Vec<u8>,
     pub save_type: SaveType,

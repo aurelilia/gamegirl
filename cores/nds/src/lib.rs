@@ -129,8 +129,7 @@ pub struct Nds {
     scheduler: Scheduler<NdsEvent>,
     time_7: Time,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub c: Common,
 }
 

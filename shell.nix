@@ -14,6 +14,8 @@ let
     trunk
 
     # Useful tools
+    cargo-llvm-lines
+    cargo-bloat
     cargo-edit
     cargo-flamegraph
     cargo-watch

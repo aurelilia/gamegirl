@@ -72,8 +72,7 @@ pub struct Ppu {
     pub oam: Arc<[u8]>,
 
     // Renderer
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     render: PpuRendererKind,
 }
 

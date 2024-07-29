@@ -128,13 +128,11 @@ pub struct Gpu {
     gp0_cmd_buf: ArrayVec<u32, 12>,
     gp0_image_remaining: usize,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     render: Option<GlRender>,
 
     /// The last frame finished by the GPU, ready for display.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub last_frame: Option<Vec<Colour>>,
 }
 

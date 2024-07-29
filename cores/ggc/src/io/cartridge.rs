@@ -26,8 +26,7 @@ const BANK_COUNT_1MB: u16 = 64;
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Cartridge {
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub rom: Vec<u8>,
     /// Bank of the ROM area 0-4000. This is used by some MBCs.
     pub rom0_bank: u16,

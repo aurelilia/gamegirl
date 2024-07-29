@@ -15,8 +15,7 @@ use crate::Colour;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct FrameBuffer {
     /// Buffer of frames to be displayed.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     buffer: VecDeque<Vec<Colour>>,
     /// Number of frames to skip before adding a frame to the buffer.
     pub frameskip: usize,
