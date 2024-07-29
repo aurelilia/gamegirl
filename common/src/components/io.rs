@@ -129,7 +129,7 @@ impl<T: NumExt> IoSection<T> {
     }
 
     pub fn mask(mut self, mask: u32) -> Self {
-        self.value &= mask;
+        self.mask &= mask;
         self
     }
 
