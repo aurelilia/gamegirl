@@ -22,6 +22,7 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 #![feature(if_let_guard)]
+#![feature(isqrt)]
 
 mod addr;
 mod cpu;
@@ -37,6 +38,7 @@ use std::{
     path::PathBuf,
 };
 
+use addr::{BIOSPROT, SOUNDBIAS};
 use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu, Interrupt};
 use common::{
     common::options::{EmulateOptions, SystemConfig},
@@ -168,7 +170,7 @@ impl Core for Nds {
             let mut ds = self.nds7();
             for i in 0..header.arm7_size {
                 ds.set(
-                    header.arm7_entry_addr + i,
+                    header.arm7_ram_addr + i,
                     self.cart.rom[header.arm7_offset.us() + i.us()],
                 )
             }
@@ -185,7 +187,7 @@ impl Core for Nds {
             let mut ds = self.nds9();
             for i in 0..header.arm9_size {
                 ds.set(
-                    header.arm9_entry_addr + i,
+                    header.arm9_ram_addr + i,
                     self.cart.rom[header.arm9_offset.us() + i.us()],
                 )
             }
@@ -202,6 +204,8 @@ impl Core for Nds {
         // Setup system state
         self.memory.wram_status = WramStatus::All7;
         self.memory.postflg = true;
+        self.nds7().set_mmio(BIOSPROT, 0x1204u16);
+        self.nds9().set_mmio(SOUNDBIAS, 0x200u16);
     }
 
     fn make_save(&self) -> Option<GameSave> {

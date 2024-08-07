@@ -263,7 +263,7 @@ impl Default for Memory {
         Self {
             psram: Box::new([0; 4 * MB]),
             wram: Box::new([0; 32 * KB]),
-            wram_status: WramStatus::All9,
+            wram_status: WramStatus::All7,
             postflg: false,
             bios7: FREEBIOS7.into(),
             bios9: FREEBIOS9.into(),

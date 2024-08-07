@@ -185,6 +185,7 @@ impl Nds7 {
             io16!(a, SPIDATA, self.spi.data_out);
 
             // Sound
+            io16!(a, SOUNDCNT, self.apu.control);
             io16!(a, SOUNDBIAS, self.apu.bias);
 
             self.get_mmio_shared::<Self>(a)
@@ -220,6 +221,7 @@ impl Nds7 {
             });
 
             // Sound
+            iow16!(a, SOUNDCNT, s16.mask(0xFFB7).apply(&mut self.apu.control));
             iow16!(a, SOUNDBIAS, s16.apply(&mut self.apu.bias));
 
             self.set_mmio_shared::<Self>(a, v, m)
@@ -269,9 +271,9 @@ impl Nds9 {
             io32!(a, DIV_REM_H, (self.div.rem >> 32) as u32);
             // SQRT
             io16!(a, SQRTCNT_L, self.sqrt.ctrl.into());
-            io32!(a, SQRT_RESULT_L, self.sqrt.result);
+            io32!(a, SQRT_RESULT, self.sqrt.result);
             io32!(a, SQRT_INPUT, self.sqrt.input as u32);
-            io32!(a, SQRT_INPUT, (self.sqrt.input >> 32) as u32);
+            io32!(a, SQRT_INPUT_H, (self.sqrt.input >> 32) as u32);
 
             self.get_mmio_shared::<Self>(a)
         })
@@ -339,11 +341,42 @@ impl Nds9 {
             }
 
             // Math
-            // TODO React to writes.
-            iow16!(a, DIVCNT_L, s16.apply_io(&mut self.div.ctrl));
+            iow16!(a, DIVCNT_L, {
+                s16.mask(0x3).apply_io(&mut self.div.ctrl);
+                self.div.update();
+            });
+            iow32!(a, DIV_NUMER, {
+                self.div.numer =
+                    (self.div.numer & !0xFFFF_FFFF) | s32.with(self.div.numer as u32) as u64;
+                self.div.update();
+            });
+            iow32!(a, DIV_NUMER_H, {
+                self.div.numer = (self.div.numer & 0xFFFF_FFFF)
+                    | (s32.with((self.div.numer >> 32) as u32) as u64) << 32;
+                self.div.update();
+            });
+            iow32!(a, DIV_DENOM, {
+                self.div.denom =
+                    (self.div.denom & !0xFFFF_FFFF) | s32.with(self.div.denom as u32) as u64;
+                self.div.update();
+            });
+            iow32!(a, DIV_DENOM_H, {
+                self.div.denom = (self.div.denom & 0xFFFF_FFFF)
+                    | (s32.with((self.div.denom >> 32) as u32) as u64) << 32;
+                self.div.update();
+            });
             // SQRT
             iow16!(a, SQRTCNT_L, s16.apply_io(&mut self.sqrt.ctrl));
-
+            iow32!(a, SQRT_INPUT, {
+                self.sqrt.input =
+                    (self.sqrt.input & !0xFFFF_FFFF) | s32.with(self.sqrt.input as u32) as u64;
+                self.sqrt.update();
+            });
+            iow32!(a, SQRT_INPUT_H, {
+                self.sqrt.input = (self.sqrt.input & 0xFFFF_FFFF)
+                    | (s32.with((self.sqrt.input >> 32) as u32) as u64) << 32;
+                self.sqrt.update();
+            });
             self.set_mmio_shared::<Self>(a, v, m)
         })
     }

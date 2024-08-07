@@ -29,6 +29,7 @@ pub const VRAMCNT_I: u32 = 0x249;
 pub const VRAMSTAT: u32 = 0x240;
 pub const WRAMSTAT: u32 = 0x241;
 pub const HALTCNT: u32 = 0x301;
+pub const BIOSPROT: u32 = 0x308;
 
 // Graphics
 pub const DISPCNT_L: u32 = 0x0;
@@ -91,9 +92,9 @@ pub const DIV_REM: u32 = 0x2A8;
 pub const DIV_REM_H: u32 = 0x2AC;
 pub const SQRTCNT_L: u32 = 0x2B0;
 pub const SQRTCNT_H: u32 = 0x2B2;
-pub const SQRT_RESULT_L: u32 = 0x2B4;
-pub const SQRT_RESULT_H: u32 = 0x2B6;
+pub const SQRT_RESULT: u32 = 0x2B4;
 pub const SQRT_INPUT: u32 = 0x2B8;
+pub const SQRT_INPUT_H: u32 = 0x2BC;
 
 // IPC FIFO
 pub const IPCSYNC: u32 = 0x180;
@@ -119,4 +120,5 @@ pub const AUXSPICMD_H: u32 = 0x1AC;
 pub const AUXSPIIN: u32 = 0x100010;
 
 // Audio
+pub const SOUNDCNT: u32 = 0x500;
 pub const SOUNDBIAS: u32 = 0x504;

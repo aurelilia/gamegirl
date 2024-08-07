@@ -16,6 +16,7 @@ pub const SAMPLE_EVERY_N_CLOCKS: TimeS = (NDS9_CLOCK / 48000) as TimeS;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Apu {
     pub bias: u16,
+    pub control: u16
 }
 
 impl Apu {
