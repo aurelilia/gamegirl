@@ -56,6 +56,7 @@ pub struct Memory {
     wram: Box<[u8]>,
     pub wram_status: WramStatus,
     pub(super) postflg: bool,
+    pub(crate) exmem: u16,
 
     pub bios7: Box<[u8]>,
     pub bios9: Box<[u8]>,
@@ -265,6 +266,7 @@ impl Default for Memory {
             wram: Box::new([0; 32 * KB]),
             wram_status: WramStatus::All7,
             postflg: false,
+            exmem: 0,
             bios7: FREEBIOS7.into(),
             bios9: FREEBIOS9.into(),
 

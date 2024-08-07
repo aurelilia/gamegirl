@@ -65,6 +65,7 @@ impl Nds {
 
         // Misc
         io08!(a, POSTFLG, self.memory.postflg as u8);
+        io16!(a, EXMEM, self.memory.exmem);
 
         log::info!("Read from unknown IO register 0x{a:X}");
         FAILED_READ
@@ -327,6 +328,7 @@ impl Nds9 {
                 dsx.memory.wram_status = unsafe { mem::transmute(s8.raw() & 3) };
                 dsx.update_wram();
             });
+            iow16!(a, EXMEM, s16.mask(0xE8FF).apply(&mut self.memory.exmem));
             for i in H..=I {
                 iow08!(
                     a,
