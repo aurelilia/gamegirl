@@ -21,6 +21,10 @@ opt-level = 3
 inherits = "release"
 panic = "unwind"
 
+[profile.release-debug]
+inherits = "release"
+debug = true
+
 [profile.release-fast]
 inherits = "release"
 lto = false

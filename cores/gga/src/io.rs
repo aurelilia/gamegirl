@@ -121,9 +121,9 @@ impl GameGirlAdv {
                 if value.bit(14) != prev.bit(14) {
                     self.memory.prefetch.active = false;
                     self.memory.prefetch.restart = true;
-                    self.cpu.cache.invalidate_rom();
+                    self.invalidate_rom_cache();
                 } else if value.bits(2, 9) != prev.bits(2, 9) {
-                    self.cpu.cache.invalidate_rom();
+                    self.invalidate_rom_cache();
                 }
             });
 
@@ -229,5 +229,11 @@ impl GameGirlAdv {
             );
             FAILED_WRITE
         })
+    }
+
+    fn invalidate_rom_cache(&mut self) {
+        for i in (0x800_0000..0xDFF_FFFF).step_by(0x4000) {
+            self.cpu.cache.invalidate_address(i);
+        }
     }
 }

@@ -11,17 +11,18 @@ use common::numutil::NumExt;
 use super::{
     super::interface::{ArmSystem, SysWrapper},
     decode::*,
+    ThumbExecutor,
 };
 use crate::{access::*, registers::Flag::*};
 
-impl<S: ArmSystem> SysWrapper<S> {
+impl<S: ArmSystem> ThumbExecutor for SysWrapper<S> {
     // UND
-    pub(super) fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
+    fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
         self.und_inst(inst);
     }
 
     // THUMB.1/2
-    pub(super) fn thumb_arithmetic<const KIND: Thumb12Op>(&mut self, inst: ThumbInst) {
+    fn thumb_arithmetic<const KIND: Thumb12Op>(&mut self, inst: ThumbInst) {
         use Thumb12Op::*;
 
         let d = inst.reg(0);
@@ -50,7 +51,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.3
-    pub(super) fn thumb_3<const KIND: Thumb3Op>(&mut self, inst: ThumbInst) {
+    fn thumb_3<const KIND: Thumb3Op>(&mut self, inst: ThumbInst) {
         use Thumb3Op::*;
 
         let d = inst.reg(8);
@@ -71,7 +72,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.4
-    pub(super) fn thumb_alu(&mut self, inst: ThumbInst) {
+    fn thumb_alu(&mut self, inst: ThumbInst) {
         use Thumb4Op::*;
 
         let d = inst.reg(0);
@@ -132,25 +133,25 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.5
-    pub(super) fn thumb_hi_add(&mut self, inst: ThumbInst) {
+    fn thumb_hi_add(&mut self, inst: ThumbInst) {
         let (s, d) = inst.reg16();
         let res = self.reg(d.u32()).wrapping_add(self.reg(s.u32()));
         self.set_reg(d.u32(), res);
     }
 
-    pub(super) fn thumb_hi_cmp(&mut self, inst: ThumbInst) {
+    fn thumb_hi_cmp(&mut self, inst: ThumbInst) {
         let (s, d) = inst.reg16();
         let rs = self.reg(s.u32());
         let rd = self.reg(d.u32());
         self.cpu().sub::<true>(rd, rs);
     }
 
-    pub(super) fn thumb_hi_mov(&mut self, inst: ThumbInst) {
+    fn thumb_hi_mov(&mut self, inst: ThumbInst) {
         let (s, d) = inst.reg16();
         self.set_reg(d.u32(), self.reg(s.u32()));
     }
 
-    pub(super) fn thumb_hi_bx(&mut self, inst: ThumbInst) {
+    fn thumb_hi_bx(&mut self, inst: ThumbInst) {
         let (s, d) = inst.reg16();
         if d > 7 {
             // BLX
@@ -180,7 +181,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.6
-    pub(super) fn thumb_ldr6(&mut self, inst: ThumbInst) {
+    fn thumb_ldr6(&mut self, inst: ThumbInst) {
         let d = inst.reg(8);
         let n = inst.imm8();
 
@@ -191,7 +192,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.7/8
-    pub(super) fn thumb_ldrstr78<const O: ThumbStrLdrOp>(&mut self, inst: ThumbInst) {
+    fn thumb_ldrstr78<const O: ThumbStrLdrOp>(&mut self, inst: ThumbInst) {
         use ThumbStrLdrOp::*;
 
         let d = inst.reg(0);
@@ -226,7 +227,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.9
-    pub(super) fn thumb_ldrstr9<const O: ThumbStrLdrOp>(&mut self, inst: ThumbInst) {
+    fn thumb_ldrstr9<const O: ThumbStrLdrOp>(&mut self, inst: ThumbInst) {
         use ThumbStrLdrOp::*;
 
         let d = inst.reg(0);
@@ -252,7 +253,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.10
-    pub(super) fn thumb_ldrstr10<const STR: bool>(&mut self, inst: ThumbInst) {
+    fn thumb_ldrstr10<const STR: bool>(&mut self, inst: ThumbInst) {
         let d = inst.reg(0);
         let n = inst.imm5();
 
@@ -272,7 +273,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.11
-    pub(super) fn thumb_str_sp(&mut self, inst: ThumbInst) {
+    fn thumb_str_sp(&mut self, inst: ThumbInst) {
         let n = inst.imm8();
         let d = inst.reg(8);
         let rd = self.low(d);
@@ -281,7 +282,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         self.write::<u32>(addr, rd, NONSEQ);
     }
 
-    pub(super) fn thumb_ldr_sp(&mut self, inst: ThumbInst) {
+    fn thumb_ldr_sp(&mut self, inst: ThumbInst) {
         let n = inst.imm8();
         let d = inst.reg(8);
         self.cpu().registers[d.us()] =
@@ -291,7 +292,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.12
-    pub(super) fn thumb_rel_addr<const SP: bool>(&mut self, inst: ThumbInst) {
+    fn thumb_rel_addr<const SP: bool>(&mut self, inst: ThumbInst) {
         let n = inst.imm8();
         let d = inst.reg(8);
         if SP {
@@ -302,7 +303,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.13
-    pub(super) fn thumb_sp_offs(&mut self, inst: ThumbInst) {
+    fn thumb_sp_offs(&mut self, inst: ThumbInst) {
         let n = inst.imm7();
         let sp = self.cpur().sp();
         if inst.is_bit(7) {
@@ -313,7 +314,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.14
-    pub(super) fn thumb_push<const SP: bool>(&mut self, inst: ThumbInst) {
+    fn thumb_push<const SP: bool>(&mut self, inst: ThumbInst) {
         let mut sp = self.cpu().sp();
         let mut kind = NONSEQ;
 
@@ -338,7 +339,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         self.cpu().access_type = NONSEQ;
     }
 
-    pub(super) fn thumb_pop<const PC: bool>(&mut self, inst: ThumbInst) {
+    fn thumb_pop<const PC: bool>(&mut self, inst: ThumbInst) {
         let mut sp = self.cpu().sp();
         let mut kind = NONSEQ;
 
@@ -366,7 +367,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.15
-    pub(super) fn thumb_stmia(&mut self, inst: ThumbInst) {
+    fn thumb_stmia(&mut self, inst: ThumbInst) {
         let b = inst.reg(8);
         let mut kind = NONSEQ;
         let mut base_rlist_addr = None;
@@ -397,7 +398,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         self.cpu().access_type = NONSEQ;
     }
 
-    pub(super) fn thumb_ldmia(&mut self, inst: ThumbInst) {
+    fn thumb_ldmia(&mut self, inst: ThumbInst) {
         let b = inst.reg(8);
         let mut kind = NONSEQ;
 
@@ -417,7 +418,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.16
-    pub(super) fn thumb_bcond<const COND: u16>(&mut self, inst: ThumbInst) {
+    fn thumb_bcond<const COND: u16>(&mut self, inst: ThumbInst) {
         let condition = self.cpu().eval_condition(COND);
         if condition {
             let nn = (inst.imm8() as i8 as i32) * 2; // Step 2
@@ -429,12 +430,12 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.17
-    pub(super) fn thumb_swi(&mut self, _inst: ThumbInst) {
+    fn thumb_swi(&mut self, _inst: ThumbInst) {
         self.swi();
     }
 
     // THUMB.18
-    pub(super) fn thumb_br(&mut self, inst: ThumbInst) {
+    fn thumb_br(&mut self, inst: ThumbInst) {
         let nn = (inst.imm10() as i32) * 2; // Step 2
         let cpu = self.cpu();
         let pc = cpu.pc();
@@ -443,7 +444,7 @@ impl<S: ArmSystem> SysWrapper<S> {
     }
 
     // THUMB.19
-    pub(super) fn thumb_set_lr(&mut self, inst: ThumbInst) {
+    fn thumb_set_lr(&mut self, inst: ThumbInst) {
         let lr = self
             .cpur()
             .pc()
@@ -451,7 +452,7 @@ impl<S: ArmSystem> SysWrapper<S> {
         self.cpu().set_lr(lr);
     }
 
-    pub(super) fn thumb_bl<const THUMB: bool>(&mut self, inst: ThumbInst) {
+    fn thumb_bl<const THUMB: bool>(&mut self, inst: ThumbInst) {
         let pc = self.cpu().pc();
         self.set_pc(self.cpur().lr().wrapping_add(inst.imm11()));
         self.cpu().set_lr(pc - 1);

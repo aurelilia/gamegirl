@@ -18,7 +18,7 @@ mod optimizations;
 pub mod registers;
 mod thumb;
 
-use std::{fmt::Write, sync::Arc};
+use std::fmt::Write;
 
 use access::{CODE, NONSEQ, SEQ};
 use common::numutil::NumExt;
@@ -75,7 +75,7 @@ impl<S: ArmSystem> Cpu<S> {
             if let Some(cache) = gg.cpu().cache.get(pc) {
                 Cpu::run_cache(gg, cache);
                 return;
-            } else if S::can_cache_at(pc) {
+            } else if pc < 0x1000_0000 {
                 Cpu::try_make_cache(gg);
                 return;
             }
@@ -90,7 +90,7 @@ impl<S: ArmSystem> Cpu<S> {
         if gg.cpu().flag(Thumb) {
             let (inst, _, pc) = Self::fetch_next_inst::<u16>(gg);
             gg.will_execute(pc);
-            gg.execute_inst_thumb(inst.u16());
+            gg.execute_thumb(inst.u16());
         } else {
             let (inst, _, pc) = Self::fetch_next_inst::<u32>(gg);
             gg.will_execute(pc);
@@ -177,7 +177,7 @@ impl<S: ArmSystem> Cpu<S> {
             }
             gg.cpu()
                 .cache
-                .put(start_pc, CacheEntry::Thumb(Arc::new(block)));
+                .put(start_pc, CacheEntry::Thumb(Box::leak(Box::new(block))));
         } else {
             let mut block = Vec::with_capacity(5);
             while !gg.cpu().block_ended {
@@ -207,7 +207,7 @@ impl<S: ArmSystem> Cpu<S> {
             }
             gg.cpu()
                 .cache
-                .put(start_pc, CacheEntry::Arm(Arc::new(block)));
+                .put(start_pc, CacheEntry::Arm(Box::leak(Box::new(block))));
         }
     }
 

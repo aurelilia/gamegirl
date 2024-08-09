@@ -66,9 +66,5 @@ impl ArmSystem for Nds7 {
         &mut self.c.debugger
     }
 
-    fn can_cache_at(_addr: u32) -> bool {
-        false
-    }
-
     fn will_execute(&mut self, _pc: u32) {}
 }

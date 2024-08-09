@@ -8,10 +8,13 @@
 
 //! Handlers for ARM instructions.
 
+#[allow(unused)]
+mod decode;
 mod lut;
 
 use bitmatch::bitmatch;
 use common::numutil::{NumExt, U32Ext};
+use decode::{ArmAluOp, ArmLdrStrOp, ArmMulOp, ArmQclzOp};
 
 use super::interface::{ArmSystem, SysWrapper};
 use crate::{
@@ -26,6 +29,25 @@ use crate::{
 
 pub type ArmHandler<S> = fn(&mut SysWrapper<S>, ArmInst);
 pub type ArmLut<S> = [ArmHandler<S>; 256];
+
+#[allow(unused)]
+trait ArmExecutor {
+    fn arm_unknown_opcode(&mut self, inst: ArmInst);
+    fn arm_b<const BL: bool>(&mut self, inst: ArmInst);
+    fn arm_bx(&mut self, inst: ArmInst);
+    fn arm_swi(&mut self, inst: ArmInst);
+    fn arm_alu_reg<const OP: ArmAluOp>(&mut self, inst: ArmInst);
+    fn arm_alu_imm<const OP: ArmAluOp>(&mut self, inst: ArmInst);
+    fn arm_mul<const OP: ArmMulOp>(&mut self, inst: ArmInst);
+    fn arm_clz_q<const OP: ArmQclzOp>(&mut self, inst: ArmInst);
+    fn arm_msr(&mut self, inst: ArmInst);
+    fn arm_mrs(&mut self, inst: ArmInst);
+    fn arm_ldrstr<const OP: ArmLdrStrOp>(&mut self, inst: ArmInst);
+    fn arm_ldm_stm<const LDR: bool>(&mut self, inst: ArmInst);
+    fn arm_swp<const WORD: bool>(&mut self, inst: ArmInst);
+    fn arm_mrc(&mut self, inst: ArmInst);
+    fn arm_mcr(&mut self, inst: ArmInst);
+}
 
 impl<S: ArmSystem> SysWrapper<S> {
     pub fn execute_inst_arm(&mut self, inst: u32) {
@@ -895,5 +917,9 @@ pub struct ArmInst(pub u32);
 impl ArmInst {
     pub fn reg(self, idx: u32) -> u32 {
         self.0.bits(idx, 4)
+    }
+
+    pub fn set_cc(self) -> bool {
+        self.0.is_bit(20)
     }
 }

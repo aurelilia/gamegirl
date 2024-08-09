@@ -14,7 +14,11 @@ use std::{
 use common::{common::debugger::Debugger, numutil::NumExt};
 
 use super::Exception;
-use crate::{arm::ArmLut, thumb::ThumbLut, Access, Cpu};
+use crate::{
+    arm::ArmLut,
+    thumb::{make_thumb_lut, ThumbLut},
+    Access, Cpu,
+};
 
 /// Trait for a system that contains this CPU.
 pub trait ArmSystem: Sized + 'static {
@@ -23,7 +27,7 @@ pub trait ArmSystem: Sized + 'static {
     /// LUT for ARM instructions.
     const ARM_LUT: ArmLut<Self> = SysWrapper::<Self>::make_arm_lut();
     /// LUT for THUMB instructions.
-    const THUMB_LUT: ThumbLut<Self> = SysWrapper::<Self>::make_thumb_lut();
+    const THUMB_LUT: ThumbLut<SysWrapper<Self>> = make_thumb_lut::<SysWrapper<Self>>();
     /// Address of the lowest byte of IF; used when raising interrupts
     const IF_ADDR: u32;
     /// Starting address of exception vectors.
@@ -103,9 +107,6 @@ pub trait ArmSystem: Sized + 'static {
 
     /// Get the debugger for this system.
     fn debugger(&mut self) -> &mut Debugger;
-    /// Check if the current instruction can be used to start creating an
-    /// instruction cache block.
-    fn can_cache_at(addr: u32) -> bool;
 }
 
 /// Wrapper for the system that adds a few utility functions.

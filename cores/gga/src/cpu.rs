@@ -79,10 +79,4 @@ impl ArmSystem for GameGirlAdv {
     fn debugger(&mut self) -> &mut Debugger {
         &mut self.c.debugger
     }
-
-    fn can_cache_at(pc: u32) -> bool {
-        pc < 0x3FFF
-            || (0x300_0000..=(0x300_7FFF - 0x400)).contains(&pc)
-            || (0x800_0000..=0xDFF_FFFF).contains(&pc)
-    }
 }

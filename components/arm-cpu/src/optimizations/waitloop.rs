@@ -83,7 +83,7 @@ pub enum WaitloopData {
 impl WaitloopData {
     /// Returns if CPU is still running.
     pub fn on_jump(&mut self, regs: &[u32; 16], br_address: u32, dest: i32) -> bool {
-        if !(-0xF..0x0).contains(&dest) {
+        if !(-16..0).contains(&dest) {
             return true;
         }
         *self = match self {

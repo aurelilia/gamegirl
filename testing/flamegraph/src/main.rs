@@ -9,6 +9,7 @@ fn main() {
         0,
     )
     .unwrap();
+    core.skip_bootrom();
     for _ in 0..200 {
         core.advance_delta(0.1);
     }

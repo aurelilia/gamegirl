@@ -11,8 +11,7 @@ use std::{iter, ops::Range, ptr, vec};
 use crate::{numutil::NumExt, UnsafeArc};
 
 pub const RW: u8 = 0;
-pub const DIRTY: u8 = 1 << 0;
-pub const RO: u8 = 1 << 1;
+pub const RO: u8 = 1 << 0;
 
 #[derive(Default, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -50,14 +49,13 @@ impl ThinPager {
             .enumerate()
         {
             page.ptr = unsafe { ptr.byte_add((idx * 0x4000) & mask) };
-            page.flags = flags | DIRTY;
+            page.flags = flags;
         }
     }
 
     pub fn evict(&mut self, range: Range<u32>) {
         for page in &mut self.pages[Self::addr_to_page_range(range)] {
             page.ptr = ptr::null_mut();
-            page.flags &= DIRTY;
         }
     }
 
@@ -81,7 +79,6 @@ impl ThinPager {
         if page.flags & RO != 0 {
             ptr::null_mut()
         } else {
-            page.flags &= DIRTY;
             unsafe { page.ptr.byte_add(addr as usize & 0x3FFF) }
         }
     }
@@ -95,9 +92,14 @@ impl ThinPager {
         v.extend(iter::repeat(0).take(until_full_page));
     }
 
-    fn addr_to_page(addr: u32) -> usize {
+    pub fn is_page_boundary(addr: u32) -> bool {
+        addr & 0x3FFF == 0
+    }
+
+    pub fn addr_to_page(addr: u32) -> usize {
         addr.us() >> 14
     }
+
     fn addr_to_page_range(addr: Range<u32>) -> Range<usize> {
         Self::addr_to_page(addr.start)..Self::addr_to_page(addr.end)
     }
@@ -106,7 +108,6 @@ impl ThinPager {
 #[derive(Clone)]
 pub struct Page {
     pub ptr: *mut u8,
-    pub meta_idx: u32,
     pub flags: u8,
 }
 
@@ -114,8 +115,7 @@ impl Default for Page {
     fn default() -> Self {
         Self {
             ptr: ptr::null_mut(),
-            meta_idx: u32::MAX,
-            flags: DIRTY,
+            flags: 0,
         }
     }
 }

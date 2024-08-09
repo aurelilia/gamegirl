@@ -139,13 +139,22 @@ impl Core for Nds {
     common_functions!(NDS9_CLOCK, NdsEvent::PauseEmulation, [256, 192 * 2]);
 
     fn advance(&mut self) {
-        // Run an instruction on the ARM9, then keep running the ARM7
+        // Run the ARM9, then keep running the ARM7
         // until it has caught up
-        Cpu::continue_running(&mut self.nds9());
-        let mut nds7 = self.nds7();
-        while self.time_7 < self.scheduler.now() {
-            Cpu::request_interrupt_idx(&mut nds7, Interrupt::Timer0 as u16);
-            Cpu::continue_running(&mut nds7);
+        if self.cpu9.is_halted {
+            let evt = self.scheduler.pop();
+            evt.kind.dispatch(self, evt.late_by);
+            Cpu::check_unsuspend(&mut self.nds9());
+        } else {
+            Cpu::continue_running(&mut self.nds9());
+        }
+
+        if self.cpu7.is_halted {
+            Cpu::check_unsuspend(&mut self.nds7());
+        } else {
+            while self.time_7 < self.scheduler.now() {
+                Cpu::continue_running(&mut self.nds7());
+            }
         }
     }
 

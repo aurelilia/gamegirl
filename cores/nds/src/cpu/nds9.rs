@@ -75,10 +75,6 @@ impl ArmSystem for Nds9 {
         &mut self.c.debugger
     }
 
-    fn can_cache_at(_addr: u32) -> bool {
-        false
-    }
-
     fn will_execute(&mut self, _pc: u32) {}
 
     fn get_cp15(&self, cm: u32, cp: u32, cn: u32) -> u32 {

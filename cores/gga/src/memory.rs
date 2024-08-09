@@ -205,8 +205,8 @@ impl GameGirlAdv {
             return;
         }
 
-        self.cpu.cache.write(addr);
         if let Some(write) = self.memory.pager.write(addr) {
+            self.cpu.cache.invalidate_address(addr);
             *write = value;
             return;
         }
@@ -299,7 +299,7 @@ impl GameGirlAdv {
         );
 
         if self.c.config.cached_interpreter {
-            self.cpu.cache.init(self.cart.rom.len());
+            self.cpu.cache.init();
         }
     }
 

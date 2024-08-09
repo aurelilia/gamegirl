@@ -6,53 +6,59 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::sync::Arc;
+use std::{mem, ptr};
 
-use common::numutil::NumExt;
+use common::{components::thin_pager::ThinPager, numutil::NumExt};
 
-use crate::{arm::ArmHandler, interface::ArmSystem, thumb::ThumbHandler};
-
-/// Size of pages in IWRAM, since it might need clearing
-const IWRAM_PAGE_SIZE: u32 = 128;
-/// End of IWRAM, subtract a guess at the stack's max size
-const IWRAM_END: u32 = 0x300_7FFF - 0x400;
+use crate::{
+    arm::ArmHandler,
+    interface::{ArmSystem, SysWrapper},
+    thumb::ThumbHandler,
+};
 
 /// Storage for instruction caching.
-/// Currently heavily assumes GGA, TODO: More generic for NDS.
 pub struct Cache<S: ArmSystem> {
-    bios: Vec<Option<CacheEntry<S>>>,
-    rom: Vec<Option<CacheEntry<S>>>,
-
-    iwram: Vec<Option<CacheEntry<S>>>,
-    iwram_cache_indices: Vec<Vec<u32>>,
-
+    pages: Vec<Option<Box<PageData<S>>>>,
     pub enabled: bool,
 }
 
 impl<S: ArmSystem> Cache<S> {
     /// Get the cache at the given location, if available.
     pub fn get(&self, pc: u32) -> Option<CacheEntry<S>> {
-        match pc {
-            0..=0x3FFF => self.bios.get(pc.us() >> 1).cloned().flatten(),
-            0x300_0000..=IWRAM_END => self.iwram.get((pc.us() & 0x7FFF) >> 1).cloned().flatten(),
-            0x800_0000..=0xDFF_FFFF => self.rom.get((pc.us() - 0x800_0000) >> 1).cloned().flatten(),
-            _ => None,
+        let page = ThinPager::addr_to_page(pc);
+        if let Some(Some(page)) = self.pages.get(page.us()) {
+            page.entries.get((pc.us() & 0x3FFF) >> 1).copied().flatten()
+        } else {
+            None
         }
+    }
+
+    /// Invalidate all caches in the given page.
+    pub fn invalidate_address(&mut self, pc: u32) {
+        if !self.enabled || pc > 0xFFF_FFFF {
+            return;
+        }
+
+        let page = ThinPager::addr_to_page(pc);
+        self.pages[page] = None;
     }
 
     /// Put a cache at the given PC.
     pub fn put(&mut self, pc: u32, entry: CacheEntry<S>) {
-        match pc {
-            0..=0x3FFF => Self::insert(&mut self.bios, pc >> 1, entry),
-            0x300_0000..=IWRAM_END => {
-                let location = (pc & 0x7FFF) >> 1;
-                Self::insert(&mut self.iwram, location, entry);
-                self.iwram_cache_indices[location.us() / IWRAM_PAGE_SIZE.us()].push(location);
-            }
-            _ if (0x800_0000..=(0x800_0000 + (self.rom.len() << 1))).contains(&pc.us()) => {
-                Self::insert(&mut self.rom, (pc - 0x800_0000) >> 1, entry)
-            }
-            _ => (),
+        if !self.enabled {
+            return;
+        }
+
+        let slot = ThinPager::addr_to_page(pc);
+        let location = (pc & 0x3FFF) >> 1;
+        if let Some(page) = &mut self.pages[slot.us()] {
+            Cache::insert(&mut page.entries, location, entry);
+        } else {
+            let mut page = Box::new(PageData {
+                entries: vec![None; 0x4000 >> 1],
+            });
+            Cache::insert(&mut page.entries, location, entry);
+            self.pages[slot.us()] = Some(page);
         }
     }
 
@@ -61,73 +67,79 @@ impl<S: ArmSystem> Cache<S> {
     }
 
     /// Initialize caches.
-    pub fn init(&mut self, cart_size: usize) {
-        self.bios.resize(0x2000, None);
-        self.iwram.resize(0x4000, None);
-        self.iwram_cache_indices
-            .resize(0x4000 / IWRAM_PAGE_SIZE.us(), Vec::new());
-        self.rom.resize(cart_size >> 1, None);
+    pub fn init(&mut self) {
+        self.pages.clear();
+        self.pages
+            .resize_with(ThinPager::addr_to_page(0xFFF_FFFF) + 1, || None);
         self.enabled = true;
     }
 
-    /// If a block should be forcibly ended. True at IWRAM
-    /// page boundaries.
+    /// If a block should be forcibly ended. True at page boundaries.
     pub fn force_end_block(pc: u32) -> bool {
-        (0x300_0000..=0x3FF_FFFF).contains(&pc) && (pc & (IWRAM_PAGE_SIZE - 1)) == 0
-    }
-
-    /// Should be called when a write occured, if write to
-    /// IWRAM happened then the cache in that page needs to be invalidated.
-    pub fn write(&mut self, addr: u32) {
-        if !self.iwram.is_empty() && (0x300_0000..=IWRAM_END).contains(&addr) {
-            let location = (addr & 0x7FFF) >> 1;
-            for entry in self.iwram_cache_indices[location.us() / IWRAM_PAGE_SIZE.us()].drain(..) {
-                self.iwram[entry.us()] = None;
-            }
-        }
-    }
-
-    /// Invalidate all ROM caches. Usually because WAITCNT changed
-    /// and timings with it.
-    pub fn invalidate_rom(&mut self) {
-        if !self.enabled {
-            return;
-        }
-        let len = self.rom.len();
-        self.rom.clear();
-        self.rom.resize(len, None);
-        log::trace!("ROM cache invalidated: WAITCNT changed.");
+        ThinPager::is_page_boundary(pc)
     }
 }
 
 impl<S: ArmSystem> Default for Cache<S> {
     fn default() -> Self {
         Self {
-            bios: Vec::default(),
-            rom: Vec::default(),
-            iwram: Vec::default(),
-            iwram_cache_indices: Vec::default(),
+            pages: Vec::default(),
             enabled: false,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct PageData<S: ArmSystem> {
+    pub entries: Vec<Option<CacheEntry<S>>>,
+}
+
+impl<S: ArmSystem> Drop for PageData<S> {
+    fn drop(&mut self) {
+        for entry in self.entries.iter_mut().filter_map(|x| x.as_mut()) {
+            entry.drop();
         }
     }
 }
 
 /// Cache entry, ARM or THUMB instructions
 pub enum CacheEntry<S: ArmSystem> {
-    Arm(Arc<Vec<CachedInst<u32, ArmHandler<S>>>>),
-    Thumb(Arc<Vec<CachedInst<u16, ThumbHandler<S>>>>),
+    Arm(&'static [CachedInst<u32, ArmHandler<S>>]),
+    Thumb(&'static [CachedInst<u16, ThumbHandler<SysWrapper<S>>>]),
 }
 
 impl<S: ArmSystem> Clone for CacheEntry<S> {
     fn clone(&self) -> Self {
+        unsafe { ptr::read(self) }
+    }
+}
+
+impl<S: ArmSystem> Copy for CacheEntry<S> {}
+
+impl<S: ArmSystem> CacheEntry<S> {
+    fn drop(&mut self) {
         match self {
-            Self::Arm(arg0) => Self::Arm(arg0.clone()),
-            Self::Thumb(arg0) => Self::Thumb(arg0.clone()),
+            Self::Arm(a) => {
+                let inner = mem::replace(a, &[]);
+                unsafe {
+                    drop(Box::from_raw(
+                        inner as *const _ as *mut [CachedInst<u32, ArmHandler<S>>],
+                    ));
+                }
+            }
+            Self::Thumb(a) => {
+                let inner = mem::replace(a, &[]);
+                unsafe {
+                    drop(Box::from_raw(
+                        inner as *const _ as *mut [CachedInst<u16, ThumbHandler<SysWrapper<S>>>],
+                    ));
+                }
+            }
         }
     }
 }
 
-/// A cached instruction/
+/// A cached instruction
 pub struct CachedInst<I, H> {
     /// The instruction itself, an unsigned integer
     pub inst: I,

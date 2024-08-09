@@ -89,6 +89,11 @@ impl Nds {
         // Init V/WRAM
         self.gpu.vram.init_mappings(p7, p9);
         self.update_wram();
+
+        if self.c.config.cached_interpreter {
+            self.cpu7.cache.init();
+            self.cpu9.cache.init();
+        }
     }
 
     /// Evict and recreate WRAM mappings.
@@ -169,6 +174,7 @@ impl Nds7 {
         }
         if let Some(write) = self.memory.pager7.write(addr) {
             *write = value;
+            self.cpu7.cache.invalidate_address(addr);
             return;
         }
 
@@ -178,7 +184,6 @@ impl Nds7 {
             // MMIO
             0x04 => self.set_mmio(addr, value),
             _ => {
-                self.debugger().running = false;
                 log::info!("Invalid write: {addr:X}");
             }
         }
@@ -230,6 +235,7 @@ impl Nds9 {
             if self.cp15.tcm_state[tcm] != TcmState::None
                 && self.cp15.tcm_range[tcm].contains(&addr)
             {
+                self.cpu9.cache.invalidate_address(addr);
                 return self.memory.tcm[tcm]
                     .set_wrap(addr.us() - self.cp15.tcm_range[tcm].start.us(), value);
             }
@@ -239,6 +245,7 @@ impl Nds9 {
         }
         if let Some(write) = self.memory.pager9.write(addr) {
             *write = value;
+            self.cpu9.cache.invalidate_address(addr);
             return;
         }
 
