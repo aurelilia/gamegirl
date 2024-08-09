@@ -96,7 +96,7 @@ pub struct PageData<S: ArmSystem> {
 
 impl<S: ArmSystem> Drop for PageData<S> {
     fn drop(&mut self) {
-        for entry in self.entries.iter_mut().filter_map(|x| x.as_mut()) {
+        for entry in self.entries.drain(..).filter_map(|x| x) {
             entry.drop();
         }
     }
@@ -117,8 +117,8 @@ impl<S: ArmSystem> Clone for CacheEntry<S> {
 impl<S: ArmSystem> Copy for CacheEntry<S> {}
 
 impl<S: ArmSystem> CacheEntry<S> {
-    fn drop(&mut self) {
-        match self {
+    fn drop(mut self) {
+        match &mut self {
             Self::Arm(a) => {
                 let inner = mem::replace(a, &[]);
                 unsafe {
