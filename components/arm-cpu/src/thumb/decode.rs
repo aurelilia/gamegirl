@@ -122,80 +122,141 @@ pub const fn make_thumb_lut<I: ThumbExecutor>() -> ThumbLut<I> {
 
     let mut lut: ThumbLut<I> = [I::thumb_unknown_opcode; 256];
 
-    lut[0b1101_1111] = I::thumb_swi;
-    lut[0b1011_0000] = I::thumb_sp_offs;
+    lut[0b1101_1111] = |e, _| e.thumb_swi();
+    lut[0b1011_0000] = |e, i| e.thumb_sp_offs(i.imm7(), i.is_bit(7));
 
-    lut[0b0100_0100] = I::thumb_hi_add;
-    lut[0b0100_0101] = I::thumb_hi_cmp;
-    lut[0b0100_0110] = I::thumb_hi_mov;
-    lut[0b0100_0111] = I::thumb_hi_bx;
+    lut[0b0100_0100] = |e, i| e.thumb_hi_add(i.reg16());
+    lut[0b0100_0101] = |e, i| e.thumb_hi_cmp(i.reg16());
+    lut[0b0100_0110] = |e, i| e.thumb_hi_mov(i.reg16());
+    lut[0b0100_0111] = |e, i| e.thumb_hi_bx(i.reg16());
 
-    lut_span(&mut lut, 0b00000, 5, I::thumb_arithmetic::<{ Lsl }>);
-    lut_span(&mut lut, 0b00001, 5, I::thumb_arithmetic::<{ Lsr }>);
-    lut_span(&mut lut, 0b00010, 5, I::thumb_arithmetic::<{ Asr }>);
-    lut_span(&mut lut, 0b0001100, 7, I::thumb_arithmetic::<{ AddReg }>);
-    lut_span(&mut lut, 0b0001101, 7, I::thumb_arithmetic::<{ SubReg }>);
-    lut_span(&mut lut, 0b0001110, 7, I::thumb_arithmetic::<{ AddImm }>);
-    lut_span(&mut lut, 0b0001111, 7, I::thumb_arithmetic::<{ SubImm }>);
+    lut_span(&mut lut, 0b00000, 5, |e, i| {
+        e.thumb_arithmetic::<{ Lsl }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b00001, 5, |e, i| {
+        e.thumb_arithmetic::<{ Lsr }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b00010, 5, |e, i| {
+        e.thumb_arithmetic::<{ Asr }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b0001100, 7, |e, i| {
+        e.thumb_arithmetic::<{ AddReg }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b0001101, 7, |e, i| {
+        e.thumb_arithmetic::<{ SubReg }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b0001110, 7, |e, i| {
+        e.thumb_arithmetic::<{ AddImm }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b0001111, 7, |e, i| {
+        e.thumb_arithmetic::<{ SubImm }>(i.reg(0), i.reg(3), i.imm5())
+    });
 
-    lut_span(&mut lut, 0b00100, 5, I::thumb_3::<{ Mov }>);
-    lut_span(&mut lut, 0b00101, 5, I::thumb_3::<{ Cmp }>);
-    lut_span(&mut lut, 0b00110, 5, I::thumb_3::<{ Add }>);
-    lut_span(&mut lut, 0b00111, 5, I::thumb_3::<{ Sub }>);
+    lut_span(&mut lut, 0b00100, 5, |e, i| {
+        e.thumb_3::<{ Mov }>(i.reg(8), i.imm8())
+    });
+    lut_span(&mut lut, 0b00101, 5, |e, i| {
+        e.thumb_3::<{ Cmp }>(i.reg(8), i.imm8())
+    });
+    lut_span(&mut lut, 0b00110, 5, |e, i| {
+        e.thumb_3::<{ Add }>(i.reg(8), i.imm8())
+    });
+    lut_span(&mut lut, 0b00111, 5, |e, i| {
+        e.thumb_3::<{ Sub }>(i.reg(8), i.imm8())
+    });
 
-    lut_span(&mut lut, 0b010000, 6, I::thumb_alu);
-    lut_span(&mut lut, 0b01001, 5, I::thumb_ldr6);
+    lut_span(&mut lut, 0b010000, 6, |e, i| {
+        e.thumb_alu(i.thumb4(), i.reg(0), i.reg(3))
+    });
+    lut_span(&mut lut, 0b01001, 5, |e, i| {
+        e.thumb_ldr6(i.reg(8), i.imm8())
+    });
 
-    lut_span(&mut lut, 0b0101000, 7, I::thumb_ldrstr78::<{ Str }>);
-    lut_span(&mut lut, 0b0101001, 7, I::thumb_ldrstr78::<{ Strh }>);
-    lut_span(&mut lut, 0b0101010, 7, I::thumb_ldrstr78::<{ Strb }>);
-    lut_span(&mut lut, 0b0101011, 7, I::thumb_ldrstr78::<{ Ldsb }>);
-    lut_span(&mut lut, 0b0101100, 7, I::thumb_ldrstr78::<{ Ldr }>);
-    lut_span(&mut lut, 0b0101101, 7, I::thumb_ldrstr78::<{ Ldrh }>);
-    lut_span(&mut lut, 0b0101110, 7, I::thumb_ldrstr78::<{ Ldrb }>);
-    lut_span(&mut lut, 0b0101111, 7, I::thumb_ldrstr78::<{ Ldsh }>);
+    lut_span(&mut lut, 0b0101000, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Str }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101001, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Strh }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101010, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Strb }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101011, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Ldsb }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101100, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Ldr }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101101, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Ldrh }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101110, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Ldrb }>(i.reg(0), i.reg(6), i.reg(3))
+    });
+    lut_span(&mut lut, 0b0101111, 7, |e, i| {
+        e.thumb_ldrstr78::<{ Ldsh }>(i.reg(0), i.reg(6), i.reg(3))
+    });
 
-    lut_span(&mut lut, 0b01100, 5, I::thumb_ldrstr9::<{ Str }>);
-    lut_span(&mut lut, 0b01101, 5, I::thumb_ldrstr9::<{ Ldr }>);
-    lut_span(&mut lut, 0b01110, 5, I::thumb_ldrstr9::<{ Strb }>);
-    lut_span(&mut lut, 0b01111, 5, I::thumb_ldrstr9::<{ Ldrb }>);
-    lut_span(&mut lut, 0b10000, 5, I::thumb_ldrstr10::<true>);
-    lut_span(&mut lut, 0b10001, 5, I::thumb_ldrstr10::<false>);
-    lut_span(&mut lut, 0b10010, 5, I::thumb_str_sp);
-    lut_span(&mut lut, 0b10011, 5, I::thumb_ldr_sp);
+    lut_span(&mut lut, 0b01100, 5, |e, i| {
+        e.thumb_ldrstr9::<{ Str }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b01101, 5, |e, i| {
+        e.thumb_ldrstr9::<{ Ldr }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b01110, 5, |e, i| {
+        e.thumb_ldrstr9::<{ Strb }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b01111, 5, |e, i| {
+        e.thumb_ldrstr9::<{ Ldrb }>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b10000, 5, |e, i| {
+        e.thumb_ldrstr10::<true>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b10001, 5, |e, i| {
+        e.thumb_ldrstr10::<false>(i.reg(0), i.reg(3), i.imm5())
+    });
+    lut_span(&mut lut, 0b10010, 5, |e, i| {
+        e.thumb_str_sp(i.reg(8), i.imm8())
+    });
+    lut_span(&mut lut, 0b10011, 5, |e, i| {
+        e.thumb_ldr_sp(i.reg(8), i.imm8())
+    });
 
-    lut_span(&mut lut, 0b10100, 5, I::thumb_rel_addr::<false>);
-    lut_span(&mut lut, 0b10101, 5, I::thumb_rel_addr::<true>);
+    lut_span(&mut lut, 0b10100, 5, |e, i| {
+        e.thumb_rel_addr::<false>(i.reg(8), i.imm8())
+    });
+    lut_span(&mut lut, 0b10101, 5, |e, i| {
+        e.thumb_rel_addr::<true>(i.reg(8), i.imm8())
+    });
 
-    lut[0b1011_0100] = I::thumb_push::<false>;
-    lut[0b1011_0101] = I::thumb_push::<true>;
-    lut[0b1011_1100] = I::thumb_pop::<false>;
-    lut[0b1011_1101] = I::thumb_pop::<true>;
-    lut_span(&mut lut, 0b11000, 5, I::thumb_stmia);
-    lut_span(&mut lut, 0b11001, 5, I::thumb_ldmia);
+    lut[0b1011_0100] = |e, i| e.thumb_push::<false>(i.0);
+    lut[0b1011_0101] = |e, i| e.thumb_push::<true>(i.0);
+    lut[0b1011_1100] = |e, i| e.thumb_pop::<false>(i.0);
+    lut[0b1011_1101] = |e, i| e.thumb_pop::<true>(i.0);
+    lut_span(&mut lut, 0b11000, 5, |e, i| e.thumb_stmia(i.reg(8), i.0));
+    lut_span(&mut lut, 0b11001, 5, |e, i| e.thumb_ldmia(i.reg(8), i.0));
 
-    // Ugh.
-    lut[0xD0] = I::thumb_bcond::<0x0>;
-    lut[0xD1] = I::thumb_bcond::<0x1>;
-    lut[0xD2] = I::thumb_bcond::<0x2>;
-    lut[0xD3] = I::thumb_bcond::<0x3>;
-    lut[0xD4] = I::thumb_bcond::<0x4>;
-    lut[0xD5] = I::thumb_bcond::<0x5>;
-    lut[0xD6] = I::thumb_bcond::<0x6>;
-    lut[0xD7] = I::thumb_bcond::<0x7>;
-    lut[0xD8] = I::thumb_bcond::<0x8>;
-    lut[0xD9] = I::thumb_bcond::<0x9>;
-    lut[0xDA] = I::thumb_bcond::<0xA>;
-    lut[0xDB] = I::thumb_bcond::<0xB>;
-    lut[0xDC] = I::thumb_bcond::<0xC>;
-    lut[0xDD] = I::thumb_bcond::<0xD>;
-    lut[0xDE] = I::thumb_bcond::<0xE>;
+    lut[0xD0] = |e, i| e.thumb_bcond::<0x0>(i.imm8());
+    lut[0xD1] = |e, i| e.thumb_bcond::<0x1>(i.imm8());
+    lut[0xD2] = |e, i| e.thumb_bcond::<0x2>(i.imm8());
+    lut[0xD3] = |e, i| e.thumb_bcond::<0x3>(i.imm8());
+    lut[0xD4] = |e, i| e.thumb_bcond::<0x4>(i.imm8());
+    lut[0xD5] = |e, i| e.thumb_bcond::<0x5>(i.imm8());
+    lut[0xD6] = |e, i| e.thumb_bcond::<0x6>(i.imm8());
+    lut[0xD7] = |e, i| e.thumb_bcond::<0x7>(i.imm8());
+    lut[0xD8] = |e, i| e.thumb_bcond::<0x8>(i.imm8());
+    lut[0xD9] = |e, i| e.thumb_bcond::<0x9>(i.imm8());
+    lut[0xDA] = |e, i| e.thumb_bcond::<0xA>(i.imm8());
+    lut[0xDB] = |e, i| e.thumb_bcond::<0xB>(i.imm8());
+    lut[0xDC] = |e, i| e.thumb_bcond::<0xC>(i.imm8());
+    lut[0xDD] = |e, i| e.thumb_bcond::<0xD>(i.imm8());
+    lut[0xDE] = |e, i| e.thumb_bcond::<0xE>(i.imm8());
+    lut[0xDF] = |e, i| e.thumb_bcond::<0xF>(i.imm8());
 
-    lut_span(&mut lut, 0b11100, 5, I::thumb_br);
-    lut_span(&mut lut, 0b11110, 5, I::thumb_set_lr);
-    lut_span(&mut lut, 0b11101, 5, I::thumb_bl::<false>);
-    lut_span(&mut lut, 0b11111, 5, I::thumb_bl::<true>);
-
+    lut_span(&mut lut, 0b11100, 5, |e, i| e.thumb_br(i.imm10()));
+    lut_span(&mut lut, 0b11110, 5, |e, i| e.thumb_set_lr(i.imm10()));
+    lut_span(&mut lut, 0b11101, 5, |e, i| e.thumb_bl::<false>(i.imm11()));
+    lut_span(&mut lut, 0b11111, 5, |e, i| e.thumb_bl::<true>(i.imm11()));
     lut
 }
 
