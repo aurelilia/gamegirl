@@ -251,7 +251,6 @@ pub const fn make_thumb_lut<I: ThumbExecutor>() -> ThumbLut<I> {
     lut[0xDC] = |e, i| e.thumb_bcond::<0xC>(i.imm8());
     lut[0xDD] = |e, i| e.thumb_bcond::<0xD>(i.imm8());
     lut[0xDE] = |e, i| e.thumb_bcond::<0xE>(i.imm8());
-    lut[0xDF] = |e, i| e.thumb_bcond::<0xF>(i.imm8());
 
     lut_span(&mut lut, 0b11100, 5, |e, i| e.thumb_br(i.imm10()));
     lut_span(&mut lut, 0b11110, 5, |e, i| e.thumb_set_lr(i.imm10()));

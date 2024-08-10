@@ -18,7 +18,7 @@ mod optimizations;
 pub mod registers;
 mod thumb;
 
-use std::fmt::Write;
+use std::{fmt::Write, sync::Arc};
 
 use access::{CODE, NONSEQ, SEQ};
 use common::numutil::NumExt;
@@ -177,7 +177,7 @@ impl<S: ArmSystem> Cpu<S> {
             }
             gg.cpu()
                 .cache
-                .put(start_pc, CacheEntry::Thumb(Box::leak(Box::new(block))));
+                .put(start_pc, CacheEntry::Thumb(Arc::new(block)));
         } else {
             let mut block = Vec::with_capacity(5);
             while !gg.cpu().block_ended {
@@ -207,7 +207,7 @@ impl<S: ArmSystem> Cpu<S> {
             }
             gg.cpu()
                 .cache
-                .put(start_pc, CacheEntry::Arm(Box::leak(Box::new(block))));
+                .put(start_pc, CacheEntry::Arm(Arc::new(block)));
         }
     }
 

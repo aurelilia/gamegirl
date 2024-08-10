@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{mem, ptr};
+use std::{mem, ptr, sync::Arc};
 
 use common::{components::thin_pager::ThinPager, numutil::NumExt};
 
@@ -27,7 +27,7 @@ impl<S: ArmSystem> Cache<S> {
     pub fn get(&self, pc: u32) -> Option<CacheEntry<S>> {
         let page = ThinPager::addr_to_page(pc);
         if let Some(Some(page)) = self.pages.get(page.us()) {
-            page.entries.get((pc.us() & 0x3FFF) >> 1).copied().flatten()
+            page.entries.get((pc.us() & 0x3FFF) >> 1).cloned().flatten()
         } else {
             None
         }
@@ -94,47 +94,17 @@ pub struct PageData<S: ArmSystem> {
     pub entries: Vec<Option<CacheEntry<S>>>,
 }
 
-impl<S: ArmSystem> Drop for PageData<S> {
-    fn drop(&mut self) {
-        for entry in self.entries.drain(..).filter_map(|x| x) {
-            entry.drop();
-        }
-    }
-}
-
 /// Cache entry, ARM or THUMB instructions
 pub enum CacheEntry<S: ArmSystem> {
-    Arm(&'static [CachedInst<u32, ArmHandler<S>>]),
-    Thumb(&'static [CachedInst<u16, ThumbHandler<SysWrapper<S>>>]),
+    Arm(Arc<Vec<CachedInst<u32, ArmHandler<S>>>>),
+    Thumb(Arc<Vec<CachedInst<u16, ThumbHandler<SysWrapper<S>>>>>),
 }
 
 impl<S: ArmSystem> Clone for CacheEntry<S> {
     fn clone(&self) -> Self {
-        unsafe { ptr::read(self) }
-    }
-}
-
-impl<S: ArmSystem> Copy for CacheEntry<S> {}
-
-impl<S: ArmSystem> CacheEntry<S> {
-    fn drop(mut self) {
-        match &mut self {
-            Self::Arm(a) => {
-                let inner = mem::replace(a, &[]);
-                unsafe {
-                    drop(Box::from_raw(
-                        inner as *const _ as *mut [CachedInst<u32, ArmHandler<S>>],
-                    ));
-                }
-            }
-            Self::Thumb(a) => {
-                let inner = mem::replace(a, &[]);
-                unsafe {
-                    drop(Box::from_raw(
-                        inner as *const _ as *mut [CachedInst<u16, ThumbHandler<SysWrapper<S>>>],
-                    ));
-                }
-            }
+        match self {
+            Self::Arm(arg0) => Self::Arm(arg0.clone()),
+            Self::Thumb(arg0) => Self::Thumb(arg0.clone()),
         }
     }
 }
