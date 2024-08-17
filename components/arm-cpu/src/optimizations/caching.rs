@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{mem, ptr, sync::Arc};
+use std::sync::Arc;
 
 use common::{components::thin_pager::ThinPager, numutil::NumExt};
 
@@ -96,15 +96,15 @@ pub struct PageData<S: ArmSystem> {
 
 /// Cache entry, ARM or THUMB instructions
 pub enum CacheEntry<S: ArmSystem> {
-    Arm(Arc<Vec<CachedInst<u32, ArmHandler<S>>>>),
-    Thumb(Arc<Vec<CachedInst<u16, ThumbHandler<SysWrapper<S>>>>>),
+    ArmCache(Arc<Vec<CachedInst<u32, ArmHandler<S>>>>),
+    ThumbCache(Arc<Vec<CachedInst<u16, ThumbHandler<SysWrapper<S>>>>>),
 }
 
 impl<S: ArmSystem> Clone for CacheEntry<S> {
     fn clone(&self) -> Self {
         match self {
-            Self::Arm(arg0) => Self::Arm(arg0.clone()),
-            Self::Thumb(arg0) => Self::Thumb(arg0.clone()),
+            Self::ArmCache(arg0) => Self::ArmCache(arg0.clone()),
+            Self::ThumbCache(arg0) => Self::ThumbCache(arg0.clone()),
         }
     }
 }

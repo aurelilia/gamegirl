@@ -13,6 +13,7 @@
 pub mod arm;
 mod exceptions;
 pub mod interface;
+mod jit;
 mod misc;
 mod optimizations;
 pub mod registers;
@@ -105,7 +106,7 @@ impl<S: ArmSystem> Cpu<S> {
 
         let is_thumb = gg.cpu().flag(Thumb);
         match cache {
-            CacheEntry::Arm(cache) if !is_thumb => {
+            CacheEntry::ArmCache(cache) if !is_thumb => {
                 for inst in cache.iter() {
                     gg.advance_clock();
                     if gg.cpu().block_ended {
@@ -121,7 +122,7 @@ impl<S: ArmSystem> Cpu<S> {
                     }
                 }
             }
-            CacheEntry::Thumb(cache) if is_thumb => {
+            CacheEntry::ThumbCache(cache) if is_thumb => {
                 for inst in cache.iter() {
                     gg.advance_clock();
                     if gg.cpu().block_ended {
@@ -177,7 +178,7 @@ impl<S: ArmSystem> Cpu<S> {
             }
             gg.cpu()
                 .cache
-                .put(start_pc, CacheEntry::Thumb(Arc::new(block)));
+                .put(start_pc, CacheEntry::ThumbCache(Arc::new(block)));
         } else {
             let mut block = Vec::with_capacity(5);
             while !gg.cpu().block_ended {
@@ -207,7 +208,7 @@ impl<S: ArmSystem> Cpu<S> {
             }
             gg.cpu()
                 .cache
-                .put(start_pc, CacheEntry::Arm(Arc::new(block)));
+                .put(start_pc, CacheEntry::ArmCache(Arc::new(block)));
         }
     }
 

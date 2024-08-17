@@ -14,5 +14,10 @@ bitmatch.workspace = true
 num-traits = "0.2"
 num-derive = "0.4"
 
+cranelift = "0.110"
+cranelift-jit = "0.110"
+cranelift-module = "0.110"
+cranelift-native = "0.110"
+
 [features]
 serde = ["dep:serde"]
