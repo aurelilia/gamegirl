@@ -119,7 +119,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
                 if ui.button(*name).clicked() {
                     app.toasts
                         .info(format!("Downloading {url}..."))
-                        .set_duration(Some(Duration::from_secs(5)));
+                        .duration(Some(Duration::from_secs(5)));
 
                     let request = ehttp::Request::get(url);
                     let tx = app.message_channel.0.clone();
@@ -147,7 +147,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
             app.save_game();
             app.toasts
                 .info("Game saved")
-                .set_duration(Some(Duration::from_secs(5)));
+                .duration(Some(Duration::from_secs(5)));
             ui.close_menu();
         }
         if ui.button("💾 Save As...").clicked() {
@@ -156,7 +156,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
                 file_dialog::save_gamesave(file.title, file.ram);
                 app.toasts
                     .info(format!("Game saved"))
-                    .set_duration(Some(Duration::from_secs(5)));
+                    .duration(Some(Duration::from_secs(5)));
             }
             ui.close_menu();
         }
@@ -202,7 +202,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
                     *state = Some(app.core.lock().unwrap().save_state());
                     app.toasts
                         .info(format!("Saved state {}", i + 1))
-                        .set_duration(Some(Duration::from_secs(3)));
+                        .duration(Some(Duration::from_secs(3)));
                     ui.close_menu();
                 }
             }
@@ -221,7 +221,7 @@ fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mu
                     core.load_state(state);
                     app.toasts
                         .info(format!("Loaded state {}", i + 1))
-                        .set_duration(Some(Duration::from_secs(3)));
+                        .duration(Some(Duration::from_secs(3)));
                     ui.close_menu();
                 }
             }

@@ -7,6 +7,6 @@ edition = "2021"
 gamegirl = { path = "../../gamegirl", features = ["ggc", "gga"] }
 png = "0.17"
 clap = { version = "4.5", features = ["derive"] }
-zip = "2.1"
+zip = "2.2"
 rayon = "1.10"
 indicatif = "0.17"

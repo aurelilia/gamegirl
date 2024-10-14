@@ -248,7 +248,7 @@ impl App {
                         Err(e) => {
                             self.toasts
                                 .error(format!("Error loading ROM: {e}"))
-                                .set_duration(Some(Duration::from_secs(5)));
+                                .duration(Some(Duration::from_secs(5)));
                             return;
                         }
                     }
@@ -259,7 +259,7 @@ impl App {
                     if let Some(path) = file.path {
                         self.toasts
                             .success(format!("Loaded ROM: {path:?}"))
-                            .set_duration(Some(Duration::from_secs(5)));
+                            .duration(Some(Duration::from_secs(5)));
 
                         if let Some(existing) =
                             self.state.last_opened.iter().position(|p| *p == path)
@@ -272,7 +272,7 @@ impl App {
                     } else {
                         self.toasts
                             .success("Loaded ROM")
-                            .set_duration(Some(Duration::from_secs(5)));
+                            .duration(Some(Duration::from_secs(5)));
                     }
                 }
 
@@ -283,7 +283,7 @@ impl App {
                     core.c_mut().input.load_replay(file.content);
                     self.toasts
                         .info("Loaded replay")
-                        .set_duration(Some(Duration::from_secs(5)));
+                        .duration(Some(Duration::from_secs(5)));
                 }
 
                 Message::BiosOpen { file, console_id } => {
@@ -299,7 +299,7 @@ impl App {
                 Message::Error(msg) => {
                     self.toasts
                         .error(msg)
-                        .set_duration(Some(Duration::from_secs(5)));
+                        .duration(Some(Duration::from_secs(5)));
                 }
 
                 #[cfg(feature = "dynamic")]
@@ -326,7 +326,7 @@ impl App {
 
                         self.toasts
                             .success(format!("Loaded core: {path:?}"))
-                            .set_duration(Duration::from_secs(10));
+                            .duration(Duration::from_secs(10));
                     }
                 }
             }
@@ -493,11 +493,11 @@ impl App {
         if c.debugger.running {
             self.toasts
                 .info("Resuming")
-                .set_duration(Some(Duration::from_secs(2)));
+                .duration(Some(Duration::from_secs(2)));
         } else {
             self.toasts
                 .info("Paused")
-                .set_duration(Some(Duration::from_secs(2)));
+                .duration(Some(Duration::from_secs(2)));
         }
     }
 
@@ -505,6 +505,6 @@ impl App {
         self.core.lock().unwrap().reset();
         self.toasts
             .warning("Console reset")
-            .set_duration(Some(Duration::from_secs(5)));
+            .duration(Some(Duration::from_secs(5)));
     }
 }

@@ -6,7 +6,6 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use eframe::Theme;
 use gamegirl_egui::App;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -16,7 +15,6 @@ fn main() {
     env_logger::init();
     let options = eframe::NativeOptions {
         viewport: ViewportBuilder::default().with_transparent(true),
-        default_theme: Theme::Dark,
         ..Default::default()
     };
     eframe::run_native("gamegirl", options, Box::new(|ctx| Ok(App::new(ctx)))).unwrap()
