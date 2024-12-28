@@ -69,7 +69,7 @@ impl<E: Kind> Scheduler<E> {
         self.time += by;
     }
 
-    /// Execute all pending events in order with the given closure.
+    /// Get the next pending event. If there are no events ready, returns None.
     /// Note that this implementation assumes there is always at least one event
     /// scheduled.
     #[inline]
@@ -180,6 +180,7 @@ pub trait Kind: PartialEq + Copy + Clone {}
 
 /// Event that is ready to be handled.
 #[derive(Copy, Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct Event<E: Kind> {
     /// The kind of event to handle
     pub kind: E,
@@ -188,4 +189,173 @@ pub struct Event<E: Kind> {
     /// - Scheduler ran until 1010 before the event got handled
     /// - `late_by` will be 1010 - 1000 = 10.
     pub late_by: TimeS,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq, Copy, Clone, Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+    enum TestEvent {
+        #[default]
+        A,
+        B,
+        C,
+    }
+
+    impl Kind for TestEvent {}
+
+    #[test]
+    fn test_basic() {
+        let mut scheduler = Scheduler::default();
+        scheduler.schedule(TestEvent::A, 10);
+        scheduler.schedule(TestEvent::B, 5);
+        scheduler.schedule(TestEvent::C, 15);
+        assert_eq!(scheduler.get_next_pending(), None);
+
+        scheduler.advance(5);
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::B,
+                late_by: 0
+            })
+        );
+        assert_eq!(scheduler.get_next_pending(), None);
+
+        scheduler.advance(5);
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::A,
+                late_by: 0
+            })
+        );
+        assert_eq!(scheduler.get_next_pending(), None);
+
+        scheduler.advance(5);
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::C,
+                late_by: 0
+            })
+        );
+        assert_eq!(scheduler.get_next_pending(), None);
+    }
+
+    #[test]
+    fn test_cancel() {
+        let mut scheduler = Scheduler::default();
+        scheduler.schedule(TestEvent::A, 10);
+        scheduler.schedule(TestEvent::A, 19);
+        scheduler.schedule(TestEvent::B, 5);
+        scheduler.schedule(TestEvent::C, 15);
+        scheduler.cancel(TestEvent::A);
+
+        scheduler.advance(20);
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::B,
+                late_by: 15
+            })
+        );
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::C,
+                late_by: 5
+            })
+        );
+        assert_eq!(scheduler.get_next_pending(), None);
+    }
+
+    #[test]
+    fn test_cancel_single() {
+        let mut scheduler = Scheduler::default();
+        scheduler.schedule(TestEvent::A, 10);
+        scheduler.schedule(TestEvent::B, 5);
+        scheduler.schedule(TestEvent::C, 15);
+        assert!(scheduler.cancel_single(TestEvent::A));
+
+        scheduler.advance(20);
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::B,
+                late_by: 15
+            })
+        );
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::C,
+                late_by: 5
+            })
+        );
+        assert_eq!(scheduler.get_next_pending(), None);
+    }
+
+    #[test]
+    fn test_cancel_with_remaining() {
+        let mut scheduler = Scheduler::default();
+        scheduler.schedule(TestEvent::A, 10);
+        scheduler.schedule(TestEvent::B, 5);
+        scheduler.schedule(TestEvent::C, 15);
+        let (remaining, kind) = scheduler.cancel_with_remaining(|e| e == TestEvent::A);
+        assert_eq!(remaining, 10);
+        assert_eq!(kind, TestEvent::A);
+
+        scheduler.advance(20);
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::B,
+                late_by: 15
+            })
+        );
+        assert_eq!(
+            scheduler.get_next_pending(),
+            Some(Event {
+                kind: TestEvent::C,
+                late_by: 5
+            })
+        );
+        assert_eq!(scheduler.get_next_pending(), None);
+    }
+
+    #[test]
+    fn test_pop() {
+        let mut scheduler = Scheduler::default();
+        scheduler.schedule(TestEvent::A, 10);
+        scheduler.schedule(TestEvent::B, 5);
+        scheduler.schedule(TestEvent::C, 15);
+
+        assert_eq!(
+            scheduler.pop(),
+            Event {
+                kind: TestEvent::B,
+                late_by: 0
+            }
+        );
+        assert_eq!(scheduler.now(), 5);
+        assert_eq!(
+            scheduler.pop(),
+            Event {
+                kind: TestEvent::A,
+                late_by: 0
+            }
+        );
+        assert_eq!(scheduler.now(), 10);
+        assert_eq!(
+            scheduler.pop(),
+            Event {
+                kind: TestEvent::C,
+                late_by: 0
+            }
+        );
+        assert_eq!(scheduler.now(), 15);
+    }
 }

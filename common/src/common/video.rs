@@ -63,3 +63,33 @@ impl FrameBuffer {
         !self.buffer.is_empty()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_frameskip_0() {
+        let mut fb = FrameBuffer::default();
+
+        assert_eq!(fb.should_render_this_frame(), true);
+        fb.start_next_frame();
+        assert_eq!(fb.should_render_this_frame(), true);
+        fb.start_next_frame();
+        assert_eq!(fb.should_render_this_frame(), true);
+    }
+
+    #[test]
+    fn test_frameskip_1() {
+        let mut fb = FrameBuffer::default();
+        fb.frameskip = 1;
+
+        assert_eq!(fb.should_render_this_frame(), true);
+        fb.start_next_frame();
+        assert_eq!(fb.should_render_this_frame(), false);
+        fb.start_next_frame();
+        assert_eq!(fb.should_render_this_frame(), true);
+        fb.start_next_frame();
+        assert_eq!(fb.should_render_this_frame(), false);
+    }
+}

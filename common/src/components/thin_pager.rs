@@ -122,3 +122,48 @@ impl Default for Page {
 
 unsafe impl Send for Page {}
 unsafe impl Sync for Page {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        let mut tp = ThinPager::default();
+        tp.init(0x8000);
+        let v = vec![0; 0x4000];
+        tp.map(&v, 0..0x4000, RW);
+        tp.map(&v, 0x4000..0x8000, RO);
+        assert_eq!(tp.read::<u32>(0), Some(0));
+        assert_eq!(tp.write::<u32>(0), Some(&mut 0));
+        assert_eq!(tp.read::<u32>(0x4000), Some(0));
+        assert_eq!(tp.write::<u32>(0x4000), None);
+    }
+
+    #[test]
+    fn test_map_ptr() {
+        let mut tp = ThinPager::default();
+        tp.init(0x8000);
+        let v = vec![0; 0x4000];
+        tp.map_ptr(v.as_ptr() as *mut _, 0..0x4000, usize::MAX, RW);
+        tp.map_ptr(v.as_ptr() as *mut _, 0x4000..0x8000, usize::MAX, RO);
+        assert_eq!(tp.read::<u32>(0), Some(0));
+        assert_eq!(tp.write::<u32>(0), Some(&mut 0));
+        assert_eq!(tp.read::<u32>(0x4000), Some(0));
+        assert_eq!(tp.write::<u32>(0x4000), None);
+    }
+
+    #[test]
+    fn test_evict() {
+        let mut tp = ThinPager::default();
+        tp.init(0x8000);
+        let v = vec![0; 0x4000];
+        tp.map(&v, 0..0x4000, RW);
+        tp.map(&v, 0x4000..0x8000, RO);
+        tp.evict(0..0x4000);
+        assert_eq!(tp.read::<u32>(0), None);
+        assert_eq!(tp.write::<u32>(0), None);
+        assert_eq!(tp.read::<u32>(0x4000), Some(0));
+        assert_eq!(tp.write::<u32>(0x4000), None);
+    }
+}

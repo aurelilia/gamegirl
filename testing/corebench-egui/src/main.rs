@@ -16,7 +16,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use eframe::{egui::ViewportBuilder, emath::History, Theme};
+use eframe::{egui::ViewportBuilder, emath::History};
 use gamegirl::{
     common::Core,
     dummy_core,
@@ -40,7 +40,6 @@ fn main() {
     env_logger::init();
     let options = eframe::NativeOptions {
         viewport: ViewportBuilder::default().with_transparent(true),
-        default_theme: Theme::Dark,
         ..Default::default()
     };
     eframe::run_native(

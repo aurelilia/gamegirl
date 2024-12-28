@@ -158,3 +158,132 @@ impl<T: NumExt> IoSection<T> {
         T::from_u32(self.value & self.mask)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_section_apply_keep_all() {
+        let mut value = 0x1234_5678;
+        let section = section::<u32>(0, 0x8765_4321, 0xFFFF_FFFF);
+        section.apply(&mut value);
+        assert_eq!(value, 0x8765_4321);
+    }
+
+    #[test]
+    fn test_section_apply_keep_some() {
+        let section = section::<u32>(0, 0x4321, 0x0000_FFFF);
+        assert_eq!(section.with(0x1234_5678), 0x1234_4321);
+    }
+
+    #[test]
+    fn test_get_mmio_single_byte() {
+        let value = get_mmio_apply::<u8>(0, |a| {
+            io08!(a, 0, 0x12);
+            FAILED_READ
+        });
+        assert_eq!(value, 0x12);
+    }
+
+    #[test]
+    fn test_get_mmio_single_halfword() {
+        let value = get_mmio_apply::<u16>(0, |a| {
+            io16!(a, 0, 0x1234);
+            FAILED_READ
+        });
+        assert_eq!(value, 0x1234);
+    }
+
+    #[test]
+    fn test_get_mmio_half_halfword_lower() {
+        let value = get_mmio_apply::<u16>(1, |a| {
+            io16!(a, 0, 0x1234);
+            FAILED_READ
+        });
+        assert_eq!(value, 0x0012);
+    }
+
+    #[test]
+    fn test_get_mmio_half_halfword_upper() {
+        let value = get_mmio_apply::<u16>(0, |a| {
+            io08!(a, 1, 0x12);
+            FAILED_READ
+        });
+        assert_eq!(value, 0x1200);
+    }
+
+    #[test]
+    fn test_get_mmio_nothing() {
+        let value = get_mmio_apply::<u16>(0, |_| FAILED_READ);
+        assert_eq!(value, 0);
+    }
+
+    #[test]
+    fn test_get_mmio_cross_register() {
+        let value = get_mmio_apply::<u16>(0, |a| {
+            io08!(a, 0, 0x12);
+            io08!(a, 1, 0x34);
+            FAILED_READ
+        });
+        assert_eq!(value, 0x3412);
+    }
+
+    #[test]
+    fn test_set_mmio_single_byte() {
+        let mut value = 0;
+        set_mmio_apply(0, 0x12u8, |a, v, m| {
+            let s8 = section::<u8>(a, v, m);
+            iow08!(a, 0, s8.apply(&mut value));
+            FAILED_WRITE
+        });
+        assert_eq!(value, 0x12);
+    }
+
+    #[test]
+    fn test_set_mmio_single_halfword() {
+        let mut value = 0;
+        set_mmio_apply(0, 0x1234u16, |a, v, m| {
+            let s16 = section::<u16>(a, v, m);
+            iow16!(a, 0, s16.apply(&mut value));
+            FAILED_WRITE
+        });
+        assert_eq!(value, 0x1234);
+    }
+
+    #[test]
+    fn test_set_mmio_half_halfword_lower() {
+        let mut value = 0;
+        set_mmio_apply(1, 0x12u8, |a, v, m| {
+            let s16 = section::<u16>(a, v, m);
+            iow16!(a, 0, s16.apply(&mut value));
+            FAILED_WRITE
+        });
+        assert_eq!(value, 0x1200);
+    }
+
+    #[test]
+    fn test_set_mmio_half_halfword_upper() {
+        let mut value = 0;
+        set_mmio_apply(0, 0x1234u16, |a, v, m| {
+            let s8 = section::<u8>(a, v, m);
+            iow08!(a, 1, s8.apply(&mut value));
+            FAILED_WRITE
+        });
+        assert_eq!(value, 0x0012);
+    }
+
+    #[test]
+    fn test_set_mmio_cross_register() {
+        let mut value1 = 0;
+        let mut value2 = 0;
+        set_mmio_apply(0, 0x1234u16, |a, v, m| {
+            let s8 = section::<u8>(a, v, m);
+            iow08!(a, 0, s8.apply(&mut value1));
+            iow08!(a, 1, s8.apply(&mut value2));
+            FAILED_WRITE
+        });
+        assert_eq!(value2, 0x12);
+        assert_eq!(value1, 0x34);
+    }
+}
