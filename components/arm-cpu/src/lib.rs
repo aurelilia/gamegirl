@@ -8,7 +8,6 @@
 
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
-#![feature(const_mut_refs)]
 
 pub mod arm;
 mod exceptions;

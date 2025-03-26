@@ -52,7 +52,7 @@ fn navbar(app: &mut App, ctx: &Context) {
 }
 
 fn navbar_content(app: &mut App, ctx: &Context, ui: &mut Ui) {
-    widgets::global_dark_light_mode_switch(ui);
+    widgets::global_theme_preference_switch(ui);
     ui.separator();
 
     ui.menu_button("File", |ui| {

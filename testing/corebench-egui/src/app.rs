@@ -14,7 +14,7 @@ use std::{
 };
 
 use eframe::{
-    egui::{Color32, Context, TextureOptions},
+    egui::{Color32, Context, OutputCommand, TextureOptions},
     emath::History,
     epaint::{ColorImage, ImageData, ImageDelta, TextureId},
     CreationContext, Frame,
@@ -138,7 +138,10 @@ impl App {
                 Message::CopyHashToClipboard(core) => {
                     self.cores[core].c.advance_delta(0.2);
                     let hash = TestSuite::screen_hash(&mut self.cores[core].c);
-                    ctx.output_mut(|o| o.copied_text = format!("0x{hash:X}"));
+                    ctx.output_mut(|o| {
+                        o.commands
+                            .push(OutputCommand::CopyText(format!("0x{hash:X}")))
+                    });
                 }
             }
         }

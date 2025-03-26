@@ -85,7 +85,7 @@ fn navbar(app: &mut App, ctx: &Context, frame: &Frame) {
 }
 
 fn navbar_content(app: &mut App, now: f64, frame: &Frame, ctx: &Context, ui: &mut Ui) {
-    widgets::global_dark_light_mode_switch(ui);
+    widgets::global_theme_preference_switch(ui);
     ui.separator();
     ui.spacing_mut().item_spacing[0] = 13.0;
 

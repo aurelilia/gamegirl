@@ -35,11 +35,11 @@ incremental = true
 opt-level = 1
 
 [workspace.dependencies]
-log = "0.4.22"
-serde = { version = "1.0.210", features = ["derive", "rc"] }
-serde_arrays = "0.1.0"
+log = "0.4.27"
+serde = { version = "1.0.219", features = ["derive", "rc"] }
+serde_arrays = "0.2.0"
 arrayvec = "0.7.6"
-bitflags = "2.6.0"
+bitflags = "2.9.0"
 modular-bitfield = "0.11"
 bitmatch = "0.1.1"
-glow = "0.14"
+glow = "0.16"

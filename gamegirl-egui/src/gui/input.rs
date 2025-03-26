@@ -39,7 +39,7 @@ fn button_win(ctx: &Context, core: &mut Box<dyn Core>, button: input::Button, te
     egui::Window::new(text)
         .title_bar(false)
         .resizable(false)
-        .frame(Frame::window(&ctx.style()).inner_margin(Margin::same(10.0)))
+        .frame(Frame::window(&ctx.style()).inner_margin(Margin::same(10)))
         .show(ctx, |ui| button_ui(ui, core, button, text));
 }
 
@@ -47,7 +47,7 @@ fn button_ui(ui: &mut Ui, core: &mut Box<dyn Core>, button: input::Button, text:
     ui.spacing_mut().button_padding = [10.0, 10.0].into();
     let btn = ui.add(
         Button::new(RichText::new(text).size(40.0))
-            .rounding(50.0)
+            .corner_radius(50.0)
             .sense(Sense::drag())
             .min_size([60.0; 2].into()),
     );

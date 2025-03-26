@@ -22,7 +22,6 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 #![feature(if_let_guard)]
-#![feature(isqrt)]
 
 mod addr;
 mod cpu;

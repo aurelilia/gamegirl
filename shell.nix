@@ -23,8 +23,6 @@ let
 
     # Other emulators for ease of debugging
     mgba
-    nanoboyadvance
-    desmume
   ];
 in
   pkgs.mkShell {
