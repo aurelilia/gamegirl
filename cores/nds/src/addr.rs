@@ -68,6 +68,7 @@ pub const DISPCAPCNT_H: u32 = 0x66;
 pub const DISP_MMEM_FIFO_L: u32 = 0x68;
 pub const DISP_MMEM_FIFO_H: u32 = 0x6A;
 pub const MASTER_BRIGHT: u32 = 0x6C;
+pub const POWCNT1: u32 = 0x304;
 
 // Timers
 pub const TM0CNT_L: u32 = 0x100;

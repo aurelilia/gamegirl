@@ -51,7 +51,7 @@ use cpu::{
     cp15::Cp15,
     math::{Div, Sqrt},
 };
-use hw::{input::Input, ipc::IpcFifo, spi::SpiBus};
+use hw::{bios::UserSettings, input::Input, ipc::IpcFifo, spi::SpiBus};
 use memory::WramStatus;
 use scheduling::PpuEvent;
 
@@ -215,6 +215,20 @@ impl Core for Nds {
         self.memory.postflg = true;
         self.nds7().set_mmio(BIOSPROT, 0x1204u16);
         self.nds9().set_mmio(SOUNDBIAS, 0x200u16);
+
+        /// Write RAM things
+        self.nds9().set::<u32>(0x027FF800, 0x00001FC2);
+        self.nds9().set::<u32>(0x027FF804, 0x00001FC2);
+        self.nds9().set::<u16>(0x027FF850, 0x5835);
+        self.nds9().set::<u16>(0x027FF880, 0x0007);
+        self.nds9().set::<u16>(0x027FF884, 0x0006);
+        self.nds9().set::<u32>(0x027FFC00, 0x00001FC2);
+        self.nds9().set::<u32>(0x027FFC04, 0x00001FC2);
+        self.nds9().set::<u16>(0x027FFC10, 0x5835);
+        self.nds9().set::<u16>(0x027FFC40, 0x0001);
+
+        /// Write user settings
+        let settings = UserSettings::get_bogus();
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -263,11 +277,8 @@ impl Nds {
         }
         nds.cart.load_rom(cart);
 
-        log::error!("{:#?}", nds.cart.header());
         nds.init_memory();
         Gpu::init_render(&mut nds);
-
-        // nds.skip_bootrom();
         nds
     }
 }

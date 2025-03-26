@@ -164,7 +164,10 @@ impl Nds7 {
         match region {
             // MMIO
             0x04 => self.get_mmio(addr),
-            _ => T::from_u8(0),
+            _ => {
+                log::info!("DS7: Invalid read: {addr:08X}");
+                T::from_u8(0)
+            }
         }
     }
 
@@ -184,7 +187,7 @@ impl Nds7 {
             // MMIO
             0x04 => self.set_mmio(addr, value),
             _ => {
-                log::info!("Invalid write: {addr:X}");
+                log::info!("DS7: Invalid write: {addr:08X} <= {value:08X}");
             }
         }
     }
@@ -224,7 +227,7 @@ impl Nds9 {
             0x04 => self.get_mmio(addr),
 
             _ => {
-                log::info!("Invalid read: {addr:X}");
+                log::info!("DS9: Invalid read: {addr:08X}");
                 T::from_u32(0)
             }
         }
@@ -260,7 +263,7 @@ impl Nds9 {
             0x04 => self.set_mmio(addr, value),
 
             _ => {
-                log::info!("Invalid write: {addr:X}");
+                log::info!("DS9: Invalid write: {addr:08X} <= {value:08X}");
             }
         }
     }

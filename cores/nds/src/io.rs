@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+// TODO: Respect EXMEMCNT
+
 use std::{marker::PhantomData, mem};
 
 use arm_cpu::{Cpu, Interrupt};
@@ -22,8 +24,8 @@ use crate::{
 impl Nds {
     pub fn get_mmio_shared<DS: NdsCpu>(&mut self, a: u32) -> (u32, u32, u32) {
         // FIFO
-        io16!(a, IPCSYNC, self.fifo.sync_read(DS::I));
-        io16!(a, IPCFIFOCNT, self.fifo.cnt_read(DS::I));
+        io32!(a, IPCSYNC, self.fifo.sync_read(DS::I).u32());
+        io32!(a, IPCFIFOCNT, self.fifo.cnt_read(DS::I).u32());
         io32!(a, IPCFIFORECV_L, {
             let (value, intr) = self.fifo.receive(DS::I);
             self.maybe_irq_to_other(DS::I, intr);
@@ -41,6 +43,22 @@ impl Nds {
                 a,
                 TM0CNT_H + (idx * 4),
                 self.timers[DS::I].control[idx.us()].into()
+            );
+
+            io32!(
+                a,
+                0xB0 + (idx.u32() * 0xC),
+                self.dmas[DS::I].channels[idx.us()].sad
+            );
+            io32!(
+                a,
+                0xB4 + (idx.u32() * 0xC),
+                self.dmas[DS::I].channels[idx.us()].dad
+            );
+            io16!(
+                a,
+                0xB8 + (idx.u32() * 0xC),
+                self.dmas[DS::I].channels[idx.us()].count.into()
             );
             io16!(
                 a,
@@ -67,7 +85,7 @@ impl Nds {
         io08!(a, POSTFLG, self.memory.postflg as u8);
         io16!(a, EXMEM, self.memory.exmem);
 
-        log::info!("Read from unknown IO register 0x{a:X}");
+        log::info!("DS{}, Read from unknown IO register 0x{a:X}", DS::I);
         FAILED_READ
     }
 
@@ -77,13 +95,13 @@ impl Nds {
         let s32 = section::<u32>(a, v, m);
 
         // FIFO
-        iow16!(a, IPCSYNC, {
+        iow32!(a, IPCSYNC, {
             let send_irq = self.fifo.sync_write(DS::I, s16);
             if send_irq {
                 self.send_irq(DS::I ^ 1, Interrupt::IpcSync);
             }
         });
-        iow16!(a, IPCFIFOCNT, self.fifo.cnt_write(DS::I, s16));
+        iow32!(a, IPCFIFOCNT, self.fifo.cnt_write(DS::I, s16));
         iow32!(a, IPCFIFOSEND_L, {
             let intr = self.fifo.send(DS::I, s32.with(0));
             self.maybe_irq_to_other(DS::I, intr);
@@ -166,14 +184,17 @@ impl Nds {
         // Misc
         iow08!(a, POSTFLG, self.memory.postflg = true);
 
-        log::info!("Write to unknown IO register 0x{a:X}, value 0x{v:X}");
+        log::info!(
+            "DS{}, Write to unknown IO register 0x{a:X}, value 0x{v:X}",
+            DS::I
+        );
         FAILED_WRITE
     }
 }
 
 impl Nds7 {
     pub fn get_mmio<T: NumExt>(&mut self, addr: u32) -> T {
-        get_mmio_apply(addr, |a| {
+        let value = get_mmio_apply(addr, |a| {
             // Memory / IRQ control
             io32!(a, IME, self.cpu7.ime as u32);
             io32!(a, IE, self.cpu7.ie);
@@ -189,11 +210,17 @@ impl Nds7 {
             io16!(a, SOUNDCNT, self.apu.control);
             io16!(a, SOUNDBIAS, self.apu.bias);
 
+            // Misc
+            io08!(a, HALTCNT, 0);
+
             self.get_mmio_shared::<Self>(a)
-        })
+        });
+        log::info!("DS7, Read from IO register 0x{addr:08X} => 0x{value:X}");
+        value
     }
 
     pub fn set_mmio<T: NumExt>(&mut self, addr: u32, value: T) {
+        log::info!("DS7, Write to IO register 0x{addr:08X} <= 0x{value:X}");
         set_mmio_apply(addr, value, |a, v, m| {
             let s8 = section::<u8>(a, v, m);
             let s16 = section::<u16>(a, v, m);
@@ -225,6 +252,9 @@ impl Nds7 {
             iow16!(a, SOUNDCNT, s16.mask(0xFFB7).apply(&mut self.apu.control));
             iow16!(a, SOUNDBIAS, s16.apply(&mut self.apu.bias));
 
+            // Misc
+            iow16!(a, BIOSPROT, ());
+
             self.set_mmio_shared::<Self>(a, v, m)
         })
     }
@@ -232,7 +262,7 @@ impl Nds7 {
 
 impl Nds9 {
     pub fn get_mmio<T: NumExt>(&mut self, addr: u32) -> T {
-        get_mmio_apply(addr, |a| {
+        let value = get_mmio_apply(addr, |a| {
             // Memory / IRQ control
             io32!(a, IME, self.cpu9.ime as u32);
             io32!(a, IE, self.cpu9.ie);
@@ -247,6 +277,7 @@ impl Nds9 {
             }
             io16!(a, DISP3DCNT, self.gpu.gpu.cnt.into());
             io32!(a, DISPCAPCNT_L, self.gpu.capture.cnt.into());
+            io32!(a, POWCNT1, self.gpu.powcnt1.into());
 
             // RAM control
             io08!(a, VRAMCNT_A, self.gpu.vram.ctrls[A].into());
@@ -277,10 +308,13 @@ impl Nds9 {
             io32!(a, SQRT_INPUT_H, (self.sqrt.input >> 32) as u32);
 
             self.get_mmio_shared::<Self>(a)
-        })
+        });
+        log::info!("DS7, Read from IO register 0x{addr:08X} => 0x{value:X}");
+        value
     }
 
     pub fn set_mmio<T: NumExt>(&mut self, addr: u32, value: T) {
+        log::info!("DS9, Write to IO register 0x{addr:08X} <= 0x{value:X}");
         set_mmio_apply(addr, value, |a, v, m| {
             let s8 = section::<u8>(a, v, m);
             let s16 = section::<u16>(a, v, m);
@@ -309,6 +343,7 @@ impl Nds9 {
             }
             iow16!(a, DISP3DCNT, s16.apply_io(&mut self.gpu.gpu.cnt));
             iow32!(a, DISPCAPCNT_L, s32.apply_io(&mut self.gpu.capture.cnt));
+            iow32!(a, POWCNT1, s32.apply_io(&mut self.gpu.powcnt1));
 
             // RAM control
             let dsx: &mut Nds = &mut *self;

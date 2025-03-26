@@ -12,6 +12,7 @@ use arm_cpu::{Cpu, Interrupt};
 use capture::CaptureUnit;
 use common::{numutil::NumExt, UnsafeArc};
 use engine3d::Engine3D;
+use modular_bitfield::prelude::*;
 use ppu::{registers::DisplayStatus, Ppu, HEIGHT, VBLANK_END};
 use vram::{Vram, VramCtrl};
 
@@ -35,6 +36,7 @@ pub struct Gpu {
     pub capture: CaptureUnit,
 
     pub(super) dispstat: CpuDevice<DisplayStatus>,
+    pub(super) powcnt1: PowerControl1,
     pub(super) vcount: u16,
 }
 
@@ -156,6 +158,7 @@ impl Default for Gpu {
             gpu: Engine3D::default(),
             capture: CaptureUnit::default(),
             dispstat: [DisplayStatus::default(); 2],
+            powcnt1: PowerControl1::default(),
             vcount: 0,
         };
 
@@ -163,4 +166,23 @@ impl Default for Gpu {
         gpu.ppus[1].regs.is_a = false;
         gpu
     }
+}
+
+#[bitfield]
+#[repr(u32)]
+#[derive(Debug, Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct PowerControl1 {
+    pub disp_en: bool,
+    pub ppu_engine_a: bool,
+    pub render_engine: bool,
+    pub geom_engine: bool,
+    #[skip]
+    __: B5,
+    pub ppu_engine_b: bool,
+    #[skip]
+    __: B5,
+    pub disp_swap: bool,
+    #[skip]
+    __: B16,
 }

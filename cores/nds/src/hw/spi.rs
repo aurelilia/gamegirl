@@ -99,6 +99,7 @@ impl SpiBus {
                     }
                     FirmwareState::ReadWaitingAddr { addr } => {
                         let mut addr = word(hword(addr[2], addr[1]), addr[0].u16());
+                        log::info!("FIRM: Read from 0x{addr:05X}");
                         self.data_out = self.firm_data[addr.us()].u16();
                         addr += 1;
                         self.firm = FirmwareState::Read { addr }
@@ -106,6 +107,7 @@ impl SpiBus {
 
                     FirmwareState::Read { ref mut addr } => {
                         self.data_out = self.firm_data[addr.us()].u16();
+                        log::info!("FIRM: Read from 0x{addr:05X}");
                         *addr += 1;
                     }
                 }
