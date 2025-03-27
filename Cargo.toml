@@ -6,10 +6,7 @@ members = [
     "cores/gga",
     "cores/nds",
     "gamegirl",
-    "gamegirl-egui",
-    "testing/corebench-egui",
-    "testing/flamegraph",
-    "testing/gamerunner",
+    "frontends/*",
 ]
 resolver = "2"
 

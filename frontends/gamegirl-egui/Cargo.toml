@@ -1,0 +1,62 @@
+[package]
+name = "gamegirl-egui"
+default-run = "gamegirl_bin"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "gamegirl_bin"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+gamegirl = { path = "../../gamegirl", features = [
+    "ggc",
+    "gga",
+    "nds",
+    "std",
+    "serde_config",
+] }
+
+egui = "0.31"
+egui_extras = "0.31"
+eframe = { version = "0.31", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "persistence",
+    "wayland",
+] }
+egui-notify = { git = "https://github.com/ItsEthra/egui-notify", branch = "master" }
+
+cpal = "0.15.3"
+rfd = "0.15.3"
+gilrs = { version = "0.11.0", features = ["serde-serialize"] }
+
+log.workspace = true
+serde.workspace = true
+
+once_cell = { version = "*", optional = true }
+hqx = { git = "https://github.com/CryZe/wasmboy-rs", tag = "v0.1.3", optional = true }
+ehttp = { version = "0.5", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11.7"
+futures-executor = "0.3.31"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+tracing-wasm = "0.2.1"
+wasm-bindgen-futures = "0.4.50"
+cpal = { version = "0.15.3", features = ["wasm-bindgen"] }
+web-sys = "0.3.77"
+
+[features]
+default = ["savestates", "dep:ehttp"]
+savestates = ["gamegirl/serde"]
+remote-debugger = ["gamegirl/remote-debugger", "once_cell"]
+filters = ["hqx"]
+dynamic = ["gamegirl/dynamic"]

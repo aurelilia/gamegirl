@@ -1,0 +1,23 @@
+[package]
+name = "corebench-egui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gamegirl = { path = "../../gamegirl", features = [
+    "dynamic",
+    "ggc",
+    "gga",
+    "std",
+] }
+eframe = { version = "0.31.1", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "persistence",
+] }
+egui_plot = "0.31"
+libloading = "0.8"
+env_logger = "0.11.7"
+rfd = "0.15.3"
+futures-executor = "0.3.31"
+walkdir = "2"

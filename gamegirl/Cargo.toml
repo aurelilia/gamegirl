@@ -34,6 +34,9 @@ notify = { version = "8.0.0", optional = true }
 web-sys = { version = "0.3.77", features = ["Storage", "Window"] }
 base64 = "0.22.1"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+common = { path = "../common", features = ["zstd"] }
+
 [features]
 serde = [
     "common/serde",
@@ -44,6 +47,7 @@ serde = [
     #    "psx?/serde",
 ]
 serde_config = ["common/serde_config"]
-remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch"]
-dynamic = ["dep:libloading", "dep:notify"]
+
 std = ["common/std", "dep:zip"]
+remote-debugger = ["dep:gdbstub", "dep:gdbstub_arch", "std"]
+dynamic = ["dep:libloading", "dep:notify", "std"]

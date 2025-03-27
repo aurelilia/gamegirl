@@ -1,7 +1,0 @@
-[package]
-name = "flamegraph"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-gamegirl = { path = "../../gamegirl", features = ["gga", "nds", "std"] }
