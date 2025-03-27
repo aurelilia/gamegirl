@@ -99,8 +99,8 @@ pub fn set_mmio_apply<T: NumExt>(
     while current_byte < T::WIDTH {
         let (from_start_offset, reg_size) = inner(addr + current_byte, value, mask);
         let written = reg_size - from_start_offset;
-        value >>= written * 8;
-        mask >>= written * 8;
+        value = value.wrapping_shr(written * 8);
+        mask = mask.wrapping_shr(written * 8);
         current_byte += written;
     }
 }
