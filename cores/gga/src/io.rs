@@ -80,11 +80,6 @@ impl GameGirlAdv {
     }
 
     pub fn get_mmio_invalid(&self, a: u32) -> (u32, u32, u32) {
-        self.c.debugger.log(
-            "invalid-mmio-read-unknown",
-            format!("Read from unknown IO register 0x{a:03X}, returning open bus"),
-            Severity::Warning,
-        );
         let value = self.invalid_read::<false>(0x400_0000);
         (value, a & 1, 2)
     }

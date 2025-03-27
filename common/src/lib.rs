@@ -6,14 +6,20 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-#![feature(btree_cursors)]
+#![no_std]
 
-use std::{any::Any, cell::UnsafeCell, cmp::Ordering, sync::Arc};
+extern crate alloc;
 
-use common::debugger::Width;
+#[cfg(feature = "std")]
+extern crate std;
+
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use core::{any::Any, cell::UnsafeCell, cmp::Ordering};
+
 pub use common::Common;
+use common::{debugger::Width, options::SystemConfig};
 pub use components::scheduler::{Time, TimeS};
-use components::storage::GameSave;
+use components::storage::{GameCart, GameSave};
 
 pub mod common;
 pub mod components;
@@ -35,6 +41,15 @@ pub type Pointer = u32;
 pub type Colour = [u8; 4];
 
 pub trait Core: Send + Sync {
+    /// Try to create a core instance from the given game cart, if it is
+    /// valid for this core's system.
+    /// Can also create an instance with no cart loaded, if possible.
+    /// The core is free to .take() the cart if it's valid; when returning
+    /// None it should not touch it.
+    fn try_new(cart: &mut Option<GameCart>, config: &SystemConfig) -> Option<Box<Self>>
+    where
+        Self: Sized;
+
     /// Advance by one step, where step is system-defined.
     fn advance(&mut self);
     /// Advance the system clock by _at least_ the given delta in seconds.
@@ -70,7 +85,7 @@ pub trait Core: Send + Sync {
     /// Note that unaligned values will not be checked; the exact meaning
     /// of unaligned is platform-specific.
     fn search_memory(&self, _value: u32, _width: Width, _kind: Ordering) -> Vec<u32> {
-        vec![]
+        Vec::new()
     }
     /// Get the value of all registers. Exact meaning is platform-specific.
     fn get_registers(&self) -> Vec<usize> {
@@ -144,7 +159,7 @@ impl<T> UnsafeArc<T> {
     }
 }
 
-impl<T> std::ops::Deref for UnsafeArc<T> {
+impl<T> core::ops::Deref for UnsafeArc<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -152,7 +167,7 @@ impl<T> std::ops::Deref for UnsafeArc<T> {
     }
 }
 
-impl<T> std::ops::DerefMut for UnsafeArc<T> {
+impl<T> core::ops::DerefMut for UnsafeArc<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut (*self.0.get()) }
     }

@@ -6,14 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{
-    ops::RangeInclusive,
-    sync::{
-        mpsc::{self, Sender},
-        Arc, Mutex,
-    },
-    thread,
-};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use core::ops::RangeInclusive;
 
 use common::{
     numutil::{hword, NumExt},
@@ -23,6 +17,9 @@ use objects::ObjPixel;
 
 use super::{BackgroundMode, DisplayMode, PpuRegisters, HEIGHT, TRANS, WIDTH};
 use crate::graphics::Vram;
+
+// #[cfg(feature = "std")]
+extern crate std;
 
 mod modes;
 mod objects;
@@ -48,9 +45,10 @@ pub enum PpuRendererKind {
     #[default]
     Invalid,
     SingleCore(Box<PpuRender>),
+    #[cfg(feature = "std")]
     Threaded {
-        sender: Sender<PpuRegisters>,
-        last: Arc<Mutex<Option<Vec<Colour>>>>,
+        sender: std::sync::mpsc::Sender<PpuRegisters>,
+        last: std::sync::Arc<std::sync::Mutex<Option<Vec<Colour>>>>,
     },
 }
 
@@ -58,6 +56,7 @@ impl PpuRendererKind {
     pub fn get_last(&self) -> Option<Vec<Colour>> {
         match self {
             PpuRendererKind::SingleCore(s) => Some(s.pixels.to_vec()),
+            #[cfg(feature = "std")]
             PpuRendererKind::Threaded { last, .. } => last.lock().unwrap().take(),
             PpuRendererKind::Invalid => unreachable!(),
         }
@@ -69,18 +68,20 @@ impl PpuRendererKind {
                 s.r = regs;
                 s.render_line()
             }
+            #[cfg(feature = "std")]
             PpuRendererKind::Threaded { sender, .. } => sender.send(regs).unwrap(),
             PpuRendererKind::Invalid => unreachable!(),
         }
     }
 
     pub fn new(mut render: PpuRender, is_multi: bool) -> Self {
+        #[cfg(feature = "std")]
         if is_multi {
-            let (sender, rx) = mpsc::channel();
-            let last = Arc::new(Mutex::new(None));
+            let (sender, rx) = std::sync::mpsc::channel();
+            let last = Arc::new(std::sync::Mutex::new(None));
 
             let last_mutex = Arc::clone(&last);
-            thread::spawn(move || loop {
+            std::thread::spawn(move || loop {
                 let Ok(regs) = rx.recv() else { return };
                 render.r = regs;
                 render.render_line();
@@ -90,10 +91,9 @@ impl PpuRendererKind {
                 }
             });
 
-            Self::Threaded { sender, last }
-        } else {
-            Self::SingleCore(Box::new(render))
+            return Self::Threaded { sender, last };
         }
+        Self::SingleCore(Box::new(render))
     }
 }
 

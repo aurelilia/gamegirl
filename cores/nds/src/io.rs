@@ -8,7 +8,7 @@
 
 // TODO: Respect EXMEMCNT
 
-use std::{marker::PhantomData, mem};
+use core::{marker::PhantomData, mem};
 
 use arm_cpu::{Cpu, Interrupt};
 pub use common::components::io::*;

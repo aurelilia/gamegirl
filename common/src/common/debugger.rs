@@ -6,7 +6,12 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{cmp::Ordering, fmt::Debug, sync::Mutex, time::Instant};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::cmp::Ordering;
 
 use crate::{numutil::NumExt, Pointer};
 
@@ -35,7 +40,7 @@ pub struct Debugger {
     /// logged and discarded.
     pub diagnostic_level: Severity,
     /// Diagnostic events that have occurred.
-    pub diagnostic_events: Mutex<Vec<DiagnosticEvent>>,
+    pub diagnostic_events: Vec<DiagnosticEvent>,
 }
 
 impl Debugger {
@@ -93,18 +98,16 @@ impl Debugger {
 
     /// Log a diagnostic event that occured, if the corresponding level
     /// is enabled.
-    pub fn log(&self, evt_type: &str, event: String, severity: Severity) {
+    pub fn log(&mut self, evt_type: &str, event: String, severity: Severity) {
         if severity >= self.diagnostic_level {
-            self.diagnostic_events
-                .lock()
-                .unwrap()
-                .push(DiagnosticEvent {
-                    evt_type: evt_type.to_string(),
-                    event,
-                    severity,
-                    time: Instant::now(),
-                    state: None,
-                });
+            self.diagnostic_events.push(DiagnosticEvent {
+                evt_type: evt_type.to_string(),
+                event,
+                severity,
+                #[cfg(feature = "std")]
+                time: std::time::Instant::now(),
+                state: None,
+            });
         }
     }
 }
@@ -133,8 +136,9 @@ pub struct DiagnosticEvent {
     pub event: String,
     /// The severity of the event.
     pub severity: Severity,
-    /// The time the event occurred .
-    pub time: Instant,
+    /// The time the event occurred.
+    #[cfg(feature = "std")]
+    pub time: std::time::Instant,
     /// Save state, if enabled, to be used to aid debugging.
     pub state: Option<Vec<u8>>,
 }
@@ -153,7 +157,7 @@ pub enum Severity {
 }
 
 impl PartialOrd for Severity {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some((*self as u32).cmp(&(*other as u32)))
     }
 }

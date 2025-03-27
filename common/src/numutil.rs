@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{fmt::UpperHex, mem, ops::BitAnd};
+use core::{fmt::UpperHex, mem, ops::BitAnd};
 
 /// Trait for common number operations.
 pub trait NumExt: BitAnd<Output = Self> + Copy + PartialEq + Default + UpperHex {

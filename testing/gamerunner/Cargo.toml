@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gamegirl = { path = "../../gamegirl", features = ["ggc", "gga"] }
+gamegirl = { path = "../../gamegirl", features = ["ggc", "gga", "std"] }
 png = "0.17"
 clap = { version = "4.5", features = ["derive"] }
 zip = "2.5"

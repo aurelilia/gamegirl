@@ -197,15 +197,14 @@ fn event_log(dbg: &mut Debugger, ui: &mut Ui) {
                     }
                 });
             if ui.button("Clear").clicked() {
-                dbg.diagnostic_events.lock().unwrap().clear();
+                dbg.diagnostic_events.clear();
             }
         });
     });
 
     ui.separator();
     ScrollArea::vertical().show(ui, |ui| {
-        let events = dbg.diagnostic_events.lock().unwrap();
-        for event in events.iter().rev() {
+        for event in dbg.diagnostic_events.iter().rev() {
             ui.label(RichText::new(&event.event).color(severity_color(event.severity)))
                 .on_hover_ui(|ui| {
                     ui.label(format!("Type: {}", event.evt_type));

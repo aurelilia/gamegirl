@@ -11,13 +11,13 @@ common = { path = "../../common" }
 log.workspace = true
 serde = { workspace = true, optional = true }
 bitmatch.workspace = true
-num-traits = "0.2"
-num-derive = "0.4"
+num-traits = { version = "0.2", default-features = false }
+num-derive = { version = "0.4", default-features = false }
 
-cranelift = "0.118"
-cranelift-jit = "0.118"
-cranelift-module = "0.118"
-cranelift-native = "0.118"
+cranelift = { version = "0.118", optional = true }
+cranelift-jit = { version = "0.118", optional = true }
+cranelift-module = { version = "0.118", optional = true }
+cranelift-native = { version = "0.118", optional = true }
 
 [features]
 serde = ["dep:serde"]

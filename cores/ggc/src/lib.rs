@@ -6,7 +6,12 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{cmp::Ordering, mem, path::PathBuf};
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{boxed::Box, vec::Vec};
+use core::{cmp::Ordering, mem};
 
 use common::{
     common::{
@@ -17,7 +22,7 @@ use common::{
     components::{
         memory_mapper::MemoryMapper,
         scheduler::Scheduler,
-        storage::{GameSave, Storage},
+        storage::{GameCart, GameSave},
     },
     numutil::{hword, word, NumExt},
     Common, Core, Time,
@@ -125,6 +130,23 @@ impl Core for GameGirl {
     fn get_rom(&self) -> Vec<u8> {
         self.cart.rom.clone()
     }
+
+    fn try_new(cart_ref: &mut Option<GameCart>, config: &SystemConfig) -> Option<Box<Self>> {
+        let mut ggc = Box::<Self>::default();
+        if let Some(cart) = cart_ref.take() {
+            if cart.rom[0x0104] != 0xCE || cart.rom[0x0105] != 0xED {
+                // Missing nintendo logo bytes!
+                *cart_ref = Some(cart);
+                return None;
+            }
+            let mut cartridge = Cartridge::from_rom(cart.rom);
+            if let Some(save) = cart.save {
+                cartridge.load_save(save);
+            }
+            ggc.load_cart(cartridge, config, false);
+        }
+        Some(ggc)
+    }
 }
 
 impl GameGirl {
@@ -183,18 +205,6 @@ impl GameGirl {
         }
         self.load_cart_mem(cart, config);
         self.c.config = config.clone();
-    }
-
-    /// Create a system with a cart already loaded.
-    pub fn with_cart(cart: Vec<u8>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
-        let mut cart = Cartridge::from_rom(cart);
-        if let Some(save) = Storage::load(path, cart.title(true)) {
-            cart.load_save(save);
-        }
-
-        let mut ggc = Box::<Self>::default();
-        ggc.load_cart(cart, config, false);
-        ggc
     }
 }
 

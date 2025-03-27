@@ -11,7 +11,10 @@
 #![feature(if_let_guard)]
 #![feature(trait_alias)]
 
-use std::{cmp::Ordering, mem, path::PathBuf};
+extern crate alloc;
+
+use alloc::{boxed::Box, string::String, vec, vec::Vec};
+use core::{cmp::Ordering, mem};
 
 use arm_cpu::Cpu;
 use audio::Apu;
@@ -22,7 +25,11 @@ use common::{
         Common,
     },
     common_functions,
-    components::{scheduler::Scheduler, storage::GameSave, thin_pager::ThinPager},
+    components::{
+        scheduler::Scheduler,
+        storage::{GameCart, GameSave},
+        thin_pager::ThinPager,
+    },
     numutil::NumExt,
     Core, TimeS,
 };
@@ -50,6 +57,7 @@ mod scheduling;
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Default)]
 pub struct GameGirlAdv {
     pub cpu: Cpu<Self>,
     pub memory: Memory,
@@ -146,6 +154,38 @@ impl Core for GameGirlAdv {
             Width::Word => self.set(addr, value),
         }
     }
+
+    fn try_new(cart_ref: &mut Option<GameCart>, config: &SystemConfig) -> Option<Box<Self>> {
+        let cart = if let Some(mut cart) = cart_ref.take() {
+            if let Some(elf_read) = Self::decode_elf(&cart.rom) {
+                cart.rom = elf_read;
+            } else if cart.rom.iter().skip(0xB5).take(6).any(|b| *b != 0) {
+                // Not actuall a GGA cart! Missing empty header region
+                *cart_ref = Some(cart);
+                return None;
+            };
+            ThinPager::normalize(&mut cart.rom);
+            Cartridge::with_cart(cart)
+        } else {
+            Cartridge::default()
+        };
+
+        let mut gg = Box::<GameGirlAdv>::new(GameGirlAdv {
+            cpu: Cpu::default(),
+            memory: Memory::default(),
+            ppu: Ppu::default(),
+            apu: Apu::default(),
+            dma: Dmas::default(),
+            timers: Timers::default(),
+            cart,
+            serial: Serial::default(),
+
+            scheduler: Scheduler::default(),
+            c: Common::with_config(config.clone()),
+        });
+        gg.initialize();
+        Some(gg)
+    }
 }
 
 impl GameGirlAdv {
@@ -195,36 +235,6 @@ impl GameGirlAdv {
         // still buggy
     }
 
-    pub fn new(cart: Option<Vec<u8>>, path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
-        let cart = if let Some(cart) = cart {
-            let mut cart = if let Some(elf_read) = Self::decode_elf(&cart) {
-                elf_read
-            } else {
-                cart
-            };
-            ThinPager::normalize(&mut cart);
-            Cartridge::with_rom_and_stored_ram(cart, path)
-        } else {
-            Cartridge::default()
-        };
-
-        let mut gg = Box::<GameGirlAdv>::new(GameGirlAdv {
-            cpu: Cpu::default(),
-            memory: Memory::default(),
-            ppu: Ppu::default(),
-            apu: Apu::default(),
-            dma: Dmas::default(),
-            timers: Timers::default(),
-            cart,
-            serial: Serial::default(),
-
-            scheduler: Scheduler::default(),
-            c: Common::with_config(config.clone()),
-        });
-        gg.initialize();
-        gg
-    }
-
     fn decode_elf(cart: &[u8]) -> Option<Vec<u8>> {
         let elf = Elf::from_bytes(cart).ok()?;
         let mut buf = vec![0; 0x1FF_FFFF];
@@ -245,25 +255,5 @@ impl GameGirlAdv {
         }
 
         Some(buf)
-    }
-}
-
-impl Default for GameGirlAdv {
-    fn default() -> Self {
-        let mut gg = Self {
-            cpu: Cpu::default(),
-            memory: Memory::default(),
-            ppu: Ppu::default(),
-            apu: Apu::default(),
-            dma: Dmas::default(),
-            timers: Timers::default(),
-            cart: Cartridge::default(),
-            serial: Serial::default(),
-
-            scheduler: Scheduler::default(),
-            c: Common::default(),
-        };
-        gg.initialize();
-        gg
     }
 }

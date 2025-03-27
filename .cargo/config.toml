@@ -1,6 +1,8 @@
 [target.wasm32-unknown-unknown]
 rustflags = [
-  "-C", "link-args=-z stack-size=5500000",
+  "-C",
+  "link-args=-z stack-size=5500000",
+  "-Ctarget-feature=+soft-float",
 ]
 
 [target.x86_64-unknown-linux-gnu]

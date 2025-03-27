@@ -6,7 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::default;
+use alloc::vec::Vec;
+use core::default;
 
 use arm_cpu::{Cpu, Interrupt};
 use common::{

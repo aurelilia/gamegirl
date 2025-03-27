@@ -12,10 +12,8 @@
 pub mod mplayer;
 pub mod psg;
 
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use alloc::{collections::VecDeque, sync::Arc};
+use std::sync::Mutex;
 
 use common::{
     components::scheduler::Scheduler,

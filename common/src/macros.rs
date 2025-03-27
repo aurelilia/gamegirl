@@ -34,13 +34,13 @@ macro_rules! common_functions {
         }
 
         #[cfg(feature = "serde")]
-        fn save_state(&mut self) -> Vec<u8> {
+        fn save_state(&mut self) -> ::alloc::vec::Vec<u8> {
             ::common::serialize::serialize(self, self.c.config.compress_savestates)
         }
 
         #[cfg(feature = "serde")]
         fn load_state(&mut self, state: &[u8]) {
-            let old_self = mem::replace(
+            let old_self = ::core::mem::replace(
                 self,
                 ::common::serialize::deserialize(state, self.c.config.compress_savestates),
             );
@@ -48,8 +48,8 @@ macro_rules! common_functions {
         }
 
         #[cfg(not(feature = "serde"))]
-        fn save_state(&mut self) -> Vec<u8> {
-            vec![]
+        fn save_state(&mut self) -> ::alloc::vec::Vec<u8> {
+            ::alloc::vec::Vec::new()
         }
 
         #[cfg(not(feature = "serde"))]
@@ -71,7 +71,7 @@ macro_rules! common_functions {
             &mut self.c
         }
 
-        fn as_any(&mut self) -> &mut dyn std::any::Any {
+        fn as_any(&mut self) -> &mut dyn ::core::any::Any {
             self
         }
     };

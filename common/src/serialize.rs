@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use alloc::vec::Vec;
+
 use bincode::config;
 
 /// Serialize an object that can be loaded with [deserialize].
@@ -13,7 +15,7 @@ use bincode::config;
 #[cfg(feature = "zstd")]
 pub fn serialize<T: serde::Serialize>(thing: &T, with_zstd: bool) -> Vec<u8> {
     if with_zstd {
-        let mut dest = vec![];
+        let mut dest = Vec::new();
         let mut writer = zstd::stream::Encoder::new(&mut dest, 3).unwrap();
         bincode::serde::encode_into_std_write(thing, &mut writer, config::legacy()).unwrap();
         writer.finish().unwrap();

@@ -9,7 +9,7 @@
 //! Inner implementation of CP15 for the ARMv5.
 //! Note that getters and setters are in `nds9.rs`, as part of the ARM
 //! interface.
-use std::ops::Range;
+use core::ops::Range;
 
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 

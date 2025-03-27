@@ -161,7 +161,7 @@ impl<C: Channel> Dac<C> {
     }
 }
 
-impl<C: Channel> std::ops::Deref for Dac<C> {
+impl<C: Channel> core::ops::Deref for Dac<C> {
     type Target = C;
 
     fn deref(&self) -> &Self::Target {
@@ -169,7 +169,7 @@ impl<C: Channel> std::ops::Deref for Dac<C> {
     }
 }
 
-impl<C: Channel> std::ops::DerefMut for Dac<C> {
+impl<C: Channel> core::ops::DerefMut for Dac<C> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.channel
     }

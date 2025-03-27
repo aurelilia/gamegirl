@@ -1,4 +1,4 @@
-use std::marker::ConstParamTy;
+use core::marker::ConstParamTy;
 
 use num_derive::FromPrimitive;
 

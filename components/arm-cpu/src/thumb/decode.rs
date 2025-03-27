@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{fmt::Display, marker::ConstParamTy};
+use core::{fmt::Display, marker::ConstParamTy};
 
 use bitmatch::bitmatch;
 use common::numutil::{NumExt, U16Ext};
@@ -273,7 +273,7 @@ pub const fn lut_span<T: Copy>(lut: &mut [T], idx: usize, size: usize, handler: 
 
 impl Display for ThumbInst {
     #[bitmatch]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         #[bitmatch]
         match self.0 {
             "11011111_nnnnnnnn" => write!(f, "swi 0x{:02X}", n),

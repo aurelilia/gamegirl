@@ -6,7 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{mem, ptr};
+use alloc::boxed::Box;
+use core::{mem, ptr};
 
 use arm_cpu::{
     interface::{ArmSystem, RwType},

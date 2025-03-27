@@ -6,14 +6,14 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{
+use alloc::{string::String, vec::Vec};
+use core::{
     iter,
-    path::PathBuf,
     sync::atomic::{AtomicU32, Ordering},
 };
 
 use common::{
-    components::storage::{GameSave, Storage},
+    components::storage::{GameCart, GameSave},
     numutil::NumExt,
 };
 use FlashCmdStage::*;
@@ -150,13 +150,12 @@ impl Cartridge {
         buf
     }
 
-    pub fn with_rom_and_stored_ram(rom: Vec<u8>, path: Option<PathBuf>) -> Self {
+    pub fn with_cart(cart: GameCart) -> Self {
         let mut this = Self::default();
-        this.load_rom(rom);
-        let Some(ram) = Storage::load(path, this.title()) else {
-            return this;
-        };
-        this.load_save(ram);
+        this.load_rom(cart.rom);
+        if let Some(save) = cart.save {
+            this.load_save(save);
+        }
         this
     }
 }

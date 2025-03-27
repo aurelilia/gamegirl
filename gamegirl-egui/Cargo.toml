@@ -14,8 +14,13 @@ path = "src/main.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-common = { path = "../common", features = ["serde_config"] }
-gamegirl = { path = "../gamegirl", features = ["ggc", "gga", "nds"] }
+gamegirl = { path = "../gamegirl", features = [
+    "ggc",
+    "gga",
+    "nds",
+    "std",
+    "serde_config",
+] }
 
 egui = "0.31"
 egui_extras = "0.31"

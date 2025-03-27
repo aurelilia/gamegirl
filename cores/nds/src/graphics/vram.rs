@@ -6,7 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{mem, ops::Range};
+use alloc::boxed::Box;
+use core::{mem, ops::Range};
 
 use common::{
     components::thin_pager::{ThinPager, RW},

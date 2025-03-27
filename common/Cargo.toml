@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 log.workspace = true
-rubato = { version = "0.16", default-features = false }
+rubato = { version = "0.16", optional = true }
 
 serde = { workspace = true, optional = true }
 serde_arrays = { workspace = true, optional = true }
@@ -28,3 +28,4 @@ serde = [
     "serde_config",
 ]
 serde_config = ["dep:serde"]
+std = ["dep:rubato"]

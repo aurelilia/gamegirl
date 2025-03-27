@@ -6,7 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{iter, ops::Range, ptr, vec};
+use alloc::{vec, vec::Vec};
+use core::{iter, ops::Range, ptr};
 
 use crate::{numutil::NumExt, UnsafeArc};
 
@@ -125,6 +126,8 @@ unsafe impl Sync for Page {}
 
 #[cfg(test)]
 mod test {
+    use alloc::vec;
+
     use super::*;
 
     #[test]

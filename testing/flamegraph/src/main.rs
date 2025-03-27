@@ -1,12 +1,12 @@
-use gamegirl::common::common::options::SystemConfig;
+use gamegirl::{common::common::options::SystemConfig, GameCart};
 
 fn main() {
     let mut core = gamegirl::load_cart(
-        include_bytes!("../../../bench.gb").to_vec(),
-        None,
+        GameCart {
+            rom: include_bytes!("../../../bench.gb").to_vec(),
+            save: None,
+        },
         &SystemConfig::default(),
-        None,
-        0,
     )
     .unwrap();
     core.skip_bootrom();

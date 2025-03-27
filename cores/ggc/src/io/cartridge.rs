@@ -6,12 +6,10 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{
-    iter,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use alloc::{string::String, vec, vec::Vec};
+use core::iter;
 
-use common::{components::storage::GameSave, numutil::NumExt};
+use common::{common::time, components::storage::GameSave, numutil::NumExt};
 
 use crate::io::cartridge::MBCKind::*;
 
@@ -258,7 +256,7 @@ impl Cartridge {
     pub fn load_save(&mut self, save: GameSave) {
         self.ram = save.ram;
         if let MBC3RTC { rtc, .. } = &mut self.kind {
-            rtc.start = save.rtc.unwrap_or_else(Rtc::since_unix);
+            rtc.start = save.rtc.unwrap_or_else(time::since_unix);
         }
     }
 
@@ -303,7 +301,7 @@ pub struct Rtc {
 
 impl Rtc {
     fn latch(&mut self) {
-        self.latched_at = Some(Self::since_unix());
+        self.latched_at = Some(time::since_unix());
     }
 
     fn get(&self, idx: u8) -> u16 {
@@ -316,19 +314,12 @@ impl Rtc {
 
     fn set(&mut self, _idx: u8, _value: u8) {
         // TODO this is not how MBC3RTC works
-        self.start = Self::since_unix();
+        self.start = time::since_unix();
     }
 
     fn diff(&self) -> u64 {
         self.latched_at
-            .unwrap_or_else(|| Self::since_unix() - self.start)
-    }
-
-    fn since_unix() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
+            .unwrap_or_else(|| time::since_unix() - self.start)
     }
 }
 

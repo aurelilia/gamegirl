@@ -267,7 +267,9 @@ fn replays(app: &mut App, _ctx: &Context, ui: &mut Ui) {
         (ReplayState::None, Some(file)) => {
             ui.label("Status: Not currently recording replay");
             if ui.button("Restart system and start recording").clicked() {
-                core.c_mut().input.replay = ReplayState::Recording(InputReplay::empty(file));
+                core.c_mut().input.replay = ReplayState::Recording(InputReplay::empty(
+                    file.as_os_str().to_string_lossy().into(),
+                ));
                 core.reset();
             }
             if ui.button("Load recording and restart").clicked() {

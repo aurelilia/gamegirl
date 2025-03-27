@@ -16,6 +16,8 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
+use alloc::vec::Vec;
+
 use bitflags::bitflags;
 use channel::{Channel, Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;

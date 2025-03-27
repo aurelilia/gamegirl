@@ -17,6 +17,7 @@ pub mod audio;
 pub mod debugger;
 pub mod input;
 pub mod options;
+pub mod time;
 pub mod video;
 
 /// Common fields shared by all systems.

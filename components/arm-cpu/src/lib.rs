@@ -6,19 +6,29 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+#![no_std]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
+
+extern crate alloc;
 
 pub mod arm;
 mod exceptions;
 pub mod interface;
+#[cfg(feature = "cranelift")]
 mod jit;
 mod misc;
 mod optimizations;
 pub mod registers;
 mod thumb;
 
-use std::{fmt::Write, sync::Arc};
+use alloc::{
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::fmt::Write;
 
 use access::{CODE, NONSEQ, SEQ};
 use common::numutil::NumExt;

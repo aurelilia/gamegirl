@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use alloc::{boxed::Box, vec::Vec};
+
 use common::numutil::{hword, word, NumExt, U32Ext};
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
@@ -79,7 +81,7 @@ impl SpiBus {
                 self.data_out = 0xFF;
                 match &mut self.firm {
                     FirmwareState::AwaitingCmd => match value & 0xFF {
-                        0x03 => self.firm = FirmwareState::ReadWaitingAddr { addr: vec![] },
+                        0x03 => self.firm = FirmwareState::ReadWaitingAddr { addr: Vec::new() },
                         0x05 => self.firm = FirmwareState::ReadStatusWaiting,
                         0x06 => self.firm_write_en = true,
                         0x04 => self.firm_write_en = false,

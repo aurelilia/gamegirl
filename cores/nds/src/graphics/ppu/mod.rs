@@ -30,7 +30,7 @@
 pub mod registers;
 mod render;
 
-use std::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 
 use arm_cpu::{Cpu, Interrupt};
 use common::{common::video::FrameBuffer, numutil::NumExt, Colour, UnsafeArc};

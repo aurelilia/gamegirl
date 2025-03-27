@@ -11,8 +11,8 @@
 // Thank you!
 // It's currently effetively a function-by-function rewrite in Rust.
 
-use core::slice;
-use std::{cmp, mem, ptr};
+use alloc::vec::Vec;
+use core::{cmp, mem, ptr, slice};
 
 use crate::GameGirlAdv;
 
@@ -69,7 +69,6 @@ pub fn find_mp2k(rom: &[u8]) -> Option<u32> {
     for addr in (0..(rom.len() - LEN)).step_by(2) {
         let crc = crc32(&rom[addr..(addr + LEN)]);
         if CRC32 == crc {
-            println!("SoundMain at 0x{addr:X}");
             let mut addr =
                 u32::from_le_bytes(rom[(addr + 0x74)..(addr + 0x78)].try_into().unwrap());
             if (addr & 1) == 0 {
@@ -79,7 +78,6 @@ pub fn find_mp2k(rom: &[u8]) -> Option<u32> {
                 addr &= !3;
                 addr += 8;
             }
-            println!("SoundMainRAM at 0x{addr:X}");
             return Some(addr);
         }
     }
@@ -349,7 +347,6 @@ impl MusicPlayer {
                 sampler.compressed = compressed;
             }
 
-            dbg!(sampler.wave_data, wave_size);
             let wave_data =
                 unsafe { slice::from_raw_parts_mut(sampler.wave_data, wave_size as usize) };
             for j in 0..SAMPLES_PER_FRAME {

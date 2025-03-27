@@ -6,7 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::ptr;
+use alloc::boxed::Box;
+use core::ptr;
 
 use crate::numutil::NumExt;
 

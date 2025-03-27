@@ -6,9 +6,12 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+extern crate std;
+
+use alloc::{boxed::Box, vec::Vec};
 use std::path::{Path, PathBuf};
 
-use common::{common::options::SystemConfig, Core};
+use common::{common::options::SystemConfig, components::storage::GameCart, Core};
 use libloading::{Library, Symbol};
 use notify::{
     event::{AccessKind, AccessMode},
@@ -25,7 +28,14 @@ pub type NewCoreFn = extern "C" fn(Vec<u8>) -> Box<dyn Core>;
 #[allow(improper_ctypes_definitions)]
 #[no_mangle]
 pub extern "C" fn new_core(cart: Vec<u8>) -> Box<dyn Core> {
-    crate::load_cart(cart, None, &SystemConfig::default(), None, 0).unwrap()
+    crate::load_cart(
+        GameCart {
+            rom: cart,
+            save: None,
+        },
+        &SystemConfig::default(),
+    )
+    .unwrap()
 }
 
 pub struct DynamicContext {
@@ -49,7 +59,7 @@ impl DynamicContext {
             .watch(Path::new("./dyn-cores"), RecursiveMode::Recursive)
             .unwrap();
         Self {
-            loaded_cores: vec![],
+            loaded_cores: Vec::new(),
             _watcher,
         }
     }

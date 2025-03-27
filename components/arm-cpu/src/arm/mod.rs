@@ -12,6 +12,12 @@
 mod decode;
 mod lut;
 
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use bitmatch::bitmatch;
 use common::numutil::{NumExt, U32Ext};
 use decode::{ArmAluOp, ArmLdrStrOp, ArmMulOp, ArmQclzOp};

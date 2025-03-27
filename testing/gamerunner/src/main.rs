@@ -13,7 +13,7 @@ use gamegirl::{
         input::Button,
         options::{ConsoleBios, SystemConfig},
     },
-    Core,
+    Core, GameCart,
 };
 use indicatif::{MultiProgress, ProgressBar};
 use png::{BitDepth, ColorType, Encoder};
@@ -150,7 +150,7 @@ fn run_game(
     } else {
         fs::read(&path).unwrap()
     };
-    let mut core = gamegirl::load_cart(rom, None, config, None, 0).unwrap();
+    let mut core = gamegirl::load_cart(GameCart { rom, save: None }, config).unwrap();
 
     for _ in 0..80 {
         let time = Instant::now();

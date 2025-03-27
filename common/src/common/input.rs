@@ -6,7 +6,13 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::{collections::BTreeMap, fmt::Write, ops::Bound, path::PathBuf};
+use alloc::{
+    collections::btree_map::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::fmt::Write;
 
 use crate::{numutil::NumExt, Time};
 
@@ -113,14 +119,14 @@ pub enum ReplayState {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct InputReplay {
     /// File name of the replay.
-    pub file: PathBuf,
+    pub file: String,
     /// A list of button states at given times.
     pub states: BTreeMap<Time, ButtonState>,
 }
 
 impl InputReplay {
     /// Create a new empty replay with the given file name.
-    pub fn empty(file: PathBuf) -> Self {
+    pub fn empty(file: String) -> Self {
         Self {
             file,
             states: BTreeMap::new(),
@@ -130,7 +136,7 @@ impl InputReplay {
     /// Load a replay from a string, in .rpl format.
     pub fn load(str: String) -> Self {
         let mut lines = str.lines();
-        let file = lines.next().unwrap().to_string().into();
+        let file = lines.next().unwrap().to_string();
         InputReplay {
             file,
             states: lines
@@ -154,20 +160,19 @@ impl InputReplay {
     /// Get the button state for the given time.
     pub fn get_at(&self, time: Time) -> ButtonState {
         self.states
-            .lower_bound(Bound::Excluded(&time))
-            .peek_prev()
+            .range(..time)
+            .next_back()
             .map(|(_, v)| *v)
             .unwrap_or_default()
     }
 
     /// Save the replay to a string, in .rpl format.
     pub fn serialize(&self) -> String {
-        self.states.iter().fold(
-            format!("{}\n", self.file.to_str().unwrap()),
-            |mut acc, e| {
+        self.states
+            .iter()
+            .fold(format!("{}\n", self.file), |mut acc, e| {
                 writeln!(acc, "{:010b}|{}", e.1 .0, e.0).unwrap();
                 acc
-            },
-        )
+            })
     }
 }

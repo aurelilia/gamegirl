@@ -22,6 +22,9 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 #![feature(if_let_guard)]
+#![no_std]
+
+extern crate alloc;
 
 mod addr;
 mod cpu;
@@ -31,10 +34,10 @@ mod io;
 mod memory;
 mod scheduling;
 
-use std::{
+use alloc::{boxed::Box, string::String, vec::Vec};
+use core::{
     mem,
     ops::{Deref, DerefMut, Index, IndexMut},
-    path::PathBuf,
 };
 
 use addr::{BIOSPROT, SOUNDBIAS};
@@ -42,7 +45,10 @@ use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu, Interrupt};
 use common::{
     common::options::{EmulateOptions, SystemConfig},
     common_functions,
-    components::{scheduler::Scheduler, storage::GameSave},
+    components::{
+        scheduler::Scheduler,
+        storage::{GameCart, GameSave},
+    },
     numutil::NumExt,
     Colour, Common, Core, Time, TimeS,
 };
@@ -238,6 +244,33 @@ impl Core for Nds {
     fn get_rom(&self) -> Vec<u8> {
         self.cart.rom.clone()
     }
+
+    fn try_new(cart_ref: &mut Option<GameCart>, config: &SystemConfig) -> Option<Box<Self>> {
+        let mut nds = Box::<Self>::default();
+        nds.c.config = config.clone();
+        if let Some(bios) = config.get_bios("nds7") {
+            nds.memory.bios7 = bios.into();
+        }
+        if let Some(bios) = config.get_bios("nds9") {
+            nds.memory.bios9 = bios.into();
+        }
+        if let Some(fw) = config.get_bios("ndsfw") {
+            nds.spi.firm_data = fw.into();
+        }
+
+        if let Some(cart) = cart_ref.take() {
+            if cart.rom.iter().skip(0x15).take(6).any(|b| *b != 0) {
+                // Not NDS cart! Missing zero-filled header region
+                *cart_ref = Some(cart);
+                return None;
+            }
+            nds.cart.load_rom(cart.rom);
+        }
+
+        nds.init_memory();
+        Gpu::init_render(&mut nds);
+        Some(nds)
+    }
 }
 
 impl Nds {
@@ -260,25 +293,6 @@ impl Nds {
     pub fn restore_from(&mut self, old_self: Self) {
         self.c.restore_from(old_self.c);
         self.init_memory();
-    }
-
-    pub fn with_cart(cart: Vec<u8>, _path: Option<PathBuf>, config: &SystemConfig) -> Box<Self> {
-        let mut nds = Box::<Self>::default();
-        nds.c.config = config.clone();
-        if let Some(bios) = config.get_bios("nds7") {
-            nds.memory.bios7 = bios.into();
-        }
-        if let Some(bios) = config.get_bios("nds9") {
-            nds.memory.bios9 = bios.into();
-        }
-        if let Some(fw) = config.get_bios("ndsfw") {
-            nds.spi.firm_data = fw.into();
-        }
-        nds.cart.load_rom(cart);
-
-        nds.init_memory();
-        Gpu::init_render(&mut nds);
-        nds
     }
 }
 

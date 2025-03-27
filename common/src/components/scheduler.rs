@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use alloc::vec::Vec;
+
 /// Type for unsigned time, in system ticks
 pub type Time = u64;
 /// Type for signed time, in system ticks

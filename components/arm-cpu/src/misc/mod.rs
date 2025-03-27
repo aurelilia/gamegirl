@@ -8,7 +8,8 @@
 
 mod alu;
 
-use std::fmt::Display;
+use alloc::format;
+use core::fmt::Display;
 
 use common::{common::debugger::Severity, numutil::NumExt};
 

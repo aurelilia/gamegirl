@@ -13,16 +13,15 @@ use std::{
     time::Duration,
 };
 
-use common::{common::options::SystemConfig, Colour as RColour, Core};
 use cpal::Stream;
 use eframe::{
     egui::{Context, Event, TextureOptions},
     emath::History,
     epaint::{ColorImage, ImageData, ImageDelta, TextureId},
-    glow::{self},
     CreationContext, Frame, Storage,
 };
 use egui_notify::{Anchor, Toasts};
+use gamegirl::{common::Colour as RColour, Core, GameCart, Storage as GGStorage, SystemConfig};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
@@ -99,7 +98,7 @@ pub struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         let size = self.update_gg(ctx);
-        self.process_messages(frame.gl());
+        self.process_messages();
         gui::draw(self, ctx, frame, size);
 
         // Immediately repaint, since the GG will have a new frame.
@@ -223,23 +222,20 @@ impl App {
     }
 
     /// Process all async messages that came in during this frame.
-    fn process_messages(&mut self, gl: Option<&Arc<glow::Context>>) {
+    fn process_messages(&mut self) {
         while let Ok(msg) = self.message_channel.1.try_recv() {
             match msg {
                 Message::RomOpen(file) => {
                     self.save_game();
 
-                    let tex = match self.textures[0] {
-                        TextureId::Managed(m) => m,
-                        _ => panic!(),
-                    };
-
+                    // TODO This breaks the WASM build!!!
+                    let save = GGStorage::load(file.path.clone(), "".into());
                     let sys = gamegirl::load_cart_maybe_zip(
-                        file.content,
-                        file.path.clone(),
+                        GameCart {
+                            rom: file.content,
+                            save,
+                        },
                         &self.state.options.sys,
-                        gl.cloned(),
-                        tex as u32,
                     );
                     match sys {
                         Ok(sys) => {
@@ -335,7 +331,9 @@ impl App {
 
     /// Save the system cart RAM, if a cart is loaded and it has RAM.
     pub fn save_game(&self) {
-        gamegirl::save_game(&**self.core.lock().unwrap(), self.current_rom_path.clone());
+        if let Some(save) = self.core.lock().unwrap().make_save() {
+            GGStorage::save(self.current_rom_path.clone(), save);
+        }
     }
 
     pub fn new(ctx: &CreationContext<'_>) -> Box<Self> {
