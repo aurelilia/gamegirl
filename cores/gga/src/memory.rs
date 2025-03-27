@@ -6,7 +6,8 @@
 // If a copy of these licenses was not distributed with self file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::mem;
+use alloc::boxed::Box;
+use core::mem;
 
 use arm_cpu::{
     access::{CODE, NONSEQ, SEQ},
@@ -141,16 +142,6 @@ impl GameGirlAdv {
             _ if T::WIDTH == 4 => T::from_u32(self.invalid_read::<true>(addr)),
             _ => T::from_u32(self.invalid_read::<false>(addr)),
         }
-    }
-
-    pub fn get_fastmem<T: Copy>(&self, addr_unaligned: u32) -> Option<T> {
-        let addr = addr_unaligned & !(mem::size_of::<T>().u32() - 1);
-        self.memory.pager.read(addr)
-    }
-
-    pub fn get_fastmem_raw(&mut self, addr: u32) -> Option<*mut u8> {
-        let ptr = self.memory.pager.get_raw(addr).ptr;
-        (!ptr.is_null()).then_some(ptr)
     }
 
     pub(super) fn invalid_read<const WORD: bool>(&self, addr: u32) -> u32 {
@@ -460,6 +451,18 @@ impl GameGirlAdv {
 
             _ => 1,
         }
+    }
+}
+
+impl Memory {
+    pub fn get_fastmem<T: Copy>(&self, addr_unaligned: u32) -> Option<T> {
+        let addr = addr_unaligned & !(mem::size_of::<T>().u32() - 1);
+        self.pager.read(addr)
+    }
+
+    pub fn get_fastmem_raw(&mut self, addr: u32) -> Option<*mut u8> {
+        let ptr = self.pager.get_raw(addr).ptr;
+        (!ptr.is_null()).then_some(ptr)
     }
 }
 

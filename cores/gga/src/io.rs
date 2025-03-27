@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with self file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+use alloc::format;
+
 use ::common::{common::debugger::Severity, components::io::get_mmio_apply, numutil::NumExt, *};
 use arm_cpu::{Cpu, Interrupt};
 use components::io::{section, set_mmio_apply, FAILED_WRITE};

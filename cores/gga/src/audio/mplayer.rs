@@ -14,7 +14,7 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice};
 
-use crate::GameGirlAdv;
+use crate::{memory::Memory, GameGirlAdv};
 
 const MAX_CH: usize = 12;
 const TOTAL_FRAME_COUNT: u32 = 7;
@@ -104,12 +104,11 @@ impl MusicPlayer {
     pub fn pc_match(gg: &mut GameGirlAdv) {
         let addr = gg.get(0x300_7FF0);
         if addr != 0 {
-            let player = gg.apu.mplayer.clone();
-            player.lock().unwrap().sound_main_ram(gg, addr);
+            gg.apu.mplayer.sound_main_ram(&mut gg.memory, addr);
         }
     }
 
-    pub fn sound_main_ram(&mut self, bus: &mut GameGirlAdv, info_addr: u32) {
+    pub fn sound_main_ram(&mut self, bus: &mut Memory, info_addr: u32) {
         let Some(sound_info): Option<SoundInfo> = bus.get_fastmem(info_addr) else {
             return;
         };
@@ -270,7 +269,7 @@ impl MusicPlayer {
         self.buffer.fill(0.0);
     }
 
-    fn render_frame(&mut self, bus: &mut GameGirlAdv) {
+    fn render_frame(&mut self, bus: &mut Memory) {
         const DIFFERENTIAL_LUT: &[f32] = &[
             i8_to_float(0x00u8 as i8),
             i8_to_float(0x01u8 as i8),
@@ -479,7 +478,7 @@ impl MusicPlayer {
         }
     }
 
-    pub fn read_sample(&mut self, bus: &mut GameGirlAdv) -> [f32; 2] {
+    pub fn read_sample(&mut self, bus: &mut Memory) -> [f32; 2] {
         if self.buffer_read_index == 0 {
             self.render_frame(bus);
         }

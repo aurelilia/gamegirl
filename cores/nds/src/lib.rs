@@ -18,11 +18,11 @@
 // - Power management
 // - Cartridge
 
+#![no_std]
 #![allow(unused)]
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 #![feature(if_let_guard)]
-#![no_std]
 
 extern crate alloc;
 

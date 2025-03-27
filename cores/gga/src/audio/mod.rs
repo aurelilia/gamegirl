@@ -12,8 +12,7 @@
 pub mod mplayer;
 pub mod psg;
 
-use alloc::{collections::VecDeque, sync::Arc};
-use std::sync::Mutex;
+use alloc::collections::VecDeque;
 
 use common::{
     components::scheduler::Scheduler,
@@ -78,7 +77,7 @@ pub struct Apu {
     pub cnt: SoundControl,
     pub bias: SoundBias,
 
-    pub mplayer: Arc<Mutex<MusicPlayer>>,
+    pub mplayer: MusicPlayer,
     pub hle_hook: u32,
 
     // 4 channels found on GG(C)
@@ -136,8 +135,7 @@ impl Apu {
         let a: i16;
         let b: i16;
         if gg.apu.hle_hook != 0 {
-            let player = gg.apu.mplayer.clone();
-            let mplayer = player.lock().unwrap().read_sample(gg);
+            let mplayer = gg.apu.mplayer.read_sample(&mut gg.memory);
             a = (mplayer[0] * 512.) as i16 * a_vol_mul;
             b = (mplayer[1] * 512.) as i16 * b_vol_mul;
         } else {
@@ -188,8 +186,7 @@ impl Apu {
     pub fn timer_overflow<const CH: usize>(gg: &mut GameGirlAdv) {
         if let Some(next) = gg.apu.buffers[CH].pop_front() {
             if gg.apu.hle_hook != 0 && CH == 0 {
-                let player = gg.apu.mplayer.clone();
-                let mplayer = player.lock().unwrap().read_sample(gg);
+                let mplayer = gg.apu.mplayer.read_sample(&mut gg.memory);
                 gg.apu.current_samples = [(mplayer[0] * 512.) as i16, (mplayer[1] * 512.) as i16];
             } else {
                 gg.apu.current_samples[CH] = next as i16 * 2;

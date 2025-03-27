@@ -18,7 +18,7 @@ use objects::ObjPixel;
 use super::{BackgroundMode, DisplayMode, PpuRegisters, HEIGHT, TRANS, WIDTH};
 use crate::graphics::Vram;
 
-// #[cfg(feature = "std")]
+#[cfg(feature = "std")]
 extern crate std;
 
 mod modes;
@@ -93,6 +93,10 @@ impl PpuRendererKind {
 
             return Self::Threaded { sender, last };
         }
+
+        #[cfg(not(feature = "std"))]
+        assert!(!is_multi);
+
         Self::SingleCore(Box::new(render))
     }
 }

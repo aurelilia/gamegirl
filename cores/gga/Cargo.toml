@@ -28,3 +28,4 @@ serde = [
     "arm-cpu/serde",
     "bitflags/serde",
 ]
+std = []
