@@ -1,0 +1,16 @@
+[package]
+name = "gamegirl-gtk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+gamegirl = { path = "../../gamegirl", features = [
+    "ggc",
+    "gga",
+    "nds",
+    "std",
+    "cpal-audio",
+    "serde_config",
+] }
+
+gtk = { version = "0.9.6", package = "gtk4", features = ["v4_16"] }

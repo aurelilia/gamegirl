@@ -8,6 +8,7 @@ let
     clang
     alsa-lib
     gtk3
+    gtk4
     wayland
     libxkbcommon
     libGL

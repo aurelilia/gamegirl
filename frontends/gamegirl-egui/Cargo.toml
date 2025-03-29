@@ -19,6 +19,7 @@ gamegirl = { path = "../../gamegirl", features = [
     "gga",
     "nds",
     "std",
+    "cpal-audio",
     "serde_config",
 ] }
 
@@ -32,7 +33,6 @@ eframe = { version = "0.31", default-features = false, features = [
 ] }
 egui-notify = { git = "https://github.com/ItsEthra/egui-notify", branch = "master" }
 
-cpal = "0.15.3"
 rfd = "0.15.3"
 gilrs = { version = "0.11.0", features = ["serde-serialize"] }
 

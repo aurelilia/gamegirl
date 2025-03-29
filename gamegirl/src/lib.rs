@@ -29,6 +29,8 @@ pub use nds;
 // pub use psx;
 use thiserror::Error;
 
+#[cfg(feature = "cpal-audio")]
+pub mod cpal;
 #[cfg(all(feature = "dynamic", target_family = "unix"))]
 pub mod dynamic;
 #[cfg(all(feature = "remote-debugger", target_family = "unix"))]

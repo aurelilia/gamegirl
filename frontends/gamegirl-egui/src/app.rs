@@ -13,7 +13,6 @@ use std::{
     time::Duration,
 };
 
-use cpal::Stream;
 use eframe::{
     egui::{Context, Event, TextureOptions},
     emath::History,
@@ -21,7 +20,10 @@ use eframe::{
     CreationContext, Frame, Storage,
 };
 use egui_notify::{Anchor, Toasts};
-use gamegirl::{common::Colour as RColour, Core, GameCart, Storage as GGStorage, SystemConfig};
+use gamegirl::{
+    common::Colour as RColour, cpal::AudioStream, Core, GameCart, Storage as GGStorage,
+    SystemConfig,
+};
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
@@ -77,7 +79,7 @@ pub struct App {
     /// Frame times.
     pub frame_times: History<f32>,
     /// Stream for audio.
-    audio_stream: Option<Stream>,
+    audio_stream: AudioStream,
     /// App window states.
     pub app_window_states: [bool; APP_WINDOW_COUNT],
     /// Debugger window states.
@@ -249,7 +251,7 @@ impl App {
                         }
                     }
 
-                    self.audio_stream = crate::setup_cpal(self.core.clone());
+                    self.audio_stream = gamegirl::cpal::setup(self.core.clone());
 
                     self.current_rom_path = file.path.clone();
                     if let Some(path) = file.path {
@@ -377,7 +379,7 @@ impl App {
             controller_axes: HashMap::with_capacity(6),
             message_channel: (tx, rx),
             frame_times: History::new(0..120, 2.0),
-            audio_stream: None,
+            audio_stream: AudioStream::empty(),
 
             state,
         })
