@@ -1,0 +1,102 @@
+use std::{collections::HashMap, fmt::Display};
+
+use InputAction::*;
+use gamegirl::common::common::input::{self, Button::*};
+use gtk::gdk::Key;
+
+/// Input configuration struct.
+#[derive(Debug)]
+pub struct Input {
+    mappings: HashMap<InputSource, InputAction>,
+}
+
+impl Input {
+    /// Get a mapping.
+    pub fn get(&self, src: InputSource) -> Option<InputAction> {
+        self.mappings.get(&src).copied()
+    }
+
+    /// Set a mapping.
+    pub fn set(&mut self, src: InputSource, value: InputAction) {
+        if src == InputSource::Key(Key::Escape) {
+            // ESC: unset all mappings
+            for k in self.key_for(value).collect::<Vec<_>>() {
+                self.mappings.remove(&k);
+            }
+        } else {
+            self.mappings.insert(src, value);
+        }
+    }
+
+    /// Get the key for a certain action.
+    pub fn key_for(&mut self, action: InputAction) -> impl Iterator<Item = InputSource> + '_ {
+        self.mappings
+            .iter()
+            .filter(move |(_, v)| **v == action)
+            .map(|(k, _)| *k)
+    }
+
+    /// Get the key for a certain action, formatted to a string.
+    pub fn key_for_fmt(&mut self, action: InputAction) -> String {
+        let mut keys = self
+            .key_for(action)
+            .map(|k| format!("{k}"))
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys.join(", ")
+    }
+
+    pub fn new() -> Self {
+        Self {
+            mappings: HashMap::from([
+                (InputSource::Key(Key::X), Button(A)),
+                (InputSource::Key(Key::Z), Button(B)),
+                (InputSource::Key(Key::Return), Button(Start)),
+                (InputSource::Key(Key::space), Button(Select)),
+                (InputSource::Key(Key::Down), Button(Down)),
+                (InputSource::Key(Key::Up), Button(Up)),
+                (InputSource::Key(Key::Left), Button(Left)),
+                (InputSource::Key(Key::Right), Button(Right)),
+                (InputSource::Key(Key::A), Button(L)),
+                (InputSource::Key(Key::S), Button(R)),
+                (InputSource::Key(Key::R), Hotkey(4)),
+            ]),
+        }
+    }
+}
+
+impl Default for Input {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// An action that is to be performed when the user hits a key.
+/// Can be a button or a hotkey, the latter is stored
+/// as an index into an array of functions.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum InputSource {
+    Key(Key),
+    Button(gilrs::Button),
+    Axis { axis: gilrs::Axis, is_neg: bool },
+}
+
+impl Display for InputSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InputSource::Key(k) => write!(f, "{k:?}"),
+            InputSource::Button(b) => write!(f, "{b:?}"),
+            InputSource::Axis { axis, is_neg } if *is_neg => write!(f, "{axis:?}-"),
+            InputSource::Axis { axis, .. } => write!(f, "{axis:?}+"),
+        }
+    }
+}
+
+/// An action that is to be performed when the user hits a key.
+/// Can be a button or a hotkey, the latter is stored
+/// as an index into an array of functions.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+pub enum InputAction {
+    Button(input::Button),
+    Hotkey(u8),
+}

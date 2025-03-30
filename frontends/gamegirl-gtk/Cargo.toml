@@ -14,3 +14,7 @@ gamegirl = { path = "../../gamegirl", features = [
 ] }
 
 gtk = { version = "0.9.6", package = "gtk4", features = ["v4_16"] }
+adw = { version = "0.7.2", package = "libadwaita", features = ["v1_5"] }
+gilrs = { version = "0.11.0", features = ["serde-serialize"] }
+
+serde.workspace = true

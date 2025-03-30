@@ -9,6 +9,7 @@ let
     alsa-lib
     gtk3
     gtk4
+    libadwaita
     wayland
     libxkbcommon
     libGL

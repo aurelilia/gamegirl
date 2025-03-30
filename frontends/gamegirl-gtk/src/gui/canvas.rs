@@ -1,19 +1,37 @@
+use std::sync::{Arc, Mutex};
+
+use adw::subclass::prelude::ObjectSubclassIsExt;
 use gamegirl::Core;
 use gtk::{
     gdk,
-    glib::{self, subclass::types::ObjectSubclassIsExt},
+    glib::{self},
+    prelude::{WidgetExt, WidgetExtManual},
 };
+
+pub fn get() -> (gtk::Picture, Arc<Mutex<Box<dyn Core>>>) {
+    let draw = GamegirlPaintable::new();
+    let pict = gtk::Picture::builder()
+        .halign(gtk::Align::BaselineFill)
+        .valign(gtk::Align::BaselineFill)
+        .content_fit(gtk::ContentFit::Contain)
+        .hexpand(true)
+        .vexpand(true)
+        .paintable(&draw)
+        .build();
+    pict.add_tick_callback(|pict, _| {
+        pict.queue_draw();
+        glib::ControlFlow::Continue
+    });
+    (pict, draw.imp().core.clone())
+}
 
 glib::wrapper! {
     pub struct GamegirlPaintable(ObjectSubclass<imp::GamegirlPaintable>) @implements gdk::Paintable;
 }
 
 impl GamegirlPaintable {
-    pub fn new(core: Box<dyn Core>) -> Self {
-        let this: Self = glib::Object::new();
-        let imp = this.imp();
-        *imp.core.lock().unwrap() = core;
-        this
+    pub fn new() -> Self {
+        glib::Object::new()
     }
 }
 
