@@ -124,26 +124,32 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
 
             ui.heading("Fast-forward");
             ui.horizontal(|ui| {
-                ui.add(Slider::new(&mut opt.fast_forward_hold_speed, 2..=10));
+                ui.add(Slider::new(
+                    &mut opt.rewinder.fast_forward_hold_speed,
+                    2..=10,
+                ));
                 ui.label("Fast forward speed (Hold)");
             });
             ui.horizontal(|ui| {
-                ui.add(Slider::new(&mut opt.fast_forward_toggle_speed, 2..=10));
+                ui.add(Slider::new(
+                    &mut opt.rewinder.fast_forward_toggle_speed,
+                    2..=10,
+                ));
                 ui.label("Fast forward speed (Toggle)");
             });
             ui.add(Separator::default().spacing(10.));
 
             ui.heading("Rewind");
-            ui.checkbox(&mut opt.enable_rewind, "Enable Rewinding");
-            if opt.enable_rewind {
+            ui.checkbox(&mut opt.rewinder.enable_rewind, "Enable Rewinding");
+            if opt.rewinder.enable_rewind {
                 ui.checkbox(&mut opt.sys.compress_savestates, "Compress rewind data")
                 .on_hover_text("Heavily reduces rewinding memory usage, but requires a lot of performance.\nLoad a ROM to apply changes to this.");
                 ui.horizontal(|ui| {
-                    ui.add(Slider::new(&mut opt.rewind_buffer_size, 1..=60))
+                    ui.add(Slider::new(&mut opt.rewinder.rewind_buffer_size, 1..=60))
                         .on_hover_text(format!(
                             "Uses about ~{}MB of RAM",
-                            opt.rewind_buffer_size
-                                + opt.rewind_buffer_size
+                            opt.rewinder.rewind_buffer_size
+                                + opt.rewinder.rewind_buffer_size
                                     * (!opt.sys.compress_savestates as usize * 4),
                         ));
                     ui.label("Rewind time in seconds");

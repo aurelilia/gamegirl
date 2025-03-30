@@ -43,12 +43,12 @@ fn rom_file_picker(header: HeaderBar) {
     dialog.open(
         Some(&gtk().main_window),
         Option::<&Cancellable>::None,
-        move |file| {
-            if let Some((path, rom)) = file
-                .ok()
-                .and_then(|f| f.path())
-                .and_then(|p| fs::read(&p).ok().map(|b| (p, b)))
-            {
+        move |file| match file
+            .ok()
+            .map(|f| f.path().and_then(|p| fs::read(&p).ok().map(|b| (p, b))))
+        {
+            // Got a ROM
+            Some(Some((path, rom))) => {
                 let title = format!("gamegirl - {}", path.file_stem().unwrap().display());
                 let save = Storage::load(Some(path), "".into());
 
@@ -66,9 +66,13 @@ fn rom_file_picker(header: HeaderBar) {
                             .add_toast(Toast::new(&format!("Failed to load ROM: {}", err)));
                     }
                 }
-            } else {
+            }
+            // Failed getting path or reading out file
+            Some(None) => {
                 gtk().toast.add_toast(Toast::new("Failed to load ROM!"));
             }
+            // User aborted
+            None => (),
         },
     );
 }

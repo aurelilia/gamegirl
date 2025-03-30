@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use gamegirl::{SystemConfig, frontend::input::Input};
+use gamegirl::{
+    SystemConfig,
+    frontend::{input::Input, rewinder::RewinderConfig},
+};
 
 use crate::gui::input::GtkKey;
 
@@ -21,15 +24,8 @@ pub struct Options {
     pub sys: SystemConfig,
     /// Input configuration.
     pub input: Input<GtkKey>,
-
-    /// Fast forward speed for the hold button.
-    pub fast_forward_hold_speed: usize,
-    /// Fast forward speed for the toggle button.
-    pub fast_forward_toggle_speed: usize,
-    /// Enable rewinding.
-    pub enable_rewind: bool,
-    /// Rewind buffer size (if enabled), in seconds.
-    pub rewind_buffer_size: usize,
+    /// Rewinder configuration.
+    pub rewinder: RewinderConfig,
 }
 
 impl Default for Options {
@@ -37,10 +33,7 @@ impl Default for Options {
         Self {
             sys: Default::default(),
             input: Input::new(),
-            fast_forward_hold_speed: 2,
-            fast_forward_toggle_speed: 2,
-            enable_rewind: true,
-            rewind_buffer_size: 10,
+            rewinder: RewinderConfig::default(),
         }
     }
 }

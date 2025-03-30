@@ -6,7 +6,30 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use std::iter;
+use std::{iter, vec::Vec};
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct RewinderConfig {
+    /// Fast forward speed for the hold button.
+    pub fast_forward_hold_speed: usize,
+    /// Fast forward speed for the toggle button.
+    pub fast_forward_toggle_speed: usize,
+    /// Enable rewinding.
+    pub enable_rewind: bool,
+    /// Rewind buffer size (if enabled), in seconds.
+    pub rewind_buffer_size: usize,
+}
+
+impl Default for RewinderConfig {
+    fn default() -> Self {
+        Self {
+            fast_forward_hold_speed: 2,
+            fast_forward_toggle_speed: 2,
+            enable_rewind: true,
+            rewind_buffer_size: 10,
+        }
+    }
+}
 
 /// Struct for storing rewind state.
 /// "Rewinding" in the context of this is considered anything that 'turns back'
@@ -80,7 +103,7 @@ impl RWBuffer {
     /// Create a new buffer with the given seconds of rewind storage.
     fn new(secs: usize) -> Self {
         Self {
-            vec: iter::repeat(vec![]).take(60 * secs).collect(),
+            vec: iter::repeat(Vec::new()).take(60 * secs).collect(),
             cur_idx: 0,
             stop_idx: 0,
         }

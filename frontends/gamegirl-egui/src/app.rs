@@ -26,6 +26,7 @@ use gamegirl::{
         self,
         cpal::AudioStream,
         input::{Input, InputAction, InputSource},
+        rewinder::{Rewinder, RewinderConfig},
     },
     Core, GameCart, Storage as GGStorage, SystemConfig,
 };
@@ -35,7 +36,6 @@ use crate::{
     filter::{Blend, Filter, ScreenBuffer},
     gui::{self, cheat::CheatEngineState, options, APP_WINDOW_COUNT},
     input::{self, EguiKey, File},
-    rewind::Rewinder,
     Colour,
 };
 
@@ -203,7 +203,7 @@ impl App {
         } else {
             core.advance_delta(delta);
             let frame = core.c_mut().video_buffer.pop();
-            if frame.is_some() && self.state.options.enable_rewind {
+            if frame.is_some() && self.state.options.rewinder.enable_rewind {
                 let state = core.save_state();
                 self.rewinder.rewind_buffer.push(state);
             }
@@ -359,7 +359,7 @@ impl App {
             core,
             current_rom_path: None,
 
-            rewinder: Rewinder::new(state.options.rewind_buffer_size),
+            rewinder: Rewinder::new(state.options.rewinder.rewind_buffer_size),
             screen_buffer: ScreenBuffer::default(),
             fast_forward_toggled: false,
             #[cfg(feature = "dynamic")]
@@ -435,15 +435,8 @@ pub struct Options {
     pub sys: SystemConfig,
     /// Input configuration.
     pub input: Input<EguiKey>,
-
-    /// Fast forward speed for the hold button.
-    pub fast_forward_hold_speed: usize,
-    /// Fast forward speed for the toggle button.
-    pub fast_forward_toggle_speed: usize,
-    /// Enable rewinding.
-    pub enable_rewind: bool,
-    /// Rewind buffer size (if enabled), in seconds.
-    pub rewind_buffer_size: usize,
+    /// Rewind configuration.
+    pub rewinder: RewinderConfig,
 
     /// Texture filter applied to the display.
     pub tex_filter: Filter,
@@ -462,10 +455,7 @@ impl Default for Options {
         Self {
             sys: Default::default(),
             input: Input::new(),
-            fast_forward_hold_speed: 2,
-            fast_forward_toggle_speed: 2,
-            enable_rewind: true,
-            rewind_buffer_size: 10,
+            rewinder: RewinderConfig::default(),
             tex_filter: Filter::Nearest,
             screen_blend: Blend::None,
             pixel_perfect: false,

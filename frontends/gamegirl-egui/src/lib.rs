@@ -13,7 +13,6 @@ mod debug;
 mod filter;
 mod gui;
 mod input;
-mod rewind;
 
 pub use app::App;
 use eframe::egui::Color32;

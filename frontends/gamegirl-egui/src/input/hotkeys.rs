@@ -23,7 +23,7 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
         let mut core = app.core.lock().unwrap();
         let c = core.c_mut();
         if pressed {
-            c.options.speed_multiplier = app.state.options.fast_forward_hold_speed;
+            c.options.speed_multiplier = app.state.options.rewinder.fast_forward_hold_speed;
         } else {
             c.options.speed_multiplier = 1;
         }
@@ -36,7 +36,7 @@ pub const HOTKEYS: &[(&str, HotkeyFn)] = &[
 
             app.fast_forward_toggled = !app.fast_forward_toggled;
             if app.fast_forward_toggled {
-                c.options.speed_multiplier = app.state.options.fast_forward_toggle_speed;
+                c.options.speed_multiplier = app.state.options.rewinder.fast_forward_toggle_speed;
             } else {
                 c.options.speed_multiplier = 1;
             }
