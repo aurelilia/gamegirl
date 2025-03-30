@@ -18,9 +18,7 @@ gamegirl = { path = "../../gamegirl", features = [
     "ggc",
     "gga",
     "nds",
-    "std",
-    "cpal-audio",
-    "serde_config",
+    "frontend",
 ] }
 
 egui = "0.31"

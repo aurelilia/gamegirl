@@ -11,12 +11,15 @@ use eframe::{
     egui::{vec2, CollapsingHeader, ComboBox, Context, Slider, Ui},
 };
 use egui::{Color32, RichText, Separator};
-use gamegirl::common::common::{audio::AudioSampler, input::Button, options::CgbMode};
+use gamegirl::{
+    common::common::{audio::AudioSampler, input::Button, options::CgbMode},
+    frontend::input::InputAction,
+};
 
 use crate::{
     app::{App, GuiStyle, Options},
     filter::{Blend, Filter},
-    input::{file_dialog, InputAction, HOTKEYS},
+    input::{file_dialog, HOTKEYS},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

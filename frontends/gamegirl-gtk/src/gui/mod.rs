@@ -1,17 +1,16 @@
-use std::{
-    fs,
-    sync::{Arc, Mutex},
-};
+use std::fs;
 
 use adw::{HeaderBar, Toast};
-use gamegirl::{Core, GameCart, Storage, SystemConfig};
+use gamegirl::{
+    GameCart, Storage, SystemConfig,
+    frontend::input::{InputAction, InputSource},
+};
 use gtk::{
     EventControllerKey, Label,
     gio::{Cancellable, prelude::FileExt},
     glib::object::Cast,
     prelude::{ButtonExt, WidgetExt},
 };
-use input::Input;
 
 use crate::gtk;
 
@@ -42,7 +41,7 @@ fn rom_file_picker(header: HeaderBar) {
         .modal(true)
         .build();
     dialog.open(
-        Option::<&gtk::Window>::None,
+        Some(&gtk().main_window),
         Option::<&Cancellable>::None,
         move |file| {
             if let Some((path, rom)) = file
@@ -77,9 +76,14 @@ fn rom_file_picker(header: HeaderBar) {
 pub fn key_controller() -> EventControllerKey {
     let controller = EventControllerKey::new();
     controller.connect_key_pressed(move |_, key, _, _| {
-        let input = Input::new();
         let key = key.to_upper();
-        if let Some(input::InputAction::Button(button)) = input.get(input::InputSource::Key(key)) {
+        if let Some(InputAction::Button(button)) = gtk()
+            .state
+            .borrow_mut()
+            .options
+            .input
+            .key_triggered(InputSource::Key(key.into()))
+        {
             gtk()
                 .core
                 .lock()
@@ -93,9 +97,14 @@ pub fn key_controller() -> EventControllerKey {
         }
     });
     controller.connect_key_released(move |_, key, _, _| {
-        let input = Input::new();
         let key = key.to_upper();
-        if let Some(input::InputAction::Button(button)) = input.get(input::InputSource::Key(key)) {
+        if let Some(InputAction::Button(button)) = gtk()
+            .state
+            .borrow_mut()
+            .options
+            .input
+            .key_triggered(InputSource::Key(key.into()))
+        {
             gtk()
                 .core
                 .lock()

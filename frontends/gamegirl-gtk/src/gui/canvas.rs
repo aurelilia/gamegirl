@@ -41,7 +41,7 @@ mod imp {
         sync::{Arc, Mutex},
     };
 
-    use gamegirl::{Core, cpal::AudioStream};
+    use gamegirl::{Core, frontend, frontend::cpal::AudioStream};
     use gtk::{
         gdk::{self, subclass::prelude::PaintableImpl},
         glib::{
@@ -61,7 +61,7 @@ mod imp {
     impl Default for GamegirlPaintable {
         fn default() -> Self {
             let core = Arc::new(Mutex::new(gamegirl::dummy_core()));
-            let _audio_stream = gamegirl::cpal::setup(core.clone());
+            let _audio_stream = frontend::cpal::setup(core.clone());
             Self {
                 core,
                 _audio_stream,

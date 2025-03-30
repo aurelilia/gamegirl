@@ -1,11 +1,13 @@
+mod config;
 mod gui;
 
 use std::{
-    cell::OnceCell,
+    cell::{OnceCell, RefCell},
     sync::{Arc, Mutex},
 };
 
 use adw::{Application, ToastOverlay};
+use config::State;
 use gamegirl::Core;
 use gtk::{
     ApplicationWindow,
@@ -25,7 +27,8 @@ fn gtk() -> &'static App {
 
 pub struct App {
     core: Arc<Mutex<Box<dyn Core>>>,
-    window: ApplicationWindow,
+    state: RefCell<State>,
+    main_window: ApplicationWindow,
     toast: ToastOverlay,
 }
 
@@ -56,7 +59,8 @@ fn build_ui(app: &Application) {
     APP.with(|a| {
         a.set(Box::leak(Box::new(App {
             core,
-            window,
+            state: RefCell::default(),
+            main_window: window,
             toast,
         })))
         .ok()

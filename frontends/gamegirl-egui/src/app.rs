@@ -21,15 +21,20 @@ use eframe::{
 };
 use egui_notify::{Anchor, Toasts};
 use gamegirl::{
-    common::Colour as RColour, cpal::AudioStream, Core, GameCart, Storage as GGStorage,
-    SystemConfig,
+    common::Colour as RColour,
+    frontend::{
+        self,
+        cpal::AudioStream,
+        input::{Input, InputAction, InputSource},
+    },
+    Core, GameCart, Storage as GGStorage, SystemConfig,
 };
 use gilrs::{Axis, EventType, Gilrs};
 
 use crate::{
     filter::{Blend, Filter, ScreenBuffer},
     gui::{self, cheat::CheatEngineState, options, APP_WINDOW_COUNT},
-    input::{self, File, Input, InputAction, InputSource},
+    input::{self, EguiKey, File},
     rewind::Rewinder,
     Colour,
 };
@@ -148,7 +153,7 @@ impl App {
                     ..
                 } = event
                 {
-                    self.handle_evt(InputSource::Key(*key), *pressed);
+                    self.handle_evt(InputSource::Key((*key).into()), *pressed);
                 }
             }
             while let Some(gilrs::Event { event, .. }) = self.gil.next_event() {
@@ -206,13 +211,8 @@ impl App {
         }
     }
 
-    fn handle_evt(&mut self, src: InputSource, pressed: bool) {
-        if let Some(action) = self.state.options.input.pending.take() {
-            self.state.options.input.set(src, action);
-            return;
-        }
-
-        match self.state.options.input.get(src) {
+    fn handle_evt(&mut self, src: InputSource<EguiKey>, pressed: bool) {
+        match self.state.options.input.key_triggered(src) {
             Some(InputAction::Button(btn)) => {
                 let mut core = self.core.lock().unwrap();
                 let time = core.get_time();
@@ -251,7 +251,7 @@ impl App {
                         }
                     }
 
-                    self.audio_stream = gamegirl::cpal::setup(self.core.clone());
+                    self.audio_stream = frontend::cpal::setup(self.core.clone());
 
                     self.current_rom_path = file.path.clone();
                     if let Some(path) = file.path {
@@ -434,7 +434,7 @@ pub struct Options {
     /// Options passed to the system when loading a ROM.
     pub sys: SystemConfig,
     /// Input configuration.
-    pub input: Input,
+    pub input: Input<EguiKey>,
 
     /// Fast forward speed for the hold button.
     pub fast_forward_hold_speed: usize,

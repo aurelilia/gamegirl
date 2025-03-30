@@ -8,9 +8,7 @@ gamegirl = { path = "../../gamegirl", features = [
     "ggc",
     "gga",
     "nds",
-    "std",
-    "cpal-audio",
-    "serde_config",
+    "frontend",
 ] }
 
 gtk = { version = "0.9.6", package = "gtk4", features = ["v4_16"] }
