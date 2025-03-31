@@ -2,34 +2,33 @@ mod config;
 mod gui;
 
 use std::{
-    cell::{OnceCell, RefCell},
+    cell::{Cell, OnceCell, RefCell},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
-use adw::{Application, ToastOverlay};
+use adw::Application;
 use config::State;
 use gamegirl::Core;
 use gtk::{
-    ApplicationWindow,
     gio::prelude::{ApplicationExt, ApplicationExtManual},
     glib::{self},
     prelude::{GtkWindowExt, WidgetExt},
 };
-use gui::canvas;
+use gui::window::GameGirlWindow;
 
 thread_local! {
-    static APP: OnceCell<&'static App> = OnceCell::new();
+    static APP: OnceCell<&'static AppState> = OnceCell::new();
 }
 
-fn gtk() -> &'static App {
+fn state() -> &'static AppState {
     APP.with(|a| *a.get().unwrap())
 }
 
-pub struct App {
+pub struct AppState {
     core: Arc<Mutex<Box<dyn Core>>>,
     state: RefCell<State>,
-    main_window: ApplicationWindow,
-    toast: ToastOverlay,
+    current_rom_path: RefCell<Option<PathBuf>>,
 }
 
 fn main() -> glib::ExitCode {
@@ -37,31 +36,23 @@ fn main() -> glib::ExitCode {
         .application_id("eu.catin.gamegirl")
         .build();
     app.connect_activate(build_ui);
+    app.connect_startup(|_| {
+        adw::init().unwrap();
+    });
     app.connect_shutdown(|_| println!("oops"));
     app.run()
 }
 
 fn build_ui(app: &Application) {
-    let (pict, core) = canvas::get();
-    let toast = ToastOverlay::new();
-    toast.set_child(Some(&pict));
-    let header = gui::header();
-
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("gamegirl")
-        .child(&toast)
-        .build();
-    window.set_titlebar(Some(&header));
-    window.add_controller(gui::key_controller());
+    let (window, core) = GameGirlWindow::new(app);
+    window.add_controller(gui::key_controller(&window));
     window.present();
 
     APP.with(|a| {
-        a.set(Box::leak(Box::new(App {
+        a.set(Box::leak(Box::new(AppState {
             core,
             state: RefCell::default(),
-            main_window: window,
-            toast,
+            current_rom_path: RefCell::default(),
         })))
         .ok()
         .unwrap()

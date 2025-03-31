@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use gamegirl::{
     SystemConfig,
     frontend::{input::Input, rewinder::RewinderConfig},
@@ -10,9 +8,6 @@ use crate::gui::input::GtkKey;
 /// State that is persisted on app reboot.
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 pub struct State {
-    /// A list of last opened ROMs. Size is capped to 10, last opened
-    /// ROM is at index 0. The oldest ROM gets removed first.
-    pub last_opened: Vec<PathBuf>,
     /// User configuration options.
     pub options: Options,
 }

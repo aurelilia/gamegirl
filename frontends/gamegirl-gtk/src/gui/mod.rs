@@ -1,100 +1,30 @@
-use std::fs;
+use gamegirl::frontend::input::{InputAction, InputSource};
+use gtk::EventControllerKey;
+use window::GameGirlWindow;
 
-use adw::{HeaderBar, Toast};
-use gamegirl::{
-    GameCart, Storage, SystemConfig,
-    frontend::input::{InputAction, InputSource},
-};
-use gtk::{
-    EventControllerKey, Label,
-    gio::{Cancellable, prelude::FileExt},
-    glib::object::Cast,
-    prelude::{ButtonExt, WidgetExt},
-};
+use crate::state;
 
-use crate::gtk;
-
+pub mod actions;
 pub mod canvas;
 pub mod input;
+pub mod settings;
+pub mod window;
 
-pub fn header() -> HeaderBar {
-    let header = HeaderBar::new();
+pub fn key_controller(window: &GameGirlWindow) -> EventControllerKey {
+    let core1 = window.core();
+    let core2 = window.core();
 
-    let open_button = gtk::Button::builder()
-        .label("Open")
-        .halign(gtk::Align::Start)
-        .margin_start(10)
-        .focusable(false)
-        .build();
-    open_button.set_parent(&header);
-    open_button.connect_clicked(move |button| {
-        rom_file_picker(button.parent().unwrap().downcast().unwrap())
-    });
-
-    header
-}
-
-fn rom_file_picker(header: HeaderBar) {
-    let dialog = gtk::FileDialog::builder()
-        .title("Open File")
-        .accept_label("Open")
-        .modal(true)
-        .build();
-    dialog.open(
-        Some(&gtk().main_window),
-        Option::<&Cancellable>::None,
-        move |file| match file
-            .ok()
-            .map(|f| f.path().and_then(|p| fs::read(&p).ok().map(|b| (p, b))))
-        {
-            // Got a ROM
-            Some(Some((path, rom))) => {
-                let title = format!("gamegirl - {}", path.file_stem().unwrap().display());
-                let save = Storage::load(Some(path), "".into());
-
-                match gamegirl::load_cart(GameCart { rom, save }, &SystemConfig::default()) {
-                    Ok(sys) => {
-                        *gtk().core.lock().unwrap() = sys;
-                        gtk().toast.add_toast(Toast::new("Loaded ROM!"));
-
-                        let label = Label::builder().label(title).css_classes(["title"]).build();
-                        header.set_title_widget(Some(&label));
-                    }
-                    Err(err) => {
-                        gtk()
-                            .toast
-                            .add_toast(Toast::new(&format!("Failed to load ROM: {}", err)));
-                    }
-                }
-            }
-            // Failed getting path or reading out file
-            Some(None) => {
-                gtk().toast.add_toast(Toast::new("Failed to load ROM!"));
-            }
-            // User aborted
-            None => (),
-        },
-    );
-}
-
-pub fn key_controller() -> EventControllerKey {
     let controller = EventControllerKey::new();
     controller.connect_key_pressed(move |_, key, _, _| {
         let key = key.to_upper();
-        if let Some(InputAction::Button(button)) = gtk()
+        if let Some(InputAction::Button(button)) = state()
             .state
             .borrow_mut()
             .options
             .input
             .key_triggered(InputSource::Key(key.into()))
         {
-            gtk()
-                .core
-                .lock()
-                .unwrap()
-                .c_mut()
-                .input
-                .set(0, button, true);
+            core1.lock().unwrap().c_mut().input.set(0, button, true);
             gtk::glib::Propagation::Stop
         } else {
             gtk::glib::Propagation::Proceed
@@ -102,20 +32,14 @@ pub fn key_controller() -> EventControllerKey {
     });
     controller.connect_key_released(move |_, key, _, _| {
         let key = key.to_upper();
-        if let Some(InputAction::Button(button)) = gtk()
+        if let Some(InputAction::Button(button)) = state()
             .state
             .borrow_mut()
             .options
             .input
             .key_triggered(InputSource::Key(key.into()))
         {
-            gtk()
-                .core
-                .lock()
-                .unwrap()
-                .c_mut()
-                .input
-                .set(0, button, false);
+            core2.lock().unwrap().c_mut().input.set(0, button, false);
         }
     });
     controller

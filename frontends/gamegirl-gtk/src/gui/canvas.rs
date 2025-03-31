@@ -5,24 +5,21 @@ use gamegirl::Core;
 use gtk::{
     gdk,
     glib::{self},
-    prelude::{WidgetExt, WidgetExtManual},
+    prelude::*,
 };
 
-pub fn get() -> (gtk::Picture, Arc<Mutex<Box<dyn Core>>>) {
+pub fn bind(pict: &gtk::Picture) -> Arc<Mutex<Box<dyn Core>>> {
+    assert!(
+        pict.paintable().is_none(),
+        "Canvas was bound more than once!"
+    );
     let draw = GamegirlPaintable::new();
-    let pict = gtk::Picture::builder()
-        .halign(gtk::Align::BaselineFill)
-        .valign(gtk::Align::BaselineFill)
-        .content_fit(gtk::ContentFit::Contain)
-        .hexpand(true)
-        .vexpand(true)
-        .paintable(&draw)
-        .build();
+    pict.set_paintable(Some(&draw));
     pict.add_tick_callback(|pict, _| {
         pict.queue_draw();
         glib::ControlFlow::Continue
     });
-    (pict, draw.imp().core.clone())
+    draw.imp().core.clone()
 }
 
 glib::wrapper! {

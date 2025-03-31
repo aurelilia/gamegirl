@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <template class="SettingsWindow" parent="GtkApplicationWindow">
+    <property name="default-width">600</property>
+    <property name="default-height">400</property>
+    <property name="title">gamegirl Settings</property>
+    <child>
+      <object class="GtkNotebook">
+        <property name="tab-pos">left</property>
+
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="valign">center</property>
+            <property name="vexpand">1</property>
+            <property name="spacing">6</property>
+            <property name="margin-start">12</property>
+            <property name="margin-end">12</property>
+            <property name="margin-top">12</property>
+            <property name="margin-bottom">12</property>
+            <child>
+              <object class="GtkLabel">
+                <property name="label">gamegirl GTK</property>
+                <style>
+                  <class name="large-title"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="label">created by leela aurelia</property>
+                <property name="wrap">True</property>
+                <property name="justify">center</property>
+                <style>
+                  <class name="dim-label"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel">
+            <property name="label">About</property>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <child>
+              <object class="GtkLabel">
+                <property name="label">Video</property>
+                <style>
+                  <class name="large-title"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel">
+            <property name="label">Video</property>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <child>
+              <object class="GtkLabel">
+                <property name="label">Audio</property>
+                <style>
+                  <class name="large-title"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel">
+            <property name="label">Audio</property>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <child>
+              <object class="GtkLabel">
+                <property name="label">Input</property>
+                <style>
+                  <class name="large-title"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel">
+            <property name="label">Input</property>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <child>
+              <object class="GtkLabel">
+                <property name="label">Emulation</property>
+                <style>
+                  <class name="large-title"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel">
+            <property name="label">Emulation</property>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <child>
+              <object class="GtkLabel">
+                <property name="label">Features</property>
+                <style>
+                  <class name="large-title"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel">
+            <property name="label">Features</property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>
