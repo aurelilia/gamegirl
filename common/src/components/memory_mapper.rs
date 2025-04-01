@@ -40,9 +40,9 @@ pub trait MemoryMappedSystem<const SIZE: usize>: Sized {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryMapper<const SIZE: usize> {
-    #[cfg_attr(feature = "serde", serde(skip, default))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "serde_pages::<SIZE>"))]
     read_pages: Box<[*mut u8]>,
-    #[cfg_attr(feature = "serde", serde(skip, default))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "serde_pages::<SIZE>"))]
     write_pages: Box<[*mut u8]>,
 }
 
