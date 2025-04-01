@@ -7,7 +7,10 @@ use adw::{Application, subclass::prelude::ObjectSubclassIsExt};
 use config::Options;
 use gamegirl::frontend::rewinder::Rewinder;
 use gtk::{
-    gio::prelude::{ApplicationExt, ApplicationExtManual},
+    gio::{
+        self,
+        prelude::{ApplicationExt, ApplicationExtManual},
+    },
     glib::{self},
     prelude::{GtkWindowExt, WidgetExt},
 };
@@ -36,6 +39,7 @@ impl Default for AppState {
 }
 
 fn main() -> glib::ExitCode {
+    gio::resources_register_include!("gamegirl.gresource").expect("Failed to register resources.");
     let app = Application::builder()
         .application_id("eu.catin.gamegirl")
         .build();

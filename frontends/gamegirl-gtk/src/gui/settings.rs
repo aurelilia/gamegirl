@@ -17,7 +17,7 @@ mod imp {
     use gtk::{glib, prelude::GtkWindowExt, subclass::prelude::*};
 
     #[derive(Default, Debug, gtk::CompositeTemplate)]
-    #[template(file = "../../res/ui/settings.ui")]
+    #[template(resource = "/eu/catin/gamegirl/settings.ui")]
     pub struct SettingsWindow {}
 
     #[glib::object_subclass]

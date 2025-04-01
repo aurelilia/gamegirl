@@ -10,6 +10,7 @@ let
     gtk3
     gtk4
     libadwaita
+    librsvg
     wayland
     libxkbcommon
     libGL

@@ -49,7 +49,7 @@ mod imp {
     use crate::{AppState, gui::settings::SettingsWindow};
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(file = "../../res/ui/main.ui")]
+    #[template(resource = "/eu/catin/gamegirl/main.ui")]
     pub struct GameGirlWindow {
         #[template_child]
         pub header: TemplateChild<adw::HeaderBar>,

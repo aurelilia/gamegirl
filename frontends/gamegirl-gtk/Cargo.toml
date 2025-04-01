@@ -22,3 +22,6 @@ bincode = { version = "2.0.1", features = ["serde"] }
 [features]
 default = ["savestates"]
 savestates = ["gamegirl/serde", "gamegirl/zstd"]
+
+[build-dependencies]
+glib-build-tools = "0.20.0"

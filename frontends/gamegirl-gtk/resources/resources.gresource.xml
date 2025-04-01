@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/eu/catin/gamegirl">
+    <file compressed="true" preprocess="xml-stripblanks">main.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">settings.ui</file>
+  </gresource>
+
+  <gresource prefix="/eu/catin/gamegirl/icons/scalable/actions">
+    <file>cat-symbolic.svg</file>
+    <file>audio-x-generic-symbolic.svg</file>
+    <file>gamepad-symbolic.svg</file>
+    <file>dragon-solid-symbolic.svg</file>
+    <file>person-symbolic.svg</file>
+    <file>heart-filled-symbolic.svg</file>
+  </gresource>
+</gresources>

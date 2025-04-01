@@ -99,7 +99,7 @@
 
     <section>
       <item>
-        <attribute name="label" translatable="yes">_Settings</attribute>
+        <attribute name="label" translatable="yes">_Options</attribute>
         <attribute name="action">win.open_settings</attribute>
       </item>
       <item>
