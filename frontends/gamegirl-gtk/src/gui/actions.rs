@@ -5,7 +5,7 @@ use std::{
 
 use adw::{Toast, subclass::prelude::ObjectSubclassIsExt};
 use gamegirl::{GameCart, Storage, SystemConfig};
-use gtk::{Label, gio::prelude::FileExt};
+use gtk::{Label, gio::prelude::FileExt, glib::Variant};
 
 use super::window::GameGirlWindow;
 
@@ -29,7 +29,7 @@ impl GameGirlWindow {
                 match gamegirl::load_cart(GameCart { rom, save }, &SystemConfig::default()) {
                     Ok(sys) => {
                         *self.core().lock().unwrap() = sys;
-                        *crate::state().current_rom_path.borrow_mut() = Some(path);
+                        self.imp().state.borrow_mut().current_rom_path = Some(path);
                         self.toast(Toast::new("Loaded ROM!"));
 
                         let label = Label::builder().label(title).css_classes(["title"]).build();
@@ -53,7 +53,7 @@ impl GameGirlWindow {
         let core = self.core();
         let save = core.lock().unwrap().make_save();
         if let Some(save) = save {
-            Storage::save(crate::state().current_rom_path.borrow().clone(), save);
+            Storage::save(self.imp().state.borrow().current_rom_path.clone(), save);
         }
     }
 
@@ -101,6 +101,94 @@ impl GameGirlWindow {
             self.toast(Toast::new("Resuming"));
         } else {
             self.toast(Toast::new("Paused"));
+        }
+    }
+
+    pub fn save_state(&self, slot: &Variant) {
+        let slot = slot.get::<u32>().unwrap() as usize - 1;
+        let save = self.core().lock().unwrap().save_state();
+        let rev = &mut self.imp().state.borrow_mut().rewinder;
+        rev.save_states[slot] = Some(save);
+        self.toast(Toast::new("Saved state"));
+    }
+
+    pub fn load_state(&self, slot: &Variant) {
+        let slot = slot.get::<u32>().unwrap() as usize - 1;
+        let core = self.core();
+        let mut core = core.lock().unwrap();
+        let save = core.save_state();
+        let rev = &mut self.imp().state.borrow_mut().rewinder;
+        let to_load = if slot == 5 {
+            &rev.before_last_ss_load
+        } else {
+            &rev.save_states[slot]
+        };
+        if let Some(to_load) = to_load {
+            println!("loading state {slot}: size: {}", to_load.len());
+            core.load_state(&to_load);
+            rev.before_last_ss_load = Some(save);
+            self.toast(Toast::new("Loaded state"));
+        } else {
+            self.toast(Toast::new("Save to this state first!"));
+        }
+    }
+
+    pub async fn save_state_as(&self) {
+        let core = self.core();
+        let save = core.lock().unwrap().save_state();
+        let dialog = gtk::FileDialog::builder()
+            .title("Save State")
+            .accept_label("Save")
+            .modal(true)
+            .build();
+        let file = dialog.save_future(Some(self)).await;
+        match file.ok().map(|f| {
+            f.path().and_then(|p| {
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(&p)
+                    .and_then(|mut f| f.write_all(&save))
+                    .ok()
+                    .map(|_| p)
+            })
+        }) {
+            // Valid path
+            Some(Some(path)) => {
+                self.toast(Toast::new(&format!("Saved to {}", path.display())));
+            }
+            // Failed getting path or writing out file
+            Some(None) => {
+                self.toast(Toast::new("Failed to save to file!"));
+            }
+            // User aborted
+            None => (),
+        }
+    }
+
+    pub async fn load_state_as(&self) {
+        let core = self.core();
+        let dialog = gtk::FileDialog::builder()
+            .title("Load State")
+            .accept_label("Load")
+            .modal(true)
+            .build();
+        let file = dialog.open_future(Some(self)).await;
+        match file
+            .ok()
+            .map(|f| f.path().and_then(|p| fs::read(&p).ok().map(|b| (p, b))))
+        {
+            // Valid path and file
+            Some(Some((path, save))) => {
+                core.lock().unwrap().load_state(&save);
+                self.toast(Toast::new(&format!("Loaded state from {}", path.display())));
+            }
+            // Failed getting path or reading out file
+            Some(None) => {
+                self.toast(Toast::new("Failed to load file!"));
+            }
+            // User aborted
+            None => (),
         }
     }
 }

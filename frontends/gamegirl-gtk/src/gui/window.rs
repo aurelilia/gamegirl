@@ -14,10 +14,10 @@ glib::wrapper! {
 }
 
 impl GameGirlWindow {
-    pub fn new<P: IsA<gtk::Application>>(app: &P) -> (Self, Arc<Mutex<Box<dyn Core>>>) {
+    pub fn new<P: IsA<gtk::Application>>(app: &P) -> Self {
         let this: Self = glib::Object::builder().property("application", app).build();
-        let core = canvas::bind(&this.imp().game);
-        (this, core)
+        canvas::bind(&this.imp().game);
+        this
     }
 
     pub fn toast(&self, toast: Toast) {
@@ -38,11 +38,17 @@ impl GameGirlWindow {
 }
 
 mod imp {
-    use gtk::{glib, prelude::GtkWindowExt, subclass::prelude::*};
+    use std::cell::RefCell;
 
-    use crate::gui::settings::SettingsWindow;
+    use gtk::{
+        glib::{self, VariantTy},
+        prelude::GtkWindowExt,
+        subclass::prelude::*,
+    };
 
-    #[derive(Default, Debug, gtk::CompositeTemplate)]
+    use crate::{AppState, gui::settings::SettingsWindow};
+
+    #[derive(Default, gtk::CompositeTemplate)]
     #[template(file = "../../res/ui/main.ui")]
     pub struct GameGirlWindow {
         #[template_child]
@@ -51,6 +57,8 @@ mod imp {
         pub game: TemplateChild<gtk::Picture>,
         #[template_child]
         pub toast: TemplateChild<adw::ToastOverlay>,
+
+        pub state: RefCell<AppState>,
     }
 
     #[glib::object_subclass]
@@ -73,6 +81,26 @@ mod imp {
                 "win.save_as",
                 None,
                 |win, _action_name, _action_target| async move { win.save_game_as().await },
+            );
+            klass.install_action(
+                "win.save_state",
+                Some(VariantTy::UINT32),
+                |win, _action_name, action_target| win.save_state(action_target.unwrap()),
+            );
+            klass.install_action(
+                "win.load_state",
+                Some(VariantTy::UINT32),
+                |win, _action_name, action_target| win.load_state(action_target.unwrap()),
+            );
+            klass.install_action_async(
+                "win.save_state_as",
+                None,
+                |win, _action_name, _action_target| async move { win.save_state_as().await },
+            );
+            klass.install_action_async(
+                "win.load_state_as",
+                None,
+                |win, _action_name, _action_target| async move { win.load_state_as().await },
             );
             klass.install_action("win.reset", None, |win, _action_name, _action_target| {
                 win.core().lock().unwrap().reset();

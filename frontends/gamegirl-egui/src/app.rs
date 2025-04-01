@@ -64,7 +64,7 @@ pub struct App {
     pub current_rom_path: Option<PathBuf>,
 
     /// Rewinder state.
-    pub rewinder: Rewinder,
+    pub rewinder: Rewinder<10>,
     /// Screen buffer state.
     pub screen_buffer: ScreenBuffer,
     /// If the emulator is fast-forwarding using the toggle hotkey.

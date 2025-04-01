@@ -34,9 +34,9 @@ impl Default for RewinderConfig {
 /// Struct for storing rewind state.
 /// "Rewinding" in the context of this is considered anything that 'turns back'
 /// the clock - both literal frame-by-frame rewinding, and savestates.
-pub struct Rewinder {
+pub struct Rewinder<const SAVESTATES: usize> {
     /// Save states that the user can store/load at any time.
-    pub save_states: [Option<Vec<u8>>; 10],
+    pub save_states: [Option<Vec<u8>>; SAVESTATES],
     /// Save state created before the last load, to allow the user
     /// to undo a load.
     pub before_last_ss_load: Option<Vec<u8>>,
@@ -52,7 +52,7 @@ pub struct Rewinder {
     pub rewinding: bool,
 }
 
-impl Rewinder {
+impl<const SAVESTATES: usize> Rewinder<SAVESTATES> {
     /// Set the size of the rewind buffer in seconds.
     pub fn set_rw_buf_size(&mut self, secs: usize) {
         self.rewind_buffer = RWBuffer::new(secs);
@@ -60,7 +60,7 @@ impl Rewinder {
 
     pub fn new(buffer_secs: usize) -> Self {
         Self {
-            save_states: [None, None, None, None, None, None, None, None, None, None],
+            save_states: [const { None }; SAVESTATES],
             before_last_ss_load: None,
             rewind_buffer: RWBuffer::new(buffer_secs),
             rewinding: false,

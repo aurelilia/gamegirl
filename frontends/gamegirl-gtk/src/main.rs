@@ -1,15 +1,11 @@
 mod config;
 mod gui;
 
-use std::{
-    cell::{Cell, OnceCell, RefCell},
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::path::PathBuf;
 
-use adw::Application;
-use config::State;
-use gamegirl::Core;
+use adw::{Application, subclass::prelude::ObjectSubclassIsExt};
+use config::Options;
+use gamegirl::frontend::rewinder::Rewinder;
 use gtk::{
     gio::prelude::{ApplicationExt, ApplicationExtManual},
     glib::{self},
@@ -17,18 +13,26 @@ use gtk::{
 };
 use gui::window::GameGirlWindow;
 
-thread_local! {
-    static APP: OnceCell<&'static AppState> = OnceCell::new();
-}
-
-fn state() -> &'static AppState {
-    APP.with(|a| *a.get().unwrap())
-}
-
+/// App state. This struct is contained in the main app window.
 pub struct AppState {
-    core: Arc<Mutex<Box<dyn Core>>>,
-    state: RefCell<State>,
-    current_rom_path: RefCell<Option<PathBuf>>,
+    /// User config state.
+    options: Options,
+    /// Path of the currently loaded ROM.
+    current_rom_path: Option<PathBuf>,
+    /// Current rewinder state.
+    rewinder: Rewinder<5>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        let options = Options::default();
+        let rewinder = Rewinder::new(options.rewinder.rewind_buffer_size);
+        Self {
+            options,
+            current_rom_path: Default::default(),
+            rewinder,
+        }
+    }
 }
 
 fn main() -> glib::ExitCode {
@@ -39,22 +43,15 @@ fn main() -> glib::ExitCode {
     app.connect_startup(|_| {
         adw::init().unwrap();
     });
-    app.connect_shutdown(|_| println!("oops"));
     app.run()
 }
 
 fn build_ui(app: &Application) {
-    let (window, core) = GameGirlWindow::new(app);
+    let window = GameGirlWindow::new(app);
     window.add_controller(gui::key_controller(&window));
-    window.present();
-
-    APP.with(|a| {
-        a.set(Box::leak(Box::new(AppState {
-            core,
-            state: RefCell::default(),
-            current_rom_path: RefCell::default(),
-        })))
-        .ok()
-        .unwrap()
+    window.connect_destroy(|window| {
+        window.save_game();
+        window.imp().state.borrow().options.to_disk();
     });
+    window.present();
 }

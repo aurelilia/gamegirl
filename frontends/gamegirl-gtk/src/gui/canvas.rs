@@ -1,14 +1,10 @@
-use std::sync::{Arc, Mutex};
-
-use adw::subclass::prelude::ObjectSubclassIsExt;
-use gamegirl::Core;
 use gtk::{
     gdk,
     glib::{self},
     prelude::*,
 };
 
-pub fn bind(pict: &gtk::Picture) -> Arc<Mutex<Box<dyn Core>>> {
+pub fn bind(pict: &gtk::Picture) {
     assert!(
         pict.paintable().is_none(),
         "Canvas was bound more than once!"
@@ -19,7 +15,6 @@ pub fn bind(pict: &gtk::Picture) -> Arc<Mutex<Box<dyn Core>>> {
         pict.queue_draw();
         glib::ControlFlow::Continue
     });
-    draw.imp().core.clone()
 }
 
 glib::wrapper! {
