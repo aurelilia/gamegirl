@@ -116,13 +116,71 @@
         </child>
 
         <child>
-          <object class="GtkBox">
+          <object class="AdwPreferencesPage">
+            <property name="title">Video</property>
+            <property name="icon_name">video-display-symbolic</property>
             <child>
-              <object class="GtkLabel">
-                <property name="label">Video</property>
-                <style>
-                  <class name="large-title"/>
-                </style>
+              <object class="AdwPreferencesGroup" id="video_graphics">
+                <property name="title" translatable="yes">Graphics</property>
+                <child>
+                  <object class="AdwComboRow">
+                    <property name="title" translatable="yes">Texture Filter</property>
+                    <property name="subtitle" translatable="yes">Texture filter applied. hqx costs performance.</property>
+                    <property name="model">
+                      <object class="GtkStringList">
+                        <items>
+                          <item translatable="yes">Nearest (sharp)</item>
+                          <item translatable="yes">Linear (blurry)</item>
+                          <item translatable="yes">hq2x</item>
+                          <item translatable="yes">hq3x</item>
+                          <item translatable="yes">hq4x</item>
+                        </items>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow">
+                    <property name="title" translatable="yes">Blending Mode</property>
+                    <property name="subtitle" translatable="yes">How frames are blended to emulate slow screens. Some GBA games require this to look good.</property>
+                    <property name="model">
+                      <object class="GtkStringList">
+                        <items>
+                          <item translatable="yes">Do Not Blend</item>
+                          <item translatable="yes">Soften</item>
+                          <item translatable="yes">Accumulate</item>
+                        </items>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow">
+                    <property name="title" translatable="yes">Frame Skip</property>
+                    <property name="subtitle" translatable="yes">Only compute every X frame. Faster, but makes video look choppy.</property>
+                    <property name="adjustment">
+                      <object class="GtkAdjustment">
+                        <property name="lower">0</property>
+                        <property name="upper">10</property>
+                        <property name="value">0</property>
+                        <property name="page-increment">2</property>
+                        <property name="step-increment">1</property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Pixel Perfect Scaling</property>
+                    <property name="subtitle" translatable="yes">Only scale the screen to integer multiples. Makes screen slightly sharper, but smaller.</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Preserve Aspect Ratio</property>
+                    <property name="subtitle" translatable="yes">Preserve console aspect ratio and do not stretch to fit.</property>
+                  </object>
+                </child>
               </object>
             </child>
           </object>
@@ -151,13 +209,75 @@
         </child>
 
         <child>
-          <object class="GtkBox">
+          <object class="AdwPreferencesPage">
+            <property name="title">Audio</property>
+            <property name="icon_name">audio-x-generic-symbolic</property>
             <child>
-              <object class="GtkLabel">
-                <property name="label">Audio</property>
-                <style>
-                  <class name="large-title"/>
-                </style>
+              <object class="AdwPreferencesGroup" id="audio_audio">
+                <property name="title" translatable="yes">Audio</property>
+                <child>
+                  <object class="AdwSpinRow">
+                    <property name="title" translatable="yes">Volume</property>
+                    <property name="adjustment">
+                      <object class="GtkAdjustment">
+                        <property name="lower">0</property>
+                        <property name="upper">100</property>
+                        <property name="value">75</property>
+                        <property name="page-increment">20</property>
+                        <property name="step-increment">5</property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow">
+                    <property name="title" translatable="yes">Volume during fast-forward</property>
+                    <property name="subtitle" translatable="yes">Applied whenever the game isn't running at regular speed</property>
+                    <property name="adjustment">
+                      <object class="GtkAdjustment">
+                        <property name="lower">0</property>
+                        <property name="upper">100</property>
+                        <property name="value">50</property>
+                        <property name="page-increment">20</property>
+                        <property name="step-increment">5</property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow">
+                    <property name="title" translatable="yes">Output Sample Rate</property>
+                    <property name="subtitle" translatable="yes">Sample rate to mix to. Leave at 48kHz if unsure..</property>
+                    <property name="model">
+                      <object class="GtkStringList">
+                        <items>
+                          <item translatable="yes">22.0kHz</item>
+                          <item translatable="yes">44.1kHz</item>
+                          <item translatable="yes">48.0kHz</item>
+                          <item translatable="yes">96.0kHz</item>
+                          <item translatable="yes">192.0kHz</item>
+                        </items>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow">
+                    <property name="title" translatable="yes">Resampling Algorithm</property>
+                    <property name="subtitle" translatable="yes">Which resampling algorithm to use. Sinc is more expensive, but sounds better.</property>
+                    <property name="model">
+                      <object class="GtkStringList">
+                        <items>
+                          <item translatable="yes">Nearest</item>
+                          <item translatable="yes">Linear</item>
+                          <item translatable="yes">Cubic</item>
+                          <item translatable="yes">Sinc-Linear</item>
+                          <item translatable="yes">Sinc-Cubic</item>
+                        </items>
+                      </object>
+                    </property>
+                  </object>
+                </child>
               </object>
             </child>
           </object>
@@ -221,13 +341,83 @@
         </child>
 
         <child>
-          <object class="GtkBox">
+          <object class="AdwPreferencesPage">
+            <property name="title">Emulation</property>
+            <property name="icon_name">applications-science-symbolic</property>
             <child>
-              <object class="GtkLabel">
-                <property name="label">Emulation</property>
-                <style>
-                  <class name="large-title"/>
-                </style>
+              <object class="AdwPreferencesGroup" id="emulation_bios">
+                <property name="title" translatable="yes">System Files</property>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="margin-top">12</property>
+                    <property name="label">Select the BIOS files to use for emulated consoles. All 3 GameBoy consoles will run with a replacement if not provided. Note that some GBA games require an official BIOS.</property>
+                    <property name="wrap">True</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title" translatable="yes">GameBoy</property>
+                    <property name="subtitle" translatable="yes">No file provided, using replacement</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title" translatable="yes">GameBoy Color</property>
+                    <property name="subtitle" translatable="yes">No file provided, using replacement</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title" translatable="yes">GameBoy Advance</property>
+                    <property name="subtitle" translatable="yes">No file provided, using replacement</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="emulation_gb">
+                <property name="title" translatable="yes">GameBoy (Color)</property>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Enable GameBoy Color color correction</property>
+                    <property name="subtitle" translatable="yes">Make colors look closer to a real console</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow">
+                    <property name="title" translatable="yes">Mode preference</property>
+                    <property name="subtitle" translatable="yes">Force the emulation of a specific model.</property>
+                    <property name="model">
+                      <object class="GtkStringList">
+                        <items>
+                          <item translatable="yes">Force GB Color</item>
+                          <item translatable="yes">Default to GB Color</item>
+                          <item translatable="yes">Force GB</item>
+                        </items>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="emulation_gba">
+                <property name="title" translatable="yes">GameBoy Advance</property>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Enable CPU optimizations</property>
+                    <property name="subtitle" translatable="yes">Make the emulator run a lot faster. Might break very few games.</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Multi-threaded Mode</property>
+                    <property name="subtitle" translatable="yes">Make the emulator run faster. Might lead to slight graphical glitches.</property>
+                  </object>
+                </child>
               </object>
             </child>
           </object>
@@ -256,13 +446,59 @@
         </child>
 
         <child>
-          <object class="GtkBox">
+          <object class="AdwPreferencesPage">
+            <property name="title">Features</property>
+            <property name="icon_name">applications-science-symbolic</property>
             <child>
-              <object class="GtkLabel">
-                <property name="label">Features</property>
-                <style>
-                  <class name="large-title"/>
-                </style>
+              <object class="AdwPreferencesGroup" id="features_general">
+                <property name="title" translatable="yes">General</property>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Start running on ROM load</property>
+                    <property name="subtitle" translatable="yes">Start running immediately when loading a game</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSwitchRow">
+                    <property name="title" translatable="yes">Skip System Splash Screen</property>
+                    <property name="subtitle" translatable="yes">Skip screens like the GB's "Nintendo" logo</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="features_ff">
+                <property name="title" translatable="yes">Fast-forward</property>
+                <child>
+                  <object class="AdwSpinRow">
+                    <property name="title" translatable="yes">Fast-forward speed (hold)</property>
+                    <property name="subtitle" translatable="yes">Speed when using the "hold" shortcut</property>
+                    <property name="adjustment">
+                      <object class="GtkAdjustment">
+                        <property name="lower">2</property>
+                        <property name="upper">10</property>
+                        <property name="value">2</property>
+                        <property name="page-increment">2</property>
+                        <property name="step-increment">1</property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow">
+                    <property name="title" translatable="yes">Fast-forward speed (toggle)</property>
+                    <property name="subtitle" translatable="yes">Speed when using the "toggle" shortcut</property>
+                    <property name="adjustment">
+                      <object class="GtkAdjustment">
+                        <property name="lower">2</property>
+                        <property name="upper">10</property>
+                        <property name="value">3</property>
+                        <property name="page-increment">2</property>
+                        <property name="step-increment">1</property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
               </object>
             </child>
           </object>
