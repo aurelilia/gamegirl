@@ -4,7 +4,7 @@ use std::{
 };
 
 use adw::{Toast, subclass::prelude::ObjectSubclassIsExt};
-use gamegirl::{GameCart, Storage, SystemConfig};
+use gamegirl::{GameCart, Storage};
 use gtk::{Label, gio::prelude::FileExt, glib::Variant};
 
 use super::window::GameGirlWindow;
@@ -26,7 +26,10 @@ impl GameGirlWindow {
                 let title = format!("gamegirl - {}", path.file_stem().unwrap().display());
                 let save = Storage::load(Some(path.clone()), "".into());
 
-                match gamegirl::load_cart(GameCart { rom, save }, &SystemConfig::default()) {
+                match gamegirl::load_cart(
+                    GameCart { rom, save },
+                    &self.imp().state.borrow().options.sys,
+                ) {
                     Ok(sys) => {
                         *self.core().lock().unwrap() = sys;
                         self.imp().state.borrow_mut().current_rom_path = Some(path);

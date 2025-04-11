@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use adw::Toast;
 use gamegirl::Core;
-use gtk::{gio, glib, prelude::*, subclass::prelude::*};
+use gtk::{ContentFit, gio, glib, prelude::*, subclass::prelude::*};
 
 use super::canvas::{self, GamegirlPaintable};
 
@@ -16,8 +16,23 @@ glib::wrapper! {
 impl GameGirlWindow {
     pub fn new<P: IsA<gtk::Application>>(app: &P) -> Self {
         let this: Self = glib::Object::builder().property("application", app).build();
-        canvas::bind(&this.imp().game);
+        let drawable = canvas::bind(&this.imp().game);
+        drawable.set_filter(this.imp().state.borrow().options.texture_filter);
+        drawable.set_blend_filter(this.imp().state.borrow().options.blend_filter);
+        this.set_preserve_aspect_ratio(this.imp().state.borrow().options.preserve_aspect_ratio);
         this
+    }
+
+    pub fn canvas(&self) -> GamegirlPaintable {
+        self.imp().game.paintable().unwrap().downcast().unwrap()
+    }
+
+    pub fn set_preserve_aspect_ratio(&self, preserve: bool) {
+        self.imp().game.set_content_fit(if preserve {
+            ContentFit::Contain
+        } else {
+            ContentFit::Fill
+        });
     }
 
     pub fn toast(&self, toast: Toast) {
@@ -114,7 +129,7 @@ mod imp {
                 "win.open_settings",
                 None,
                 |win, _action_name, _action_target| {
-                    let win = SettingsWindow::new(&win.application().unwrap());
+                    let win = SettingsWindow::new(&win.application().unwrap(), win.clone());
                     win.present();
                 },
             );

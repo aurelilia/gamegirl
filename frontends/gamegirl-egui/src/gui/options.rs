@@ -125,14 +125,14 @@ pub(super) fn options(app: &mut App, ctx: &Context, ui: &mut Ui) {
             ui.heading("Fast-forward");
             ui.horizontal(|ui| {
                 ui.add(Slider::new(
-                    &mut opt.rewinder.fast_forward_hold_speed,
+                    &mut opt.rewinder.ff_hold_speed,
                     2..=10,
                 ));
                 ui.label("Fast forward speed (Hold)");
             });
             ui.horizontal(|ui| {
                 ui.add(Slider::new(
-                    &mut opt.rewinder.fast_forward_toggle_speed,
+                    &mut opt.rewinder.ff_toggle_speed,
                     2..=10,
                 ));
                 ui.label("Fast forward speed (Toggle)");

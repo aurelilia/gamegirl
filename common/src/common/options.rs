@@ -131,7 +131,7 @@ impl Default for SystemConfig {
 }
 
 /// How to handle CGB mode depending on cart compatibility.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_config", derive(serde::Deserialize, serde::Serialize))]
 pub enum CgbMode {
     /// Always run in CGB mode, even when the cart does not support it.

@@ -5,7 +5,7 @@ use std::{
 
 use gamegirl::{
     SystemConfig,
-    frontend::{input::Input, rewinder::RewinderConfig},
+    frontend::{filter::Blend, input::Input, rewinder::RewinderConfig},
 };
 
 use crate::gui::input::GtkKey;
@@ -18,7 +18,13 @@ pub struct Options {
     /// Input configuration.
     pub input: Input<GtkKey>,
     /// Rewinder configuration.
-    pub rewinder: RewinderConfig,
+    pub rewind: RewinderConfig,
+    /// Texture filter to use.
+    pub texture_filter: TextureFilter,
+    /// Blending filter to use.
+    pub blend_filter: Blend,
+    /// If aspect ration should be preserved.
+    pub preserve_aspect_ratio: bool,
 }
 
 impl Options {
@@ -26,7 +32,10 @@ impl Options {
         Self {
             sys: Default::default(),
             input: Input::new(),
-            rewinder: RewinderConfig::default(),
+            rewind: RewinderConfig::default(),
+            texture_filter: TextureFilter::Nearest,
+            blend_filter: Blend::None,
+            preserve_aspect_ratio: true,
         }
     }
 
@@ -57,4 +66,11 @@ impl Default for Options {
     fn default() -> Self {
         Self::from_disk()
     }
+}
+
+#[derive(Copy, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub enum TextureFilter {
+    Nearest,
+    Linear,
+    Trilinear,
 }

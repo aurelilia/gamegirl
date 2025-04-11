@@ -1,3 +1,5 @@
+// TODO merge with generic blending module in gamegirl::frontend
+
 use std::{mem, sync::Arc};
 
 use eframe::egui::{Color32, TextureOptions};

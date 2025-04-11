@@ -1,10 +1,15 @@
+use adw::subclass::prelude::ObjectSubclassIsExt;
+use gamegirl::frontend::filter::Blend;
 use gtk::{
     gdk,
     glib::{self},
+    gsk::ScalingFilter,
     prelude::*,
 };
 
-pub fn bind(pict: &gtk::Picture) {
+use crate::config::TextureFilter;
+
+pub fn bind(pict: &gtk::Picture) -> GamegirlPaintable {
     assert!(
         pict.paintable().is_none(),
         "Canvas was bound more than once!"
@@ -15,6 +20,7 @@ pub fn bind(pict: &gtk::Picture) {
         pict.queue_draw();
         glib::ControlFlow::Continue
     });
+    draw
 }
 
 glib::wrapper! {
@@ -22,6 +28,19 @@ glib::wrapper! {
 }
 
 impl GamegirlPaintable {
+    pub fn set_filter(&self, filter: TextureFilter) {
+        let filter = match filter {
+            TextureFilter::Nearest => ScalingFilter::Nearest,
+            TextureFilter::Linear => ScalingFilter::Linear,
+            TextureFilter::Trilinear => ScalingFilter::Trilinear,
+        };
+        self.imp().filter.set(filter);
+    }
+
+    pub fn set_blend_filter(&self, blend: Blend) {
+        self.imp().blend.set(blend);
+    }
+
     pub fn new() -> Self {
         glib::Object::new()
     }
@@ -29,11 +48,19 @@ impl GamegirlPaintable {
 
 mod imp {
     use std::{
+        cell::{Cell, RefCell},
         mem,
         sync::{Arc, Mutex},
     };
 
-    use gamegirl::{Core, frontend, frontend::cpal::AudioStream};
+    use gamegirl::{
+        Core,
+        frontend::{
+            self,
+            cpal::AudioStream,
+            filter::{Blend, ScreenBuffer},
+        },
+    };
     use gtk::{
         gdk::{self, subclass::prelude::PaintableImpl},
         glib::{
@@ -41,6 +68,7 @@ mod imp {
             subclass::{object::ObjectImpl, types::ObjectSubclass},
         },
         graphene::{self, Rect},
+        gsk::ScalingFilter,
         prelude::SnapshotExt,
     };
 
@@ -48,6 +76,10 @@ mod imp {
         pub core: Arc<Mutex<Box<dyn Core>>>,
         _audio_stream: AudioStream,
         last_texture: Mutex<Option<gdk::MemoryTexture>>,
+
+        buffer: RefCell<ScreenBuffer>,
+        pub(super) filter: Cell<ScalingFilter>,
+        pub(super) blend: Cell<Blend>,
     }
 
     impl Default for GamegirlPaintable {
@@ -58,6 +90,10 @@ mod imp {
                 core,
                 _audio_stream,
                 last_texture: Mutex::new(None),
+
+                buffer: RefCell::default(),
+                filter: Cell::new(ScalingFilter::Nearest),
+                blend: Cell::new(Blend::None),
             }
         }
     }
@@ -89,6 +125,7 @@ mod imp {
             let mut last_texture = self.last_texture.lock().unwrap();
             let maybe_frame = core.c_mut().video_buffer.pop();
             if let Some(frame) = maybe_frame {
+                let frame = self.buffer.borrow_mut().next_frame(frame, self.blend.get());
                 let size = core.screen_size();
                 let byte_vec = unsafe {
                     let mut byte_vec: Vec<u8> = mem::transmute(frame);
@@ -108,7 +145,7 @@ mod imp {
             if let Some(tex) = &*last_texture {
                 snapshot.append_scaled_texture(
                     tex,
-                    gtk::gsk::ScalingFilter::Nearest,
+                    self.filter.get(),
                     &Rect::new(0.0, 0.0, width as f32, height as f32),
                 );
             } else {

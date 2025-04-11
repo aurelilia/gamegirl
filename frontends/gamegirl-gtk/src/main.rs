@@ -29,7 +29,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         let options = Options::default();
-        let rewinder = Rewinder::new(options.rewinder.rewind_buffer_size);
+        let rewinder = Rewinder::new(options.rewind.rewind_buffer_size);
         Self {
             options,
             current_rom_path: Default::default(),
@@ -40,6 +40,7 @@ impl Default for AppState {
 
 fn main() -> glib::ExitCode {
     gio::resources_register_include!("gamegirl.gresource").expect("Failed to register resources.");
+
     let app = Application::builder()
         .application_id("eu.catin.gamegirl")
         .build();

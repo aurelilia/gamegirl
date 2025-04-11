@@ -11,9 +11,9 @@ use std::{iter, vec::Vec};
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct RewinderConfig {
     /// Fast forward speed for the hold button.
-    pub fast_forward_hold_speed: usize,
+    pub ff_hold_speed: usize,
     /// Fast forward speed for the toggle button.
-    pub fast_forward_toggle_speed: usize,
+    pub ff_toggle_speed: usize,
     /// Enable rewinding.
     pub enable_rewind: bool,
     /// Rewind buffer size (if enabled), in seconds.
@@ -23,8 +23,8 @@ pub struct RewinderConfig {
 impl Default for RewinderConfig {
     fn default() -> Self {
         Self {
-            fast_forward_hold_speed: 2,
-            fast_forward_toggle_speed: 2,
+            ff_hold_speed: 2,
+            ff_toggle_speed: 2,
             enable_rewind: true,
             rewind_buffer_size: 10,
         }
