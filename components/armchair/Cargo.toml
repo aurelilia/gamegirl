@@ -1,0 +1,23 @@
+[package]
+name = "armchair"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path = "../../common" }
+
+log.workspace = true
+serde = { workspace = true, optional = true }
+bitmatch.workspace = true
+num-traits = { version = "0.2", default-features = false }
+num-derive = { version = "0.4", default-features = false }
+
+cranelift = { version = "0.118", optional = true }
+cranelift-jit = { version = "0.118", optional = true }
+cranelift-module = { version = "0.118", optional = true }
+cranelift-native = { version = "0.118", optional = true }
+
+[features]
+serde = ["dep:serde"]

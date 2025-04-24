@@ -38,5 +38,5 @@ serde_arrays = "0.2.0"
 arrayvec = { version = "0.7.6", default-features = false }
 bitflags = "2.9.0"
 modular-bitfield = "0.11"
-bitmatch = "0.1.1"
+bitmatch = { path = "./components/bitmatch" }
 glow = "0.16"

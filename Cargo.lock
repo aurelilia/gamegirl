@@ -232,6 +232,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "armchair"
+version = "0.1.0"
+dependencies = [
+ "bitmatch",
+ "common",
+ "cranelift",
+ "cranelift-jit",
+ "cranelift-module",
+ "cranelift-native",
+ "log",
+ "num-derive",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -517,8 +533,6 @@ dependencies = [
 [[package]]
 name = "bitmatch"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a53e105d41966c9b4594b8e3b7cf8e81ae63cc83664880b049af8a11381a3ad"
 dependencies = [
  "boolean_expression",
  "proc-macro2",

@@ -2,5 +2,5 @@
     "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
     "editor.formatOnSave": true,
     "rust-analyzer.showUnlinkedFileNotification": false,
-    "rust-analyzer.cargo.targetDir": true
+    "rust-analyzer.cargo.targetDir": "/ethereal/cache/ra-target"
 }

@@ -1,0 +1,427 @@
+// Copyright (c) 2024 Leela Aurelia, git@elia.garden
+//
+// Unless otherwise noted, this file is released and thus subject to the
+// terms of the Mozilla pub(super)lic License Version 2.0 (MPL-2.0) or the
+// GNU General pub(super)lic License Version 3 (GPL-3).
+// If a copy of these licenses was not distributed with this file, you can
+// obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
+
+use common::numutil::NumExt;
+
+use super::{decode::*, ThumbHandler, ThumbVisitor};
+use crate::{
+    interface::{Bus, CpuVersion},
+    memory::{access::*, Address, RelativeOffset},
+    registers::{Flag::*, LowRegister, Register},
+    Cpu,
+};
+
+impl<S: Bus> Cpu<S> {
+    pub fn interpret_thumb(&mut self, inst: u16) {
+        let handler = Self::get_interpreter_handler_thumb(inst);
+        handler(self, ThumbInst::of(inst));
+    }
+
+    pub fn get_interpreter_handler_thumb(inst: u16) -> ThumbHandler<Self> {
+        S::Version::THUMB.interpreter_lut[inst.us() >> 8]
+    }
+
+    pub fn get_cached_handler_thumb(inst: u16) -> ThumbHandler<Self> {
+        (S::Version::THUMB.cache_handler_lookup)(ThumbInst::of(inst))
+    }
+}
+
+impl<S: Bus> ThumbVisitor for Cpu<S> {
+    // UND
+    fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
+        self.und_inst(inst);
+    }
+
+    // THUMB.1/2
+    fn thumb_alu_imm<const KIND: Thumb1Op>(&mut self, d: LowRegister, s: LowRegister, n: u32) {
+        use Thumb1Op::*;
+        let rs = self.regs[s];
+        let value = match KIND {
+            Lsl => self.lsl::<true>(rs, n),
+            Lsr => self.lsr::<true, true>(rs, n),
+            Asr => self.asr::<true, true>(rs, n),
+            Add => self.add::<true>(rs, n & 7),
+            Sub => self.sub::<true>(rs, n & 7),
+        };
+        self.regs[d] = value;
+    }
+
+    // THUMB.2
+    fn thumb_2_reg<const KIND: Thumb2Op>(
+        &mut self,
+        d: LowRegister,
+        s: LowRegister,
+        n: LowRegister,
+    ) {
+        let rs = self.regs[s];
+        let rn = self.regs[n];
+        let value = match KIND {
+            Thumb2Op::Add => self.add::<true>(rs, rn),
+            Thumb2Op::Sub => self.sub::<true>(rs, rn),
+        };
+        self.regs[d] = value;
+    }
+
+    // THUMB.3
+    fn thumb_3<const KIND: Thumb3Op>(&mut self, d: LowRegister, n: u32) {
+        use Thumb3Op::*;
+        let rd = self.regs[d];
+        match KIND {
+            Mov => {
+                self.set_nz::<true>(n);
+                self.regs[d] = n;
+            }
+            Cmp => {
+                self.sub::<true>(rd, n);
+            }
+            Add => self.regs[d] = self.add::<true>(rd, n),
+            Sub => self.regs[d] = self.sub::<true>(rd, n),
+        };
+    }
+
+    // THUMB.4
+    fn thumb_alu<const KIND: Thumb4Op>(&mut self, d: LowRegister, s: LowRegister) {
+        use Thumb4Op::*;
+
+        let rd = self.regs[d];
+        let rs = self.regs[s];
+
+        self.regs[d] = match KIND {
+            And => self.and::<true>(rd, rs),
+            Eor => self.xor::<true>(rd, rs),
+            Lsl => {
+                self.idle_nonseq();
+                self.lsl::<true>(rd, rs & 0xFF)
+            }
+            Lsr => {
+                self.idle_nonseq();
+                self.lsr::<true, false>(rd, rs & 0xFF)
+            }
+            Asr => {
+                self.idle_nonseq();
+                self.asr::<true, false>(rd, rs & 0xFF)
+            }
+            Adc => {
+                let c = self.regs.is_flag(Carry) as u32;
+                self.adc::<true>(rd, rs, c)
+            }
+            Sbc => {
+                let c = self.regs.is_flag(Carry) as u32;
+                self.sbc::<true>(rd, rs, c)
+            }
+            Ror => {
+                self.idle_nonseq();
+                self.ror::<true, false>(rd, rs & 0xFF)
+            }
+            Tst => {
+                self.and::<true>(rd, rs);
+                rd
+            }
+            Neg => self.neg::<true>(rs),
+            Cmp => {
+                self.sub::<true>(rd, rs);
+                rd
+            }
+            Cmn => {
+                self.add::<true>(rd, rs);
+                rd
+            }
+            Orr => self.or::<true>(rd, rs),
+            Mul => {
+                self.apply_mul_idle_ticks(rd, true);
+                self.mul::<true>(rd, rs)
+            }
+            Bic => self.bit_clear::<true>(rd, rs),
+            Mvn => self.not::<true>(rs),
+        }
+    }
+
+    // THUMB.5
+    fn thumb_hi_add(&mut self, (s, d): (Register, Register)) {
+        let res = self.regs[d].wrapping_add(self.regs[s]);
+        self.set_reg(d, res);
+    }
+
+    fn thumb_hi_cmp(&mut self, (s, d): (Register, Register)) {
+        let rs = self.regs[s];
+        let rd = self.regs[d];
+        self.sub::<true>(rd, rs);
+    }
+
+    fn thumb_hi_mov(&mut self, (s, d): (Register, Register)) {
+        self.set_reg(d, self.regs[s]);
+    }
+
+    fn thumb_hi_bx(&mut self, s: Register, blx: bool) {
+        if blx {
+            // BLX
+            let rn = self.regs[s];
+            // Is this v5 behavior correct?
+            if S::Version::IS_V5 {
+                let pc = self.regs.pc() - Address(1);
+                self.regs.set_lr(pc);
+                if !rn.is_bit(0) {
+                    self.regs.set_flag(Thumb, false);
+                }
+            }
+            self.set_pc(Address(rn));
+        } else if s.is_pc() {
+            // BX ARM switch
+            self.regs.set_flag(Thumb, false);
+            self.set_pc(self.regs.pc()); // Align
+        } else {
+            // BX
+            if self.regs[s].is_bit(0) {
+                self.set_pc(Address(self.regs[s] & !1));
+            } else {
+                self.regs.set_flag(Thumb, false);
+                self.set_pc(Address(self.regs[s] & !3));
+            }
+        }
+    }
+
+    // THUMB.6
+    fn thumb_ldr6(&mut self, d: LowRegister, offset: Address) {
+        self.regs[d] = self.read_word_ldrswp(self.regs.adj_pc() + offset, NONSEQ);
+        // LDR has +1I
+        self.idle_nonseq();
+    }
+
+    // THUMB.7/8
+    fn thumb_ldrstr78<const O: ThumbStrLdrOp>(
+        &mut self,
+        d: LowRegister,
+        b: LowRegister,
+        o: LowRegister,
+    ) {
+        use ThumbStrLdrOp::*;
+
+        let rb = self.regs[b];
+        let ro = self.regs[o];
+        let rd = self.regs[d];
+        let addr = Address(rb.wrapping_add(ro));
+        self.access_type = NONSEQ;
+
+        match O {
+            Str => self.write::<u32>(addr, rd, NONSEQ),
+            Strh => self.write::<u16>(addr, rd.u16(), NONSEQ),
+            Strb => self.write::<u8>(addr, rd.u8(), NONSEQ),
+            Ldsb => self.regs[d] = self.read::<u8>(addr, NONSEQ) as i8 as i32 as u32,
+            Ldr => self.regs[d] = self.read_word_ldrswp(addr, NONSEQ),
+            Ldrh => self.regs[d] = self.read::<u16>(addr, NONSEQ),
+            Ldrb => self.regs[d] = self.read::<u8>(addr, NONSEQ).u32(),
+            // LDSH, needs special handling for unaligned reads which makes it behave as LDRSB
+            Ldsh if addr.0.is_bit(0) => {
+                self.regs[d] = self.read::<u8>(addr, NONSEQ) as i8 as i32 as u32;
+            }
+            Ldsh => self.regs[d] = self.read::<u16>(addr, NONSEQ) as i16 as i32 as u32,
+        }
+        if O as usize > 2 {
+            // LDR has +1I
+            self.bus.tick(1);
+        }
+    }
+
+    // THUMB.9
+    fn thumb_ldrstr9<const O: ThumbStrLdrOp>(
+        &mut self,
+        d: LowRegister,
+        b: LowRegister,
+        offset: Address,
+    ) {
+        use ThumbStrLdrOp::*;
+
+        let rb = Address(self.regs[b]);
+        let rd = self.regs[d];
+        self.access_type = NONSEQ;
+
+        match O {
+            Str => self.write::<u32>(rb + offset, rd, NONSEQ),
+            Strb => self.write::<u8>(rb + offset, rd.u8(), NONSEQ),
+
+            Ldr => self.regs[d] = self.read_word_ldrswp(rb + offset, NONSEQ),
+            Ldrb => self.regs[d] = self.read::<u8>(rb + offset, NONSEQ).u32(),
+
+            _ => unreachable!(),
+        }
+
+        if O == Ldr || O == Ldrb {
+            // LDR has +1I
+            self.bus.tick(1);
+        }
+    }
+
+    // THUMB.10
+    fn thumb_ldrstr10<const STR: bool>(&mut self, d: LowRegister, b: LowRegister, offset: Address) {
+        let rd = self.regs[d];
+        let addr = Address(self.regs[b]) + offset;
+        self.access_type = NONSEQ;
+
+        if STR {
+            self.write::<u16>(addr, rd.u16(), NONSEQ);
+        } else {
+            self.regs[d] = self.read::<u16>(addr, NONSEQ).u32();
+            // LDR has +1I
+            self.bus.tick(1);
+        }
+    }
+
+    // THUMB.11
+    fn thumb_str_sp(&mut self, d: LowRegister, offset: Address) {
+        let rd = self.regs[d];
+        let addr = self.regs.sp() + offset;
+        self.access_type = NONSEQ;
+        self.write::<u32>(addr, rd, NONSEQ);
+    }
+
+    fn thumb_ldr_sp(&mut self, d: LowRegister, offset: Address) {
+        self.regs[d] = self.read_word_ldrswp(self.regs.sp() + offset, NONSEQ);
+        // LDR has +1I
+        self.idle_nonseq();
+    }
+
+    // THUMB.12
+    fn thumb_rel_addr<const SP: bool>(&mut self, d: LowRegister, offset: Address) {
+        if SP {
+            self.regs[d] = (self.regs.sp() + offset).0;
+        } else {
+            self.regs[d] = (self.regs.adj_pc() + offset).0;
+        }
+    }
+
+    // THUMB.13
+    fn thumb_sp_offs(&mut self, offset: RelativeOffset) {
+        let sp = self.regs.sp();
+        self.regs.set_sp(sp.add_rel(offset));
+    }
+
+    // THUMB.14
+    fn thumb_push(&mut self, reg_list: u8, lr: bool) {
+        let mut sp = self.regs.sp();
+        let mut kind = NONSEQ;
+
+        if lr {
+            sp -= Address::WORD;
+            let lr = self.regs.lr();
+            self.write::<u32>(sp, lr.0, kind);
+            kind = SEQ;
+        }
+
+        for reg in LowRegister::from_rlist(reg_list).rev() {
+            sp -= Address::WORD;
+            let reg = self.regs[reg];
+            self.write::<u32>(sp, reg, kind);
+            kind = SEQ;
+        }
+
+        assert!(kind == SEQ);
+        self.regs.set_sp(sp);
+        self.access_type = NONSEQ;
+    }
+
+    fn thumb_pop(&mut self, reg_list: u8, pc: bool) {
+        let mut sp = self.regs.sp();
+        let mut kind = NONSEQ;
+
+        for reg in LowRegister::from_rlist(reg_list) {
+            self.regs[reg] = self.read::<u32>(sp, kind);
+            sp += Address::WORD;
+            kind = SEQ;
+        }
+
+        if pc {
+            let pc = self.read::<u32>(sp, kind);
+            if S::Version::IS_V5 && !pc.is_bit(0) {
+                self.regs.set_flag(Thumb, false);
+            }
+            self.set_pc(Address(pc));
+            sp += Address::WORD;
+            kind = SEQ;
+        }
+
+        assert!(kind == SEQ);
+        self.regs.set_sp(sp);
+        self.idle_nonseq();
+    }
+
+    // THUMB.15
+    fn thumb_stmia(&mut self, b: LowRegister, reg_list: u8) {
+        let mut kind = NONSEQ;
+        let mut base_rlist_addr = None;
+        let mut rb = Address(self.regs[b]);
+
+        for reg in LowRegister::from_rlist(reg_list) {
+            if reg == b && kind != NONSEQ {
+                base_rlist_addr = Some(Address(self.regs[b]));
+            }
+            let reg = self.regs[reg];
+            self.write::<u32>(rb, reg, kind);
+            rb += Address::WORD;
+            self.regs[b] = rb.0;
+            kind = SEQ;
+        }
+
+        if let Some(addr) = base_rlist_addr {
+            // If base was in Rlist and not the first, write final address to that location.
+            // We ignore timing since this was already (wrongly) written in the loop above.
+            self.bus.set::<u32>(addr, rb.0);
+        }
+
+        if kind == NONSEQ {
+            self.on_empty_rlist(Register(b.0), true, true, false);
+        }
+        self.access_type = NONSEQ;
+    }
+
+    fn thumb_ldmia(&mut self, b: LowRegister, reg_list: u8) {
+        let mut kind = NONSEQ;
+
+        for reg in LowRegister::from_rlist(reg_list) {
+            let addr = self.regs[b];
+            self.regs[reg] = self.read::<u32>(Address(addr), kind);
+            self.regs[b] = self.regs[b].wrapping_add(4);
+            kind = SEQ;
+        }
+
+        if kind == NONSEQ {
+            self.on_empty_rlist(Register(b.0), false, true, false);
+        }
+        self.idle_nonseq();
+    }
+
+    // THUMB.16
+    fn thumb_bcond(&mut self, cond: u16, offset: RelativeOffset) {
+        let condition = self.regs.eval_condition(cond);
+        if condition {
+            self.relative_jump(offset);
+        }
+    }
+
+    // THUMB.17
+    fn thumb_swi(&mut self) {
+        self.exception_occured(crate::Exception::Swi);
+    }
+
+    // THUMB.18
+    fn thumb_br(&mut self, offset: RelativeOffset) {
+        self.relative_jump(offset);
+    }
+
+    // THUMB.19
+    fn thumb_set_lr(&mut self, offset: RelativeOffset) {
+        let lr = self.regs.pc().add_rel(offset);
+        self.regs.set_lr(lr);
+    }
+
+    fn thumb_bl<const THUMB: bool>(&mut self, offset: Address) {
+        let pc = self.regs.pc();
+        self.set_pc(self.regs.lr() + offset);
+        self.regs.set_lr(pc - Address::BYTE);
+        self.regs.set_flag(Thumb, THUMB);
+    }
+}
