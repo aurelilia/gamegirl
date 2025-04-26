@@ -6,14 +6,14 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use common::{numutil::NumExt, Time};
+use common::{common::debugger::Debugger, numutil::NumExt, Time};
 
-use super::Exception;
 use crate::{
     arm::{self, ArmInstructionSet},
     memory::{Access, Address},
+    state::CpuState,
     thumb::{self, ThumbInstructionSet},
-    Cpu,
+    Cpu, Exception,
 };
 
 /// Configuration that specifies how the system should behave on the bus.
@@ -23,7 +23,7 @@ pub struct BusCpuConfig {
 }
 
 /// Trait for a system that contains this CPU.
-pub trait Bus: Sized + Default + 'static {
+pub trait Bus: Sized + 'static {
     /// CPU version to emulate for this bus.
     type Version: CpuVersion<Self>;
 
@@ -33,21 +33,54 @@ pub trait Bus: Sized + Default + 'static {
     /// Increment the system clock by the given amount of CPU ticks.
     fn tick(&mut self, cycles: Time);
     /// Handle pending events on the bus.
-    fn handle_events(&mut self);
+    fn handle_events(&mut self, cpu: &mut CpuState);
+    /// Get the system debugger.
+    fn debugger(&mut self) -> &mut Debugger;
 
     /// Callback to perform any system-specific behavior on an exception.
-    fn exception_happened(&mut self, kind: Exception);
+    fn exception_happened(&mut self, cpu: &mut CpuState, kind: Exception);
     /// Callback to perform any system-specific behavior on a pipeline stall.
-    fn pipeline_stalled(&mut self);
+    fn pipeline_stalled(&mut self, cpu: &mut CpuState);
 
     /// Get the value at the given memory address.
-    fn get<T: RwType>(&mut self, addr: Address) -> T;
+    fn get<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address) -> T;
     /// Set the value at the given memory address.
-    fn set<T: RwType>(&mut self, addr: Address, value: T);
+    fn set<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address, value: T);
     /// Get the access time in S/N cycles for the given memory address.
     /// The type is mut here due to things like the prefetch buffer,
     /// which changes state when accessed.
-    fn wait_time<T: RwType>(&mut self, addr: Address, access: Access) -> u16;
+    fn wait_time<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address, access: Access) -> u16;
+
+    /// Get the value at the given memory address and add to the system clock.
+    fn read<T: RwType>(
+        &mut self,
+        cpu: &mut CpuState,
+        addr: Address,
+        access: Access,
+    ) -> T::ReadOutput {
+        let time = self.wait_time::<T>(cpu, addr, access);
+        self.tick(time as u64);
+
+        let value = self.get::<T>(cpu, addr).u32();
+        T::ReadOutput::from_u32(if !Self::Version::IS_V5 && T::WIDTH == 2 {
+            // Special handling for halfwords on ARMv4
+            if addr.0.is_bit(0) {
+                // Unaligned
+                value.u32().rotate_right(8)
+            } else {
+                value.u32()
+            }
+        } else {
+            value
+        })
+    }
+    /// Set the value at the given memory address and add to the system clock.
+    fn write<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address, value: T, access: Access) {
+        let time = self.wait_time::<T>(cpu, addr, access);
+        self.tick(time as u64);
+        self.debugger().write_occurred(addr.0);
+        self.set(cpu, addr, value);
+    }
 
     /// Callback for getting CP15 register.
     /// This CPU implementation relies on the system to provide the CP15

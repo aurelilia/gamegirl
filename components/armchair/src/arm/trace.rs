@@ -8,7 +8,7 @@ use super::{
 use crate::{
     memory::RelativeOffset,
     misc::{self, print_op},
-    registers::Register,
+    state::Register,
 };
 
 impl Display for ArmInst {
@@ -73,16 +73,18 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         match shift_operand {
             ArmOperandKind::Immediate(0) if shift_kind == ArmAluShift::Lsl => write!(self.f, "{m}"),
             ArmOperandKind::Immediate(0) if shift_kind == ArmAluShift::Lsr => {
-                write!(self.f, "{m} lsr #32")
+                write!(self.f, "{m}, lsr $32")
             }
             ArmOperandKind::Immediate(0) if shift_kind == ArmAluShift::Asr => {
-                write!(self.f, "{m} asr #32")
+                write!(self.f, "{m}, asr $32")
             }
             ArmOperandKind::Immediate(0) if shift_kind == ArmAluShift::Ror => {
-                write!(self.f, "{m} rrx #1")
+                write!(self.f, "{m}, rrx $1")
             }
-            ArmOperandKind::Immediate(imm) => write!(self.f, "{m} {} #{imm}", print_op(shift_kind)),
-            ArmOperandKind::Register(reg) => write!(self.f, "{m} {} {reg}", print_op(shift_kind)),
+            ArmOperandKind::Immediate(imm) => {
+                write!(self.f, "{m}, {} ${imm}", print_op(shift_kind))
+            }
+            ArmOperandKind::Register(reg) => write!(self.f, "{m}, {} {reg}", print_op(shift_kind)),
         }
         .unwrap()
     }
@@ -92,7 +94,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         if CPSR {
             write!(self.f, "s").unwrap();
         }
-        write!(self.f, " {d}, {n}, #{imm}").unwrap();
+        write!(self.f, " {d}, {n}, ${imm}").unwrap();
     }
 
     fn arm_mul<const OP: ArmMulOp>(
@@ -107,10 +109,10 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         if cpsr {
             write!(self.f, "s").unwrap();
         }
-        if OP == ArmMulOp::Mul || OP == ArmMulOp::Mla {
-            write!(self.f, " {d}, {m}, {s}").unwrap();
-        } else {
-            write!(self.f, " {n}, {d}, {m}, {s}").unwrap();
+        match OP {
+            ArmMulOp::Mul => write!(self.f, " {d}, {m}, {s}").unwrap(),
+            ArmMulOp::Mla => write!(self.f, " {d}, {m}, {s}, {n}").unwrap(),
+            _ => write!(self.f, " {n}, {d}, {m}, {s}").unwrap(),
         }
     }
 
@@ -161,7 +163,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         }
 
         match src {
-            ArmOperandKind::Immediate(imm) => write!(self.f, ", #0x{imm:X}"),
+            ArmOperandKind::Immediate(imm) => write!(self.f, ", $0x{imm:X}"),
             ArmOperandKind::Register(reg) => write!(self.f, ", {reg}"),
         }
         .unwrap()
@@ -201,14 +203,14 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         let shift = 'shift: {
             let base = match offset {
                 ArmLdrStrOperandKind::Immediate(0) => break 'shift "".to_string(),
-                ArmLdrStrOperandKind::Immediate(imm) => format!("#0x{imm:X}"),
+                ArmLdrStrOperandKind::Immediate(imm) => format!("$0x{imm:X}"),
                 ArmLdrStrOperandKind::Register(reg) => format!("{reg}"),
                 ArmLdrStrOperandKind::ShiftedRegister { base, shift, by } => {
-                    format!("{base} {} #{by}", print_op(shift))
+                    format!("{base}, {} ${by}", print_op(shift))
                 }
             };
-            let op = if config.up { "+" } else { "-" };
-            format!(" {op}{base}")
+            let op = if config.up { "" } else { "-" };
+            format!(", {op}{base}")
         };
 
         if config.pre {
@@ -217,7 +219,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
                 write!(self.f, "!").unwrap();
             }
         } else {
-            write!(self.f, ", [{n}], {shift}").unwrap()
+            write!(self.f, ", [{n}]{shift}").unwrap()
         }
     }
 
@@ -225,7 +227,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         write!(
             self.f,
             "{}{}",
-            if config.ldr { "ldr" } else { "str" },
+            if config.ldr { "ldm" } else { "stm" },
             self.cc
         )
         .unwrap();
@@ -239,10 +241,13 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         if config.writeback {
             write!(self.f, "!").unwrap();
         }
-        write!(self.f, ",").unwrap();
-        for r in Register::from_rlist(rlist) {
-            write!(self.f, " {r}").unwrap()
+        let mut regs = Register::from_rlist(rlist);
+        let first = regs.next().unwrap_or(Register(0));
+        write!(self.f, ", {{{first}").unwrap();
+        for r in regs {
+            write!(self.f, ", {r}").unwrap()
         }
+        write!(self.f, "}}").unwrap();
         if force_user {
             write!(self.f, " ^").unwrap()
         }

@@ -2127,7 +2127,7 @@ dependencies = [
 name = "gga"
 version = "0.1.0"
 dependencies = [
- "arm-cpu",
+ "armchair",
  "arrayvec",
  "bitflags 2.9.0",
  "common",

@@ -6,73 +6,87 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use alloc::format;
-
-use common::{common::debugger::Severity, numutil::NumExt};
+use common::numutil::NumExt;
 
 use crate::{
     interface::Bus,
     memory::Address,
-    registers::{
+    state::{
+        CpuState,
         Flag::{FiqDisable, IrqDisable, Thumb},
         Mode,
     },
     Cpu,
 };
 
-impl<S: Bus> Cpu<S> {
-    /// Check if an interrupt needs to be handled and jump to the handler if so.
-    /// Called on any events that might cause an interrupt to be triggered..
-    pub fn check_if_interrupt(&mut self) {
-        if self.is_interrupt_pending() {
-            self.regs.bump_pc(4);
-            self.exception_occured(Exception::Irq);
-        }
-    }
-
-    fn is_interrupt_pending(&self) -> bool {
-        self.ime && !self.regs.is_flag(IrqDisable) && (self.ie & self.if_) != 0
-    }
-
+impl CpuState {
     /// An exception occurred, jump to the bootrom handler and deal with it.
-    pub(crate) fn exception_occured(&mut self, kind: Exception) {
-        self.bus.exception_happened(kind);
-        if self.regs.is_flag(Thumb) {
-            self.regs.bump_pc(2); // ??
+    pub(crate) fn exception_occured<S: Bus>(&mut self, bus: &mut S, kind: Exception) {
+        bus.exception_happened(self, kind);
+        if self.is_flag(Thumb) {
+            self.bump_pc(2); // ??
         }
 
-        let cpsr = self.regs.cpsr();
-        self.regs.set_mode(kind.mode());
+        let cpsr = self.cpsr();
+        self.set_mode(kind.mode());
 
-        self.regs.set_flag(Thumb, false);
-        self.regs.set_flag(IrqDisable, true);
+        self.set_flag(Thumb, false);
+        self.set_flag(IrqDisable, true);
         if let Exception::Reset | Exception::Fiq = kind {
-            self.debugger.log(
-                "exception-raised",
-                format!("An unusual exception got raised: {kind:?}"),
-                Severity::Warning,
-            );
-            self.regs.set_flag(FiqDisable, true);
+            self.set_flag(FiqDisable, true);
         }
 
-        let lr = self.regs.pc() - Address(self.current_instruction_size());
-        self.regs.set_lr(lr);
-        self.regs.set_spsr(cpsr);
-        self.set_pc(S::CONFIG.exception_vector_base_address + kind.vector());
+        let lr = self.pc() - Address(self.current_instruction_size());
+        self.set_lr(lr);
+        self.set_spsr(cpsr);
+        self.set_pc(bus, S::CONFIG.exception_vector_base_address + kind.vector());
     }
 
     /// Request an interrupt. Will check if the CPU will service it right away.
-    #[inline]
-    pub fn request_interrupt(&mut self, int: Interrupt) {
-        self.request_interrupt_with_index(int as u16);
+    pub fn request_interrupt(&mut self, bus: &mut impl Bus, int: Interrupt) {
+        self.request_interrupt_with_index(bus, int as u16);
     }
 
     /// Request an interrupt by index. Will check if the CPU will service it
     /// right away.
-    #[inline]
+    pub fn request_interrupt_with_index(&mut self, bus: &mut impl Bus, idx: u16) {
+        self.intr.if_.set_bit(idx, true);
+        self.check_if_interrupt(bus);
+    }
+
+    fn is_interrupt_pending(&self) -> bool {
+        self.intr.ime && !self.is_flag(IrqDisable) && (self.intr.ie & self.intr.if_) != 0
+    }
+
+    /// Check if an interrupt needs to be handled and jump to the handler if so.
+    /// Called on any events that might cause an interrupt to be triggered.
+    pub fn check_if_interrupt(&mut self, bus: &mut impl Bus) {
+        if self.is_interrupt_pending() {
+            self.bump_pc(4);
+            self.exception_occured(bus, Exception::Irq);
+        }
+    }
+
+    /// Immediately halt the CPU until an IRQ is pending
+    pub fn halt_on_irq(&mut self) {
+        self.is_halted = true;
+    }
+}
+
+impl<S: Bus> Cpu<S> {
+    /// Request an interrupt. Will check if the CPU will service it right away.
+    pub fn request_interrupt(&mut self, int: Interrupt) {
+        self.state.request_interrupt(&mut self.bus, int);
+    }
+
+    /// Request an interrupt by index. Will check if the CPU will service it
+    /// right away.
     pub fn request_interrupt_with_index(&mut self, idx: u16) {
-        self.if_.set_bit(idx, true);
-        self.check_if_interrupt();
+        self.state.request_interrupt_with_index(&mut self.bus, idx);
+    }
+
+    pub(crate) fn exception_occured(&mut self, kind: Exception) {
+        self.state.exception_occured(&mut self.bus, kind);
     }
 }
 
@@ -144,4 +158,12 @@ impl Exception {
         ];
         MODE[self as usize]
     }
+}
+
+#[derive(Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct InterruptController {
+    pub ime: bool,
+    pub ie: u32,
+    pub if_: u32,
 }

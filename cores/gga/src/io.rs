@@ -9,23 +9,23 @@
 use alloc::format;
 
 use ::common::{common::debugger::Severity, components::io::get_mmio_apply, numutil::NumExt, *};
-use arm_cpu::{Cpu, Interrupt};
+use armchair::{Address, Interrupt};
 use components::io::{section, set_mmio_apply, FAILED_WRITE};
 
 use crate::{
     addr::*,
     audio::{self, Apu},
+    cpu::GgaFullBus,
     hw::dma::Dmas,
-    GameGirlAdv,
 };
 
-impl GameGirlAdv {
-    pub fn get_mmio<T: NumExt>(&self, addr: u32) -> T {
-        get_mmio_apply(addr, |a| {
+impl GgaFullBus<'_> {
+    pub fn get_mmio<T: NumExt>(&self, addr: Address) -> T {
+        get_mmio_apply(addr.0, |a| {
             // Memory / IRQ control
-            io16!(a, IME, self.cpu.ime as u16);
-            io16!(a, IE, self.cpu.ie as u16);
-            io16!(a, IF, self.cpu.if_ as u16);
+            io16!(a, IME, self.cpu.intr.ime as u16);
+            io16!(a, IE, self.cpu.intr.ie as u16);
+            io16!(a, IF, self.cpu.intr.if_ as u16);
             io16!(a, WAITCNT, self.memory.waitcnt.into());
 
             // Timers + DMA
@@ -82,28 +82,28 @@ impl GameGirlAdv {
     }
 
     pub fn get_mmio_invalid(&self, a: u32) -> (u32, u32, u32) {
-        let value = self.invalid_read::<false>(0x400_0000);
+        let value = self.invalid_read::<false>(Address(0x400_0000));
         (value, a & 1, 2)
     }
 
-    pub fn set_mmio<T: NumExt>(&mut self, addr: u32, value: T) {
-        set_mmio_apply(addr, value, |a, v, m| {
+    pub fn set_mmio<T: NumExt>(&mut self, addr: Address, value: T) {
+        set_mmio_apply(addr.0, value, |a, v, m| {
             let s8 = section::<u8>(a, v, m);
             let s16 = section::<u16>(a, v, m);
             let s32 = section::<u32>(a, v, m);
 
             // Memory / IRQ control
             iow16!(a, IME, {
-                self.cpu.ime = s16.with(0).is_bit(0);
-                Cpu::check_if_interrupt(self);
+                self.cpu.intr.ime = s16.with(0).is_bit(0);
+                self.cpu.check_if_interrupt(self.bus);
             });
             iow16!(a, IE, {
-                self.cpu.ie = s16.with(self.cpu.ie.u16()).u32();
-                Cpu::check_if_interrupt(self);
+                self.cpu.intr.ie = s16.with(self.cpu.intr.ie.u16()).u32();
+                self.cpu.check_if_interrupt(self.bus);
             });
             iow16!(a, IF, {
-                self.cpu.if_ &= !s16.raw().u32();
-                Cpu::check_if_interrupt(self);
+                self.cpu.intr.if_ &= !s16.raw().u32();
+                self.cpu.check_if_interrupt(self.bus);
             });
             iow08!(a, HALTCNT, self.cpu.halt_on_irq());
             iow16!(a, WAITCNT, {
@@ -141,8 +141,8 @@ impl GameGirlAdv {
 
             // CGB audio
             if matches!(a & !1, 0x60..=0x80 | 0x84 | 0x86 | 0x8A | 0x90..=0x9F) {
-                let mut sched = audio::shed(&mut self.scheduler);
-                Apu::write_register_psg(&mut self.apu.cgb_chans, a.u16(), s8.raw(), &mut sched);
+                let mut sched = audio::shed(&mut self.bus.scheduler);
+                Apu::write_register_psg(&mut self.bus.apu.cgb_chans, a.u16(), s8.raw(), &mut sched);
                 return (0, 1);
             }
 
@@ -160,7 +160,7 @@ impl GameGirlAdv {
                     s16.apply(&mut self.timers.reload[idx])
                 );
                 iow16!(a, TM0CNT_H + (idx.u32() * 4), {
-                    self.timers.hi_write(&mut self.scheduler, idx, s16)
+                    self.bus.timers.hi_write(&mut self.bus.scheduler, idx, s16)
                 });
 
                 iow32!(
@@ -188,7 +188,7 @@ impl GameGirlAdv {
             // Serial
             iow16!(a, SIOCNT, {
                 if s16.raw() == 0x4003 {
-                    Cpu::request_interrupt(self, Interrupt::Serial);
+                    self.cpu.request_interrupt(self.bus, Interrupt::Serial);
                 }
             });
             iow16!(a, RCNT, s16.mask(0x41F0).apply_io(&mut self.serial.rcnt));
@@ -230,7 +230,8 @@ impl GameGirlAdv {
 
     fn invalidate_rom_cache(&mut self) {
         for i in (0x800_0000..0xDFF_FFFF).step_by(0x4000) {
-            self.cpu.cache.invalidate_address(i);
+            // TODO
+            // self.cpu.cache.invalidate_address(i);
         }
     }
 }

@@ -47,14 +47,6 @@ macro_rules! common_functions {
             self.restore_from(old_self);
         }
 
-        #[cfg(not(feature = "serde"))]
-        fn save_state(&mut self) -> ::alloc::vec::Vec<u8> {
-            ::alloc::vec::Vec::new()
-        }
-
-        #[cfg(not(feature = "serde"))]
-        fn load_state(&mut self, state: &[u8]) {}
-
         fn get_time(&self) -> ::common::Time {
             self.scheduler.now()
         }
@@ -69,10 +61,6 @@ macro_rules! common_functions {
 
         fn c_mut(&mut self) -> &mut ::common::Common {
             &mut self.c
-        }
-
-        fn as_any(&mut self) -> &mut dyn ::core::any::Any {
-            self
         }
     };
 }

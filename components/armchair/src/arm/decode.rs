@@ -6,7 +6,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
 use super::ArmVisitor;
-use crate::{memory::RelativeOffset, registers::Register};
+use crate::{memory::RelativeOffset, state::Register};
 
 #[derive(Copy, Clone)]
 pub struct ArmInst(u32);
@@ -349,7 +349,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         },
         "00110010_????" => |e, i| {
             e.arm_msr(
-                ArmOperandKind::Immediate((i.0 & 0xFF).rotate_right((i.0 >> 8) & 0xF) << 1),
+                ArmOperandKind::Immediate((i.0 & 0xFF).rotate_right(((i.0 >> 8) & 0xF) * 2)),
                 i.is_bit(19),
                 i.is_bit(16),
                 false,
@@ -357,7 +357,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         },
         "00110110_????" => |e, i| {
             e.arm_msr(
-                ArmOperandKind::Immediate((i.0 & 0xFF).rotate_right((i.0 >> 8) & 0xF) << 1),
+                ArmOperandKind::Immediate((i.0 & 0xFF).rotate_right(((i.0 >> 8) & 0xF) * 2)),
                 i.is_bit(19),
                 i.is_bit(16),
                 true,
@@ -548,8 +548,8 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         },
 
         // Memory: Single Data Swap (SWP)
-        "00010000_1001" => |e, i| e.arm_swp::<false>(i.reg(16), i.reg(12), i.reg(0)),
-        "00010100_1001" => |e, i| e.arm_swp::<true>(i.reg(16), i.reg(12), i.reg(0)),
+        "00010100_1001" => |e, i| e.arm_swp::<false>(i.reg(16), i.reg(12), i.reg(0)),
+        "00010000_1001" => |e, i| e.arm_swp::<true>(i.reg(16), i.reg(12), i.reg(0)),
 
         // Data Processing (ALU)
         // With Register
@@ -598,7 +598,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
             e.arm_alu_imm::<false>(
                 i.reg(16),
                 i.reg(12),
-                (i.0 & 0xFF).rotate_right(i.bits(8..=11)),
+                (i.0 & 0xFF).rotate_right(i.bits(8..=11) * 2),
                 i.safe_transmute(21..=24),
             )
         },
@@ -606,7 +606,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
             e.arm_alu_imm::<true>(
                 i.reg(16),
                 i.reg(12),
-                (i.0 & 0xFF).rotate_right(i.bits(8..=11)),
+                (i.0 & 0xFF).rotate_right(i.bits(8..=11) * 2),
                 i.safe_transmute(21..=24),
             )
         },
@@ -621,33 +621,82 @@ pub const fn arm_inst_to_lookup_idx(inst: u32) -> usize {
 
 #[cfg(test)]
 mod test {
-    use alloc::string::ToString;
+    use alloc::{format, string::ToString};
 
     use super::*;
 
     #[test]
     fn decode_b() {
-        disasm_ok((0b1010 << 24) | 0xFFF, "beq #0x3FFC");
-        disasm_ok((0b1010 << 24) | 0xFFFFFF, "beq #-0x4");
+        disasm_ok((0b1010 << 24) | 0xFFF, "beq $0x3FFC");
+        disasm_ok((0b1010 << 24) | 0xFFFFFF, "beq $-0x4");
     }
 
     #[test]
     fn decode_bl() {
-        disasm_ok((0b1011 << 24) | 0xFFF, "bleq #0x3FFC");
-        disasm_ok((0b1011 << 24) | 0xFFFFFF, "bleq #-0x4");
+        disasm_ok((0b1011 << 24) | 0xFFF, "bleq $0x3FFC");
+        disasm_ok((0b1011 << 24) | 0xFFFFFF, "bleq $-0x4");
     }
 
     #[test]
     fn decode_bx() {
-        disasm_ok(0b00010010111111111111_0001_1000, "bxeq r8");
-        disasm_ok(0b00010010111111111111_0010_1001, "bxeq r9");
+        disasm_block_register_variables("bx N", "E12FFF1N", true);
     }
 
     #[test]
     fn decode_blx() {
-        disasm_ok((0b1111_1010 << 24) | 0xFFF, "blx #0x3FFC");
-        disasm_ok((0b1111_1011 << 24) | 0xFFFFFF, "blx #-0x2");
-        disasm_ok(0b00010010111111111111_0011_1110, "blxeq lr");
+        disasm_ok((0b1111_1010 << 24) | 0xFFF, "blx $0x3FFC");
+        disasm_ok((0b1111_1011 << 24) | 0xFFFFFF, "blx $-0x2");
+        disasm_block_register_variables("blx N", "E12FFF3N", true);
+    }
+
+    #[test]
+    fn decode_alu_reg() {
+        disasm_block_register_variables("and Z, N, M", "E00NZ00M", true);
+        disasm_block_register_variables("eor Z, N, M, lsl $12", "E02NZ60M", true);
+        disasm_block_register_variables("sub Z, N, M, asr S", "E04NZS5M", false);
+        disasm_block_register_variables("rsbs Z, N, M, lsr $12", "E07NZ62M", true);
+        disasm_block_register_variables("adds Z, N, M, ror S", "E09NZS7M", false);
+        disasm_block_register_variables("adcs Z, N, M", "E0BNZ00M", true);
+        disasm_block_register_variables("sbcs Z, N, M", "E0DNZ00M", true);
+        disasm_block_register_variables("rscs Z, N, M", "E0FNZ00M", true);
+        disasm_block_register_variables("tsts r0, N, M", "E11N000M", true);
+        disasm_block_register_variables("teqs r0, N, M", "E13N000M", true);
+        disasm_block_register_variables("cmps r0, N, M", "E15N000M", true);
+        disasm_block_register_variables("cmns r0, N, M", "E17N000M", true);
+        disasm_block_register_variables("orr Z, N, M", "E18NZ00M", true);
+        disasm_block_register_variables("mov Z, r0, M", "E1A0Z00M", true);
+        disasm_block_register_variables("bic Z, N, M", "E1CNZ00M", true);
+        disasm_block_register_variables("mvn Z, r0, M", "E1E0Z00M", true);
+
+        disasm_ok(
+            0b000_0101_0_0000_1100_11111_01_0_0101,
+            "adceq r12, r0, r5, lsr $31",
+        );
+        disasm_ok(
+            0b000_0100_1_0000_1100_11111_10_0_0101,
+            "addeqs r12, r0, r5, asr $31",
+        );
+        disasm_ok(
+            0b000_1000_1_0000_0000_11110_11_1_0101,
+            "tsteqs r0, r0, r5, ror pc",
+        );
+        disasm_ok(
+            0b000_1101_0_1111_0000_11110_00_1_0101,
+            "moveq r0, pc, r5, lsl pc",
+        );
+    }
+
+    #[test]
+    fn decode_alu_imm() {
+        disasm_block_register_variables("and Z, N, $255", "E20NZ0FF", true);
+        disasm_block_register_variables("tsts r0, N, $255", "E31N00FF", true);
+        disasm_block_register_variables("mov Z, r0, $255", "E3A0Z0FF", true);
+
+        disasm_ok(0b001_0101_0_0000_1100_0000_00000001, "adceq r12, r0, $1");
+        disasm_ok(
+            0b001_1101_0_1111_0000_0001_00000001,
+            "moveq r0, pc, $1073741824",
+        );
     }
 
     #[test]
@@ -656,8 +705,169 @@ mod test {
         disasm_ok((0b1110_1111 << 24) | 0xFFF, "swi");
     }
 
+    #[test]
+    fn decode_mul() {
+        disasm_block_register_variables(
+            r"
+                mul Z, M, S
+                mla Z, M, S, N
+                umaal N, Z, M, S
+                umull N, Z, M, S
+                umlal N, Z, M, S
+                smull N, Z, M, S
+                smlal N, Z, M, S
+                muls Z, M, S
+                mlas Z, M, S, N
+                umulls N, Z, M, S
+                umlals N, Z, M, S
+                smulls N, Z, M, S
+                smlals N, Z, M, S
+            ",
+            "E00Z0S9ME02ZNS9ME04ZNS9ME08ZNS9ME0AZNS9ME0CZNS9ME0EZNS9ME01Z0S9ME03ZNS9ME09ZNS9ME0BZNS9ME0DZNS9ME0FZNS9M",
+            false
+        );
+    }
+
+    #[ignore] // TODO v5
+    #[test]
+    fn decode_hmul() {}
+
+    #[ignore] // TODO v5
+    #[test]
+    fn decode_clz() {
+        disasm_block_register_variables("clz Z, N", "E16FZF1N", true);
+    }
+
+    #[ignore] // TODO v5
+    #[test]
+    fn decode_q() {
+        disasm_block_register_variables(
+            r"
+                qadd Z, N, M
+                qsub Z, N, M
+                qdadd Z, N, M
+                qdsub Z, N, M
+            ",
+            "E10NZ05NE12NZ05NE14NZ05NE16NZ05N",
+            false,
+        );
+    }
+
+    #[test]
+    fn decode_mrs() {
+        disasm_block_register_variables(
+            r"
+                mrs Z, cpsr
+                mrs Z, spsr
+            ",
+            "E10FZ000E14FZ000",
+            false,
+        );
+    }
+
+    #[test]
+    fn decode_msr() {
+        disasm_block_register_variables(
+            r"
+                msr cpsr_ctrl_flg, Z
+                msr spsr_ctrl_flg, Z
+                msr cpsr_ctrl_flg, $0xFF
+                msr spsr_ctrl_flg, $0xFF
+            ",
+            "E129F00ZE169F00ZE329F0FFE369F0FF",
+            false,
+        );
+
+        disasm_ok(
+            0b00010_0_10_10011111_00000000_1000,
+            "msreq cpsr_ctrl_flg, r8",
+        );
+        disasm_ok(0b00010_1_10_10001111_00000000_1000, "msreq spsr_flg, r8");
+        disasm_ok(0b00110_1_10_10001111_0000_11111111, "msreq spsr_flg, $0xFF");
+    }
+
+    #[test]
+    fn decode_ldrstr() {
+        disasm_ok(0xE5915000, "ldr r5, [r1]");
+        disasm_ok(0xE5C23042, "strb r3, [r2, $0x42]");
+        disasm_ok(0xE6D27105, "ldrb r7, [r2], r5, lsl $2");
+        disasm_ok(0xE486F231, "str pc, [r6], $0x231");
+    }
+
+    #[test]
+    fn decode_ldrhstrh() {
+        disasm_ok(0xE1F150B0, "ldrh r5, [r1]!");
+        disasm_ok(0xE1C234B2, "strh r3, [r2, $0x42]");
+        disasm_ok(0xE09270B5, "ldrh r7, [r2], r5");
+        disasm_ok(0xE0C6F2B3, "strh pc, [r6], $0x23");
+    }
+
+    #[test]
+    fn decode_ldrstr_signed() {
+        disasm_ok(0xE1F150D0, "ldrsb r5, [r1]!");
+        disasm_ok(0xE09270F5, "ldrsh r7, [r2], r5");
+    }
+
+    #[ignore] // TODO v5
+    #[test]
+    fn decode_ldrdstrd() {}
+
+    #[test]
+    fn decode_stmldm() {
+        disasm_block(
+            r"
+                stmia r3!, {r0, r2}
+                stmda r2, {r0, r1, r2, r3, r4}
+                ldmib r3!, {r0, r2}
+                ldmdb sp, {r0, r1, r2, r3, r4}
+                ldmda r2, {r0, r1, r2, r3, r4} ^
+            ",
+            "E8A30005E802001FE9B30005E91D001FE852001F",
+        );
+    }
+
+    #[test]
+    fn decode_swp() {
+        disasm_block_register_variables(
+            r"
+                swp Z, M, [N]
+                swpb Z, M, [N]
+            ",
+            "E10NZ09ME14NZ09M",
+            false,
+        );
+    }
+
     fn disasm_ok(asm: u32, disasm: &str) {
         let inst = ArmInst(asm);
         assert_eq!(disasm, inst.to_string())
+    }
+
+    fn disasm_block(disasm: &str, hex: &str) {
+        let instructions = hex
+            .as_bytes()
+            .chunks(8)
+            .map(|c| u32::from_str_radix(str::from_utf8(c).unwrap(), 16).unwrap())
+            .map(|c| ArmInst(c).to_string());
+        for (actual, expected) in instructions.zip(disasm.lines().filter(|l| !l.is_empty())) {
+            assert_eq!(expected.trim_ascii_start(), actual)
+        }
+    }
+
+    fn disasm_block_register_variables(disasm: &str, hex: &str, allow_pc: bool) {
+        let range = if allow_pc { 0..16 } else { 0..15 };
+        for letter in ['Z', 'M', 'N', 'S'] {
+            if hex.contains(letter) {
+                for reg in range {
+                    let as_hex = format!("{reg:X}");
+                    let as_dec = format!("{}", Register(reg));
+                    let hex = hex.replace(letter, &as_hex);
+                    let disasm = disasm.replace(letter, &as_dec);
+                    disasm_block_register_variables(&disasm, &hex, allow_pc);
+                }
+                return;
+            }
+        }
+        disasm_block(disasm, hex);
     }
 }

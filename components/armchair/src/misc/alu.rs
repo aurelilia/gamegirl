@@ -8,7 +8,7 @@
 
 use common::numutil::NumExt;
 
-use crate::{interface::Bus, registers::Flag, Cpu};
+use crate::{interface::Bus, state::Flag, Cpu};
 
 impl<S: Bus> Cpu<S> {
     /// Logical/Arithmetic shift left
@@ -75,7 +75,7 @@ impl<S: Bus> Cpu<S> {
         if by == 0 && ZERO_IS_1 {
             let res = value
                 .rotate_right(1)
-                .set_bit(31, self.regs.is_flag(Flag::Carry));
+                .set_bit(31, self.state.is_flag(Flag::Carry));
             self.set_nzc::<SET_CPSR>(res, value.is_bit(0));
             res
         } else {
@@ -172,8 +172,8 @@ impl<S: Bus> Cpu<S> {
         if ENABLE {
             let neg = value & (1 << 31);
             let zero = ((value == 0) as u32) << 30;
-            self.regs
-                .set_cpsr_flags((self.regs.cpsr() & 0x3FFF_FFFF) | zero | neg);
+            self.state
+                .set_cpsr_flags((self.state.cpsr() & 0x3FFF_FFFF) | zero | neg);
         }
     }
 
@@ -182,15 +182,15 @@ impl<S: Bus> Cpu<S> {
             let neg = value & (1 << 31);
             let zero = ((value == 0) as u32) << 30;
             let carry = (carry as u32) << 29;
-            self.regs
-                .set_cpsr_flags((self.regs.cpsr() & 0x1FFF_FFFF) | zero | neg | carry);
+            self.state
+                .set_cpsr_flags((self.state.cpsr() & 0x1FFF_FFFF) | zero | neg | carry);
         }
     }
 
     fn set_flag_cpsr<const ENABLE: bool>(&mut self, flag: Flag, en: bool) {
         if ENABLE {
-            self.regs
-                .set_cpsr_flags(self.regs.cpsr().set_bit(flag as u16, en));
+            self.state
+                .set_cpsr_flags(self.state.cpsr().set_bit(flag as u16, en));
         }
     }
 }

@@ -11,9 +11,9 @@ use AdvEvent::*;
 
 use crate::{
     audio::{psg::GenApuEvent, Apu},
+    cpu::GgaFullBus,
     hw::timer::Timers,
     ppu::Ppu,
-    GameGirlAdv,
 };
 
 /// All scheduler events on the GGA.
@@ -34,18 +34,18 @@ pub enum AdvEvent {
     TimerOverflow(u8),
 }
 
-impl AdvEvent {
+impl GgaFullBus<'_> {
     /// Handle the event by delegating to the appropriate handler.
-    pub fn dispatch(self, gg: &mut GameGirlAdv, late_by: TimeS) {
-        match self {
-            PauseEmulation => gg.c.in_tick = false,
-            UpdateKeypad => gg.check_keycnt(),
-            PpuEvent(evt) => Ppu::handle_event(gg, evt, late_by),
+    pub fn dispatch(&mut self, event: AdvEvent, late_by: TimeS) {
+        match event {
+            PauseEmulation => self.bus.c.in_tick = false,
+            UpdateKeypad => self.check_keycnt(),
+            PpuEvent(evt) => Ppu::handle_event(self, evt, late_by),
             ApuEvent(evt) => {
-                let time = Apu::handle_event(gg, evt, late_by);
-                gg.scheduler.schedule(self, time);
+                let time = Apu::handle_event(self, evt, late_by);
+                self.scheduler.schedule(event, time);
             }
-            TimerOverflow(idx) => Timers::handle_overflow_event(gg, idx, late_by),
+            TimerOverflow(idx) => Timers::handle_overflow_event(self, idx, late_by),
         }
     }
 }

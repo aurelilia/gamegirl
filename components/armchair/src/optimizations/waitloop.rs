@@ -1,6 +1,8 @@
 use crate::{
+    interface::Bus,
     memory::{Address, RelativeOffset},
-    registers::Registers,
+    state::CpuState,
+    Cpu,
 };
 
 #[derive(Default)]
@@ -12,7 +14,11 @@ impl WaitloopData {
 
     /// To be called before a relative jump.
     /// Returns if CPU is still running.
-    pub fn on_jump(&mut self, regs: &Registers, dest: RelativeOffset) -> bool {
+    pub fn on_jump(&mut self, regs: &CpuState, dest: RelativeOffset) -> bool {
         true
     }
+}
+
+impl<S: Bus> Cpu<S> {
+    pub fn check_unsuspend(&mut self) {}
 }

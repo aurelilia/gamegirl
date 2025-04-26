@@ -16,7 +16,7 @@ use num_traits::FromPrimitive;
 use super::ThumbVisitor;
 use crate::{
     memory::{Address, RelativeOffset},
-    registers::{LowRegister, Register},
+    state::{LowRegister, Register},
 };
 
 #[derive(Copy, Clone)]
@@ -296,25 +296,25 @@ mod test {
 
     #[test]
     fn decode_thumb1() {
-        disasm_ok(0b000_00_11111_101_001, "lsl r1, r5, #31");
-        disasm_ok(0b000_01_10000_101_011, "lsr r3, r5, #16");
-        disasm_ok(0b000_10_00010_101_000, "asr r0, r5, #2");
+        disasm_ok(0b000_00_11111_101_001, "lsl r1, r5, $31");
+        disasm_ok(0b000_01_10000_101_011, "lsr r3, r5, $16");
+        disasm_ok(0b000_10_00010_101_000, "asr r0, r5, $2");
     }
 
     #[test]
     fn decode_thumb2() {
         disasm_ok(0b00011_00_000_101_001, "add r1, r5, r0");
         disasm_ok(0b00011_01_000_101_001, "sub r1, r5, r0");
-        disasm_ok(0b00011_10_010_101_011, "add r3, r5, #2");
-        disasm_ok(0b00011_11_100_101_001, "sub r1, r5, #4");
+        disasm_ok(0b00011_10_010_101_011, "add r3, r5, $2");
+        disasm_ok(0b00011_11_100_101_001, "sub r1, r5, $4");
     }
 
     #[test]
     fn decode_thumb3() {
-        disasm_ok(0b001_00_100_11111111, "mov r4, #0xFF");
-        disasm_ok(0b001_01_110_01111111, "cmp r6, #0x7F");
-        disasm_ok(0b001_10_111_00111111, "add r7, #0x3F");
-        disasm_ok(0b001_11_001_11110111, "sub r1, #0xF7");
+        disasm_ok(0b001_00_100_11111111, "mov r4, $0xFF");
+        disasm_ok(0b001_01_110_01111111, "cmp r6, $0x7F");
+        disasm_ok(0b001_10_111_00111111, "add r7, $0x3F");
+        disasm_ok(0b001_11_001_11110111, "sub r1, $0xF7");
     }
 
     #[test]
@@ -348,7 +348,7 @@ mod test {
 
     #[test]
     fn decode_thumb6() {
-        disasm_ok(0b01001_100_11111111, "ldr r4, [PC, #0x3FC]");
+        disasm_ok(0b01001_100_11111111, "ldr r4, [PC, $0x3FC]");
     }
 
     #[test]
@@ -361,7 +361,7 @@ mod test {
 
     #[test]
     fn decode_thumb8() {
-        disasm_ok(0b011_00_11111_110_101, "str r5, [r6, #0x7C]");
+        disasm_ok(0b011_00_11111_110_101, "str r5, [r6, $0x7C]");
         disasm_ok(0b0101_01_1_001_010_100, "ldsb r4, [r2, r1]");
         disasm_ok(0b0101_10_1_001_010_100, "ldrh r4, [r2, r1]");
         disasm_ok(0b0101_11_1_001_010_100, "ldsh r4, [r2, r1]");
@@ -369,34 +369,34 @@ mod test {
 
     #[test]
     fn decode_thumb9() {
-        disasm_ok(0b011_00_11111_110_101, "str r5, [r6, #0x7C]");
-        disasm_ok(0b011_01_00001_110_101, "ldr r5, [r6, #0x4]");
-        disasm_ok(0b011_10_11111_110_101, "strb r5, [r6, #0x1F]");
-        disasm_ok(0b011_11_00001_110_101, "ldrb r5, [r6, #0x1]");
+        disasm_ok(0b011_00_11111_110_101, "str r5, [r6, $0x7C]");
+        disasm_ok(0b011_01_00001_110_101, "ldr r5, [r6, $0x4]");
+        disasm_ok(0b011_10_11111_110_101, "strb r5, [r6, $0x1F]");
+        disasm_ok(0b011_11_00001_110_101, "ldrb r5, [r6, $0x1]");
     }
 
     #[test]
     fn decode_thumb10() {
-        disasm_ok(0b1000_0_00001_001_000, "strh r0, [r1, #0x2]");
-        disasm_ok(0b1000_1_00001_001_000, "ldrh r0, [r1, #0x2]");
+        disasm_ok(0b1000_0_00001_001_000, "strh r0, [r1, $0x2]");
+        disasm_ok(0b1000_1_00001_001_000, "ldrh r0, [r1, $0x2]");
     }
 
     #[test]
     fn decode_thumb11() {
-        disasm_ok(0b1001_0_100_00000001, "str r4, [sp, #0x4]");
-        disasm_ok(0b1001_1_100_00000001, "ldr r4, [sp, #0x4]");
+        disasm_ok(0b1001_0_100_00000001, "str r4, [sp, $0x4]");
+        disasm_ok(0b1001_1_100_00000001, "ldr r4, [sp, $0x4]");
     }
 
     #[test]
     fn decode_thumb12() {
-        disasm_ok(0b1010_0_000_00000010, "add r0, pc, #0x8");
-        disasm_ok(0b1010_1_000_00000011, "add r0, sp, #0xC");
+        disasm_ok(0b1010_0_000_00000010, "add r0, pc, $0x8");
+        disasm_ok(0b1010_1_000_00000011, "add r0, sp, $0xC");
     }
 
     #[test]
     fn decode_thumb13() {
-        disasm_ok(0b10110000_0_0000010, "add sp, #0x8");
-        disasm_ok(0b10110000_1_0000100, "add sp, #-0x10");
+        disasm_ok(0b10110000_0_0000010, "add sp, $0x8");
+        disasm_ok(0b10110000_1_0000100, "add sp, $-0x10");
     }
 
     #[test]
@@ -415,8 +415,8 @@ mod test {
 
     #[test]
     fn decode_thumb16() {
-        disasm_ok(0b1101_0000_11111111, "beq #-0x2");
-        disasm_ok(0b1101_1000_01111111, "bhi #0xFE");
+        disasm_ok(0b1101_0000_11111111, "beq $-0x2");
+        disasm_ok(0b1101_1000_01111111, "bhi $0xFE");
     }
 
     #[test]
@@ -426,15 +426,15 @@ mod test {
 
     #[test]
     fn decode_thumb18() {
-        disasm_ok(0b11100_11111111111, "b #-0x2");
-        disasm_ok(0b11100_00000000001, "b #0x2");
+        disasm_ok(0b11100_11111111111, "b $-0x2");
+        disasm_ok(0b11100_00000000001, "b $0x2");
     }
 
     #[test]
     fn decode_thumb19() {
-        disasm_ok(0b11110_00000000010, "mov lr, (pc + #0x2000)");
-        disasm_ok(0b11111_00000000010, "bl lr + #0x4");
-        disasm_ok(0b11101_00000000010, "blx lr + #0x4");
+        disasm_ok(0b11110_00000000010, "mov lr, (pc + $0x2000)");
+        disasm_ok(0b11111_00000000010, "bl lr + $0x4");
+        disasm_ok(0b11101_00000000010, "blx lr + $0x4");
     }
 
     fn disasm_ok(asm: u16, disasm: &str) {

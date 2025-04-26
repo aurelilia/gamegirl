@@ -1,16 +1,17 @@
 use core::{
     fmt::Display,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Mul, Neg, Not, Sub, SubAssign},
 };
 
 use common::numutil::NumExt;
 
 use crate::{
-    interface::{Bus, CpuVersion, RwType},
+    interface::{Bus, RwType},
     Cpu,
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Address(pub u32);
 
 impl Address {
@@ -36,6 +37,10 @@ impl Address {
         } else {
             RelativeOffset(-(self.0 as i32))
         }
+    }
+
+    pub fn align(self, to: u32) -> Address {
+        Address(self.0 & !(to - 1))
     }
 }
 
@@ -69,20 +74,38 @@ impl SubAssign for Address {
 
 impl Display for Address {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "#0x{:X}", self.0)
+        write!(f, "$0x{:X}", self.0)
     }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct RelativeOffset(pub i32);
 
+impl RelativeOffset {
+    pub const BYTE: RelativeOffset = RelativeOffset(1);
+    pub const HW: RelativeOffset = RelativeOffset(2);
+    pub const WORD: RelativeOffset = RelativeOffset(4);
+
+    pub fn mul(self, by: i32) -> RelativeOffset {
+        RelativeOffset(self.0 * by)
+    }
+}
+
 impl Display for RelativeOffset {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if self.0 >= 0 {
-            write!(f, "#0x{:X}", self.0)
+            write!(f, "$0x{:X}", self.0)
         } else {
-            write!(f, "#-0x{:X}", -self.0)
+            write!(f, "$-0x{:X}", -self.0)
         }
+    }
+}
+
+impl Neg for RelativeOffset {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        RelativeOffset(-self.0)
     }
 }
 
@@ -101,32 +124,16 @@ pub mod access {
 impl<S: Bus> Cpu<S> {
     /// Get the value at the given memory address and add to the system clock.
     pub fn read<T: RwType>(&mut self, addr: Address, access: Access) -> T::ReadOutput {
-        let time = self.bus.wait_time::<T>(addr, access);
-        self.bus.tick(time as u64);
-
-        let value = self.bus.get::<T>(addr).u32();
-        self.waitloop
+        let value = self.bus.read::<T>(&mut self.state, addr, access);
+        self.opt
+            .waitloop
             .on_read(addr, value.u32(), T::from_u32(u32::MAX).u32());
-
-        T::ReadOutput::from_u32(if !S::Version::IS_V5 && T::WIDTH == 2 {
-            // Special handling for halfwords on ARMv4
-            if addr.0.is_bit(0) {
-                // Unaligned
-                value.u32().rotate_right(8)
-            } else {
-                value.u32()
-            }
-        } else {
-            value
-        })
+        value
     }
 
     /// Set the value at the given memory address and add to the system clock.
     pub fn write<T: RwType>(&mut self, addr: Address, value: T, access: Access) {
-        let time = self.bus.wait_time::<T>(addr, access);
-        self.bus.tick(time as u64);
-        self.waitloop.on_write();
-        self.debugger.write_occurred(addr.0);
-        self.bus.set(addr, value);
+        self.opt.waitloop.on_write();
+        self.bus.write(&mut self.state, addr, value, access);
     }
 }

@@ -7,7 +7,7 @@ use decode::{
 use crate::{
     interface::{Bus, InstructionSet},
     memory::RelativeOffset,
-    registers::Register,
+    state::Register,
 };
 
 mod decode;

@@ -6,13 +6,13 @@ use common::{common::debugger::Severity, numutil::NumExt};
 use crate::{
     interface::{Bus, CpuVersion},
     memory::{access::NONSEQ, Access, Address, RelativeOffset},
-    registers::Register,
+    state::Register,
     Cpu, Exception,
 };
 
 impl<S: Bus> Cpu<S> {
     pub fn und_inst<T: UpperHex>(&mut self, code: T) {
-        self.debugger.log(
+        self.bus.debugger().log(
             "unknown-opcode",
             format!("Unknown opcode '0x{code:X}'"),
             Severity::Error,
@@ -23,7 +23,7 @@ impl<S: Bus> Cpu<S> {
     /// Idle for 1 cycle and set access type to non-sequential.
     pub fn idle_nonseq(&mut self) {
         self.bus.tick(1);
-        self.access_type = NONSEQ;
+        self.state.access_type = NONSEQ;
     }
 
     /// Calculate MUL instruction wait cycles for ARMv4 and add them to the
@@ -44,9 +44,9 @@ impl<S: Bus> Cpu<S> {
     /// Read a half-word from the bus (LE).
     /// If address is unaligned, do LDRSH behavior.
     pub fn read_hword_ldrsh(&mut self, addr: Address, kind: Access) -> u32 {
-        let time = self.bus.wait_time::<u16>(addr, kind);
+        let time = self.bus.wait_time::<u16>(&mut self.state, addr, kind);
         self.bus.tick(time as u64);
-        let val = self.bus.get::<u16>(addr).u32();
+        let val = self.bus.get::<u16>(&mut self.state, addr).u32();
         if !S::Version::IS_V5 && addr.0.is_bit(0) {
             // Unaligned on ARMv4
             (val >> 8) as i8 as i32 as u32
@@ -74,7 +74,7 @@ impl<S: Bus> Cpu<S> {
     /// empty, which causes R15 to be loaded/stored and Rb to be
     /// incremented/decremented by 0x40.
     pub fn on_empty_rlist(&mut self, rb: Register, str: bool, up: bool, before: bool) {
-        let addr = Address(self.regs[rb]);
+        let addr = Address(self.state[rb]);
         self.set_reg(rb, (addr.add_signed(Address(0x40), up)).0);
 
         if !S::Version::IS_V5 && str {
@@ -84,7 +84,7 @@ impl<S: Bus> Cpu<S> {
                 (false, true) => addr - Address(0x40),
                 (false, false) => addr - Address(0x3C),
             };
-            let value = self.regs.pc().0 + self.current_instruction_size();
+            let value = self.state.pc().0 + self.state.current_instruction_size();
             self.write::<u32>(addr, value, NONSEQ);
         } else if !S::Version::IS_V5 {
             let val = self.read::<u32>(addr, NONSEQ);
@@ -94,7 +94,7 @@ impl<S: Bus> Cpu<S> {
 
     /// Perform a relative jump.
     pub fn relative_jump(&mut self, offset: RelativeOffset) {
-        self.is_halted = !self.waitloop.on_jump(&self.regs, offset);
-        self.set_pc(self.regs.pc().add_rel(offset));
+        self.state.is_halted = !self.opt.waitloop.on_jump(&self.state, offset);
+        self.set_pc(self.state.pc().add_rel(offset));
     }
 }

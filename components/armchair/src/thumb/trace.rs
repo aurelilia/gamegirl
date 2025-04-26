@@ -7,7 +7,7 @@ use super::{
 use crate::{
     memory::{Address, RelativeOffset},
     misc::{self, print_op},
-    registers::{LowRegister, Register},
+    state::{LowRegister, Register},
 };
 
 impl Display for ThumbInst {
@@ -28,7 +28,7 @@ impl<'f1, 'f2> ThumbVisitor for ThumbFormat<'f1, 'f2> {
     }
 
     fn thumb_alu_imm<const KIND: Thumb1Op>(&mut self, d: LowRegister, s: LowRegister, n: u32) {
-        write!(self.f, "{} {d}, {s}, #{n}", print_op(KIND)).unwrap()
+        write!(self.f, "{} {d}, {s}, ${n}", print_op(KIND)).unwrap()
     }
 
     fn thumb_2_reg<const KIND: Thumb2Op>(
@@ -41,7 +41,7 @@ impl<'f1, 'f2> ThumbVisitor for ThumbFormat<'f1, 'f2> {
     }
 
     fn thumb_3<const KIND: Thumb3Op>(&mut self, d: LowRegister, n: u32) {
-        write!(self.f, "{} {d}, #0x{n:X}", print_op(KIND)).unwrap()
+        write!(self.f, "{} {d}, $0x{n:X}", print_op(KIND)).unwrap()
     }
 
     fn thumb_alu<const KIND: Thumb4Op>(&mut self, d: LowRegister, s: LowRegister) {

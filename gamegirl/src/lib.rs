@@ -147,10 +147,6 @@ impl Core for Dummy {
         None
     }
 
-    fn as_any(&mut self) -> &mut dyn core::any::Any {
-        self
-    }
-
     fn get_rom(&self) -> Vec<u8> {
         Vec::new()
     }

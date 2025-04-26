@@ -12,6 +12,7 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
+use armchair::Address;
 use common::{
     components::storage::{GameCart, GameSave},
     numutil::NumExt,
@@ -70,9 +71,9 @@ impl Cartridge {
         }
     }
 
-    pub fn is_eeprom_at(&self, addr: u32) -> bool {
+    pub fn is_eeprom_at(&self, addr: Address) -> bool {
         matches!(self.save_type, SaveType::Eeprom(_))
-            && (self.rom.len() <= 16 * (KB * KB) || addr >= 0x0DFF_FF00)
+            && (self.rom.len() <= 16 * (KB * KB) || addr.0 >= 0x0DFF_FF00)
     }
 
     pub fn load_rom(&mut self, rom: Vec<u8>) {
@@ -246,9 +247,9 @@ impl Eeprom {
         }
     }
 
-    pub fn dma3_started(&mut self, dst: u32, cnt: u32) {
+    pub fn dma3_started(&mut self, dst: Address, cnt: u32) {
         // Try to detect EEPROM size
-        if self.size == EepromSize::Unknown && (0xD00_0000..=0xDFF_FFFF).contains(&dst) {
+        if self.size == EepromSize::Unknown && (0xD00_0000..=0xDFF_FFFF).contains(&dst.0) {
             self.size = match cnt {
                 9 | 73 => EepromSize::E512,
                 17 | 81 => EepromSize::E8k,

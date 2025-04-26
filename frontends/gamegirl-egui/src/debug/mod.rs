@@ -33,7 +33,7 @@ type Windows<T> = &'static [(&'static str, DbgFn<T>)];
 pub fn menu(app: &mut App, ui: &mut Ui) {
     let lock = app.core.clone();
     let mut core = lock.lock().unwrap();
-    let core = core.as_any();
+    let core = (&mut **core) as &mut dyn Any;
 
     maybe_system::<GameGirl>(core, |_| ggc::ui_menu(app, ui));
     maybe_system::<GameGirlAdv>(core, |_| gga::ui_menu(app, ui));
@@ -46,7 +46,7 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
 pub fn render(app: &mut App, ctx: &Context) {
     let lock = app.core.clone();
     let mut core = lock.lock().unwrap();
-    let core = core.as_any();
+    let core = (&mut **core) as &mut dyn Any;
 
     maybe_system::<GameGirl>(core, |c| render_inner(ggc::get_windows(), c, app, ctx));
     maybe_system::<GameGirlAdv>(core, |c| render_inner(gga::get_windows(), c, app, ctx));

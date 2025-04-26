@@ -15,6 +15,7 @@ use eframe::{
 use gamegirl::{
     common::{numutil::NumExt, Core},
     gga::{
+        armchair::{interface::Bus, state::Register, Address},
         hw::timer::{self},
         ppu::registers::{Window, WindowCtrl},
         GameGirlAdv,
@@ -57,55 +58,70 @@ pub fn get_windows() -> Windows<GameGirlAdv> {
 fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
-            ui.set_min_width(300.0);
+            ui.set_min_width(600.0);
             // Account for prefetch
-            let mut pc = gg.cpu.pc().wrapping_sub(gg.cpu.inst_size());
+            let mut pc = gg.cpu.state.pc() - gg.cpu.state.next_instruction_offset();
+            let inst = gg.cpu.bus.get(&mut gg.cpu.state, pc);
             ui.add(
                 Label::new(
-                    RichText::new(format!("0x{:08X} {}", pc, gg.get_inst_mnemonic(pc)))
-                        .monospace()
-                        .color(Colour::GREEN),
+                    RichText::new(format!(
+                        "0x{:08X} {}",
+                        pc.0,
+                        gg.cpu.state.get_inst_mnemonic(inst)
+                    ))
+                    .monospace()
+                    .color(Colour::GREEN),
                 )
                 .extend(),
             );
-            pc += gg.cpu.inst_size();
+            pc += gg.cpu.state.next_instruction_offset();
             for _ in 0..0xF {
+                let inst = gg.cpu.bus.get(&mut gg.cpu.state, pc);
                 ui.add(
                     Label::new(
-                        RichText::new(format!("0x{:08X} {}", pc, gg.get_inst_mnemonic(pc)))
-                            .monospace(),
+                        RichText::new(format!(
+                            "0x{:08X} {}",
+                            pc.0,
+                            gg.cpu.state.get_inst_mnemonic(inst)
+                        ))
+                        .monospace(),
                     )
                     .extend(),
                 );
-                pc += gg.cpu.inst_size();
+                pc += gg.cpu.state.next_instruction_offset();
             }
         });
         ui.separator();
         ui.vertical(|ui| {
             ui.add(Label::new(RichText::new("Stack:").monospace()).extend());
-            let mut sp = gg.cpu.sp();
+            let mut sp = gg.cpu.state.sp();
             for _ in 0..0xF {
                 ui.add(
                     Label::new(
-                        RichText::new(format!("0x{:08X} - {:08X}", sp, gg.get::<u32>(sp)))
-                            .monospace(),
+                        RichText::new(format!(
+                            "{sp} - {:08X}",
+                            gg.cpu.bus.get::<u32>(&mut gg.cpu.state, sp)
+                        ))
+                        .monospace(),
                     )
                     .extend(),
                 );
-                sp = sp.wrapping_add(4);
+                sp += Address::WORD;
             }
         });
         ui.separator();
 
         ui.vertical(|ui| {
             for reg in 0..=12 {
-                ui.monospace(format!("R{:02} = {:08X}", reg, gg.cpu.reg(reg)));
+                ui.monospace(format!("R{:02} = {:08X}", reg, gg.cpu.state[Register(reg)]));
             }
-            ui.monospace(format!("SP  = {:08X}", gg.cpu.sp()));
-            ui.monospace(format!("LR  = {:08X}", gg.cpu.lr()));
+            ui.monospace(format!("SP  = {:08X}", gg.cpu.state.sp().0));
+            ui.monospace(format!("LR  = {:08X}", gg.cpu.state.lr().0));
             ui.add(
-                Label::new(RichText::new(format!("PC  = {:08X} ", gg.cpu.pc())).monospace())
-                    .extend(),
+                Label::new(
+                    RichText::new(format!("PC  = {:08X} ", gg.cpu.state.pc().0)).monospace(),
+                )
+                .extend(),
             );
         });
     });
@@ -114,14 +130,14 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.monospace("       NZCO                    IFT");
-            ui.monospace(format!("CPSR = {:032b}", gg.cpu.cpsr));
-            ui.monospace(format!("SPSR = {:032b}", gg.cpu.spsr()));
+            ui.monospace(format!("CPSR = {:032b}", gg.cpu.state.cpsr()));
+            ui.monospace(format!("SPSR = {:032b}", gg.cpu.state.spsr()));
         });
         ui.separator();
         ui.vertical(|ui| {
             ui.monospace("       GKDDDDSTTTTCHV");
-            ui.monospace(format!("IF = {:016b}", gg.cpu.if_));
-            ui.monospace(format!("IE = {:016b}", gg.cpu.ie));
+            ui.monospace(format!("IF = {:016b}", gg.cpu.state.intr.if_));
+            ui.monospace(format!("IE = {:016b}", gg.cpu.state.intr.ie));
         });
     });
     ui.separator();
@@ -131,9 +147,9 @@ fn debugger(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
             gg.advance();
         }
         ui.checkbox(&mut gg.c.debugger.running, "Running");
-        ui.checkbox(&mut gg.cpu.is_halted, "CPU Halted");
+        ui.checkbox(&mut gg.cpu.state.is_halted, "CPU Halted");
 
-        if gg.cpu.ime {
+        if gg.cpu.state.intr.ime {
             ui.label("(IME on)");
         }
     });

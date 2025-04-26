@@ -14,7 +14,9 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice};
 
-use crate::{memory::Memory, GameGirlAdv};
+use armchair::Address;
+
+use crate::{cpu::GgaFullBus, memory::Memory};
 
 const MAX_CH: usize = 12;
 const TOTAL_FRAME_COUNT: u32 = 7;
@@ -101,10 +103,10 @@ pub struct MusicPlayer {
 }
 
 impl MusicPlayer {
-    pub fn pc_match(gg: &mut GameGirlAdv) {
-        let addr = gg.get(0x300_7FF0);
+    pub fn pc_match(gg: &mut GgaFullBus<'_>) {
+        let addr = gg.get(Address(0x300_7FF0));
         if addr != 0 {
-            gg.apu.mplayer.sound_main_ram(&mut gg.memory, addr);
+            gg.bus.apu.mplayer.sound_main_ram(&mut gg.bus.memory, addr);
         }
     }
 

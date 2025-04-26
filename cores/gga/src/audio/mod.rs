@@ -24,7 +24,7 @@ use mplayer::MusicPlayer;
 use psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
 
 use super::scheduling::AdvEvent;
-use crate::{addr::FIFO_A_L, hw::dma::Dmas, scheduling::ApuEvent, GameGirlAdv, CPU_CLOCK};
+use crate::{addr::FIFO_A_L, cpu::GgaFullBus, hw::dma::Dmas, scheduling::ApuEvent, CPU_CLOCK};
 
 const SAMPLE_EVERY_N_CLOCKS: TimeS = CPU_CLOCK as TimeS / 2i64.pow(15);
 const GG_OFFS: TimeS = 4;
@@ -90,7 +90,7 @@ pub struct Apu {
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this
     /// function returns the time after which the event should repeat.
-    pub fn handle_event(gg: &mut GameGirlAdv, event: ApuEvent, late_by: TimeS) -> TimeS {
+    pub fn handle_event(gg: &mut GgaFullBus<'_>, event: ApuEvent, late_by: TimeS) -> TimeS {
         match event {
             // We multiply the time by 4 since the generic APU expects GG t-cycles,
             // which are 1/4th of GGA CPU clock
@@ -108,7 +108,7 @@ impl Apu {
         }
     }
 
-    pub fn init_scheduler(gg: &mut GameGirlAdv) {
+    pub fn init_scheduler(gg: &mut GgaFullBus<'_>) {
         GenericApu::init_scheduler(&mut shed(&mut gg.scheduler));
         gg.scheduler.schedule(
             AdvEvent::ApuEvent(ApuEvent::PushSample),
@@ -118,7 +118,7 @@ impl Apu {
             .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
     }
 
-    fn push_output(gg: &mut GameGirlAdv) {
+    fn push_output(gg: &mut GgaFullBus<'_>) {
         if !gg.apu.cgb_chans.power {
             // Master enable, also applies to DMA channels
             gg.c.audio_buffer.input[0].push(0.);
@@ -135,7 +135,7 @@ impl Apu {
         let a: i16;
         let b: i16;
         if gg.apu.hle_hook != 0 {
-            let mplayer = gg.apu.mplayer.read_sample(&mut gg.memory);
+            let mplayer = gg.bus.apu.mplayer.read_sample(&mut gg.bus.memory);
             a = (mplayer[0] * 512.) as i16 * a_vol_mul;
             b = (mplayer[1] * 512.) as i16 * b_vol_mul;
         } else {
@@ -183,10 +183,10 @@ impl Apu {
 impl Apu {
     /// Timer handling this channel overflowed, go to next sample and request
     /// more samples if needed
-    pub fn timer_overflow<const CH: usize>(gg: &mut GameGirlAdv) {
+    pub fn timer_overflow<const CH: usize>(gg: &mut GgaFullBus<'_>) {
         if let Some(next) = gg.apu.buffers[CH].pop_front() {
             if gg.apu.hle_hook != 0 && CH == 0 {
-                let mplayer = gg.apu.mplayer.read_sample(&mut gg.memory);
+                let mplayer = gg.bus.apu.mplayer.read_sample(&mut gg.bus.memory);
                 gg.apu.current_samples = [(mplayer[0] * 512.) as i16, (mplayer[1] * 512.) as i16];
             } else {
                 gg.apu.current_samples[CH] = next as i16 * 2;

@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::Interrupt;
 use common::{
     components::{io::IoSection, scheduler::Scheduler},
     numutil::NumExt,
@@ -14,7 +14,7 @@ use common::{
 };
 use modular_bitfield::{bitfield, specifiers::*};
 
-use crate::{audio::Apu, scheduling::AdvEvent, GameGirlAdv};
+use crate::{audio::Apu, cpu::GgaFullBus, scheduling::AdvEvent};
 
 pub const DIVS: [u16; 4] = [1, 64, 256, 1024];
 
@@ -53,7 +53,7 @@ pub struct Timers {
 
 impl Timers {
     /// Handle overflow of a scheduled timer.
-    pub fn handle_overflow_event(gg: &mut GameGirlAdv, idx: u8, late_by: TimeS) {
+    pub fn handle_overflow_event(gg: &mut GgaFullBus<'_>, idx: u8, late_by: TimeS) {
         Self::overflow(gg, idx, -late_by);
     }
 
@@ -134,14 +134,15 @@ impl Timers {
     }
 
     /// Handle an overflow and return time until next.
-    fn overflow(gg: &mut GameGirlAdv, idx: u8, offset: TimeS) {
+    fn overflow(gg: &mut GgaFullBus<'_>, idx: u8, offset: TimeS) {
         let ctrl = gg.timers.control[idx.us()];
         let reload = gg.timers.reload[idx.us()];
         let mut value = Self::time_read_inner(&gg.timers, idx.us(), gg.scheduler.now());
 
         // Fire IRQ if enabled
         if ctrl.irq_en() {
-            Cpu::request_interrupt_idx(gg, Interrupt::Timer0 as u16 + idx.u16());
+            gg.cpu
+                .request_interrupt_with_index(gg.bus, Interrupt::Timer0 as u16 + idx.u16());
         }
 
         if idx < 2 {
@@ -170,8 +171,8 @@ impl Timers {
 
         if !ctrl.count_up() {
             Self::start_timer(
-                &mut gg.timers,
-                &mut gg.scheduler,
+                &mut gg.bus.timers,
+                &mut gg.bus.scheduler,
                 idx.us(),
                 ctrl,
                 offset,
@@ -188,7 +189,7 @@ impl Timers {
 
     /// Increment a timer. Used for cascading timers.
     #[inline]
-    fn inc_timer(gg: &mut GameGirlAdv, idx: usize) {
+    fn inc_timer(gg: &mut GgaFullBus<'_>, idx: usize) {
         let new = gg.timers.counters[idx].checked_add(1);
         match new {
             Some(val) => gg.timers.counters[idx] = val,

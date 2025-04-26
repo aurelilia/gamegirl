@@ -9,11 +9,11 @@
 use alloc::boxed::Box;
 use core::mem;
 
-use arm_cpu::{
+use armchair::{
     access::{CODE, NONSEQ, SEQ},
-    interface::{ArmSystem, RwType},
-    registers::Flag,
-    Access,
+    interface::{Bus, RwType},
+    state::Flag,
+    Access, Address,
 };
 use common::{
     components::thin_pager::{ThinPager, RO, RW},
@@ -22,11 +22,14 @@ use common::{
 use modular_bitfield::{bitfield, specifiers::*};
 
 use crate::{
+    cpu::GgaFullBus,
     hw::{bios::BIOS, input::KeyControl},
-    GameGirlAdv,
+    GgaBus,
 };
 
 pub const KB: usize = 1024;
+
+pub const MAX_ADDRESS: Address = Address(0xFFF_FFFF);
 
 #[bitfield]
 #[repr(u16)]
@@ -56,8 +59,8 @@ pub struct Prefetch {
     pub restart: bool,
     thumb: bool,
 
-    head: u32,
-    tail: u32,
+    head: Address,
+    tail: Address,
 
     count: u32,
     countdown: i16,
@@ -85,21 +88,21 @@ pub struct Memory {
     wait_other: [u16; 32],
 }
 
-impl GameGirlAdv {
-    pub fn get<T: RwType>(&self, addr_unaligned: u32) -> T {
-        let addr = addr_unaligned & !(T::WIDTH - 1);
-        if addr > 0xFFF_FFFF {
+impl GgaFullBus<'_> {
+    pub fn get<T: RwType>(&self, addr_unaligned: Address) -> T {
+        let addr = addr_unaligned.align(T::WIDTH);
+        if addr > MAX_ADDRESS {
             return T::from_u32(self.invalid_read::<false>(addr));
         }
-        if let Some(read) = self.memory.pager.read(addr) {
+        if let Some(read) = self.memory.pager.read(addr.0) {
             return read;
         }
 
-        let region = addr >> 24;
-        let a = addr.us();
+        let region = addr.0 >> 24;
+        let a = addr.0.us();
         match region {
             // Basic
-            0x00 => self.bios_read(a),
+            0x00 => self.bios_read(addr),
             0x05 => self.ppu.palette.get_wrap(a),
             0x07 => self.ppu.oam.get_wrap(a),
 
@@ -123,7 +126,7 @@ impl GameGirlAdv {
             // Flash / SRAM
             0x0E | 0x0F => {
                 // Reading [half]words causes the byte to be repeated
-                let byte = self.cart.read_ram_byte(addr_unaligned.us() & 0xFFFF);
+                let byte = self.cart.read_ram_byte(addr_unaligned.0.us() & 0xFFFF);
                 match T::WIDTH {
                     1 => T::from_u8(byte),
                     2 => T::from_u16(hword(byte, byte)),
@@ -144,12 +147,12 @@ impl GameGirlAdv {
         }
     }
 
-    pub(super) fn invalid_read<const WORD: bool>(&self, addr: u32) -> u32 {
-        let shift = (addr & 3) << 3;
-        let value = match addr {
+    pub(super) fn invalid_read<const WORD: bool>(&self, addr: Address) -> u32 {
+        let shift = (addr.0 & 3) << 3;
+        let value = match addr.0 {
             0x0800_0000..=0x0DFF_FFFF => {
                 // Out of bounds ROM read
-                let addr = (addr & !if WORD { 3 } else { 1 }) >> 1;
+                let addr = (addr.0 & !if WORD { 3 } else { 1 }) >> 1;
                 let low = addr.u16();
                 return word(low, low.wrapping_add(1));
             }
@@ -158,29 +161,31 @@ impl GameGirlAdv {
 
             _ => {
                 // Open bus
-                if self.cpu.pc() > 0xFFF_FFFF
-                    || (self.cpu.pc() > 0x3FFF && self.cpu.pc() < 0x200_0000)
-                    || (self.cpu.pc() >= 0x400_0000 && self.cpu.pc() < 0x500_0000)
+                let pc_addr = self.cpu.pc();
+                let pc = pc_addr.0;
+                if pc > 0xFFF_FFFF
+                    || (0x3FFF..0x200_0000).contains(&pc)
+                    || (0x400_0000..0x500_0000).contains(&pc)
                 {
                     return 0;
                 }
 
-                if !self.cpu.flag(Flag::Thumb) {
+                if !self.cpu.is_flag(Flag::Thumb) {
                     // Simple case: just read PC in ARM mode
                     self.get(self.cpu.pc())
                 } else {
                     // Thumb mode... complicated.
                     // https://problemkaputt.de/gbatek.htm#gbaunpredictablethings
-                    match self.cpu.pc() >> 24 {
+                    match pc >> 24 {
                         0x02 | 0x05 | 0x06 | 0x08..=0xD => {
                             let hword = self.get(self.cpu.pc());
                             word(hword, hword)
                         }
-                        _ if self.cpu.pc().is_bit(1) => {
-                            word(self.get(self.cpu.pc() - 2), self.get(self.cpu.pc()))
+                        _ if pc.is_bit(1) => {
+                            word(self.get(pc_addr - Address::HW), self.get(pc_addr))
                         }
-                        0x00 | 0x07 => word(self.get(self.cpu.pc()), self.get(self.cpu.pc() + 2)),
-                        0x03 => word(self.get(self.cpu.pc()), self.get(self.cpu.pc() - 2)),
+                        0x00 | 0x07 => word(self.get(pc_addr), self.get(pc_addr + Address::HW)),
+                        0x03 => word(self.get(pc_addr), self.get(pc_addr - Address::HW)),
 
                         _ => unreachable!(),
                     }
@@ -190,34 +195,35 @@ impl GameGirlAdv {
         value >> shift
     }
 
-    pub fn set<T: RwType>(&mut self, addr_unaligned: u32, value: T) {
-        let addr = addr_unaligned & !(T::WIDTH - 1);
-        if addr > 0xFFF_FFFF {
+    pub fn set<T: RwType>(&mut self, addr_unaligned: Address, value: T) {
+        let addr = addr_unaligned.align(T::WIDTH);
+        if addr > MAX_ADDRESS {
             return;
         }
 
-        if let Some(write) = self.memory.pager.write(addr) {
-            self.cpu.cache.invalidate_address(addr);
+        if let Some(write) = self.memory.pager.write(addr.0) {
+            // TODO
+            // self.cpu.cache.invalidate_address(addr);
             *write = value;
             return;
         }
 
-        let region = addr >> 24;
-        let a = addr.us();
+        let region = addr.0 >> 24;
+        let a = addr.0.us();
         match region {
             // MMIO
             0x04 => self.set_mmio(addr, value),
             // VRAM with weird mirroring and byte write behavior
             0x05..=0x07 if T::WIDTH == 1 => {
                 let value = value.u8();
-                match addr {
+                match addr.0 {
                     0x0500_0000..=0x0600_FFFF if !self.ppu.regs.is_bitmap_mode() => {
-                        self.set(addr & !1, hword(value, value))
+                        self.set(addr.align(2), hword(value, value))
                     }
-                    0x0500_0000..=0x0601_3FFF => self.set(addr & !1, hword(value, value)),
-                    0x0602_0000..=0x06FF_FFFF if addr & 0x1_FFFF < 0x1_0000 => {
+                    0x0500_0000..=0x0601_3FFF => self.set(addr.align(2), hword(value, value)),
+                    0x0602_0000..=0x06FF_FFFF if addr.0 & 0x1_FFFF < 0x1_0000 => {
                         // Only BG VRAM gets written to, OBJ VRAM is ignored
-                        self.set(addr & !1, hword(value, value));
+                        self.set(addr.align(2), hword(value, value));
                     }
                     _ => (), // Ignored
                 };
@@ -242,28 +248,29 @@ impl GameGirlAdv {
             0x0E | 0x0F => {
                 let byte = match T::WIDTH {
                     1 => value.u8(),
-                    2 if addr_unaligned.is_bit(0) => value.u16().high(),
+                    2 if addr_unaligned.0.is_bit(0) => value.u16().high(),
                     2 => value.u8(),
                     4 => {
-                        let byte_shift = (addr_unaligned & 3) * 8;
+                        let byte_shift = (addr_unaligned.0 & 3) * 8;
                         (value.u32() >> byte_shift).u8()
                     }
                     _ => unreachable!(),
                 };
-                self.cart.write_ram_byte(addr_unaligned.us() & 0xFFFF, byte);
+                self.cart
+                    .write_ram_byte(addr_unaligned.0.us() & 0xFFFF, byte);
             }
 
             _ => (),
         }
     }
 
-    fn bios_read<T: NumExt>(&self, addr: usize) -> T {
-        if addr >= 0x4000 {
-            return T::from_u32(self.invalid_read::<false>(addr as u32));
+    fn bios_read<T: NumExt>(&self, addr: Address) -> T {
+        if addr >= Address(0x4000) {
+            return T::from_u32(self.invalid_read::<false>(addr));
         }
 
-        if self.cpur().pc() < 0x100_0000 {
-            self.memory.bios.get_wrap(addr)
+        if self.cpu.pc() < Address(0x100_0000) {
+            self.memory.bios.get_wrap(addr.0.us())
         } else {
             T::from_u32(self.memory.bios_value)
         }
@@ -273,31 +280,33 @@ impl GameGirlAdv {
     pub fn init_memory(&mut self) {
         self.update_wait_times();
 
-        let pager = &mut self.memory.pager;
+        let bus = &mut self.bus;
+        let pager = &mut bus.memory.pager;
         pager.init(0xFFF_FFFF);
-        pager.map(&self.memory.ewram, 0x200_0000..0x300_0000, RW);
-        pager.map(&self.memory.iwram, 0x300_0000..0x400_0000, RW);
+        pager.map(&bus.memory.ewram, 0x200_0000..0x300_0000, RW);
+        pager.map(&bus.memory.iwram, 0x300_0000..0x400_0000, RW);
         // PAL, OAM, Writes and VRAM mirroring are in the slow path
-        pager.map(&self.ppu.vram, 0x600_0000..0x601_8000, RO);
+        pager.map(&bus.ppu.vram, 0x600_0000..0x601_8000, RO);
         // Cap at end due to EEPROM
-        let rom_len = self.cart.rom.len().u32();
-        pager.map(&self.cart.rom, 0x800_0000..(0x800_0000 + rom_len), RO);
-        pager.map(&self.cart.rom, 0xA00_0000..(0xA00_0000 + rom_len), RO);
+        let rom_len = bus.cart.rom.len().u32();
+        pager.map(&bus.cart.rom, 0x800_0000..(0x800_0000 + rom_len), RO);
+        pager.map(&bus.cart.rom, 0xA00_0000..(0xA00_0000 + rom_len), RO);
         pager.map(
-            &self.cart.rom,
+            &bus.cart.rom,
             0xC00_0000..(0xC00_0000 + rom_len).min(0x0DFF_C000),
             RO,
         );
 
         if self.c.config.cached_interpreter {
-            self.cpu.cache.init();
+            // TODO
+            // self.cpu.cache.init();
         }
     }
 
     /// Get wait time for a given address.
     #[inline]
-    pub fn wait_time<T: NumExt + 'static>(&mut self, addr: u32, ty: Access) -> u16 {
-        let region = addr.us() >> 24;
+    pub fn wait_time<T: NumExt + 'static>(&mut self, addr: Address, ty: Access) -> u16 {
+        let region = addr.0.us() >> 24;
         let wait = self.wait_time_inner::<T>(addr, ty);
         match region {
             0x08..=0x0D => self.handle_prefetch::<T>(addr, ty, wait),
@@ -312,7 +321,7 @@ impl GameGirlAdv {
 
     fn handle_prefetch<T: NumExt + 'static>(
         &mut self,
-        addr: u32,
+        addr: Address,
         ty: Access,
         mut regular: u16,
     ) -> u16 {
@@ -326,7 +335,7 @@ impl GameGirlAdv {
             // Value is head of buffer
             if pf.count != 0 && addr == pf.head {
                 pf.count -= 1;
-                pf.head += T::WIDTH;
+                pf.head += Address(T::WIDTH);
                 return 1;
             }
             // Value is being prefetched
@@ -341,7 +350,7 @@ impl GameGirlAdv {
 
         // Prefetch should keep transfer alive
         if self.memory.waitcnt.prefetch_en() {
-            let duty = if self.cpu.flag(Flag::Thumb) {
+            let duty = if self.cpu.is_flag(Flag::Thumb) {
                 self.wait_time_inner::<u16>(addr, SEQ | CODE)
             } else {
                 self.wait_time_inner::<u32>(addr, SEQ | CODE)
@@ -354,9 +363,9 @@ impl GameGirlAdv {
                 regular = self.wait_time_inner::<T>(addr, CODE);
             }
 
-            let pf = &mut self.memory.prefetch;
-            pf.thumb = self.cpu.flag(Flag::Thumb);
-            pf.tail = addr + T::WIDTH;
+            let pf = &mut self.bus.memory.prefetch;
+            pf.thumb = self.cpu.is_flag(Flag::Thumb);
+            pf.tail = addr + Address(T::WIDTH);
             pf.head = pf.tail;
             pf.active = true;
             pf.count = 0;
@@ -367,40 +376,24 @@ impl GameGirlAdv {
         regular
     }
 
-    pub(super) fn step_prefetch(&mut self, count: u16) {
-        let pf = &mut self.memory.prefetch;
-        if pf.active {
-            pf.countdown -= count as i16;
-            while pf.countdown <= 0 {
-                let capacity = if pf.thumb { 8 } else { 4 };
-                let size = if pf.thumb { 2 } else { 4 };
-                pf.countdown += pf.duty as i16;
-                if self.memory.waitcnt.prefetch_en() && pf.count < capacity {
-                    pf.count += 1;
-                    pf.tail += size;
-                }
-            }
-        }
-    }
-
     pub(super) fn stop_prefetch(&mut self) {
-        let prefetch = &mut self.memory.prefetch;
+        let prefetch = &mut self.bus.memory.prefetch;
         if prefetch.active {
             // Penalty for accessing ROM/RAM during last cycle of prefetch fetch
-            if self.cpu.pc() >= 0x800_0000 && self.cpu.pc() < 0xE00_0000 {
+            if (0x800_0000..0xE00_0000).contains(&self.cpu.pc().0) {
                 let duty = prefetch.duty / 2 + 1;
                 if prefetch.countdown == 1 || (!prefetch.thumb && duty == prefetch.countdown as u16)
                 {
-                    self.add_i_cycles(1);
-                    self.cpu().access_type = NONSEQ;
+                    self.tick(1);
+                    self.cpu.access_type = NONSEQ;
                 }
             }
             self.memory.prefetch.active = false;
         }
     }
 
-    fn wait_time_inner<T: NumExt + 'static>(&mut self, addr: u32, ty: Access) -> u16 {
-        let region = (addr.us() >> 24) & 0xF;
+    fn wait_time_inner<T: NumExt + 'static>(&mut self, addr: Address, ty: Access) -> u16 {
+        let region = (addr.0.us() >> 24) & 0xF;
         let ty_idx = if ty & SEQ != 0 { 16 } else { 0 };
         if T::WIDTH == 4 {
             self.memory.wait_word[region + ty_idx]
@@ -450,6 +443,24 @@ impl GameGirlAdv {
             (0x0E00_0000..=0x0EFF_FFFF, _, _) => Self::WS_NONSEQ[self.memory.waitcnt.sram().us()],
 
             _ => 1,
+        }
+    }
+}
+
+impl GgaBus {
+    pub(super) fn step_prefetch(&mut self, count: u16) {
+        let pf = &mut self.memory.prefetch;
+        if pf.active {
+            pf.countdown -= count as i16;
+            while pf.countdown <= 0 {
+                let capacity = if pf.thumb { 8 } else { 4 };
+                let size = if pf.thumb { Address::HW } else { Address::WORD };
+                pf.countdown += pf.duty as i16;
+                if self.memory.waitcnt.prefetch_en() && pf.count < capacity {
+                    pf.count += 1;
+                    pf.tail += size;
+                }
+            }
         }
     }
 }

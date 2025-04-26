@@ -16,8 +16,11 @@ use common::numutil::NumExt;
 
 use crate::{
     interface::{Bus, CpuVersion},
-    memory::Address,
-    Cpu,
+    memory::{
+        access::{CODE, NONSEQ, SEQ},
+        Access, Address,
+    },
+    Cpu, InterruptController, RelativeOffset,
 };
 
 /// Macro for creating accessors for mode-dependent registers.
@@ -32,7 +35,7 @@ macro_rules! mode_reg {
             }
         }
 
-        pub fn $set(&mut self, val: u32) {
+        pub(crate) fn $set(&mut self, val: u32) {
             let mode = self.mode();
             if mode == Mode::System {
                 self.$reg[0] = val;
@@ -96,7 +99,7 @@ impl Display for Register {
 /// A register with values for FIQ and all other modes
 #[derive(Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-struct FiqReg {
+pub struct FiqReg {
     pub reg: u32,
     pub fiq: u32,
 }
@@ -104,18 +107,28 @@ struct FiqReg {
 /// A register with different values for the different CPU modes
 type ModeReg = [u32; 6];
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Registers {
-    registers: [u32; 16],
+pub struct CpuState {
+    // Registers
+    pub registers: [u32; 16],
     fiqs: [FiqReg; 5],
-    sp: ModeReg,
+    pub sp: ModeReg,
     lr: ModeReg,
     cpsr: u32,
     spsr: ModeReg,
+
+    // Pipeline + Memory
+    pipeline: [u32; 2],
+    pipeline_valid: bool,
+    pub access_type: Access,
+
+    // Interrupt control
+    pub intr: InterruptController,
+    pub is_halted: bool,
 }
 
-impl Registers {
+impl CpuState {
     #[inline]
     pub fn sp(&self) -> Address {
         Address(self.registers[13])
@@ -148,12 +161,12 @@ impl Registers {
 
     /// Get the 'adjusted' value of the PC that some instructions need.
     #[inline]
-    pub fn adj_pc(&self) -> Address {
+    pub(crate) fn adj_pc(&self) -> Address {
         Address(self.registers[15] & !2)
     }
 
     #[inline]
-    pub fn bump_pc(&mut self, count: u32) -> Address {
+    pub(crate) fn bump_pc(&mut self, count: u32) -> Address {
         self.registers[15] = self.registers[15].wrapping_add(count);
         Address(self.registers[15])
     }
@@ -163,10 +176,17 @@ impl Registers {
     mode_reg!(spsr, spsr, set_spsr);
 
     /// Get a register's value for the next instruction (PC will be +4)
-    pub fn reg_pc4(&self, reg: Register) -> u32 {
+    pub(crate) fn reg_pc4(&self, reg: Register) -> u32 {
         let mut regs = self.registers;
         regs[15] += 4;
         regs[reg.0.us()]
+    }
+
+    /// Set the PC. Needs special behavior to fake the pipeline.
+    pub(crate) fn set_pc(&mut self, bus: &mut impl Bus, val: Address) {
+        // Align to 2/4 depending on mode
+        self.registers[15] = val.0 & (!(self.current_instruction_size() - 1));
+        self.pipeline_stall(bus);
     }
 
     #[inline]
@@ -175,7 +195,7 @@ impl Registers {
     }
 
     #[inline]
-    pub fn set_flag(&mut self, flag: Flag, en: bool) {
+    pub(crate) fn set_flag(&mut self, flag: Flag, en: bool) {
         self.cpsr = self.cpsr.set_bit(flag as u16, en);
     }
 
@@ -185,13 +205,13 @@ impl Registers {
     }
 
     /// Set the mode bits inside CPSR.
-    pub fn set_mode(&mut self, ctx: Mode) {
+    pub(crate) fn set_mode(&mut self, ctx: Mode) {
         self.set_cpsr((self.cpsr & !0x1F) | ctx.to_u32());
     }
 
     /// Set the CPSR. This may only change flags; mode changes will not be
     /// handled.
-    pub fn set_cpsr_flags(&mut self, value: u32) {
+    pub(crate) fn set_cpsr_flags(&mut self, value: u32) {
         self.cpsr = value;
     }
 
@@ -222,7 +242,7 @@ impl Registers {
     }
 
     /// Evaluate a condition encoded into an instruction.
-    pub fn eval_condition(&self, cond: u16) -> bool {
+    pub(crate) fn eval_condition(&self, cond: u16) -> bool {
         // This condition table is taken from mGBA sources, which are licensed under
         // MPL2 at https://github.com/mgba-emu/mgba
         // Thank you to endrift and other mGBA contributors!
@@ -247,6 +267,80 @@ impl Registers {
 
         let flags = self.cpsr >> 28;
         (COND_MASKS[cond.us()] & (1 << flags)) != 0
+    }
+
+    pub fn current_instruction_size(&self) -> u32 {
+        // 4 on ARM, 2 on THUMB
+        4 - ((self.is_flag(Flag::Thumb) as u32) << 1)
+    }
+
+    pub fn next_instruction_offset(&self) -> Address {
+        Address(self.current_instruction_size())
+    }
+}
+
+impl CpuState {
+    pub(crate) fn fill_pipeline(&mut self, with: [u32; 2]) {
+        self.pipeline = with;
+        self.pipeline_valid = true;
+    }
+
+    pub(crate) fn invalidate_pipeline(&mut self) {
+        self.pipeline_valid = false;
+    }
+
+    pub(crate) fn advance_pipeline(&mut self, next: u32) -> u32 {
+        let inst = self.pipeline[0];
+        self.pipeline[0] = self.pipeline[1];
+        self.pipeline[1] = next;
+        self.access_type = SEQ;
+        inst
+    }
+
+    /// Update the pipeline to be valid again, without wait states or actual
+    /// reads
+    pub(crate) fn revalidate_pipeline(&mut self, bus: &mut impl Bus) {
+        if self.pipeline_valid {
+            return;
+        }
+        let p = if self.is_flag(Flag::Thumb) {
+            [
+                bus.get::<u16>(self, self.pc() - Address::HW).u32(),
+                bus.get::<u16>(self, self.pc()).u32(),
+            ]
+        } else {
+            [
+                bus.get::<u32>(self, self.pc() - Address::WORD),
+                bus.get::<u32>(self, self.pc()),
+            ]
+        };
+        self.fill_pipeline(p);
+    }
+
+    /// Emulate a pipeline stall / fill; used when PC changes.
+    pub(crate) fn pipeline_stall(&mut self, bus: &mut impl Bus) {
+        bus.pipeline_stalled(self);
+        if self.is_flag(Flag::Thumb) {
+            let time = bus.wait_time::<u16>(self, self.pc(), NONSEQ | CODE);
+            bus.tick(time as u64);
+            self.bump_pc(2);
+            let time = bus.wait_time::<u16>(self, self.pc(), SEQ | CODE);
+            bus.tick(time as u64);
+        } else {
+            let time = bus.wait_time::<u32>(self, self.pc(), NONSEQ | CODE);
+            bus.tick(time as u64);
+            self.bump_pc(4);
+            let time = bus.wait_time::<u32>(self, self.pc(), SEQ | CODE);
+            bus.tick(time as u64);
+        };
+        self.invalidate_pipeline();
+        self.access_type = SEQ;
+    }
+}
+
+impl<S: Bus> Cpu<S> {
+    pub(crate) fn set_pc(&mut self, val: Address) {
+        self.state.set_pc(&mut self.bus, val);
     }
 }
 
@@ -314,43 +408,35 @@ impl Flag {
 }
 
 impl<S: Bus> Cpu<S> {
-    /// Set the PC. Needs special behavior to fake the pipeline.
-    #[inline]
-    pub fn set_pc(&mut self, val: Address) {
-        // Align to 2/4 depending on mode
-        self.regs.registers[15] = val.0 & (!(self.current_instruction_size() - 1));
-        self.pipeline_stall();
-    }
-
     /// Set a register. Needs special behavior due to PC.
-    pub fn set_reg(&mut self, reg: Register, val: u32) {
+    pub(crate) fn set_reg(&mut self, reg: Register, val: u32) {
         if reg.is_pc() {
-            self.set_pc(Address(val));
+            self.state.set_pc(&mut self.bus, Address(val));
         } else {
-            self.regs.registers[reg.0.us()] = val;
+            self.state.registers[reg.0.us()] = val;
         }
     }
 
     /// Set a register. Needs special behavior due to PC.
     /// Additionally allows a mode switch when setting PC.
-    pub fn set_reg_allow_switch(&mut self, reg: Register, val: u32) {
+    pub(crate) fn set_reg_allow_switch(&mut self, reg: Register, val: u32) {
         if reg.is_pc() {
             if S::Version::IS_V5 {
-                self.regs.set_flag(Flag::Thumb, val.is_bit(0));
+                self.state.set_flag(Flag::Thumb, val.is_bit(0));
             }
-            self.set_pc(Address(val));
+            self.state.set_pc(&mut self.bus, Address(val));
         } else {
-            self.regs.registers[reg.0.us()] = val;
+            self.state.registers[reg.0.us()] = val;
         }
     }
 
     /// Get a register's value for the next instruction (PC will be +4)
-    pub fn reg_pc4(&self, reg: Register) -> u32 {
-        self.regs.reg_pc4(reg)
+    pub(crate) fn reg_pc4(&self, reg: Register) -> u32 {
+        self.state.reg_pc4(reg)
     }
 }
 
-impl Index<LowRegister> for Registers {
+impl Index<LowRegister> for CpuState {
     type Output = u32;
 
     fn index(&self, index: LowRegister) -> &Self::Output {
@@ -358,13 +444,13 @@ impl Index<LowRegister> for Registers {
     }
 }
 
-impl IndexMut<LowRegister> for Registers {
+impl IndexMut<LowRegister> for CpuState {
     fn index_mut(&mut self, index: LowRegister) -> &mut Self::Output {
         &mut self.registers[index.0.us()]
     }
 }
 
-impl Index<Register> for Registers {
+impl Index<Register> for CpuState {
     type Output = u32;
 
     fn index(&self, index: Register) -> &Self::Output {

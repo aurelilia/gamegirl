@@ -8,10 +8,10 @@
 
 use core::mem;
 
-use arm_cpu::{
+use armchair::{
     access::{DMA, NONSEQ, SEQ},
-    interface::{ArmSystem, RwType},
-    Cpu, Interrupt,
+    interface::{Bus, RwType},
+    Address, Interrupt, RelativeOffset,
 };
 use arrayvec::ArrayVec;
 use common::{
@@ -20,7 +20,7 @@ use common::{
 };
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
-use crate::{hw::cartridge::SaveType, GameGirlAdv};
+use crate::{cpu::GgaFullBus, hw::cartridge::SaveType};
 
 const SRC_MASK: [u32; 4] = [0x7FF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF, 0xFFF_FFFF];
 const DST_MASK: [u32; 4] = [0x7FF_FFFF, 0x7FF_FFFF, 0x7FF_FFFF, 0xFFF_FFFF];
@@ -34,9 +34,9 @@ pub struct Dma {
     pub ctrl: DmaControl,
 
     /// Internal source register
-    src: u32,
+    src: Address,
     /// Internal destination register
-    dst: u32,
+    dst: Address,
 }
 
 /// GGA's 4 DMA channels.
@@ -50,27 +50,27 @@ pub struct Dmas {
     /// DMAs waiting to run after current.
     queued: ArrayVec<(u16, Reason), 3>,
     /// PC when the last DMA finished (for lingering bus behavior)
-    pub(crate) pc_at_last_end: u32,
+    pub(crate) pc_at_last_end: Address,
 }
 
 impl Dmas {
     /// Update all DMAs to see if they need ticking.
-    pub fn update_all(gg: &mut GameGirlAdv, reason: Reason) {
+    pub fn update_all(gg: &mut GgaFullBus<'_>, reason: Reason) {
         for idx in 0..4 {
             Self::step_dma(gg, idx, reason);
         }
     }
 
     /// Update a given DMA after it's control register was written.
-    pub fn ctrl_write(gg: &mut GameGirlAdv, idx: usize, new_ctrl: IoSection<u16>) {
+    pub fn ctrl_write(gg: &mut GgaFullBus<'_>, idx: usize, new_ctrl: IoSection<u16>) {
         let channel = &mut gg.dma.channels[idx];
         let old_ctrl = channel.ctrl;
         let mut new_ctrl = new_ctrl.apply_io_ret(&mut channel.ctrl);
 
         if !old_ctrl.dma_en() && new_ctrl.dma_en() {
             // Reload SRC/DST
-            channel.src = channel.sad & SRC_MASK[idx];
-            channel.dst = channel.dad & DST_MASK[idx];
+            channel.src = Address(channel.sad & SRC_MASK[idx]);
+            channel.dst = Address(channel.dad & DST_MASK[idx]);
         }
 
         new_ctrl.set_dma3_gamepak_drq_en(new_ctrl.dma3_gamepak_drq_en() && idx == 3);
@@ -80,12 +80,12 @@ impl Dmas {
 
     /// Try to perform a FIFO transfer, if the DMA is otherwise configured for
     /// it.
-    pub fn try_fifo_transfer(gg: &mut GameGirlAdv, idx: usize) {
+    pub fn try_fifo_transfer(gg: &mut GgaFullBus<'_>, idx: usize) {
         Self::step_dma(gg, idx, Reason::Fifo);
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma(gg: &mut GameGirlAdv, idx: usize, reason: Reason) {
+    fn step_dma(gg: &mut GgaFullBus<'_>, idx: usize, reason: Reason) {
         let mut channel = gg.dma.channels[idx];
         let ctrl = channel.ctrl;
 
@@ -118,23 +118,23 @@ impl Dmas {
             _ => channel.count.u32(),
         };
 
-        let src_mod = match channel.src {
-            0x800_0000..=0xDFF_FFFF => 2,
+        let src_mod = match channel.src.0 {
+            0x800_0000..=0xDFF_FFFF => RelativeOffset::HW,
             _ => Self::get_step(ctrl.src_addr()),
         };
 
         let dst_mod = match ctrl.dest_addr() {
-            _ if is_fifo => 0,
+            _ if is_fifo => RelativeOffset(0),
             AddrControl::IncReload => {
                 // Reload DST + Increment
-                channel.dst = channel.dad & DST_MASK[idx];
-                2
+                channel.dst = Address(channel.dad & DST_MASK[idx]);
+                RelativeOffset::HW
             }
             _ => Self::get_step(ctrl.dest_addr()),
         };
 
         if is_fifo || ctrl.is_32bit() {
-            Self::perform_transfer::<u32>(gg, channel, idx, count, src_mod * 2, dst_mod * 2);
+            Self::perform_transfer::<u32>(gg, channel, idx, count, src_mod.mul(2), dst_mod.mul(2));
         } else if idx == 3 {
             // Maybe alert EEPROM, if the cart has one
             if let SaveType::Eeprom(eeprom) = &mut gg.cart.save_type {
@@ -155,7 +155,8 @@ impl Dmas {
         }
         if ctrl.irq_en() {
             // Fire interrupt if configured
-            Cpu::request_interrupt_idx(gg, Interrupt::Dma0 as u16 + idx.u16());
+            gg.cpu
+                .request_interrupt_with_index(gg.bus, Interrupt::Dma0 as u16 + idx.u16());
         }
 
         gg.dma.running = prev_dma;
@@ -166,31 +167,30 @@ impl Dmas {
 
     /// Perform a transfer.
     fn perform_transfer<T: RwType>(
-        gg: &mut GameGirlAdv,
+        gg: &mut GgaFullBus<'_>,
         mut channel: Dma,
         idx: usize,
         count: u32,
-        src_mod: i32,
-        dst_mod: i32,
+        src_mod: RelativeOffset,
+        dst_mod: RelativeOffset,
     ) {
-        gg.add_i_cycles(2);
-        if channel.dst < 0x200_0000 {
+        gg.tick(2);
+        if channel.dst.0 < 0x200_0000 {
             return;
         }
 
         let mut kind = NONSEQ | DMA;
-        if channel.src >= 0x200_0000 {
-            // First, align SRC/DST
-            let align = T::WIDTH - 1;
-            channel.src &= !align;
-            channel.dst &= !align;
+        if channel.src.0 >= 0x200_0000 {
+            channel.src = channel.src.align(T::WIDTH);
+            channel.dst = channel.dst.align(T::WIDTH);
 
             for _ in 0..count {
-                let value = gg.read::<T>(channel.src, kind).u32();
-                gg.write::<T>(channel.dst, T::from_u32(value), kind);
+                let value = gg.bus.read::<T>(gg.cpu, channel.src, kind).u32();
+                gg.bus
+                    .write::<T>(gg.cpu, channel.dst, T::from_u32(value), kind);
 
-                channel.src = channel.src.wrapping_add_signed(src_mod);
-                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
+                channel.src = channel.src.add_rel(src_mod);
+                channel.dst = channel.dst.add_rel(dst_mod);
                 // Only first is NonSeq
                 kind = SEQ | DMA;
                 gg.advance_clock();
@@ -198,22 +198,24 @@ impl Dmas {
 
             // Put last value into cache
             if T::WIDTH == 4 {
-                gg.dma.cache = gg.get::<u32>(channel.src.wrapping_add_signed(-src_mod));
+                gg.dma.cache = gg.get::<u32>(channel.src.add_rel(-src_mod));
             } else {
-                let value = gg.get::<u16>(channel.src.wrapping_add_signed(-src_mod));
+                let value = gg.get::<u16>(channel.src.add_rel(-src_mod));
                 gg.dma.cache = word(value, value);
             }
         } else {
             for _ in 0..count {
                 if T::WIDTH == 4 {
-                    gg.write::<u32>(channel.dst, gg.dma.cache, kind);
-                } else if channel.dst.is_bit(1) {
-                    gg.write::<u16>(channel.dst, (gg.dma.cache >> 16).u16(), kind);
+                    gg.bus.write::<u32>(gg.cpu, channel.dst, gg.dma.cache, kind);
+                } else if channel.dst.0.is_bit(1) {
+                    gg.bus
+                        .write::<u16>(gg.cpu, channel.dst, (gg.dma.cache >> 16).u16(), kind);
                 } else {
-                    gg.write::<u16>(channel.dst, gg.dma.cache.u16(), kind);
+                    gg.bus
+                        .write::<u16>(gg.cpu, channel.dst, gg.dma.cache.u16(), kind);
                 }
-                channel.src = channel.src.wrapping_add_signed(src_mod);
-                channel.dst = channel.dst.wrapping_add_signed(dst_mod);
+                channel.src = channel.src.add_rel(src_mod);
+                channel.dst = channel.dst.add_rel(dst_mod);
                 // Only first is NonSeq
                 kind = SEQ | DMA;
                 gg.advance_clock();
@@ -226,11 +228,11 @@ impl Dmas {
     /// Get the step with which to change SRC/DST registers after every write.
     /// Multiplied by 2 for word-sized DMAs.
     /// Inc+Reload handled separately.
-    fn get_step(control: AddrControl) -> i32 {
+    fn get_step(control: AddrControl) -> RelativeOffset {
         match control {
-            AddrControl::Increment => 2,
-            AddrControl::Decrement => -2,
-            _ => 0,
+            AddrControl::Increment => RelativeOffset::HW,
+            AddrControl::Decrement => -RelativeOffset::HW,
+            _ => RelativeOffset(0),
         }
     }
 }
@@ -242,7 +244,7 @@ impl Default for Dmas {
             running: 99,
             queued: ArrayVec::new(),
             cache: 0,
-            pc_at_last_end: 0,
+            pc_at_last_end: Address(0),
         }
     }
 }

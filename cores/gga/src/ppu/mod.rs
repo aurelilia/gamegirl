@@ -19,16 +19,16 @@ mod render;
 
 use alloc::sync::Arc;
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::Interrupt;
 use common::{common::video::FrameBuffer, numutil::NumExt, Colour};
 use registers::*;
 use render::{PpuRender, PpuRendererKind};
 
 use crate::{
+    cpu::GgaFullBus,
     hw::dma::{Dmas, Reason},
     memory::KB,
     scheduling::{AdvEvent, PpuEvent},
-    GameGirlAdv,
 };
 
 const WIDTH: usize = 240;
@@ -65,7 +65,7 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub fn handle_event(gg: &mut GameGirlAdv, event: PpuEvent, late_by: i64) {
+    pub fn handle_event(gg: &mut GgaFullBus<'_>, event: PpuEvent, late_by: i64) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 if gg.c.video_buffer.should_render_this_frame() {
@@ -100,7 +100,7 @@ impl Ppu {
                         gg.ppu.regs.vcount = 0;
                         gg.ppu.end_frame();
                         if gg.c.video_buffer.should_render_this_frame() {
-                            gg.ppu.push_output(&mut gg.c.video_buffer);
+                            gg.bus.ppu.push_output(&mut gg.bus.c.video_buffer);
                         }
                         gg.c.video_buffer.start_next_frame();
                     }
@@ -122,9 +122,9 @@ impl Ppu {
             .schedule(AdvEvent::PpuEvent(next_event), cycles - late_by);
     }
 
-    fn maybe_interrupt(gg: &mut GameGirlAdv, int: Interrupt) {
+    fn maybe_interrupt(gg: &mut GgaFullBus<'_>, int: Interrupt) {
         if gg.ppu.regs.dispstat.irq_enables().is_bit(int as u16) {
-            Cpu::request_interrupt(gg, int);
+            gg.cpu.request_interrupt(gg.bus, int);
         }
     }
 
@@ -156,7 +156,7 @@ impl Ppu {
         }
     }
 
-    pub fn init_render(gg: &mut GameGirlAdv) {
+    pub fn init_render(gg: &mut GgaFullBus<'_>) {
         let render = PpuRender::new(
             Arc::clone(&gg.ppu.palette),
             Arc::clone(&gg.ppu.vram),

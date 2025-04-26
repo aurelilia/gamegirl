@@ -4,7 +4,7 @@ use decode::{Thumb1Op, Thumb2Op, Thumb3Op, Thumb4Op, ThumbStrLdrOp};
 use crate::{
     interface::{Bus, InstructionSet},
     memory::{Address, RelativeOffset},
-    registers::{LowRegister, Register},
+    state::{LowRegister, Register},
 };
 
 mod decode;

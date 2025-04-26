@@ -40,7 +40,7 @@ pub type Pointer = u32;
 /// to depend on the rather heavy egui.
 pub type Colour = [u8; 4];
 
-pub trait Core: Send + Sync {
+pub trait Core: Any + Send + Sync {
     /// Try to create a core instance from the given game cart, if it is
     /// valid for this core's system.
     /// Can also create an instance with no cart loaded, if possible.
@@ -61,9 +61,11 @@ pub trait Core: Send + Sync {
     fn skip_bootrom(&mut self);
 
     /// Create a save state that can be loaded with [load_state].
+    #[cfg(feature = "serde")]
     fn save_state(&mut self) -> Vec<u8>;
     /// Load a state produced by [save_state].
     /// Will restore the current cartridge and debugger.
+    #[cfg(feature = "serde")]
     fn load_state(&mut self, state: &[u8]);
 
     /// Get the current system time.
@@ -102,7 +104,6 @@ pub trait Core: Send + Sync {
 
     fn c(&self) -> &Common;
     fn c_mut(&mut self) -> &mut Common;
-    fn as_any(&mut self) -> &mut dyn Any;
 
     fn produce_frame(&mut self) -> Option<Vec<Colour>> {
         while self.c().debugger.running && self.c_mut().video_buffer.pop().is_none() {

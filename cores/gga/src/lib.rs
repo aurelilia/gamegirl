@@ -15,9 +15,13 @@
 extern crate alloc;
 
 use alloc::{boxed::Box, string::String, vec, vec::Vec};
-use core::{cmp::Ordering, mem};
+use core::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut},
+};
 
-use arm_cpu::Cpu;
+pub use armchair;
+use armchair::{Address, Cpu};
 use audio::Apu;
 use common::{
     common::{
@@ -34,7 +38,7 @@ use common::{
     numutil::NumExt,
     Core, TimeS,
 };
-use cpu::CPU_CLOCK;
+use cpu::{GgaFullBus, CPU_CLOCK};
 use elf_rs::{Elf, ElfFile};
 use hw::{cartridge::Cartridge, serial::Serial};
 use memory::Memory;
@@ -58,9 +62,13 @@ mod scheduling;
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Default)]
 pub struct GameGirlAdv {
-    pub cpu: Cpu<Self>,
+    pub cpu: Cpu<GgaBus>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Default)]
+pub struct GgaBus {
     pub memory: Memory,
     pub ppu: Ppu,
     pub apu: Apu,
@@ -77,27 +85,28 @@ impl Core for GameGirlAdv {
     common_functions!(CPU_CLOCK, AdvEvent::PauseEmulation, [240, 160]);
 
     fn advance(&mut self) {
-        if self.cpu.is_halted {
+        if self.cpu.state.is_halted {
             // We're halted, emulate peripherals until an interrupt is pending
             let evt = self.scheduler.pop();
-            evt.kind.dispatch(self, evt.late_by);
-            Cpu::check_unsuspend(self);
+            self.bus().dispatch(evt.kind, evt.late_by);
+            self.cpu.check_unsuspend();
         } else {
-            Cpu::continue_running(self);
+            self.cpu.continue_running();
         }
     }
 
     fn reset(&mut self) {
-        let old_self = mem::take(self);
-        self.restore_from(old_self);
+        // let old_self = mem::take(self);
+        // self.restore_from(old_self);
     }
 
     fn skip_bootrom(&mut self) {
-        self.cpu.set_cpsr(0x1F);
-        self.cpu.registers[15] = 0x0800_0004;
-        self.cpu.sp[0] = 0x0300_7F00;
-        self.cpu.sp[2] = 0x0300_7FE0;
-        self.cpu.sp[4] = 0x0300_7FA0;
+        self.cpu.state.set_cpsr(0x1F);
+        self.cpu.state.registers[15] = 0x0800_0004;
+        self.cpu.state.sp[0] = 0x0300_7F00;
+        self.cpu.state.registers[13] = 0x0300_7F00;
+        self.cpu.state.sp[2] = 0x0300_7FE0;
+        self.cpu.state.sp[4] = 0x0300_7FA0;
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -105,7 +114,9 @@ impl Core for GameGirlAdv {
     }
 
     fn get_memory(&self, addr: u32, width: Width) -> u32 {
-        self.get::<u32>(addr) & width.mask()
+        // self.bus().get::<u32>(Address(addr)) & width.mask()
+        // todo
+        0
     }
 
     fn search_memory(&self, value: u32, width: Width, kind: Ordering) -> Vec<u32> {
@@ -141,7 +152,12 @@ impl Core for GameGirlAdv {
     }
 
     fn get_registers(&self) -> Vec<usize> {
-        self.cpu.registers.into_iter().map(NumExt::us).collect()
+        self.cpu
+            .state
+            .registers
+            .into_iter()
+            .map(NumExt::us)
+            .collect()
     }
 
     fn get_rom(&self) -> Vec<u8> {
@@ -150,9 +166,9 @@ impl Core for GameGirlAdv {
 
     fn set_memory(&mut self, addr: u32, value: u32, width: Width) {
         match width {
-            Width::Byte => self.set(addr, value.u8()),
-            Width::Halfword => self.set(addr, value.u16()),
-            Width::Word => self.set(addr, value),
+            Width::Byte => self.bus().set(Address(addr), value.u8()),
+            Width::Halfword => self.bus().set(Address(addr), value.u16()),
+            Width::Word => self.bus().set(Address(addr), value),
         }
     }
 
@@ -172,68 +188,37 @@ impl Core for GameGirlAdv {
         };
 
         let mut gg = Box::<GameGirlAdv>::new(GameGirlAdv {
-            cpu: Cpu::default(),
-            memory: Memory::default(),
-            ppu: Ppu::default(),
-            apu: Apu::default(),
-            dma: Dmas::default(),
-            timers: Timers::default(),
-            cart,
-            serial: Serial::default(),
+            cpu: Cpu::new(GgaBus {
+                memory: Memory::default(),
+                ppu: Ppu::default(),
+                apu: Apu::default(),
+                dma: Dmas::default(),
+                timers: Timers::default(),
+                cart,
+                serial: Serial::default(),
 
-            scheduler: Scheduler::default(),
-            c: Common::with_config(config.clone()),
+                scheduler: Scheduler::default(),
+                c: Common::with_config(config.clone()),
+            }),
         });
-        gg.initialize();
+        gg.bus().initialize();
         Some(gg)
     }
 }
 
 impl GameGirlAdv {
-    /// Advance everything but the CPU.
-    fn advance_clock(&mut self) {
-        if self.scheduler.has_events() {
-            while let Some(event) = self.scheduler.get_next_pending() {
-                event.kind.dispatch(self, event.late_by);
-            }
-        }
-    }
-
-    pub fn get_inst_mnemonic(&mut self, ptr: u32) -> String {
-        Cpu::<Self>::get_inst(self, ptr)
-    }
-
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {
-        let save = old_self.cart.make_save();
-        self.cart.load_rom(old_self.cart.rom);
+        let bus = old_self.cpu.bus;
+        let save = bus.cart.make_save();
+        self.cart.load_rom(bus.cart.rom);
         if let Some(save) = save {
             self.cart.load_save(save);
         }
 
-        self.c.restore_from(old_self.c);
-        self.setup_host_state();
-    }
-
-    pub fn setup_host_state(&mut self) {
-        self.init_memory();
-        Ppu::init_render(self);
-        if let Some(bios) = self.c.config.get_bios("agb") {
-            self.memory.bios = bios.into();
-        }
-    }
-
-    pub fn initialize(&mut self) {
-        Apu::init_scheduler(self);
-        self.scheduler
-            .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
-        self.scheduler
-            .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
-        self.c.audio_buffer.set_input_sr(2usize.pow(15));
-        self.setup_host_state();
-        // self.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO
-        // still buggy
+        self.c.restore_from(bus.c);
+        self.bus().setup_host_state();
     }
 
     fn decode_elf(cart: &[u8]) -> Option<Vec<u8>> {
@@ -256,5 +241,58 @@ impl GameGirlAdv {
         }
 
         Some(buf)
+    }
+
+    fn bus(&mut self) -> GgaFullBus {
+        self.into()
+    }
+}
+
+impl GgaFullBus<'_> {
+    /// Advance everything but the CPU.
+    fn advance_clock(&mut self) {
+        if self.scheduler.has_events() {
+            while let Some(event) = self.scheduler.get_next_pending() {
+                self.dispatch(event.kind, event.late_by);
+            }
+        }
+    }
+
+    pub fn get_inst_mnemonic(&mut self, ptr: Address) -> String {
+        self.cpu.get_inst_mnemonic(self.get(ptr))
+    }
+
+    pub fn setup_host_state(&mut self) {
+        self.init_memory();
+        Ppu::init_render(self);
+        if let Some(bios) = self.c.config.get_bios("agb") {
+            self.memory.bios = bios.into();
+        }
+    }
+
+    pub fn initialize(&mut self) {
+        Apu::init_scheduler(self);
+        self.scheduler
+            .schedule(AdvEvent::PpuEvent(PpuEvent::HblankStart), 960);
+        self.scheduler
+            .schedule(AdvEvent::UpdateKeypad, (CPU_CLOCK / 120.0) as TimeS);
+        self.c.audio_buffer.set_input_sr(2usize.pow(15));
+        self.setup_host_state();
+        // self.apu.hle_hook = mplayer::find_mp2k(&cart).unwrap_or(0); TODO
+        // still buggy
+    }
+}
+
+impl Deref for GameGirlAdv {
+    type Target = GgaBus;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cpu.bus
+    }
+}
+
+impl DerefMut for GameGirlAdv {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cpu.bus
     }
 }

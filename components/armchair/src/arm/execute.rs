@@ -10,7 +10,7 @@ use crate::{
         access::{NONSEQ, SEQ},
         Address, RelativeOffset,
     },
-    registers::{Flag::*, Mode, Register},
+    state::{Flag::*, Mode, Register},
     Cpu,
 };
 
@@ -28,7 +28,7 @@ impl<S: Bus> Cpu<S> {
         // BLX/CP15 on ARMv5 is a special case: it is encoded with NV.
         let armv5_uncond = S::Version::IS_V5 && (inst.bits(25, 7) == 0b111_1101)
             || (inst.bits(24, 9) == 0b1111_1110);
-        self.regs.eval_condition(inst.bits(28, 4).u16()) || armv5_uncond
+        self.state.eval_condition(inst.bits(28, 4).u16()) || armv5_uncond
     }
 
     pub fn get_interpreter_handler_arm(inst: u32) -> ArmHandler<Self> {
@@ -56,31 +56,31 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
     }
 
     fn arm_bl(&mut self, offset: RelativeOffset) {
-        self.regs.set_lr(self.regs.pc() - Address::WORD);
+        self.state.set_lr(self.state.pc() - Address::WORD);
         self.relative_jump(offset);
     }
 
     fn arm_bx(&mut self, n: Register) {
-        let rn = self.regs[n];
+        let rn = self.state[n];
         let is_thumb = rn.is_bit(0);
-        self.regs.set_flag(Thumb, is_thumb);
+        self.state.set_flag(Thumb, is_thumb);
         self.set_pc(Address(rn - is_thumb as u32));
     }
 
     fn arm_blx(&mut self, src: ArmSignedOperandKind) {
         match src {
             ArmSignedOperandKind::Immediate(offset) => {
-                self.regs.set_lr(self.regs.pc() - Address::WORD);
-                self.regs.set_flag(Thumb, true);
-                self.set_pc(self.regs.pc().add_rel(offset));
+                self.state.set_lr(self.state.pc() - Address::WORD);
+                self.state.set_flag(Thumb, true);
+                self.set_pc(self.state.pc().add_rel(offset));
             }
 
             ArmSignedOperandKind::Register(reg) => {
-                let rn = self.regs[reg];
-                self.regs.set_lr(self.regs.pc() - Address::WORD);
+                let rn = self.state[reg];
+                self.state.set_lr(self.state.pc() - Address::WORD);
 
                 let is_thumb = rn.is_bit(0);
-                self.regs.set_flag(Thumb, is_thumb);
+                self.state.set_flag(Thumb, is_thumb);
                 self.set_pc(Address(rn - is_thumb as u32));
             }
         }
@@ -97,14 +97,14 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
     ) {
         let (a, b) = match shift_operand {
             ArmOperandKind::Immediate(imm) => {
-                let a = self.regs[n];
-                let rm = self.regs[m];
+                let a = self.state[n];
+                let rm = self.state[m];
                 (a, self.shifted_op::<CPSR, true>(rm, shift_kind, imm))
             }
             ArmOperandKind::Register(reg) => {
                 let a = self.reg_pc4(n);
                 let rm = self.reg_pc4(m);
-                let shift = self.regs[reg] & 0xFF;
+                let shift = self.state[reg] & 0xFF;
                 (a, self.shifted_op::<CPSR, false>(rm, shift_kind, shift))
             }
         };
@@ -112,7 +112,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
     }
 
     fn arm_alu_imm<const CPSR: bool>(&mut self, n: Register, d: Register, imm: u32, op: ArmAluOp) {
-        self.alu_inner::<CPSR>(op, self.regs[n], imm, d);
+        self.alu_inner::<CPSR>(op, self.state[n], imm, d);
     }
 
     fn arm_mul<const OP: ArmMulOp>(
@@ -123,10 +123,10 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         m: Register,
         cpsr: bool,
     ) {
-        let rm = self.regs[m];
-        let rs = self.regs[s];
-        let rn = self.regs[n];
-        let rd = self.regs[d];
+        let rm = self.state[m];
+        let rs = self.state[s];
+        let rn = self.state[n];
+        let rd = self.state[d];
 
         let a = rm as u64;
         let b = rs as u64;
@@ -172,9 +172,9 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         }
         if cpsr {
             let neg_bit = if !is_mul { 63 } else { 31 };
-            self.regs.set_flag(Zero, out == 0);
-            self.regs.set_flag(Neg, out.is_bit(neg_bit));
-            self.regs.set_flag(Carry, false);
+            self.state.set_flag(Zero, out == 0);
+            self.state.set_flag(Neg, out.is_bit(neg_bit));
+            self.state.set_flag(Carry, false);
         }
 
         // TODO signed might be wrong
@@ -190,10 +190,10 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         x_top: bool,
         y_top: bool,
     ) {
-        let rm = self.regs[m];
-        let rs = self.regs[s];
-        let rn = self.regs[n] as i32 as i64;
-        let rd = self.regs[d] as i32 as i64;
+        let rm = self.state[m];
+        let rs = self.state[s];
+        let rn = self.state[n] as i32 as i64;
+        let rd = self.state[d] as i32 as i64;
 
         let a = if x_top { rm.high() } else { rm.low() } as i16 as i64;
         let b = if y_top { rs.high() } else { rs.low() } as i16 as i64;
@@ -205,7 +205,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
                 let r = a.wrapping_mul(b);
                 let res = r.wrapping_add(rn);
                 if TryInto::<i32>::try_into(res).is_err() {
-                    self.regs.set_flag(QClamped, true);
+                    self.state.set_flag(QClamped, true);
                 }
                 res
             }
@@ -220,7 +220,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
                 let r = r >> 16;
                 let res = r.saturating_add(rn);
                 if (r as i32).checked_add(rn as i32).is_none() {
-                    self.regs.set_flag(QClamped, true);
+                    self.state.set_flag(QClamped, true);
                 }
                 res
             }
@@ -244,13 +244,13 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
     }
 
     fn arm_clz(&mut self, m: Register, d: Register) {
-        let count = self.regs[m].leading_zeros();
+        let count = self.state[m].leading_zeros();
         self.set_reg(d, count);
     }
 
     fn arm_q<const OP: ArmQOp>(&mut self, n: Register, m: Register, d: Register) {
-        let rm = self.regs[m] as i32;
-        let rn = self.regs[n] as i32;
+        let rm = self.state[m] as i32;
+        let rn = self.state[n] as i32;
         let value = match OP {
             ArmQOp::Qadd => rm.saturating_add(rn),
             ArmQOp::Qsub => rm.saturating_sub(rn),
@@ -264,7 +264,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
             ArmQOp::QdSub => rn.checked_mul(2).and_then(|rn| rm.checked_sub(rn)),
         };
         if checked.is_none() {
-            self.regs.set_flag(QClamped, true);
+            self.state.set_flag(QClamped, true);
         }
         self.set_reg(d, value as u32);
     }
@@ -272,36 +272,36 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
     fn arm_msr(&mut self, src: ArmOperandKind, flags: bool, ctrl: bool, spsr: bool) {
         let src = match src {
             ArmOperandKind::Immediate(imm) => imm,
-            ArmOperandKind::Register(reg) => self.regs[reg],
+            ArmOperandKind::Register(reg) => self.state[reg],
         };
         let mut dest = if spsr {
-            self.regs.spsr()
+            self.state.spsr()
         } else {
-            self.regs.cpsr()
+            self.state.cpsr()
         };
 
         if flags {
             dest = (dest & 0x00FF_FFFF) | (src & 0xFF00_0000);
         };
-        if ctrl && self.regs.mode() != Mode::User {
+        if ctrl && self.state.mode() != Mode::User {
             dest = (dest & 0xFFFF_FF00) | (src & 0xFF);
         };
 
         if spsr {
-            self.regs.set_spsr(dest);
+            self.state.set_spsr(dest);
         } else {
             // Thumb flag may not be changed
             dest = dest.set_bit(5, false);
-            self.regs.set_cpsr(dest);
-            self.check_if_interrupt();
+            self.state.set_cpsr(dest);
+            self.state.check_if_interrupt(&mut self.bus);
         }
     }
 
     fn arm_mrs(&mut self, d: Register, spsr: bool) {
         let psr = if spsr {
-            self.regs.spsr()
+            self.state.spsr()
         } else {
-            self.regs.cpsr()
+            self.state.cpsr()
         };
         self.set_reg(d, psr.set_bit(4, true));
     }
@@ -313,12 +313,12 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         offset: ArmLdrStrOperandKind,
         config: ArmLdrStrConfig,
     ) {
-        let mut addr = Address(self.regs[n]);
+        let mut addr = Address(self.state[n]);
         let offset = match offset {
             ArmLdrStrOperandKind::Immediate(imm) => Address(imm),
-            ArmLdrStrOperandKind::Register(reg) => Address(self.regs[reg]),
+            ArmLdrStrOperandKind::Register(reg) => Address(self.state[reg]),
             ArmLdrStrOperandKind::ShiftedRegister { base, shift, by } => {
-                let base = self.regs[base];
+                let base = self.state[base];
                 let addr = self.shifted_op::<false, true>(base, shift, by);
                 Address(addr)
             }
@@ -375,7 +375,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
             self.set_reg(n, addr.0);
         }
 
-        self.access_type = NONSEQ;
+        self.state.access_type = NONSEQ;
         if config.kind.is_ldr() {
             // All LDR stall by 1I
             self.bus.tick(1);
@@ -384,10 +384,10 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
 
     fn arm_ldmstm(&mut self, n: Register, rlist: u16, force_user: bool, config: ArmLdmStmConfig) {
         // Prelude
-        let starting_addr = Address(self.regs[n]);
-        let cpsr = self.regs.cpsr();
+        let starting_addr = Address(self.state[n]);
+        let cpsr = self.state.cpsr();
         if force_user {
-            self.regs.set_mode(Mode::System);
+            self.state.set_mode(Mode::System);
         }
 
         // Figure out parameters
@@ -431,7 +431,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
 
         // Epilogue
         if force_user {
-            self.regs.set_cpsr(cpsr);
+            self.state.set_cpsr(cpsr);
         }
 
         let ldr_writeback = Self::IS_V5 && (register_count == 1 || last_register != Some(n));
@@ -442,7 +442,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         if kind == NONSEQ {
             self.on_empty_rlist(n, !config.ldr, config.up, config.pre);
         }
-        self.access_type = NONSEQ;
+        self.state.access_type = NONSEQ;
         if config.ldr {
             // All LDR stall by 1I
             self.bus.tick(1);
@@ -450,8 +450,8 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
     }
 
     fn arm_swp<const WORD: bool>(&mut self, n: Register, d: Register, m: Register) {
-        let addr = Address(self.regs[n]);
-        let reg = self.regs[m];
+        let addr = Address(self.state[n]);
+        let reg = self.state[m];
         if WORD {
             let out = self.read_word_ldrswp(addr, NONSEQ);
             self.set_reg(d, out);
@@ -471,8 +471,8 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
 
         let value = self.bus.get_cp15(cm, cp, cn);
         if rd.is_pc() {
-            let cpsr = self.regs.cpsr() & 0x0FFF_FFFF;
-            self.regs.set_cpsr(cpsr | (value & 0xF000_0000));
+            let cpsr = self.state.cpsr() & 0x0FFF_FFFF;
+            self.state.set_cpsr(cpsr | (value & 0xF000_0000));
         } else {
             self.set_reg(rd, value);
         }
@@ -496,9 +496,9 @@ impl<S: Bus> Cpu<S> {
             ArmAluOp::Sub => self.sub::<CPSR>(a, b),
             ArmAluOp::Rsb => self.sub::<CPSR>(b, a),
             ArmAluOp::Add => self.add::<CPSR>(a, b),
-            ArmAluOp::Adc => self.adc::<CPSR>(a, b, self.regs.is_flag(Carry) as u32),
-            ArmAluOp::Sbc => self.sbc::<CPSR>(a, b, self.regs.is_flag(Carry) as u32),
-            ArmAluOp::Rsc => self.sbc::<CPSR>(b, a, self.regs.is_flag(Carry) as u32),
+            ArmAluOp::Adc => self.adc::<CPSR>(a, b, self.state.is_flag(Carry) as u32),
+            ArmAluOp::Sbc => self.sbc::<CPSR>(a, b, self.state.is_flag(Carry) as u32),
+            ArmAluOp::Rsc => self.sbc::<CPSR>(b, a, self.state.is_flag(Carry) as u32),
             ArmAluOp::Tst => {
                 self.and::<true>(a, b);
                 0
@@ -524,11 +524,12 @@ impl<S: Bus> Cpu<S> {
             ArmAluOp::Mvn => self.not::<CPSR>(b),
         };
 
-        if CPSR && d.is_pc() && self.regs.mode() != Mode::User && self.regs.mode() != Mode::System {
+        if CPSR && d.is_pc() && self.state.mode() != Mode::User && self.state.mode() != Mode::System
+        {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
-            let spsr = self.regs.spsr();
-            self.regs.set_cpsr(spsr);
+            let spsr = self.state.spsr();
+            self.state.set_cpsr(spsr);
         }
 
         if op.should_write() {

@@ -9,11 +9,14 @@
 //! Input handler.
 //! Luckily, GGA input is dead simple compared to even GG.
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::Interrupt;
 use common::TimeS;
 use modular_bitfield::{bitfield, specifiers::B14};
 
-use crate::{cpu::CPU_CLOCK, scheduling::AdvEvent, GameGirlAdv};
+use crate::{
+    cpu::{GgaFullBus, CPU_CLOCK},
+    scheduling::AdvEvent,
+};
 
 #[bitfield]
 #[repr(u16)]
@@ -25,7 +28,7 @@ pub struct KeyControl {
     irq_is_and: bool,
 }
 
-impl GameGirlAdv {
+impl GgaFullBus<'_> {
     pub fn keyinput(&self) -> u16 {
         // GGA input is active low
         0x3FF ^ self.c.input.state(self.scheduler.now()).0
@@ -44,7 +47,7 @@ impl GameGirlAdv {
                     cond & input == cond
                 };
             if fire {
-                Cpu::request_interrupt(self, Interrupt::Joypad);
+                self.cpu.request_interrupt(self.bus, Interrupt::Joypad);
             }
 
             self.scheduler
