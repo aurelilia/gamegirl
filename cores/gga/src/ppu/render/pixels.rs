@@ -132,13 +132,6 @@ impl PpuRender {
                 self.pixels[xy2d(x + 1, y)][1] = a;
             }
         }
-
-        // Consider forced blank
-        if self.r.dispcnt.forced_blank_enable() {
-            for x in 0..WIDTH {
-                self.pixels[xy2d(x, y)] = [255; 4];
-            }
-        }
     }
 
     fn finalize_pixel(

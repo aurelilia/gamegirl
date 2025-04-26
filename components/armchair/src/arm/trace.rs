@@ -89,11 +89,19 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         .unwrap()
     }
 
-    fn arm_alu_imm<const CPSR: bool>(&mut self, n: Register, d: Register, imm: u32, op: ArmAluOp) {
+    fn arm_alu_imm<const CPSR: bool>(
+        &mut self,
+        n: Register,
+        d: Register,
+        imm: u32,
+        imm_ror: u32,
+        op: ArmAluOp,
+    ) {
         write!(self.f, "{}{}", print_op(op), self.cc).unwrap();
         if CPSR {
             write!(self.f, "s").unwrap();
         }
+        let imm = imm.rotate_right(imm_ror);
         write!(self.f, " {d}, {n}, ${imm}").unwrap();
     }
 

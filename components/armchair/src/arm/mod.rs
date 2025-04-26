@@ -44,7 +44,14 @@ trait ArmVisitor {
         shift_kind: ArmAluShift,
         shift_operand: ArmOperandKind,
     );
-    fn arm_alu_imm<const CPSR: bool>(&mut self, n: Register, d: Register, imm: u32, op: ArmAluOp);
+    fn arm_alu_imm<const CPSR: bool>(
+        &mut self,
+        n: Register,
+        d: Register,
+        imm: u32,
+        imm_ror: u32,
+        op: ArmAluOp,
+    );
     fn arm_mul<const OP: ArmMulOp>(
         &mut self,
         n: Register,

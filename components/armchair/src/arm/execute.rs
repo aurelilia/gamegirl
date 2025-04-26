@@ -95,6 +95,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         shift_kind: ArmAluShift,
         shift_operand: ArmOperandKind,
     ) {
+        let carry = self.state.is_flag(Carry);
         let (a, b) = match shift_operand {
             ArmOperandKind::Immediate(imm) => {
                 let a = self.state[n];
@@ -108,11 +109,20 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
                 (a, self.shifted_op::<CPSR, false>(rm, shift_kind, shift))
             }
         };
-        self.alu_inner::<CPSR>(op, a, b, d);
+        self.alu_inner::<CPSR>(op, a, b, carry, d);
     }
 
-    fn arm_alu_imm<const CPSR: bool>(&mut self, n: Register, d: Register, imm: u32, op: ArmAluOp) {
-        self.alu_inner::<CPSR>(op, self.state[n], imm, d);
+    fn arm_alu_imm<const CPSR: bool>(
+        &mut self,
+        n: Register,
+        d: Register,
+        imm: u32,
+        imm_ror: u32,
+        op: ArmAluOp,
+    ) {
+        let carry = self.state.is_flag(Carry);
+        let imm = self.ror::<CPSR, false>(imm, imm_ror);
+        self.alu_inner::<CPSR>(op, self.state[n], imm, carry, d);
     }
 
     fn arm_mul<const OP: ArmMulOp>(
@@ -489,16 +499,16 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
 }
 
 impl<S: Bus> Cpu<S> {
-    fn alu_inner<const CPSR: bool>(&mut self, op: ArmAluOp, a: u32, b: u32, d: Register) {
+    fn alu_inner<const CPSR: bool>(&mut self, op: ArmAluOp, a: u32, b: u32, c: bool, d: Register) {
         let value = match op {
             ArmAluOp::And => self.and::<CPSR>(a, b),
             ArmAluOp::Eor => self.xor::<CPSR>(a, b),
             ArmAluOp::Sub => self.sub::<CPSR>(a, b),
             ArmAluOp::Rsb => self.sub::<CPSR>(b, a),
             ArmAluOp::Add => self.add::<CPSR>(a, b),
-            ArmAluOp::Adc => self.adc::<CPSR>(a, b, self.state.is_flag(Carry) as u32),
-            ArmAluOp::Sbc => self.sbc::<CPSR>(a, b, self.state.is_flag(Carry) as u32),
-            ArmAluOp::Rsc => self.sbc::<CPSR>(b, a, self.state.is_flag(Carry) as u32),
+            ArmAluOp::Adc => self.adc::<CPSR>(a, b, c as u32),
+            ArmAluOp::Sbc => self.sbc::<CPSR>(a, b, c as u32),
+            ArmAluOp::Rsc => self.sbc::<CPSR>(b, a, c as u32),
             ArmAluOp::Tst => {
                 self.and::<true>(a, b);
                 0

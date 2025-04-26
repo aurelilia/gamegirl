@@ -36,8 +36,6 @@ pub use state::CpuState;
 
 use crate::{interface::RwType, state::Flag::Thumb};
 
-// TODO initial pipeline fill
-
 /// Represents the CPU of the console.
 /// It is generic over the system used; see `interface.rs`.
 #[repr(C)]

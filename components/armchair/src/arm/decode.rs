@@ -38,11 +38,12 @@ impl ArmInst {
     }
 
     fn ldrstr_config(self, kind: ArmLdrStrKind) -> ArmLdrStrConfig {
+        let pre = self.is_bit(24);
         ArmLdrStrConfig {
-            pre: self.is_bit(24),
+            pre,
             up: self.is_bit(23),
             kind,
-            writeback: self.is_bit(21),
+            writeback: !pre || self.is_bit(21),
         }
     }
     fn ldrstr_shift_reg(self) -> ArmLdrStrOperandKind {
@@ -598,7 +599,8 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
             e.arm_alu_imm::<false>(
                 i.reg(16),
                 i.reg(12),
-                (i.0 & 0xFF).rotate_right(i.bits(8..=11) * 2),
+                i.0 & 0xFF,
+                i.bits(8..=11) << 1,
                 i.safe_transmute(21..=24),
             )
         },
@@ -606,7 +608,8 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
             e.arm_alu_imm::<true>(
                 i.reg(16),
                 i.reg(12),
-                (i.0 & 0xFF).rotate_right(i.bits(8..=11) * 2),
+                i.0 & 0xFF,
+                i.bits(8..=11) << 1,
                 i.safe_transmute(21..=24),
             )
         },
@@ -697,6 +700,7 @@ mod test {
             0b001_1101_0_1111_0000_0001_00000001,
             "moveq r0, pc, $1073741824",
         );
+        disasm_ok(0xE2B00102, "adcs r0, r0, $2147483648");
     }
 
     #[test]

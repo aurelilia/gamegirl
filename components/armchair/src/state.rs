@@ -107,7 +107,7 @@ pub struct FiqReg {
 /// A register with different values for the different CPU modes
 type ModeReg = [u32; 6];
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct CpuState {
     // Registers
@@ -335,6 +335,24 @@ impl CpuState {
         };
         self.invalidate_pipeline();
         self.access_type = SEQ;
+    }
+}
+
+impl Default for CpuState {
+    fn default() -> Self {
+        Self {
+            registers: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+            fiqs: Default::default(),
+            sp: [0x0300_7F00, 0x0, 0x0300_7FE0, 0x0, 0x0300_7FA0, 0x0],
+            lr: Default::default(),
+            cpsr: 0xD3,
+            spsr: Default::default(),
+            pipeline: Default::default(),
+            pipeline_valid: Default::default(),
+            access_type: Default::default(),
+            intr: Default::default(),
+            is_halted: Default::default(),
+        }
     }
 }
 

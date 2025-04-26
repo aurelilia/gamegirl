@@ -255,7 +255,7 @@ pub enum OverflowMode {
     Wraparound = 1,
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct BgRotScal {
     pub pa: i16,
@@ -290,6 +290,22 @@ impl BgRotScal {
             (word(lo, hi & 0x7FF) | 0xF800_0000) as i32
         } else {
             word(lo, hi & 0x7FF) as i32
+        }
+    }
+}
+
+impl Default for BgRotScal {
+    fn default() -> Self {
+        Self {
+            pa: 256,
+            pb: 0,
+            pc: 0,
+            pd: 256,
+            xl: Default::default(),
+            xh: Default::default(),
+            yl: Default::default(),
+            yh: Default::default(),
+            latched: Default::default(),
         }
     }
 }
