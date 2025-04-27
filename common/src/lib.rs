@@ -63,12 +63,12 @@ pub trait Core: Any + Send + Sync {
     fn skip_bootrom(&mut self);
 
     /// Create a save state that can be loaded with [load_state].
-    #[cfg(feature = "serde")]
-    fn save_state(&mut self) -> Vec<u8>;
+    fn save_state(&mut self) -> Vec<u8> {
+        Vec::new()
+    }
     /// Load a state produced by [save_state].
     /// Will restore the current cartridge and debugger.
-    #[cfg(feature = "serde")]
-    fn load_state(&mut self, state: &[u8]);
+    fn load_state(&mut self, state: &[u8]) {}
 
     /// Get the current system time.
     fn get_time(&self) -> Time;
