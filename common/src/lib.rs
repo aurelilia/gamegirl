@@ -28,6 +28,8 @@ pub mod macros;
 pub mod numutil;
 #[cfg(feature = "serde")]
 pub mod serialize;
+#[cfg(feature = "std")]
+pub mod testing;
 
 /// Maximum pointer size used by any system. This is used in some places, like
 /// the debugger, to avoid needing to use generic parameters.

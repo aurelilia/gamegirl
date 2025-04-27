@@ -58,6 +58,8 @@ mod io;
 mod memory;
 pub mod ppu;
 mod scheduling;
+#[cfg(test)]
+mod tests;
 
 /// Console struct representing a GGA. Contains all state and is used for system
 /// emulation.

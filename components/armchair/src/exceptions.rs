@@ -50,7 +50,7 @@ impl CpuState {
     /// Request an interrupt by index. Will check if the CPU will service it
     /// right away.
     pub fn request_interrupt_with_index(&mut self, bus: &mut impl Bus, idx: u16) {
-        self.intr.if_.set_bit(idx, true);
+        self.intr.if_ = self.intr.if_.set_bit(idx, true);
         self.check_if_interrupt(bus);
     }
 

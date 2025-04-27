@@ -19,7 +19,7 @@ bitflags.workspace = true
 elf_rs = "0.3.1"
 
 [features]
-default = []
+default = ["std"]
 serde = [
     "dep:serde",
     "dep:serde_arrays",
@@ -28,4 +28,4 @@ serde = [
     "armchair/serde",
     "bitflags/serde",
 ]
-std = []
+std = ["common/std"]

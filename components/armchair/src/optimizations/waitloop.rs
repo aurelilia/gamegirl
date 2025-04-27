@@ -20,5 +20,8 @@ impl WaitloopData {
 }
 
 impl<S: Bus> Cpu<S> {
-    pub fn check_unsuspend(&mut self) {}
+    pub fn check_unsuspend(&mut self) {
+        let intr_pending = (self.state.intr.ie & self.state.intr.if_) != 0;
+        self.state.is_halted = !intr_pending;
+    }
 }
