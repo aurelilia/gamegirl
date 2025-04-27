@@ -1,6 +1,6 @@
 use core::{
     fmt::Display,
-    ops::{Add, AddAssign, Mul, Neg, Not, Sub, SubAssign},
+    ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
 use common::numutil::NumExt;

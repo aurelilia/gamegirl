@@ -13,35 +13,48 @@ pub trait NumExt: BitAnd<Output = Self> + Copy + PartialEq + Default + UpperHex 
     const WIDTH: u32;
 
     /// Get the state of the given bit. Returns 0/1.
+    #[must_use]
     fn bit(self, bit: u16) -> Self;
     /// Is the given bit set?
+    #[must_use]
     fn is_bit(&self, bit: u16) -> bool;
     /// Set the given bit.
+    #[must_use]
     fn set_bit(self, bit: u16, state: bool) -> Self;
     /// Convert to u8
+    #[must_use]
     fn u8(self) -> u8;
     /// Convert to u16
+    #[must_use]
     fn u16(self) -> u16;
     /// Convert to u32
+    #[must_use]
     fn u32(self) -> u32;
     /// Convert to usize
+    #[must_use]
     fn us(self) -> usize;
     /// Assert this to be a certain width
     fn assert_width(self, w: u32) -> Self;
 
     /// Convert from u8
+    #[must_use]
     fn from_u8(from: u8) -> Self;
     /// Convert from u16
+    #[must_use]
     fn from_u16(from: u16) -> Self;
     /// Convert from u32
+    #[must_use]
     fn from_u32(from: u32) -> Self;
 
     /// Get bits in a certain range
+    #[must_use]
     fn bits(self, start: Self, len: Self) -> Self;
 
     /// Shift to the left, giving 0 if it does not fit.
+    #[must_use]
     fn wshl(self, by: u32) -> Self;
     /// Shift to the right, giving 0 if it does not fit.
+    #[must_use]
     fn wshr(self, by: u32) -> Self;
 }
 

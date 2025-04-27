@@ -20,7 +20,7 @@ use crate::{
         access::{CODE, NONSEQ, SEQ},
         Access, Address,
     },
-    Cpu, InterruptController, RelativeOffset,
+    Cpu, InterruptController,
 };
 
 /// Macro for creating accessors for mode-dependent registers.
