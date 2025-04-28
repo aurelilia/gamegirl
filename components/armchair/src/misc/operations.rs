@@ -94,7 +94,10 @@ impl<S: Bus> Cpu<S> {
 
     /// Perform a relative jump.
     pub fn relative_jump(&mut self, offset: RelativeOffset) {
-        self.state.is_halted = !self.opt.waitloop.on_jump(&self.state, offset);
+        self.state.is_halted = !self
+            .opt
+            .waitloop
+            .on_jump(&self.state, offset, &mut self.opt.table);
         self.set_pc(self.state.pc().add_rel(offset));
     }
 }

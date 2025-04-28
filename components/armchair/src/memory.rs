@@ -127,13 +127,13 @@ impl<S: Bus> Cpu<S> {
         let value = self.bus.read::<T>(&mut self.state, addr, access);
         self.opt
             .waitloop
-            .on_read(addr, value.u32(), T::from_u32(u32::MAX).u32());
+            .on_read(addr, value.u32(), &mut self.opt.table);
         value
     }
 
     /// Set the value at the given memory address and add to the system clock.
     pub fn write<T: RwType>(&mut self, addr: Address, value: T, access: Access) {
-        self.opt.waitloop.on_write();
+        self.opt.waitloop.on_write(&mut self.opt.table);
         self.bus.write(&mut self.state, addr, value, access);
     }
 }
