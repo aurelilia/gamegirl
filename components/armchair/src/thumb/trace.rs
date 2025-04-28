@@ -13,7 +13,7 @@ use crate::{
 impl Display for ThumbInst {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut formatter = ThumbFormat { f };
-        (decode::get_instruction_handler(*self, false))(&mut formatter, *self);
+        (decode::get_instruction_handler(*self))(&mut formatter, *self);
         Ok(())
     }
 }
@@ -27,27 +27,22 @@ impl<'f1, 'f2> ThumbVisitor for ThumbFormat<'f1, 'f2> {
         write!(self.f, "{inst:X}??").unwrap()
     }
 
-    fn thumb_alu_imm<const KIND: Thumb1Op>(&mut self, d: LowRegister, s: LowRegister, n: u32) {
-        write!(self.f, "{} {d}, {s}, ${n}", print_op(KIND)).unwrap()
+    fn thumb_alu_imm(&mut self, kind: Thumb1Op, d: LowRegister, s: LowRegister, n: u32) {
+        write!(self.f, "{} {d}, {s}, ${n}", print_op(kind)).unwrap()
     }
 
-    fn thumb_2_reg<const KIND: Thumb2Op>(
-        &mut self,
-        d: LowRegister,
-        s: LowRegister,
-        n: LowRegister,
-    ) {
-        write!(self.f, "{} {d}, {s}, {n}", print_op(KIND)).unwrap()
+    fn thumb_2_reg(&mut self, kind: Thumb2Op, d: LowRegister, s: LowRegister, n: LowRegister) {
+        write!(self.f, "{} {d}, {s}, {n}", print_op(kind)).unwrap()
     }
 
-    fn thumb_3<const KIND: Thumb3Op>(&mut self, d: LowRegister, n: u32) {
-        write!(self.f, "{} {d}, $0x{n:X}", print_op(KIND)).unwrap()
+    fn thumb_3(&mut self, kind: Thumb3Op, d: LowRegister, n: u32) {
+        write!(self.f, "{} {d}, $0x{n:X}", print_op(kind)).unwrap()
     }
 
-    fn thumb_alu<const KIND: Thumb4Op>(&mut self, d: LowRegister, s: LowRegister) {
-        match KIND {
+    fn thumb_alu(&mut self, kind: Thumb4Op, d: LowRegister, s: LowRegister) {
+        match kind {
             Thumb4Op::Tst => write!(self.f, "tst {s}"),
-            _ => write!(self.f, "{} {d}, {s}", print_op(KIND)),
+            _ => write!(self.f, "{} {d}, {s}", print_op(kind)),
         }
         .unwrap()
     }
@@ -76,26 +71,28 @@ impl<'f1, 'f2> ThumbVisitor for ThumbFormat<'f1, 'f2> {
         write!(self.f, "ldr {d}, [PC, {offset}]").unwrap()
     }
 
-    fn thumb_ldrstr78<const O: ThumbStrLdrOp>(
+    fn thumb_ldrstr78(
         &mut self,
+        op: ThumbStrLdrOp,
         d: LowRegister,
         b: LowRegister,
         o: LowRegister,
     ) {
-        write!(self.f, "{} {d}, [{b}, {o}]", print_op(O)).unwrap()
+        write!(self.f, "{} {d}, [{b}, {o}]", print_op(op)).unwrap()
     }
 
-    fn thumb_ldrstr9<const O: ThumbStrLdrOp>(
+    fn thumb_ldrstr9(
         &mut self,
+        op: ThumbStrLdrOp,
         d: LowRegister,
         b: LowRegister,
         offset: Address,
     ) {
-        write!(self.f, "{} {d}, [{b}, {offset}]", print_op(O)).unwrap()
+        write!(self.f, "{} {d}, [{b}, {offset}]", print_op(op)).unwrap()
     }
 
-    fn thumb_ldrstr10<const STR: bool>(&mut self, d: LowRegister, b: LowRegister, offset: Address) {
-        if STR {
+    fn thumb_ldrstr10(&mut self, str: bool, d: LowRegister, b: LowRegister, offset: Address) {
+        if str {
             write!(self.f, "strh {d}, [{b}, {offset}]")
         } else {
             write!(self.f, "ldrh {d}, [{b}, {offset}]")
@@ -111,8 +108,8 @@ impl<'f1, 'f2> ThumbVisitor for ThumbFormat<'f1, 'f2> {
         write!(self.f, "ldr {d}, [sp, {offset}]").unwrap()
     }
 
-    fn thumb_rel_addr<const SP: bool>(&mut self, d: LowRegister, offset: Address) {
-        if SP {
+    fn thumb_rel_addr(&mut self, sp: bool, d: LowRegister, offset: Address) {
+        if sp {
             write!(self.f, "add {d}, sp, {offset}")
         } else {
             write!(self.f, "add {d}, pc, {offset}")
@@ -179,8 +176,8 @@ impl<'f1, 'f2> ThumbVisitor for ThumbFormat<'f1, 'f2> {
         write!(self.f, "mov lr, (pc + {offset})",).unwrap()
     }
 
-    fn thumb_bl<const THUMB: bool>(&mut self, offset: Address) {
-        if THUMB {
+    fn thumb_bl(&mut self, offset: Address, thumb: bool) {
+        if thumb {
             write!(self.f, "bl lr + {offset}")
         } else {
             write!(self.f, "blx lr + {offset}")

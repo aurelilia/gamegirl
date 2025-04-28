@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use core::{fmt::UpperHex, marker::ConstParamTy};
+use core::fmt::UpperHex;
 
 use bitmatch::bitmatch;
 use common::numutil::{NumExt, U16Ext};
@@ -74,7 +74,7 @@ impl UpperHex for ThumbInst {
     }
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum Thumb1Op {
     Lsl,
     Lsr,
@@ -83,13 +83,13 @@ pub enum Thumb1Op {
     Sub,
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum Thumb2Op {
     Add,
     Sub,
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum Thumb3Op {
     Mov,
     Cmp,
@@ -97,7 +97,7 @@ pub enum Thumb3Op {
     Sub,
 }
 
-#[derive(ConstParamTy, FromPrimitive, Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum Thumb4Op {
     And = 0,
     Eor,
@@ -117,7 +117,7 @@ pub enum Thumb4Op {
     Mvn,
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum ThumbStrLdrOp {
     Str = 0,
     Strh,
@@ -133,144 +133,92 @@ pub const fn get_lut_table<I: ThumbVisitor>() -> [fn(&mut I, ThumbInst); 256] {
     let mut lut: [fn(&mut I, ThumbInst); 256] = [I::thumb_unknown_opcode; 256];
     let mut i = 0;
     while i < 256 {
-        lut[i] = get_instruction_handler::<I>(ThumbInst((i << 8) as u16), true);
+        lut[i] = get_instruction_handler::<I>(ThumbInst((i << 8) as u16));
         i += 1;
     }
     lut
 }
 
 #[bitmatch]
-pub const fn get_instruction_handler<I: ThumbVisitor>(
-    i: ThumbInst,
-    for_lut: bool,
-) -> fn(&mut I, ThumbInst) {
+pub const fn get_instruction_handler<I: ThumbVisitor>(i: ThumbInst) -> fn(&mut I, ThumbInst) {
     use Thumb1Op as Op1;
     use Thumb2Op as Op2;
     use Thumb3Op as Op3;
-    use Thumb4Op as Op4;
     use ThumbStrLdrOp::*;
 
     #[bitmatch]
-    match i.0 >> 6 {
+    match i.0 >> 8 {
         // THUMB.1/2
-        "00000_?????" => |e, i| e.thumb_alu_imm::<{ Op1::Lsl }>(i.reg(0), i.reg(3), i.imm5()),
-        "00001_?????" => |e, i| e.thumb_alu_imm::<{ Op1::Lsr }>(i.reg(0), i.reg(3), i.imm5()),
-        "00010_?????" => |e, i| e.thumb_alu_imm::<{ Op1::Asr }>(i.reg(0), i.reg(3), i.imm5()),
-        "0001110_???" => {
-            |e, i| e.thumb_alu_imm::<{ Op1::Add }>(i.reg(0), i.reg(3), i.reg(6).0.u32())
-        }
-        "0001111_???" => {
-            |e, i| e.thumb_alu_imm::<{ Op1::Sub }>(i.reg(0), i.reg(3), i.reg(6).0.u32())
-        }
-        "0001100_???" => |e, i| e.thumb_2_reg::<{ Op2::Add }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0001101_???" => |e, i| e.thumb_2_reg::<{ Op2::Sub }>(i.reg(0), i.reg(3), i.reg(6)),
+        "00000_???" => |e, i| e.thumb_alu_imm(Op1::Lsl, i.reg(0), i.reg(3), i.imm5()),
+        "00001_???" => |e, i| e.thumb_alu_imm(Op1::Lsr, i.reg(0), i.reg(3), i.imm5()),
+        "00010_???" => |e, i| e.thumb_alu_imm(Op1::Asr, i.reg(0), i.reg(3), i.imm5()),
+        "0001110_?" => |e, i| e.thumb_alu_imm(Op1::Add, i.reg(0), i.reg(3), i.reg(6).0.u32()),
+        "0001111_?" => |e, i| e.thumb_alu_imm(Op1::Sub, i.reg(0), i.reg(3), i.reg(6).0.u32()),
+        "0001100_?" => |e, i| e.thumb_2_reg(Op2::Add, i.reg(0), i.reg(3), i.reg(6)),
+        "0001101_?" => |e, i| e.thumb_2_reg(Op2::Sub, i.reg(0), i.reg(3), i.reg(6)),
 
         // THUMB.3
-        "00100_?????" => |e, i| e.thumb_3::<{ Op3::Mov }>(i.reg(8), i.imm8()),
-        "00101_?????" => |e, i| e.thumb_3::<{ Op3::Cmp }>(i.reg(8), i.imm8()),
-        "00110_?????" => |e, i| e.thumb_3::<{ Op3::Add }>(i.reg(8), i.imm8()),
-        "00111_?????" => |e, i| e.thumb_3::<{ Op3::Sub }>(i.reg(8), i.imm8()),
+        "001_?????" => {
+            |e, i| e.thumb_3(Op3::from_u16(i.0.bits(11, 2)).unwrap(), i.reg(8), i.imm8())
+        }
 
         // THUMB.4
-        "010000_????" if for_lut => |e, i| match i.thumb4() {
-            Op4::And => e.thumb_alu::<{ Op4::And }>(i.reg(0), i.reg(3)),
-            Op4::Eor => e.thumb_alu::<{ Op4::Eor }>(i.reg(0), i.reg(3)),
-            Op4::Lsl => e.thumb_alu::<{ Op4::Lsl }>(i.reg(0), i.reg(3)),
-            Op4::Lsr => e.thumb_alu::<{ Op4::Lsr }>(i.reg(0), i.reg(3)),
-            Op4::Asr => e.thumb_alu::<{ Op4::Asr }>(i.reg(0), i.reg(3)),
-            Op4::Adc => e.thumb_alu::<{ Op4::Adc }>(i.reg(0), i.reg(3)),
-            Op4::Sbc => e.thumb_alu::<{ Op4::Sbc }>(i.reg(0), i.reg(3)),
-            Op4::Ror => e.thumb_alu::<{ Op4::Ror }>(i.reg(0), i.reg(3)),
-            Op4::Tst => e.thumb_alu::<{ Op4::Tst }>(i.reg(0), i.reg(3)),
-            Op4::Neg => e.thumb_alu::<{ Op4::Neg }>(i.reg(0), i.reg(3)),
-            Op4::Cmp => e.thumb_alu::<{ Op4::Cmp }>(i.reg(0), i.reg(3)),
-            Op4::Cmn => e.thumb_alu::<{ Op4::Cmn }>(i.reg(0), i.reg(3)),
-            Op4::Orr => e.thumb_alu::<{ Op4::Orr }>(i.reg(0), i.reg(3)),
-            Op4::Mul => e.thumb_alu::<{ Op4::Mul }>(i.reg(0), i.reg(3)),
-            Op4::Bic => e.thumb_alu::<{ Op4::Bic }>(i.reg(0), i.reg(3)),
-            Op4::Mvn => e.thumb_alu::<{ Op4::Mvn }>(i.reg(0), i.reg(3)),
-        },
-        "0100000000" if !for_lut => |e, i| e.thumb_alu::<{ Op4::And }>(i.reg(0), i.reg(3)),
-        "0100000001" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Eor }>(i.reg(0), i.reg(3)),
-        "0100000010" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Lsl }>(i.reg(0), i.reg(3)),
-        "0100000011" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Lsr }>(i.reg(0), i.reg(3)),
-        "0100000100" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Asr }>(i.reg(0), i.reg(3)),
-        "0100000101" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Adc }>(i.reg(0), i.reg(3)),
-        "0100000110" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Sbc }>(i.reg(0), i.reg(3)),
-        "0100000111" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Ror }>(i.reg(0), i.reg(3)),
-        "0100001000" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Tst }>(i.reg(0), i.reg(3)),
-        "0100001001" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Neg }>(i.reg(0), i.reg(3)),
-        "0100001010" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Cmp }>(i.reg(0), i.reg(3)),
-        "0100001011" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Cmn }>(i.reg(0), i.reg(3)),
-        "0100001100" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Orr }>(i.reg(0), i.reg(3)),
-        "0100001101" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Mul }>(i.reg(0), i.reg(3)),
-        "0100001110" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Bic }>(i.reg(0), i.reg(3)),
-        "0100001111" if !for_lut => |e, i| e.thumb_alu::<{ Op4::Mvn }>(i.reg(0), i.reg(3)),
+        "010000_??" => |e, i| e.thumb_alu(i.thumb4(), i.reg(0), i.reg(3)),
 
         // THUMB.5
-        "01000100_??" => |e, i| e.thumb_hi_add(i.reg16()),
-        "01000101_??" => |e, i| e.thumb_hi_cmp(i.reg16()),
-        "01000110_??" => |e, i| e.thumb_hi_mov(i.reg16()),
-        "01000111_??" => |e, i| {
+        "01000100" => |e, i| e.thumb_hi_add(i.reg16()),
+        "01000101" => |e, i| e.thumb_hi_cmp(i.reg16()),
+        "01000110" => |e, i| e.thumb_hi_mov(i.reg16()),
+        "01000111" => |e, i| {
             let (s, d) = i.reg16();
             e.thumb_hi_bx(s, d.0 > 7)
         },
 
         // THUMB.6
-        "01001_?????" => |e, i| e.thumb_ldr6(i.reg(8), Address(i.imm8().u32() << 2)),
+        "01001_???" => |e, i| e.thumb_ldr6(i.reg(8), Address(i.imm8().u32() << 2)),
         // THUMB.7/8
-        "0101000_???" => |e, i| e.thumb_ldrstr78::<{ Str }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101001_???" => |e, i| e.thumb_ldrstr78::<{ Strh }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101010_???" => |e, i| e.thumb_ldrstr78::<{ Strb }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101011_???" => |e, i| e.thumb_ldrstr78::<{ Ldsb }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101100_???" => |e, i| e.thumb_ldrstr78::<{ Ldr }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101101_???" => |e, i| e.thumb_ldrstr78::<{ Ldrh }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101110_???" => |e, i| e.thumb_ldrstr78::<{ Ldrb }>(i.reg(0), i.reg(3), i.reg(6)),
-        "0101111_???" => |e, i| e.thumb_ldrstr78::<{ Ldsh }>(i.reg(0), i.reg(3), i.reg(6)),
+        "0101_????" => |e, i| {
+            e.thumb_ldrstr78(
+                ThumbStrLdrOp::from_u16(i.0.bits(9, 3)).unwrap(),
+                i.reg(0),
+                i.reg(3),
+                i.reg(6),
+            )
+        },
         // THUMB.9
-        "01100_?????" => {
-            |e, i| e.thumb_ldrstr9::<{ Str }>(i.reg(0), i.reg(3), Address(i.imm5() << 2))
-        }
-        "01101_?????" => {
-            |e, i| e.thumb_ldrstr9::<{ Ldr }>(i.reg(0), i.reg(3), Address(i.imm5() << 2))
-        }
-        "01110_?????" => |e, i| e.thumb_ldrstr9::<{ Strb }>(i.reg(0), i.reg(3), Address(i.imm5())),
-        "01111_?????" => |e, i| e.thumb_ldrstr9::<{ Ldrb }>(i.reg(0), i.reg(3), Address(i.imm5())),
+        "01100_???" => |e, i| e.thumb_ldrstr9(Str, i.reg(0), i.reg(3), Address(i.imm5() << 2)),
+        "01101_???" => |e, i| e.thumb_ldrstr9(Ldr, i.reg(0), i.reg(3), Address(i.imm5() << 2)),
+        "01110_???" => |e, i| e.thumb_ldrstr9(Strb, i.reg(0), i.reg(3), Address(i.imm5())),
+        "01111_???" => |e, i| e.thumb_ldrstr9(Ldrb, i.reg(0), i.reg(3), Address(i.imm5())),
         // THUMB.10
-        "10000_?????" => {
-            |e, i| e.thumb_ldrstr10::<true>(i.reg(0), i.reg(3), Address(i.imm5() << 1))
-        }
-        "10001_?????" => {
-            |e, i| e.thumb_ldrstr10::<false>(i.reg(0), i.reg(3), Address(i.imm5() << 1))
+        "1000_????" => {
+            |e, i| e.thumb_ldrstr10(!i.is_bit(11), i.reg(0), i.reg(3), Address(i.imm5() << 1))
         }
 
         // THUMB.11
-        "10010_?????" => |e, i| e.thumb_str_sp(i.reg(8), Address(i.imm8() << 2)),
-        "10011_?????" => |e, i| e.thumb_ldr_sp(i.reg(8), Address(i.imm8() << 2)),
+        "10010_???" => |e, i| e.thumb_str_sp(i.reg(8), Address(i.imm8() << 2)),
+        "10011_???" => |e, i| e.thumb_ldr_sp(i.reg(8), Address(i.imm8() << 2)),
 
         // THUMB.12
-        "10100_?????" => |e, i| e.thumb_rel_addr::<false>(i.reg(8), Address(i.imm8() << 2)),
-        "10101_?????" => |e, i| e.thumb_rel_addr::<true>(i.reg(8), Address(i.imm8() << 2)),
+        "1010_????" => |e, i| e.thumb_rel_addr(i.is_bit(11), i.reg(8), Address(i.imm8() << 2)),
 
         // THUMB.13
-        "10110000_??" => |e, i| {
+        "10110000" => |e, i| {
             let offset = i.imm7() as i32;
             e.thumb_sp_offs(RelativeOffset(if i.is_bit(7) { -offset } else { offset }))
         },
 
         // THUMB.14
-        "10110100_??" => |e, i| e.thumb_push(i.0 as u8, false),
-        "10110101_??" => |e, i| e.thumb_push(i.0 as u8, true),
-        "10111100_??" => |e, i| e.thumb_pop(i.0 as u8, false),
-        "10111101_??" => |e, i| e.thumb_pop(i.0 as u8, true),
+        "1011010_?" => |e, i| e.thumb_push(i.0 as u8, i.is_bit(8)),
+        "1011110_?" => |e, i| e.thumb_pop(i.0 as u8, i.is_bit(8)),
 
         // THUMB.15
-        "11000_?????" => |e, i| e.thumb_stmia(i.reg(8), i.0 as u8),
-        "11001_?????" => |e, i| e.thumb_ldmia(i.reg(8), i.0 as u8),
+        "11000_???" => |e, i| e.thumb_stmia(i.reg(8), i.0 as u8),
+        "11001_???" => |e, i| e.thumb_ldmia(i.reg(8), i.0 as u8),
 
         // THUMB.16/17
-        "11011111_??" => |e, _| e.thumb_swi(),
-        "1101_??????" => |e, i| {
+        "11011111" => |e, _| e.thumb_swi(),
+        "1101_????" => |e, i| {
             e.thumb_bcond(
                 (i.0 >> 8) & 0xF,
                 RelativeOffset((i.imm8() as i8 as i32) * 2),
@@ -278,11 +226,10 @@ pub const fn get_instruction_handler<I: ThumbVisitor>(
         },
 
         // THUMB.18
-        "11100_?????" => |e, i| e.thumb_br(RelativeOffset(i.imm10() as i32 * 2)),
+        "11100_???" => |e, i| e.thumb_br(RelativeOffset(i.imm10() as i32 * 2)),
         // THUMB.19
-        "11110_?????" => |e, i| e.thumb_set_lr(RelativeOffset((i.imm10() as i32) << 12)),
-        "11101_?????" => |e, i| e.thumb_bl::<false>(Address(i.imm11())),
-        "11111_?????" => |e, i| e.thumb_bl::<true>(Address(i.imm11())),
+        "11110_???" => |e, i| e.thumb_set_lr(RelativeOffset((i.imm10() as i32) << 12)),
+        "111?1_???" => |e, i| e.thumb_bl(Address(i.imm11()), i.is_bit(12)),
 
         _ => I::thumb_unknown_opcode,
     }

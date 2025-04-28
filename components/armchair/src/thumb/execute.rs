@@ -38,10 +38,10 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     }
 
     // THUMB.1/2
-    fn thumb_alu_imm<const KIND: Thumb1Op>(&mut self, d: LowRegister, s: LowRegister, n: u32) {
+    fn thumb_alu_imm(&mut self, kind: Thumb1Op, d: LowRegister, s: LowRegister, n: u32) {
         use Thumb1Op::*;
         let rs = self.state[s];
-        let value = match KIND {
+        let value = match kind {
             Lsl => self.lsl::<true>(rs, n),
             Lsr => self.lsr::<true, true>(rs, n),
             Asr => self.asr::<true, true>(rs, n),
@@ -52,15 +52,10 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     }
 
     // THUMB.2
-    fn thumb_2_reg<const KIND: Thumb2Op>(
-        &mut self,
-        d: LowRegister,
-        s: LowRegister,
-        n: LowRegister,
-    ) {
+    fn thumb_2_reg(&mut self, kind: Thumb2Op, d: LowRegister, s: LowRegister, n: LowRegister) {
         let rs = self.state[s];
         let rn = self.state[n];
-        let value = match KIND {
+        let value = match kind {
             Thumb2Op::Add => self.add::<true>(rs, rn),
             Thumb2Op::Sub => self.sub::<true>(rs, rn),
         };
@@ -68,10 +63,10 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     }
 
     // THUMB.3
-    fn thumb_3<const KIND: Thumb3Op>(&mut self, d: LowRegister, n: u32) {
+    fn thumb_3(&mut self, kind: Thumb3Op, d: LowRegister, n: u32) {
         use Thumb3Op::*;
         let rd = self.state[d];
-        match KIND {
+        match kind {
             Mov => {
                 self.set_nz::<true>(n);
                 self.state[d] = n;
@@ -85,13 +80,13 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     }
 
     // THUMB.4
-    fn thumb_alu<const KIND: Thumb4Op>(&mut self, d: LowRegister, s: LowRegister) {
+    fn thumb_alu(&mut self, kind: Thumb4Op, d: LowRegister, s: LowRegister) {
         use Thumb4Op::*;
 
         let rd = self.state[d];
         let rs = self.state[s];
 
-        self.state[d] = match KIND {
+        self.state[d] = match kind {
             And => self.and::<true>(rd, rs),
             Eor => self.xor::<true>(rd, rs),
             Lsl => {
@@ -193,8 +188,9 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     }
 
     // THUMB.7/8
-    fn thumb_ldrstr78<const O: ThumbStrLdrOp>(
+    fn thumb_ldrstr78(
         &mut self,
+        op: ThumbStrLdrOp,
         d: LowRegister,
         b: LowRegister,
         o: LowRegister,
@@ -207,7 +203,7 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         let addr = Address(rb.wrapping_add(ro));
         self.state.access_type = NONSEQ;
 
-        match O {
+        match op {
             Str => self.write::<u32>(addr, rd, NONSEQ),
             Strh => self.write::<u16>(addr, rd.u16(), NONSEQ),
             Strb => self.write::<u8>(addr, rd.u8(), NONSEQ),
@@ -221,15 +217,16 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
             }
             Ldsh => self.state[d] = self.read::<u16>(addr, NONSEQ) as i16 as i32 as u32,
         }
-        if O as usize > 2 {
+        if op as usize > 2 {
             // LDR has +1I
             self.bus.tick(1);
         }
     }
 
     // THUMB.9
-    fn thumb_ldrstr9<const O: ThumbStrLdrOp>(
+    fn thumb_ldrstr9(
         &mut self,
+        op: ThumbStrLdrOp,
         d: LowRegister,
         b: LowRegister,
         offset: Address,
@@ -240,7 +237,7 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         let rd = self.state[d];
         self.state.access_type = NONSEQ;
 
-        match O {
+        match op {
             Str => self.write::<u32>(rb + offset, rd, NONSEQ),
             Strb => self.write::<u8>(rb + offset, rd.u8(), NONSEQ),
 
@@ -250,19 +247,19 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
             _ => unreachable!(),
         }
 
-        if O == Ldr || O == Ldrb {
+        if op == Ldr || op == Ldrb {
             // LDR has +1I
             self.bus.tick(1);
         }
     }
 
     // THUMB.10
-    fn thumb_ldrstr10<const STR: bool>(&mut self, d: LowRegister, b: LowRegister, offset: Address) {
+    fn thumb_ldrstr10(&mut self, str: bool, d: LowRegister, b: LowRegister, offset: Address) {
         let rd = self.state[d];
         let addr = Address(self.state[b]) + offset;
         self.state.access_type = NONSEQ;
 
-        if STR {
+        if str {
             self.write::<u16>(addr, rd.u16(), NONSEQ);
         } else {
             self.state[d] = self.read::<u16>(addr, NONSEQ).u32();
@@ -286,8 +283,8 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     }
 
     // THUMB.12
-    fn thumb_rel_addr<const SP: bool>(&mut self, d: LowRegister, offset: Address) {
-        if SP {
+    fn thumb_rel_addr(&mut self, sp: bool, d: LowRegister, offset: Address) {
+        if sp {
             self.state[d] = (self.state.sp() + offset).0;
         } else {
             self.state[d] = (self.state.adj_pc() + offset).0;
@@ -418,10 +415,10 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         self.state.set_lr(lr);
     }
 
-    fn thumb_bl<const THUMB: bool>(&mut self, offset: Address) {
+    fn thumb_bl(&mut self, offset: Address, thumb: bool) {
         let pc = self.state.pc();
         self.set_pc(self.state.lr() + offset);
         self.state.set_lr(pc - Address::BYTE);
-        self.state.set_flag(Thumb, THUMB);
+        self.state.set_flag(Thumb, thumb);
     }
 }
