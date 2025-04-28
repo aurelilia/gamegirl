@@ -35,7 +35,7 @@ trait ArmVisitor {
     fn arm_bx(&mut self, n: Register);
     fn arm_blx(&mut self, src: ArmSignedOperandKind);
 
-    fn arm_alu_reg<const CPSR: bool>(
+    fn arm_alu_reg(
         &mut self,
         n: Register,
         d: Register,
@@ -43,35 +43,39 @@ trait ArmVisitor {
         op: ArmAluOp,
         shift_kind: ArmAluShift,
         shift_operand: ArmOperandKind,
+        cpsr: bool,
     );
-    fn arm_alu_imm<const CPSR: bool>(
+    fn arm_alu_imm(
         &mut self,
         n: Register,
         d: Register,
         imm: u32,
         imm_ror: u32,
         op: ArmAluOp,
-    );
-    fn arm_mul<const OP: ArmMulOp>(
-        &mut self,
-        n: Register,
-        s: Register,
-        d: Register,
-        m: Register,
         cpsr: bool,
     );
-    fn arm_sh_mul<const OP: ArmShMulOp>(
+    fn arm_mul(
         &mut self,
         n: Register,
         s: Register,
         d: Register,
         m: Register,
+        op: ArmMulOp,
+        cpsr: bool,
+    );
+    fn arm_sh_mul(
+        &mut self,
+        n: Register,
+        s: Register,
+        d: Register,
+        m: Register,
+        op: ArmShMulOp,
         x_top: bool,
         y_top: bool,
     );
 
     fn arm_clz(&mut self, m: Register, d: Register);
-    fn arm_q<const OP: ArmQOp>(&mut self, n: Register, m: Register, d: Register);
+    fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp);
 
     fn arm_msr(&mut self, src: ArmOperandKind, flags: bool, ctrl: bool, spsr: bool);
     fn arm_mrs(&mut self, d: Register, spsr: bool);
@@ -84,7 +88,7 @@ trait ArmVisitor {
         config: ArmLdrStrConfig,
     );
     fn arm_ldmstm(&mut self, n: Register, rlist: u16, force_user: bool, config: ArmLdmStmConfig);
-    fn arm_swp<const WORD: bool>(&mut self, n: Register, d: Register, m: Register);
+    fn arm_swp(&mut self, n: Register, d: Register, m: Register, word: bool);
 
     fn arm_mrc(&mut self, cm: u32, cp: u32, pn: u32, rd: Register, cn: u32, opc: u32);
     fn arm_mcr(&mut self, cm: u32, cp: u32, pn: u32, rd: Register, cn: u32, opc: u32);

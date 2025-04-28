@@ -42,11 +42,11 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         use Thumb1Op::*;
         let rs = self.state[s];
         let value = match kind {
-            Lsl => self.lsl::<true>(rs, n),
-            Lsr => self.lsr::<true, true>(rs, n),
-            Asr => self.asr::<true, true>(rs, n),
-            Add => self.add::<true>(rs, n & 7),
-            Sub => self.sub::<true>(rs, n & 7),
+            Lsl => self.lsl(true, rs, n),
+            Lsr => self.lsr::<true>(true, rs, n),
+            Asr => self.asr::<true>(true, rs, n),
+            Add => self.add(true, rs, n & 7),
+            Sub => self.sub(true, rs, n & 7),
         };
         self.state[d] = value;
     }
@@ -56,8 +56,8 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         let rs = self.state[s];
         let rn = self.state[n];
         let value = match kind {
-            Thumb2Op::Add => self.add::<true>(rs, rn),
-            Thumb2Op::Sub => self.sub::<true>(rs, rn),
+            Thumb2Op::Add => self.add(true, rs, rn),
+            Thumb2Op::Sub => self.sub(true, rs, rn),
         };
         self.state[d] = value;
     }
@@ -68,14 +68,14 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         let rd = self.state[d];
         match kind {
             Mov => {
-                self.set_nz::<true>(n);
+                self.set_nz(true, n);
                 self.state[d] = n;
             }
             Cmp => {
-                self.sub::<true>(rd, n);
+                self.sub(true, rd, n);
             }
-            Add => self.state[d] = self.add::<true>(rd, n),
-            Sub => self.state[d] = self.sub::<true>(rd, n),
+            Add => self.state[d] = self.add(true, rd, n),
+            Sub => self.state[d] = self.sub(true, rd, n),
         };
     }
 
@@ -87,52 +87,52 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         let rs = self.state[s];
 
         self.state[d] = match kind {
-            And => self.and::<true>(rd, rs),
-            Eor => self.xor::<true>(rd, rs),
+            And => self.and(true, rd, rs),
+            Eor => self.xor(true, rd, rs),
             Lsl => {
                 self.idle_nonseq();
-                self.lsl::<true>(rd, rs & 0xFF)
+                self.lsl(true, rd, rs & 0xFF)
             }
             Lsr => {
                 self.idle_nonseq();
-                self.lsr::<true, false>(rd, rs & 0xFF)
+                self.lsr::<false>(true, rd, rs & 0xFF)
             }
             Asr => {
                 self.idle_nonseq();
-                self.asr::<true, false>(rd, rs & 0xFF)
+                self.asr::<false>(true, rd, rs & 0xFF)
             }
             Adc => {
                 let c = self.state.is_flag(Carry) as u32;
-                self.adc::<true>(rd, rs, c)
+                self.adc(true, rd, rs, c)
             }
             Sbc => {
                 let c = self.state.is_flag(Carry) as u32;
-                self.sbc::<true>(rd, rs, c)
+                self.sbc(true, rd, rs, c)
             }
             Ror => {
                 self.idle_nonseq();
-                self.ror::<true, false>(rd, rs & 0xFF)
+                self.ror::<false>(true, rd, rs & 0xFF)
             }
             Tst => {
-                self.and::<true>(rd, rs);
+                self.and(true, rd, rs);
                 rd
             }
-            Neg => self.neg::<true>(rs),
+            Neg => self.neg(true, rs),
             Cmp => {
-                self.sub::<true>(rd, rs);
+                self.sub(true, rd, rs);
                 rd
             }
             Cmn => {
-                self.add::<true>(rd, rs);
+                self.add(true, rd, rs);
                 rd
             }
-            Orr => self.or::<true>(rd, rs),
+            Orr => self.or(true, rd, rs),
             Mul => {
                 self.apply_mul_idle_ticks(rd, true);
-                self.mul::<true>(rd, rs)
+                self.mul(true, rd, rs)
             }
-            Bic => self.bit_clear::<true>(rd, rs),
-            Mvn => self.not::<true>(rs),
+            Bic => self.bit_clear(true, rd, rs),
+            Mvn => self.not(true, rs),
         }
     }
 
@@ -145,7 +145,7 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
     fn thumb_hi_cmp(&mut self, (s, d): (Register, Register)) {
         let rs = self.state[s];
         let rd = self.state[d];
-        self.sub::<true>(rd, rs);
+        self.sub(true, rd, rs);
     }
 
     fn thumb_hi_mov(&mut self, (s, d): (Register, Register)) {

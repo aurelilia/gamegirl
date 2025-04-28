@@ -1,4 +1,4 @@
-use core::{fmt::UpperHex, marker::ConstParamTy, ops::RangeInclusive};
+use core::{fmt::UpperHex, ops::RangeInclusive};
 
 use bitmatch::bitmatch;
 use common::numutil::{NumExt, U32Ext};
@@ -64,7 +64,7 @@ impl UpperHex for ArmInst {
     }
 }
 
-#[derive(FromPrimitive, ConstParamTy, Debug, PartialEq, Eq, PartialOrd)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq, PartialOrd)]
 pub enum ArmAluOp {
     And,
     Eor,
@@ -90,7 +90,7 @@ impl ArmAluOp {
     }
 }
 
-#[derive(FromPrimitive, ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum ArmAluShift {
     Lsl,
     Lsr,
@@ -118,7 +118,7 @@ pub enum ArmLdrStrOperandKind {
     },
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ArmMulOp {
     Mul,
     Mla,
@@ -129,7 +129,7 @@ pub enum ArmMulOp {
     Smlal,
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ArmShMulOp {
     SmlaXy,
     SmlawYOrSmulwY,
@@ -137,7 +137,7 @@ pub enum ArmShMulOp {
     SmulXy,
 }
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ArmQOp {
     Qadd,
     Qsub,
@@ -264,63 +264,116 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         // Multiply and Multiply-Accumulate (MUL, MLA)
         // Word Multiples
         "0000000?_1001" => |e, i| {
-            e.arm_mul::<{ ArmMulOp::Mul }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), i.is_bit(20))
-        },
-        "0000001?_1001" => |e, i| {
-            e.arm_mul::<{ ArmMulOp::Mla }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), i.is_bit(20))
-        },
-        "00000100_1001" => {
-            |e, i| e.arm_mul::<{ ArmMulOp::Umaal }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), false)
-        }
-        "0000100?_1001" => |e, i| {
-            e.arm_mul::<{ ArmMulOp::Umull }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), i.is_bit(20))
-        },
-        "0000101?_1001" => |e, i| {
-            e.arm_mul::<{ ArmMulOp::Umlal }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), i.is_bit(20))
-        },
-        "0000110?_1001" => |e, i| {
-            e.arm_mul::<{ ArmMulOp::Smull }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), i.is_bit(20))
-        },
-        "0000111?_1001" => |e, i| {
-            e.arm_mul::<{ ArmMulOp::Smlal }>(i.reg(12), i.reg(8), i.reg(16), i.reg(0), i.is_bit(20))
-        },
-        // Halfword Multiples
-        "00010000_1??0" if I::IS_V5 => |e, i| {
-            e.arm_sh_mul::<{ ArmShMulOp::SmlaXy }>(
+            e.arm_mul(
                 i.reg(12),
                 i.reg(8),
                 i.reg(16),
                 i.reg(0),
+                ArmMulOp::Mul,
+                i.is_bit(20),
+            )
+        },
+        "0000001?_1001" => |e, i| {
+            e.arm_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmMulOp::Mla,
+                i.is_bit(20),
+            )
+        },
+        "00000100_1001" => |e, i| {
+            e.arm_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmMulOp::Umaal,
+                false,
+            )
+        },
+        "0000100?_1001" => |e, i| {
+            e.arm_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmMulOp::Umull,
+                i.is_bit(20),
+            )
+        },
+        "0000101?_1001" => |e, i| {
+            e.arm_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmMulOp::Umlal,
+                i.is_bit(20),
+            )
+        },
+        "0000110?_1001" => |e, i| {
+            e.arm_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmMulOp::Smull,
+                i.is_bit(20),
+            )
+        },
+        "0000111?_1001" => |e, i| {
+            e.arm_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmMulOp::Smlal,
+                i.is_bit(20),
+            )
+        },
+        // Halfword Multiples
+        "00010000_1??0" if I::IS_V5 => |e, i| {
+            e.arm_sh_mul(
+                i.reg(12),
+                i.reg(8),
+                i.reg(16),
+                i.reg(0),
+                ArmShMulOp::SmlaXy,
                 i.is_bit(5),
                 i.is_bit(6),
             )
         },
         "00010010_1??0" if I::IS_V5 => |e, i| {
-            e.arm_sh_mul::<{ ArmShMulOp::SmlawYOrSmulwY }>(
+            e.arm_sh_mul(
                 i.reg(12),
                 i.reg(8),
                 i.reg(16),
                 i.reg(0),
+                ArmShMulOp::SmlawYOrSmulwY,
                 i.is_bit(5),
                 i.is_bit(6),
             )
         },
         "00010100_1??0" if I::IS_V5 => |e, i| {
-            e.arm_sh_mul::<{ ArmShMulOp::SmlalXy }>(
+            e.arm_sh_mul(
                 i.reg(12),
                 i.reg(8),
                 i.reg(16),
                 i.reg(0),
+                ArmShMulOp::SmlalXy,
                 i.is_bit(5),
                 i.is_bit(6),
             )
         },
         "00010110_1??0" if I::IS_V5 => |e, i| {
-            e.arm_sh_mul::<{ ArmShMulOp::SmulXy }>(
+            e.arm_sh_mul(
                 i.reg(12),
                 i.reg(8),
                 i.reg(16),
                 i.reg(0),
+                ArmShMulOp::SmulXy,
                 i.is_bit(5),
                 i.is_bit(6),
             )
@@ -549,68 +602,42 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         },
 
         // Memory: Single Data Swap (SWP)
-        "00010100_1001" => |e, i| e.arm_swp::<false>(i.reg(16), i.reg(12), i.reg(0)),
-        "00010000_1001" => |e, i| e.arm_swp::<true>(i.reg(16), i.reg(12), i.reg(0)),
+        "00010?00_1001" => |e, i| e.arm_swp(i.reg(16), i.reg(12), i.reg(0), !i.is_bit(22)),
 
         // Data Processing (ALU)
-        // With Register
-        "000????0_???0" => |e, i| {
-            e.arm_alu_reg::<false>(
+        // With Register shifted by register
+        "000?????_???0" => |e, i| {
+            e.arm_alu_reg(
                 i.reg(16),
                 i.reg(12),
                 i.reg(0),
                 i.safe_transmute(21..=24),
                 i.safe_transmute(5..=6),
                 ArmOperandKind::Immediate(i.bits(7..=11)),
+                i.is_bit(20),
             )
         },
-        "000????1_???0" => |e, i| {
-            e.arm_alu_reg::<true>(
-                i.reg(16),
-                i.reg(12),
-                i.reg(0),
-                i.safe_transmute(21..=24),
-                i.safe_transmute(5..=6),
-                ArmOperandKind::Immediate(i.bits(7..=11)),
-            )
-        },
-        "000????0_0??1" => |e, i| {
-            e.arm_alu_reg::<false>(
+        // With Register shifted by immediate
+        "000?????_0??1" => |e, i| {
+            e.arm_alu_reg(
                 i.reg(16),
                 i.reg(12),
                 i.reg(0),
                 i.safe_transmute(21..=24),
                 i.safe_transmute(5..=6),
                 ArmOperandKind::Register(i.reg(8)),
-            )
-        },
-        "000????1_0??1" => |e, i| {
-            e.arm_alu_reg::<true>(
-                i.reg(16),
-                i.reg(12),
-                i.reg(0),
-                i.safe_transmute(21..=24),
-                i.safe_transmute(5..=6),
-                ArmOperandKind::Register(i.reg(8)),
+                i.is_bit(20),
             )
         },
         // With Immediate
-        "001????0_????" => |e, i| {
-            e.arm_alu_imm::<false>(
+        "001?????_????" => |e, i| {
+            e.arm_alu_imm(
                 i.reg(16),
                 i.reg(12),
                 i.0 & 0xFF,
                 i.bits(8..=11) << 1,
                 i.safe_transmute(21..=24),
-            )
-        },
-        "001????1_????" => |e, i| {
-            e.arm_alu_imm::<true>(
-                i.reg(16),
-                i.reg(12),
-                i.0 & 0xFF,
-                i.bits(8..=11) << 1,
-                i.safe_transmute(21..=24),
+                i.is_bit(20),
             )
         },
 

@@ -56,7 +56,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         }
     }
 
-    fn arm_alu_reg<const CPSR: bool>(
+    fn arm_alu_reg(
         &mut self,
         n: Register,
         d: Register,
@@ -64,9 +64,10 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         op: ArmAluOp,
         shift_kind: ArmAluShift,
         shift_operand: ArmOperandKind,
+        cpsr: bool,
     ) {
         write!(self.f, "{}{}", print_op(op), self.cc).unwrap();
-        if CPSR {
+        if cpsr {
             write!(self.f, "s").unwrap();
         }
         write!(self.f, " {d}, {n}, ").unwrap();
@@ -89,51 +90,54 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         .unwrap()
     }
 
-    fn arm_alu_imm<const CPSR: bool>(
+    fn arm_alu_imm(
         &mut self,
         n: Register,
         d: Register,
         imm: u32,
         imm_ror: u32,
         op: ArmAluOp,
+        cpsr: bool,
     ) {
         write!(self.f, "{}{}", print_op(op), self.cc).unwrap();
-        if CPSR {
+        if cpsr {
             write!(self.f, "s").unwrap();
         }
         let imm = imm.rotate_right(imm_ror);
         write!(self.f, " {d}, {n}, ${imm}").unwrap();
     }
 
-    fn arm_mul<const OP: ArmMulOp>(
+    fn arm_mul(
         &mut self,
         n: Register,
         s: Register,
         d: Register,
         m: Register,
+        op: ArmMulOp,
         cpsr: bool,
     ) {
-        write!(self.f, "{}{}", print_op(OP), self.cc).unwrap();
+        write!(self.f, "{}{}", print_op(op), self.cc).unwrap();
         if cpsr {
             write!(self.f, "s").unwrap();
         }
-        match OP {
+        match op {
             ArmMulOp::Mul => write!(self.f, " {d}, {m}, {s}").unwrap(),
             ArmMulOp::Mla => write!(self.f, " {d}, {m}, {s}, {n}").unwrap(),
             _ => write!(self.f, " {n}, {d}, {m}, {s}").unwrap(),
         }
     }
 
-    fn arm_sh_mul<const OP: ArmShMulOp>(
+    fn arm_sh_mul(
         &mut self,
         n: Register,
         s: Register,
         d: Register,
         m: Register,
+        op: ArmShMulOp,
         x_top: bool,
         _y_top: bool,
     ) {
-        match OP {
+        match op {
             ArmShMulOp::SmlaXy => write!(self.f, "smlaxy{} {d}, {m}, {s}, {n}", self.cc),
             ArmShMulOp::SmlawYOrSmulwY if x_top => {
                 write!(self.f, "smulw{} {d}, {m}, {s}", self.cc)
@@ -151,8 +155,8 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         write!(self.f, "clz{} {d}, {m}", self.cc).unwrap()
     }
 
-    fn arm_q<const OP: ArmQOp>(&mut self, n: Register, m: Register, d: Register) {
-        write!(self.f, "{}{} {d}, {n} {m}", print_op(OP), self.cc).unwrap()
+    fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp) {
+        write!(self.f, "{}{} {d}, {n} {m}", print_op(op), self.cc).unwrap()
     }
 
     fn arm_msr(&mut self, src: ArmOperandKind, flags: bool, ctrl: bool, spsr: bool) {
@@ -261,8 +265,8 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
         }
     }
 
-    fn arm_swp<const WORD: bool>(&mut self, n: Register, d: Register, m: Register) {
-        if WORD {
+    fn arm_swp(&mut self, n: Register, d: Register, m: Register, word: bool) {
+        if word {
             write!(self.f, "swp{} {d}, {m}, [{n}]", self.cc).unwrap()
         } else {
             write!(self.f, "swp{}b {d}, {m}, [{n}]", self.cc).unwrap()

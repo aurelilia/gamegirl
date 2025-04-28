@@ -86,7 +86,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         }
     }
 
-    fn arm_alu_reg<const CPSR: bool>(
+    fn arm_alu_reg(
         &mut self,
         n: Register,
         d: Register,
@@ -94,43 +94,46 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         op: ArmAluOp,
         shift_kind: ArmAluShift,
         shift_operand: ArmOperandKind,
+        cpsr: bool,
     ) {
         let carry = self.state.is_flag(Carry);
         let (a, b) = match shift_operand {
             ArmOperandKind::Immediate(imm) => {
                 let a = self.state[n];
                 let rm = self.state[m];
-                (a, self.shifted_op::<CPSR, true>(rm, shift_kind, imm))
+                (a, self.shifted_op::<true>(rm, shift_kind, imm, cpsr))
             }
             ArmOperandKind::Register(reg) => {
                 let a = self.reg_pc4(n);
                 let rm = self.reg_pc4(m);
                 let shift = self.state[reg] & 0xFF;
-                (a, self.shifted_op::<CPSR, false>(rm, shift_kind, shift))
+                (a, self.shifted_op::<false>(rm, shift_kind, shift, cpsr))
             }
         };
-        self.alu_inner::<CPSR>(op, a, b, carry, d);
+        self.alu_inner(op, a, b, carry, d, cpsr);
     }
 
-    fn arm_alu_imm<const CPSR: bool>(
+    fn arm_alu_imm(
         &mut self,
         n: Register,
         d: Register,
         imm: u32,
         imm_ror: u32,
         op: ArmAluOp,
+        cpsr: bool,
     ) {
         let carry = self.state.is_flag(Carry);
-        let imm = self.ror::<CPSR, false>(imm, imm_ror);
-        self.alu_inner::<CPSR>(op, self.state[n], imm, carry, d);
+        let imm = self.ror::<false>(cpsr, imm, imm_ror);
+        self.alu_inner(op, self.state[n], imm, carry, d, cpsr);
     }
 
-    fn arm_mul<const OP: ArmMulOp>(
+    fn arm_mul(
         &mut self,
         n: Register,
         s: Register,
         d: Register,
         m: Register,
+        op: ArmMulOp,
         cpsr: bool,
     ) {
         let rm = self.state[m];
@@ -143,7 +146,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         let dhi = rd as u64;
         let dlo = rn as u64;
 
-        let out: u64 = match OP {
+        let out: u64 = match op {
             ArmMulOp::Mul => rm.wrapping_mul(rs) as u64,
             ArmMulOp::Mla => {
                 let r = rm.wrapping_mul(rs);
@@ -173,7 +176,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
             }
         };
 
-        let is_mul = OP == ArmMulOp::Mul || OP == ArmMulOp::Mla;
+        let is_mul = op == ArmMulOp::Mul || op == ArmMulOp::Mla;
         if !is_mul {
             self.set_reg(d, (out >> 32).u32());
             self.set_reg(n, out.u32());
@@ -188,15 +191,16 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         }
 
         // TODO signed might be wrong
-        self.apply_mul_idle_ticks(b as u32, OP == ArmMulOp::Smull || OP == ArmMulOp::Smlal);
+        self.apply_mul_idle_ticks(b as u32, op == ArmMulOp::Smull || op == ArmMulOp::Smlal);
     }
 
-    fn arm_sh_mul<const OP: ArmShMulOp>(
+    fn arm_sh_mul(
         &mut self,
         n: Register,
         s: Register,
         d: Register,
         m: Register,
+        op: ArmShMulOp,
         x_top: bool,
         y_top: bool,
     ) {
@@ -210,7 +214,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         let dhi = rd;
         let dlo = rn;
 
-        let out: i64 = match OP {
+        let out: i64 = match op {
             ArmShMulOp::SmlaXy => {
                 let r = a.wrapping_mul(b);
                 let res = r.wrapping_add(rn);
@@ -241,7 +245,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
             ArmShMulOp::SmulXy => a.wrapping_mul(b),
         };
 
-        if OP == ArmShMulOp::SmlalXy {
+        if op == ArmShMulOp::SmlalXy {
             // Don't set high reg on any but SMLAL
             self.set_reg(d, (out >> 32) as u32);
             self.set_reg(n, out as u32);
@@ -258,16 +262,16 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         self.set_reg(d, count);
     }
 
-    fn arm_q<const OP: ArmQOp>(&mut self, n: Register, m: Register, d: Register) {
+    fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp) {
         let rm = self.state[m] as i32;
         let rn = self.state[n] as i32;
-        let value = match OP {
+        let value = match op {
             ArmQOp::Qadd => rm.saturating_add(rn),
             ArmQOp::Qsub => rm.saturating_sub(rn),
             ArmQOp::QdAdd => rm.saturating_add(rn.saturating_mul(2)),
             ArmQOp::QdSub => rm.saturating_sub(rn.saturating_mul(2)),
         };
-        let checked = match OP {
+        let checked = match op {
             ArmQOp::Qadd => rm.checked_add(rn),
             ArmQOp::Qsub => rm.checked_sub(rn),
             ArmQOp::QdAdd => rn.checked_mul(2).and_then(|rn| rm.checked_add(rn)),
@@ -329,7 +333,7 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
             ArmLdrStrOperandKind::Register(reg) => Address(self.state[reg]),
             ArmLdrStrOperandKind::ShiftedRegister { base, shift, by } => {
                 let base = self.state[base];
-                let addr = self.shifted_op::<false, true>(base, shift, by);
+                let addr = self.shifted_op::<true>(base, shift, by, false);
                 Address(addr)
             }
         };
@@ -459,10 +463,10 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         }
     }
 
-    fn arm_swp<const WORD: bool>(&mut self, n: Register, d: Register, m: Register) {
+    fn arm_swp(&mut self, n: Register, d: Register, m: Register, word: bool) {
         let addr = Address(self.state[n]);
         let reg = self.state[m];
-        if WORD {
+        if word {
             let out = self.read_word_ldrswp(addr, NONSEQ);
             self.set_reg(d, out);
             self.write::<u32>(addr, reg, NONSEQ);
@@ -499,42 +503,42 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
 }
 
 impl<S: Bus> Cpu<S> {
-    fn alu_inner<const CPSR: bool>(&mut self, op: ArmAluOp, a: u32, b: u32, c: bool, d: Register) {
+    fn alu_inner(&mut self, op: ArmAluOp, a: u32, b: u32, c: bool, d: Register, cpsr: bool) {
         let value = match op {
-            ArmAluOp::And => self.and::<CPSR>(a, b),
-            ArmAluOp::Eor => self.xor::<CPSR>(a, b),
-            ArmAluOp::Sub => self.sub::<CPSR>(a, b),
-            ArmAluOp::Rsb => self.sub::<CPSR>(b, a),
-            ArmAluOp::Add => self.add::<CPSR>(a, b),
-            ArmAluOp::Adc => self.adc::<CPSR>(a, b, c as u32),
-            ArmAluOp::Sbc => self.sbc::<CPSR>(a, b, c as u32),
-            ArmAluOp::Rsc => self.sbc::<CPSR>(b, a, c as u32),
+            ArmAluOp::And => self.and(cpsr, a, b),
+            ArmAluOp::Eor => self.xor(cpsr, a, b),
+            ArmAluOp::Sub => self.sub(cpsr, a, b),
+            ArmAluOp::Rsb => self.sub(cpsr, b, a),
+            ArmAluOp::Add => self.add(cpsr, a, b),
+            ArmAluOp::Adc => self.adc(cpsr, a, b, c as u32),
+            ArmAluOp::Sbc => self.sbc(cpsr, a, b, c as u32),
+            ArmAluOp::Rsc => self.sbc(cpsr, b, a, c as u32),
             ArmAluOp::Tst => {
-                self.and::<true>(a, b);
+                self.and(true, a, b);
                 0
             }
             ArmAluOp::Teq => {
-                self.xor::<true>(a, b);
+                self.xor(true, a, b);
                 0
             }
             ArmAluOp::Cmp => {
-                self.sub::<true>(a, b);
+                self.sub(true, a, b);
                 0
             }
             ArmAluOp::Cmn => {
-                self.add::<true>(a, b);
+                self.add(true, a, b);
                 0
             }
-            ArmAluOp::Orr => self.or::<CPSR>(a, b),
+            ArmAluOp::Orr => self.or(cpsr, a, b),
             ArmAluOp::Mov => {
-                self.set_nz::<CPSR>(b);
+                self.set_nz(cpsr, b);
                 b
             }
-            ArmAluOp::Bic => self.bit_clear::<CPSR>(a, b),
-            ArmAluOp::Mvn => self.not::<CPSR>(b),
+            ArmAluOp::Bic => self.bit_clear(cpsr, a, b),
+            ArmAluOp::Mvn => self.not(cpsr, b),
         };
 
-        if CPSR && d.is_pc() && self.state.mode() != Mode::User && self.state.mode() != Mode::System
+        if cpsr && d.is_pc() && self.state.mode() != Mode::User && self.state.mode() != Mode::System
         {
             // If S=1, not in user/system mode and the dest is the PC, set CPSR to current
             // SPSR, also flush pipeline if switch to Thumb occurred
@@ -548,21 +552,22 @@ impl<S: Bus> Cpu<S> {
         }
     }
 
-    fn shifted_op<const CPSR: bool, const IMM: bool>(
+    fn shifted_op<const IMM: bool>(
         &mut self,
         nn: u32,
         op: ArmAluShift,
         shift_amount: u32,
+        cpsr: bool,
     ) -> u32 {
         if op == ArmAluShift::Lsl && shift_amount == 0 {
             // Special case: no shift
             nn
         } else {
             match op {
-                ArmAluShift::Lsl => self.lsl::<CPSR>(nn, shift_amount),
-                ArmAluShift::Lsr => self.lsr::<CPSR, IMM>(nn, shift_amount),
-                ArmAluShift::Asr => self.asr::<CPSR, IMM>(nn, shift_amount),
-                ArmAluShift::Ror => self.ror::<CPSR, IMM>(nn, shift_amount),
+                ArmAluShift::Lsl => self.lsl(cpsr, nn, shift_amount),
+                ArmAluShift::Lsr => self.lsr::<IMM>(cpsr, nn, shift_amount),
+                ArmAluShift::Asr => self.asr::<IMM>(cpsr, nn, shift_amount),
+                ArmAluShift::Ror => self.ror::<IMM>(cpsr, nn, shift_amount),
             }
         }
     }
