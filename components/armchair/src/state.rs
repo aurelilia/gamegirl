@@ -20,6 +20,7 @@ use crate::{
         access::{CODE, NONSEQ, SEQ},
         Access, Address,
     },
+    misc::InstructionKind,
     Cpu, InterruptController,
 };
 
@@ -185,7 +186,7 @@ impl CpuState {
     /// Set the PC. Needs special behavior to fake the pipeline.
     pub(crate) fn set_pc(&mut self, bus: &mut impl Bus, val: Address) {
         // Align to 2/4 depending on mode
-        self.registers[15] = val.0 & (!(self.current_instruction_size() - 1));
+        self.registers[15] = val.0 & (!(self.current_instruction_type().width() - 1));
         self.pipeline_stall(bus);
     }
 
@@ -269,13 +270,16 @@ impl CpuState {
         (COND_MASKS[cond.us()] & (1 << flags)) != 0
     }
 
-    pub fn current_instruction_size(&self) -> u32 {
-        // 4 on ARM, 2 on THUMB
-        4 - ((self.is_flag(Flag::Thumb) as u32) << 1)
+    pub fn current_instruction_type(&self) -> InstructionKind {
+        if self.is_flag(Flag::Thumb) {
+            InstructionKind::Thumb
+        } else {
+            InstructionKind::Arm
+        }
     }
 
     pub fn next_instruction_offset(&self) -> Address {
-        Address(self.current_instruction_size())
+        self.current_instruction_type().addr_width()
     }
 }
 

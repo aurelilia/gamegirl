@@ -84,7 +84,7 @@ impl<S: Bus> Cpu<S> {
                 (false, true) => addr - Address(0x40),
                 (false, false) => addr - Address(0x3C),
             };
-            let value = self.state.pc().0 + self.state.current_instruction_size();
+            let value = self.state.pc().0 + self.state.current_instruction_type().width();
             self.write::<u32>(addr, value, NONSEQ);
         } else if !S::Version::IS_V5 {
             let val = self.read::<u32>(addr, NONSEQ);

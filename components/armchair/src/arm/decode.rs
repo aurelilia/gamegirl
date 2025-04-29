@@ -184,8 +184,8 @@ pub struct ArmLdmStmConfig {
     pub writeback: bool,
 }
 
-pub const fn get_lut_table<I: ArmVisitor>() -> [fn(&mut I, ArmInst); 4096] {
-    let mut lut: [fn(&mut I, ArmInst); 4096] = [I::arm_unknown_opcode; 4096];
+pub const fn get_lut_table<I: ArmVisitor>() -> [fn(&mut I, ArmInst) -> I::Output; 4096] {
+    let mut lut: [fn(&mut I, ArmInst) -> I::Output; 4096] = [I::arm_unknown_opcode; 4096];
     let mut i = 0;
     while i < 4096 {
         let as_inst = ((i & 0xFF0) << 16) | ((i & 0xF) >> 4);
@@ -199,7 +199,7 @@ pub const fn get_lut_table<I: ArmVisitor>() -> [fn(&mut I, ArmInst); 4096] {
 pub const fn get_instruction_handler<I: ArmVisitor>(
     i: ArmInst,
     for_lut: bool,
-) -> fn(&mut I, ArmInst) {
+) -> fn(&mut I, ArmInst) -> I::Output {
     get_instruction_handler_inner(arm_inst_to_lookup_idx(i.0), i, for_lut)
 }
 
@@ -208,7 +208,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
     code: usize,
     i: ArmInst,
     for_lut: bool,
-) -> fn(&mut I, ArmInst) {
+) -> fn(&mut I, ArmInst) -> I::Output {
     // Divided by GBATEK:
     #[bitmatch]
     match code {
@@ -217,7 +217,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         "1010????_????" => |e, i| {
             let offs = RelativeOffset(i.0.i24() * 4);
             if I::IS_V5 && i.condition_code() == 0xF {
-                e.arm_blx(ArmSignedOperandKind::Immediate(offs));
+                e.arm_blx(ArmSignedOperandKind::Immediate(offs))
             } else {
                 e.arm_b(offs)
             }
@@ -226,7 +226,7 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         "1011????_????" => |e, i| {
             let offs = RelativeOffset(i.0.i24() * 4);
             if I::IS_V5 && i.condition_code() == 0xF {
-                e.arm_blx(ArmSignedOperandKind::Immediate(RelativeOffset(offs.0 + 2)));
+                e.arm_blx(ArmSignedOperandKind::Immediate(RelativeOffset(offs.0 + 2)))
             } else {
                 e.arm_bl(offs)
             }
@@ -236,21 +236,21 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
             if i.0.bits(8, 12) == 0b1111_1111_1111 {
                 e.arm_bx(i.reg(0))
             } else {
-                e.arm_unknown_opcode(i);
+                e.arm_unknown_opcode(i)
             }
         },
         "00010010_0010" if for_lut => |e, i| {
             if i.0.bits(8, 12) == 0b1111_1111_1111 {
                 e.arm_bx(i.reg(0))
             } else {
-                e.arm_unknown_opcode(i);
+                e.arm_unknown_opcode(i)
             }
         },
         "00010010_0011" if for_lut => |e, i| {
             if i.0.bits(8, 12) == 0b1111_1111_1111 {
-                e.arm_blx(ArmSignedOperandKind::Register(i.reg(0)));
+                e.arm_blx(ArmSignedOperandKind::Register(i.reg(0)))
             } else {
-                e.arm_unknown_opcode(i);
+                e.arm_unknown_opcode(i)
             }
         },
         "00010010_0001" if i.bits(8..=19) == 0b1111_1111_1111 => |e, i| e.arm_bx(i.reg(0)),

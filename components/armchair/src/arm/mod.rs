@@ -10,7 +10,7 @@ use crate::{
     state::Register,
 };
 
-mod decode;
+pub(crate) mod decode;
 mod execute;
 mod trace;
 
@@ -24,16 +24,17 @@ pub const fn instruction_set<S: Bus>() -> ArmInstructionSet<S> {
     }
 }
 
-trait ArmVisitor {
+pub(crate) trait ArmVisitor {
     const IS_V5: bool;
+    type Output;
 
-    fn arm_unknown_opcode(&mut self, inst: ArmInst);
-    fn arm_swi(&mut self);
+    fn arm_unknown_opcode(&mut self, inst: ArmInst) -> Self::Output;
+    fn arm_swi(&mut self) -> Self::Output;
 
-    fn arm_b(&mut self, offset: RelativeOffset);
-    fn arm_bl(&mut self, offset: RelativeOffset);
-    fn arm_bx(&mut self, n: Register);
-    fn arm_blx(&mut self, src: ArmSignedOperandKind);
+    fn arm_b(&mut self, offset: RelativeOffset) -> Self::Output;
+    fn arm_bl(&mut self, offset: RelativeOffset) -> Self::Output;
+    fn arm_bx(&mut self, n: Register) -> Self::Output;
+    fn arm_blx(&mut self, src: ArmSignedOperandKind) -> Self::Output;
 
     fn arm_alu_reg(
         &mut self,
@@ -44,7 +45,7 @@ trait ArmVisitor {
         shift_kind: ArmAluShift,
         shift_operand: ArmOperandKind,
         cpsr: bool,
-    );
+    ) -> Self::Output;
     fn arm_alu_imm(
         &mut self,
         n: Register,
@@ -53,7 +54,7 @@ trait ArmVisitor {
         imm_ror: u32,
         op: ArmAluOp,
         cpsr: bool,
-    );
+    ) -> Self::Output;
     fn arm_mul(
         &mut self,
         n: Register,
@@ -62,7 +63,7 @@ trait ArmVisitor {
         m: Register,
         op: ArmMulOp,
         cpsr: bool,
-    );
+    ) -> Self::Output;
     fn arm_sh_mul(
         &mut self,
         n: Register,
@@ -72,13 +73,13 @@ trait ArmVisitor {
         op: ArmShMulOp,
         x_top: bool,
         y_top: bool,
-    );
+    ) -> Self::Output;
+    fn arm_clz(&mut self, m: Register, d: Register) -> Self::Output;
+    fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp) -> Self::Output;
 
-    fn arm_clz(&mut self, m: Register, d: Register);
-    fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp);
-
-    fn arm_msr(&mut self, src: ArmOperandKind, flags: bool, ctrl: bool, spsr: bool);
-    fn arm_mrs(&mut self, d: Register, spsr: bool);
+    fn arm_msr(&mut self, src: ArmOperandKind, flags: bool, ctrl: bool, spsr: bool)
+        -> Self::Output;
+    fn arm_mrs(&mut self, d: Register, spsr: bool) -> Self::Output;
 
     fn arm_ldrstr(
         &mut self,
@@ -86,10 +87,32 @@ trait ArmVisitor {
         d: Register,
         offset: ArmLdrStrOperandKind,
         config: ArmLdrStrConfig,
-    );
-    fn arm_ldmstm(&mut self, n: Register, rlist: u16, force_user: bool, config: ArmLdmStmConfig);
-    fn arm_swp(&mut self, n: Register, d: Register, m: Register, word: bool);
+    ) -> Self::Output;
+    fn arm_ldmstm(
+        &mut self,
+        n: Register,
+        rlist: u16,
+        force_user: bool,
+        config: ArmLdmStmConfig,
+    ) -> Self::Output;
+    fn arm_swp(&mut self, n: Register, d: Register, m: Register, word: bool) -> Self::Output;
 
-    fn arm_mrc(&mut self, cm: u32, cp: u32, pn: u32, rd: Register, cn: u32, opc: u32);
-    fn arm_mcr(&mut self, cm: u32, cp: u32, pn: u32, rd: Register, cn: u32, opc: u32);
+    fn arm_mrc(
+        &mut self,
+        cm: u32,
+        cp: u32,
+        pn: u32,
+        rd: Register,
+        cn: u32,
+        opc: u32,
+    ) -> Self::Output;
+    fn arm_mcr(
+        &mut self,
+        cm: u32,
+        cp: u32,
+        pn: u32,
+        rd: Register,
+        cn: u32,
+        opc: u32,
+    ) -> Self::Output;
 }

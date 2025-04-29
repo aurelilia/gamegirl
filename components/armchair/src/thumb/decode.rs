@@ -129,8 +129,8 @@ pub enum ThumbStrLdrOp {
     Ldsh,
 }
 
-pub const fn get_lut_table<I: ThumbVisitor>() -> [fn(&mut I, ThumbInst); 256] {
-    let mut lut: [fn(&mut I, ThumbInst); 256] = [I::thumb_unknown_opcode; 256];
+pub const fn get_lut_table<I: ThumbVisitor>() -> [fn(&mut I, ThumbInst) -> I::Output; 256] {
+    let mut lut: [fn(&mut I, ThumbInst) -> I::Output; 256] = [I::thumb_unknown_opcode; 256];
     let mut i = 0;
     while i < 256 {
         lut[i] = get_instruction_handler::<I>(ThumbInst((i << 8) as u16));
@@ -140,7 +140,9 @@ pub const fn get_lut_table<I: ThumbVisitor>() -> [fn(&mut I, ThumbInst); 256] {
 }
 
 #[bitmatch]
-pub const fn get_instruction_handler<I: ThumbVisitor>(i: ThumbInst) -> fn(&mut I, ThumbInst) {
+pub const fn get_instruction_handler<I: ThumbVisitor>(
+    i: ThumbInst,
+) -> fn(&mut I, ThumbInst) -> I::Output {
     use Thumb1Op as Op1;
     use Thumb2Op as Op2;
     use Thumb3Op as Op3;

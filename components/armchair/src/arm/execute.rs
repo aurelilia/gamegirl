@@ -42,6 +42,7 @@ impl<S: Bus> Cpu<S> {
 
 impl<S: Bus> ArmVisitor for Cpu<S> {
     const IS_V5: bool = S::Version::IS_V5;
+    type Output = ();
 
     fn arm_unknown_opcode(&mut self, inst: ArmInst) {
         self.und_inst(inst);

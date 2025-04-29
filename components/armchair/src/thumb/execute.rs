@@ -32,6 +32,8 @@ impl<S: Bus> Cpu<S> {
 }
 
 impl<S: Bus> ThumbVisitor for Cpu<S> {
+    type Output = ();
+
     // UND
     fn thumb_unknown_opcode(&mut self, inst: ThumbInst) {
         self.und_inst(inst);
@@ -420,5 +422,9 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         self.set_pc(self.state.lr() + offset);
         self.state.set_lr(pc - Address::BYTE);
         self.state.set_flag(Thumb, thumb);
+        if thumb {
+            // This is a function call!
+            self.analyze_now();
+        }
     }
 }

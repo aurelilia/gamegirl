@@ -36,7 +36,7 @@ impl CpuState {
             self.set_flag(FiqDisable, true);
         }
 
-        let lr = self.pc() - Address(self.current_instruction_size());
+        let lr = self.pc() - self.current_instruction_type().addr_width();
         self.set_lr(lr);
         self.set_spsr(cpsr);
         self.set_pc(bus, S::CONFIG.exception_vector_base_address + kind.vector());

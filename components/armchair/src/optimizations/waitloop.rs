@@ -180,7 +180,7 @@ impl<S: Bus> Cpu<S> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum WaitloopPoint {
     Unanalyzed,
     Ignore,
