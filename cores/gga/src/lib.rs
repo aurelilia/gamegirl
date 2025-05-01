@@ -7,10 +7,6 @@
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
 #![no_std]
-#![allow(incomplete_features)]
-#![feature(generic_const_exprs)]
-#![feature(if_let_guard)]
-#![feature(trait_alias)]
 
 extern crate alloc;
 

@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with self file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+#![allow(unused_braces)] // modular_bitfield issue
+
 use alloc::boxed::Box;
 use core::mem;
 
@@ -136,7 +138,11 @@ impl GgaFullBus<'_> {
             }
 
             // Cart
-            0x08..=0x0D if let Some(v) = self.cart.rom.try_get_exact(a & 0x1FF_FFFF) => v,
+            // Read from the very end of the cart which might not be mapped
+            // if cart size isn't a clean multiple of page size
+            0x08..=0x0D if self.cart.rom.len() > ((a & 0x1FF_FFFF) + (T::WIDTH.us() - 1)) => {
+                self.cart.rom.get_exact(a & 0x1FF_FFFF)
+            }
             // 1MB carts are special and wrap
             0x08..0x0D if self.cart.rom.len() == (2 << 19) => {
                 self.cart.rom.get_wrap(a & 0x1FF_FFFF)

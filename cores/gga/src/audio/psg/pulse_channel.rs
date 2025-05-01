@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use super::{envelope::EnvelopGenerator, Channel, GenApuEvent, ScheduleFn};
+use super::{envelope::EnvelopGenerator, Channel, GenApuEvent};
 use crate::TimeS;
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
@@ -186,7 +186,7 @@ impl<const T: bool> Channel for PulseChannel<T> {
         self.envelope.current_volume() == 0
     }
 
-    fn trigger(&mut self, sched: &mut impl ScheduleFn) {
+    fn trigger(&mut self, sched: &mut impl FnMut(GenApuEvent, TimeS)) {
         let evt = if T {
             GenApuEvent::Pulse2Reload
         } else {

@@ -9,6 +9,8 @@
 //! TODO: Resampling is not actually being used properly.
 //! for the time being: broken!
 
+#![allow(unused_braces)] // modular_bitfield issue
+
 pub mod mplayer;
 pub mod psg;
 
@@ -21,7 +23,7 @@ use common::{
 };
 use modular_bitfield::{bitfield, specifiers::*};
 use mplayer::MusicPlayer;
-use psg::{Channel, ChannelsControl, ChannelsSelection, GenericApu, ScheduleFn};
+use psg::{Channel, ChannelsControl, ChannelsSelection, GenApuEvent, GenericApu};
 
 use super::scheduling::AdvEvent;
 use crate::{addr::FIFO_A_L, cpu::GgaFullBus, hw::dma::Dmas, scheduling::ApuEvent, CPU_CLOCK};
@@ -251,7 +253,7 @@ impl Apu {
         apu: &mut GenericApu,
         addr: u16,
         data: u8,
-        sched: &mut impl ScheduleFn,
+        sched: &mut impl FnMut(GenApuEvent, TimeS),
     ) {
         // `addr % 5 != 2` will be true if its not a length counter register,
         // as these are not affected by power off, but `addr % 5 != 2` also
@@ -403,7 +405,7 @@ impl Apu {
 }
 
 #[inline]
-pub fn shed(sched: &mut Scheduler<AdvEvent>) -> impl ScheduleFn + '_ {
+pub fn shed(sched: &mut Scheduler<AdvEvent>) -> impl FnMut(GenApuEvent, TimeS) + '_ {
     |e, t| {
         let evt = AdvEvent::ApuEvent(ApuEvent::Gen(e));
         sched.cancel(evt);

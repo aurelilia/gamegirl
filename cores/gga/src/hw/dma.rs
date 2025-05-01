@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+#![allow(unused_braces)] // modular_bitfield issue
+
 use core::mem;
 
 use armchair::{

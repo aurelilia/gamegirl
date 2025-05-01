@@ -6,7 +6,9 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use super::ScheduleFn;
+use common::TimeS;
+
+use super::GenApuEvent;
 
 pub trait Channel {
     fn output(&self) -> u8;
@@ -15,7 +17,7 @@ pub trait Channel {
     fn enabled(&self) -> bool;
     fn set_dac_enable(&mut self, enabled: bool);
     fn dac_enabled(&self) -> bool;
-    fn trigger(&mut self, sched: &mut impl ScheduleFn);
+    fn trigger(&mut self, sched: &mut impl FnMut(GenApuEvent, TimeS));
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -79,7 +81,11 @@ impl<C: Channel> LengthCountedChannel<C> {
     //
     /// A wrapper around `trigger` to account for the special case where the
     /// current counter is clocked after reloading to the max length
-    pub fn trigger_length(&mut self, is_not_length_clock_next: bool, sched: &mut impl ScheduleFn) {
+    pub fn trigger_length(
+        &mut self,
+        is_not_length_clock_next: bool,
+        sched: &mut impl FnMut(GenApuEvent, TimeS),
+    ) {
         if self.current_counter == 0 {
             self.current_counter =
                 self.max_length - (is_not_length_clock_next && self.counter_decrease_enable) as u16;
@@ -106,7 +112,7 @@ impl<C: Channel> Channel for LengthCountedChannel<C> {
         !self.channel.enabled() || self.channel.muted()
     }
 
-    fn trigger(&mut self, sched: &mut impl ScheduleFn) {
+    fn trigger(&mut self, sched: &mut impl FnMut(GenApuEvent, TimeS)) {
         if self.dac_enabled() {
             self.set_enable(true);
         }

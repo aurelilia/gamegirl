@@ -6,7 +6,9 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use super::{envelope::EnvelopGenerator, Channel, ScheduleFn};
+use common::TimeS;
+
+use super::{envelope::EnvelopGenerator, Channel, GenApuEvent};
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -85,7 +87,7 @@ impl Channel for NoiseChannel {
         self.envelope.current_volume() == 0
     }
 
-    fn trigger(&mut self, _sched: &mut impl ScheduleFn) {
+    fn trigger(&mut self, _sched: &mut impl FnMut(GenApuEvent, TimeS)) {
         self.envelope.trigger();
         // because its 15 bits
         self.feedback_shift_register = 0x7FFF;

@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use super::{Channel, GenApuEvent, ScheduleFn, TimeS};
+use super::{Channel, GenApuEvent, TimeS};
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
@@ -98,7 +98,7 @@ impl Channel for WaveChannel {
         self.channel_enable
     }
 
-    fn trigger(&mut self, sched: &mut impl ScheduleFn) {
+    fn trigger(&mut self, sched: &mut impl FnMut(GenApuEvent, TimeS)) {
         self.buffer_position = 0;
         // no idea why `3` works here, but with this tests pass and found it
         // in other emulators

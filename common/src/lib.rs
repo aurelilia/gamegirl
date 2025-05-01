@@ -68,7 +68,7 @@ pub trait Core: Any + Send + Sync {
     }
     /// Load a state produced by [save_state].
     /// Will restore the current cartridge and debugger.
-    fn load_state(&mut self, state: &[u8]) {}
+    fn load_state(&mut self, _state: &[u8]) {}
 
     /// Get the current system time.
     fn get_time(&self) -> Time;

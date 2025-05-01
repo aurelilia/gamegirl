@@ -4,11 +4,10 @@ use common::numutil::NumExt;
 
 use crate::{
     arm::{self, decode::*, ArmInst, ArmVisitor},
-    interface::Bus,
     misc::InstructionKind,
     state::{LowRegister, Register},
     thumb::{self, decode::*, ThumbInst, ThumbVisitor},
-    Address, CpuState, RelativeOffset,
+    Address, RelativeOffset,
 };
 
 pub struct InstructionAnalyzer<'s, R: FnMut(Address) -> u32> {
@@ -88,15 +87,6 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
         }
     }
 
-    fn uses_nz(&mut self) -> InstructionAnalysis {
-        InstructionAnalysis {
-            is_used: true,
-            uses_neg_flag: true,
-            uses_zero_flag: true,
-            ..Default::default()
-        }
-    }
-
     fn uses_carry(&mut self) -> InstructionAnalysis {
         InstructionAnalysis {
             is_used: true,
@@ -135,11 +125,11 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
         self.uses_all_flags()
     }
 
-    fn call(&mut self, address: Address) -> InstructionAnalysis {
+    fn call(&mut self, _address: Address) -> InstructionAnalysis {
         self.uses_all_flags()
     }
 
-    fn call_register(&mut self, reg: Register) -> InstructionAnalysis {
+    fn call_register(&mut self, _reg: Register) -> InstructionAnalysis {
         self.uses_all_flags()
     }
 
@@ -187,6 +177,7 @@ pub struct BlockAnalysis {
 }
 
 #[derive(Debug, Clone, Default)]
+#[allow(unused)]
 pub struct InstructionAnalysis {
     is_branch_target: bool,
     is_used: bool,

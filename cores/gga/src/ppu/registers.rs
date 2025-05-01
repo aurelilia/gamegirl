@@ -6,6 +6,8 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
+#![allow(unused_braces)] // modular_bitfield issue
+
 use core::cmp;
 
 use ::common::{
@@ -223,8 +225,8 @@ pub struct DisplayStatus {
     pub vcount: u8,
 }
 
-#[bitfield]
 #[repr(u16)]
+#[bitfield]
 #[derive(Debug, Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct BgControl {

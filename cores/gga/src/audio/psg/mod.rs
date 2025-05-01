@@ -258,7 +258,7 @@ impl GenericApu {
         channel: &mut LengthCountedChannel<C>,
         is_length_clock_next: bool,
         data: u8,
-        sched: &mut impl ScheduleFn,
+        sched: &mut impl FnMut(GenApuEvent, TimeS),
     ) {
         let old_length_enable = channel.read_length_enable();
         let new_length_enable = (data >> 6) & 1 == 1;
@@ -276,7 +276,7 @@ impl GenericApu {
         }
     }
 
-    pub fn init_scheduler(sched: &mut impl ScheduleFn) {
+    pub fn init_scheduler(sched: &mut impl FnMut(GenApuEvent, TimeS)) {
         sched(GenApuEvent::NoiseReload, 4);
     }
 }
@@ -286,8 +286,6 @@ impl Default for GenericApu {
         Self::new(true)
     }
 }
-
-pub trait ScheduleFn = FnMut(GenApuEvent, TimeS);
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]

@@ -9,6 +9,8 @@
 //! Input handler.
 //! Luckily, GGA input is dead simple compared to even GG.
 
+#![allow(unused_braces)] // modular_bitfield issue
+
 use armchair::Interrupt;
 use common::TimeS;
 use modular_bitfield::{bitfield, specifiers::B14};
