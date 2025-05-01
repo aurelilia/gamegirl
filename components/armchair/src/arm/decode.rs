@@ -137,7 +137,7 @@ pub enum ArmShMulOp {
     SmulXy,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, PartialEq, Eq)]
 pub enum ArmQOp {
     Qadd,
     Qsub,
@@ -379,9 +379,6 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
             )
         },
 
-        // Special ARM9 Instructions (CLZ, QADD/QSUB)
-        // TODO
-
         // PSR Transfer (MRS, MSR)
         "00010000_0000" => |e, i| e.arm_mrs(i.reg(12), false),
         "00010100_0000" => |e, i| e.arm_mrs(i.reg(12), true),
@@ -604,6 +601,12 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
         // Memory: Single Data Swap (SWP)
         "00010?00_1001" => |e, i| e.arm_swp(i.reg(16), i.reg(12), i.reg(0), !i.is_bit(22)),
 
+        // Special ARM9 Instructions (CLZ, QADD/QSUB)
+        "00010110_0001" if I::IS_V5 => |e, i| e.arm_clz(i.reg(0), i.reg(12)),
+        "00010??0_0101" if I::IS_V5 => {
+            |e, i| e.arm_q(i.reg(16), i.reg(0), i.reg(12), i.safe_transmute(21..=22))
+        }
+
         // Data Processing (ALU)
         // With Register shifted by register
         "000?????_???0" => |e, i| {
@@ -640,6 +643,29 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
                 i.is_bit(20),
             )
         },
+
+        // Coprocessor Instructions (MRC/MCR, LDC/STC, CDP, MCRR/MRRC)
+        "1110???0_???1" if I::IS_V5 => |e, i| {
+            e.arm_mcr(
+                i.bits(0..=3),
+                i.bits(5..=7),
+                i.bits(8..=11),
+                i.reg(12),
+                i.bits(16..=19),
+                i.bits(21..=23),
+            )
+        },
+        "1110???1_???1" if I::IS_V5 => |e, i| {
+            e.arm_mrc(
+                i.bits(0..=3),
+                i.bits(5..=7),
+                i.bits(8..=11),
+                i.reg(12),
+                i.bits(16..=19),
+                i.bits(21..=23),
+            )
+        },
+        "1100010?_????" => |_, _| panic!("unexpected MRRC/MCRR!"),
 
         _ => I::arm_unknown_opcode,
     }
@@ -763,13 +789,11 @@ mod test {
     #[test]
     fn decode_hmul() {}
 
-    #[ignore] // TODO v5
     #[test]
     fn decode_clz() {
         disasm_block_register_variables("clz Z, N", "E16FZF1N", true);
     }
 
-    #[ignore] // TODO v5
     #[test]
     fn decode_q() {
         disasm_block_register_variables(
@@ -779,7 +803,7 @@ mod test {
                 qdadd Z, N, M
                 qdsub Z, N, M
             ",
-            "E10NZ05NE12NZ05NE14NZ05NE16NZ05N",
+            "E10NZ05ME12NZ05ME14NZ05ME16NZ05M",
             false,
         );
     }
@@ -839,9 +863,11 @@ mod test {
         disasm_ok(0xE09270F5, "ldrsh r7, [r2], r5");
     }
 
-    #[ignore] // TODO v5
     #[test]
-    fn decode_ldrdstrd() {}
+    fn decode_ldrdstrd() {
+        disasm_ok(0xE1C4C0D0, "ldrd r12, [r4]");
+        disasm_ok(0xE1C4C0F0, "strd r12, [r4]");
+    }
 
     #[test]
     fn decode_stmldm() {
@@ -869,6 +895,16 @@ mod test {
         );
     }
 
+    #[test]
+    fn decode_mrc() {
+        disasm_ok(0xEE131F15, "mrc p15, 0, r1, c3, c5, 0");
+    }
+
+    #[test]
+    fn decode_mcr() {
+        disasm_ok(0xEE031F15, "mcr p15, 0, r1, c3, c5, 0");
+    }
+
     fn disasm_ok(asm: u32, disasm: &str) {
         let inst = ArmInst(asm);
         assert_eq!(disasm, inst.to_string())
@@ -878,7 +914,7 @@ mod test {
         let instructions = hex
             .as_bytes()
             .chunks(8)
-            .map(|c| u32::from_str_radix(str::from_utf8(c).unwrap(), 16).unwrap())
+            .map(|c| u32::from_str_radix(core::str::from_utf8(c).unwrap(), 16).unwrap())
             .map(|c| ArmInst(c).to_string());
         for (actual, expected) in instructions.zip(disasm.lines().filter(|l| !l.is_empty())) {
             assert_eq!(expected.trim_ascii_start(), actual)

@@ -154,7 +154,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
     }
 
     fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp) -> Self::Output {
-        write!(self.f, "{}{} {d}, {n} {m}", print_op(op), self.cc)
+        write!(self.f, "{}{} {d}, {n}, {m}", print_op(op), self.cc)
     }
 
     fn arm_msr(
@@ -292,7 +292,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
     ) -> Self::Output {
         write!(
             self.f,
-            "mrc{} P{pn}, {opc}, {rd}, C{cn}, C{cm}, {cp}",
+            "mrc{} p{pn}, {opc}, {rd}, c{cn}, c{cm}, {cp}",
             self.cc
         )
     }
@@ -308,7 +308,7 @@ impl<'f1, 'f2> ArmVisitor for ArmFormat<'f1, 'f2> {
     ) -> Self::Output {
         write!(
             self.f,
-            "mcr{} P{pn}, {opc}, {rd}, C{cn}, C{cm}, {cp}",
+            "mcr{} p{pn}, {opc}, {rd}, c{cn}, c{cm}, {cp}",
             self.cc
         )
     }
