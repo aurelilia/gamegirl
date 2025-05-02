@@ -65,7 +65,7 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub fn handle_event(gg: &mut GgaFullBus<'_>, event: PpuEvent, late_by: i64) {
+    pub fn handle_event(gg: &mut GgaFullBus, event: PpuEvent, late_by: i64) {
         let (next_event, cycles) = match event {
             PpuEvent::HblankStart => {
                 if gg.c.video_buffer.should_render_this_frame() {
@@ -122,9 +122,9 @@ impl Ppu {
             .schedule(AdvEvent::PpuEvent(next_event), cycles - late_by);
     }
 
-    fn maybe_interrupt(gg: &mut GgaFullBus<'_>, int: Interrupt) {
+    fn maybe_interrupt(gg: &mut GgaFullBus, int: Interrupt) {
         if gg.ppu.regs.dispstat.irq_enables().is_bit(int as u16) {
-            gg.cpu.request_interrupt(gg.bus, int);
+            gg.cpu.request_interrupt(&mut gg.bus, int);
         }
     }
 
@@ -156,7 +156,7 @@ impl Ppu {
         }
     }
 
-    pub fn init_render(gg: &mut GgaFullBus<'_>) {
+    pub fn init_render(gg: &mut GgaFullBus) {
         let render = PpuRender::new(
             Arc::clone(&gg.ppu.palette),
             Arc::clone(&gg.ppu.vram),

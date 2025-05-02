@@ -66,6 +66,8 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
         let is_thumb = rn.is_bit(0);
         self.state.set_flag(Thumb, is_thumb);
         self.set_pc(Address(rn - is_thumb as u32));
+        // This is a function call!
+        self.analyze_now();
     }
 
     fn arm_blx(&mut self, src: ArmSignedOperandKind) {
@@ -85,6 +87,8 @@ impl<S: Bus> ArmVisitor for Cpu<S> {
                 self.set_pc(Address(rn - is_thumb as u32));
             }
         }
+        // This is a function call!
+        self.analyze_now();
     }
 
     fn arm_alu_reg(

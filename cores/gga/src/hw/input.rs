@@ -30,7 +30,7 @@ pub struct KeyControl {
     irq_is_and: bool,
 }
 
-impl GgaFullBus<'_> {
+impl GgaFullBus {
     pub fn keyinput(&self) -> u16 {
         // GGA input is active low
         0x3FF ^ self.c.input.state(self.scheduler.now()).0
@@ -49,7 +49,7 @@ impl GgaFullBus<'_> {
                     cond & input == cond
                 };
             if fire {
-                self.cpu.request_interrupt(self.bus, Interrupt::Joypad);
+                self.cpu.request_interrupt(&mut self.bus, Interrupt::Joypad);
             }
 
             self.scheduler

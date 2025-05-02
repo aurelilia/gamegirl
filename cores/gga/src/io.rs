@@ -19,7 +19,7 @@ use crate::{
     hw::dma::Dmas,
 };
 
-impl GgaFullBus<'_> {
+impl GgaFullBus {
     pub fn get_mmio<T: NumExt>(&self, addr: Address) -> T {
         get_mmio_apply(addr.0, |a| {
             // Memory / IRQ control
@@ -95,15 +95,15 @@ impl GgaFullBus<'_> {
             // Memory / IRQ control
             iow16!(a, IME, {
                 self.cpu.intr.ime = s16.with(0).is_bit(0);
-                self.cpu.check_if_interrupt(self.bus);
+                self.cpu.check_if_interrupt(&mut self.bus);
             });
             iow16!(a, IE, {
                 self.cpu.intr.ie = s16.with(self.cpu.intr.ie.u16()).u32();
-                self.cpu.check_if_interrupt(self.bus);
+                self.cpu.check_if_interrupt(&mut self.bus);
             });
             iow16!(a, IF, {
                 self.cpu.intr.if_ &= !s16.raw().u32();
-                self.cpu.check_if_interrupt(self.bus);
+                self.cpu.check_if_interrupt(&mut self.bus);
             });
             iow08!(a, HALTCNT, self.cpu.halt_on_irq());
             iow16!(a, WAITCNT, {
@@ -188,7 +188,7 @@ impl GgaFullBus<'_> {
             // Serial
             iow16!(a, SIOCNT, {
                 if s16.raw() == 0x4003 {
-                    self.cpu.request_interrupt(self.bus, Interrupt::Serial);
+                    self.cpu.request_interrupt(&mut self.bus, Interrupt::Serial);
                 }
             });
             iow16!(a, RCNT, s16.mask(0x41F0).apply_io(&mut self.serial.rcnt));
@@ -229,9 +229,8 @@ impl GgaFullBus<'_> {
     }
 
     fn invalidate_rom_cache(&mut self) {
-        for i in (0x800_0000..0xDFF_FFFF).step_by(0x4000) {
-            // TODO
-            // self.cpu.cache.invalidate_address(i);
-        }
+        self.opt
+            .table
+            .invalidate_address_range(0x800_0000..0xDFF_FFFF);
     }
 }

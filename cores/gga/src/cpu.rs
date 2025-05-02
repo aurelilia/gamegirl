@@ -6,10 +6,14 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use core::ops::{Deref, DerefMut};
+use core::{
+    mem,
+    ops::{Deref, DerefMut},
+};
 
 use armchair::{
     interface::{Arm7Dtmi, Bus, BusCpuConfig, RwType},
+    optimizations::Optimizations,
     Access, Address, CpuState, Exception,
 };
 use common::{common::debugger::Debugger, Time};
@@ -30,7 +34,7 @@ impl Bus for GgaBus {
     }
 
     fn handle_events(&mut self, cpu: &mut CpuState) {
-        GgaFullBus { bus: self, cpu }.advance_clock();
+        GgaFullBus::from_parts(cpu, self).advance_clock();
     }
 
     fn debugger(&mut self) -> &mut Debugger {
@@ -46,28 +50,40 @@ impl Bus for GgaBus {
     }
 
     fn pipeline_stalled(&mut self, cpu: &mut CpuState) {
-        GgaFullBus { bus: self, cpu }.stop_prefetch();
+        GgaFullBus::from_parts(cpu, self).stop_prefetch();
     }
 
     fn get<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address) -> T {
-        GgaFullBus { bus: self, cpu }.get(addr)
+        GgaFullBus::from_parts(cpu, self).get(addr)
     }
 
     fn set<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address, value: T) {
-        GgaFullBus { bus: self, cpu }.set(addr, value)
+        GgaFullBus::from_parts(cpu, self).set(addr, value)
     }
 
     fn wait_time<T: RwType>(&mut self, cpu: &mut CpuState, addr: Address, access: Access) -> u16 {
-        GgaFullBus { bus: self, cpu }.wait_time::<T>(addr, access)
+        GgaFullBus::from_parts(cpu, self).wait_time::<T>(addr, access)
     }
 }
 
-pub struct GgaFullBus<'c> {
-    pub cpu: &'c mut CpuState,
-    pub bus: &'c mut GgaBus,
+#[repr(C)]
+pub struct GgaFullBus {
+    pub cpu: CpuState,
+    pub bus: GgaBus,
+    pub opt: Optimizations<GgaBus>,
 }
 
-impl Deref for GgaFullBus<'_> {
+impl GgaFullBus {
+    /// Build a full bus from it's parts.
+    /// The 2 parts _must_ be from the same system, otherwise this _will_ panic!
+    pub fn from_parts<'s>(cpu: &'s mut CpuState, bus: &'s mut GgaBus) -> &'s mut Self {
+        let transmuted: &'s mut Self = unsafe { mem::transmute(cpu) };
+        debug_assert_eq!(bus as *const _, (&transmuted.bus) as *const _);
+        transmuted
+    }
+}
+
+impl Deref for GgaFullBus {
     type Target = GgaBus;
 
     fn deref(&self) -> &Self::Target {
@@ -75,17 +91,20 @@ impl Deref for GgaFullBus<'_> {
     }
 }
 
-impl DerefMut for GgaFullBus<'_> {
+impl DerefMut for GgaFullBus {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.bus
     }
 }
 
-impl<'g> From<&'g mut GameGirlAdv> for GgaFullBus<'g> {
+impl<'g> From<&'g GameGirlAdv> for &'g GgaFullBus {
+    fn from(value: &'g GameGirlAdv) -> Self {
+        unsafe { mem::transmute(&value.cpu) }
+    }
+}
+
+impl<'g> From<&'g mut GameGirlAdv> for &'g mut GgaFullBus {
     fn from(value: &'g mut GameGirlAdv) -> Self {
-        Self {
-            bus: &mut value.cpu.bus,
-            cpu: &mut value.cpu.state,
-        }
+        unsafe { mem::transmute(&mut value.cpu) }
     }
 }

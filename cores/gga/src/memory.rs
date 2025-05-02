@@ -90,7 +90,7 @@ pub struct Memory {
     wait_other: [u16; 32],
 }
 
-impl GgaFullBus<'_> {
+impl GgaFullBus {
     pub fn get<T: RwType>(&self, addr_unaligned: Address) -> T {
         let addr = addr_unaligned.align(T::WIDTH);
         if addr > MAX_ADDRESS {

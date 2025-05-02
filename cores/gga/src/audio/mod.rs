@@ -92,7 +92,7 @@ pub struct Apu {
 impl Apu {
     /// Handle event. Since all APU events reschedule themselves, this
     /// function returns the time after which the event should repeat.
-    pub fn handle_event(gg: &mut GgaFullBus<'_>, event: ApuEvent, late_by: TimeS) -> TimeS {
+    pub fn handle_event(gg: &mut GgaFullBus, event: ApuEvent, late_by: TimeS) -> TimeS {
         match event {
             // We multiply the time by 4 since the generic APU expects GG t-cycles,
             // which are 1/4th of GGA CPU clock
@@ -110,7 +110,7 @@ impl Apu {
         }
     }
 
-    pub fn init_scheduler(gg: &mut GgaFullBus<'_>) {
+    pub fn init_scheduler(gg: &mut GgaFullBus) {
         GenericApu::init_scheduler(&mut shed(&mut gg.scheduler));
         gg.scheduler.schedule(
             AdvEvent::ApuEvent(ApuEvent::PushSample),
@@ -120,7 +120,7 @@ impl Apu {
             .schedule(AdvEvent::ApuEvent(ApuEvent::Sequencer), 0x8000);
     }
 
-    fn push_output(gg: &mut GgaFullBus<'_>) {
+    fn push_output(gg: &mut GgaFullBus) {
         if !gg.apu.cgb_chans.power {
             // Master enable, also applies to DMA channels
             gg.c.audio_buffer.input[0].push(0.);
@@ -185,7 +185,7 @@ impl Apu {
 impl Apu {
     /// Timer handling this channel overflowed, go to next sample and request
     /// more samples if needed
-    pub fn timer_overflow<const CH: usize>(gg: &mut GgaFullBus<'_>) {
+    pub fn timer_overflow<const CH: usize>(gg: &mut GgaFullBus) {
         if let Some(next) = gg.apu.buffers[CH].pop_front() {
             if gg.apu.hle_hook != 0 && CH == 0 {
                 let mplayer = gg.bus.apu.mplayer.read_sample(&mut gg.bus.memory);

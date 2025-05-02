@@ -15,15 +15,10 @@ mod exceptions;
 pub mod interface;
 mod memory;
 mod misc;
-mod optimizations;
+pub mod optimizations;
 pub mod state;
 mod thumb;
 pub mod tracing;
-
-use core::{
-    mem,
-    ops::{Deref, DerefMut},
-};
 
 use common::numutil::NumExt;
 pub use exceptions::*;
@@ -42,7 +37,7 @@ pub struct Cpu<S: Bus> {
     pub state: CpuState,
     pub bus: S,
     #[cfg_attr(feature = "serde", serde(skip, default))]
-    pub(crate) opt: Optimizations<S>,
+    pub opt: Optimizations<S>,
 }
 
 impl<S: Bus> Cpu<S> {
@@ -90,47 +85,5 @@ impl<S: Bus> Cpu<S> {
             state: Default::default(),
             opt: Default::default(),
         }
-    }
-}
-
-#[repr(C)]
-pub struct FullBus<S: Bus> {
-    cpu: CpuState,
-    bus: S,
-}
-
-impl<S: Bus> FullBus<S> {
-    /// Build a full bus from it's parts.
-    /// The 2 parts _must_ be from the same system, otherwise this _will_ panic!
-    pub fn from_parts<'s>(cpu: &'s mut CpuState, bus: &'s mut S) -> &'s mut Self {
-        let transmuted: &'s mut Self = unsafe { mem::transmute(cpu) };
-        debug_assert_eq!(bus as *const _, (&transmuted.bus) as *const _);
-        transmuted
-    }
-}
-
-impl<S: Bus> Deref for FullBus<S> {
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        &self.bus
-    }
-}
-
-impl<S: Bus> DerefMut for FullBus<S> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.bus
-    }
-}
-
-impl<'c, S: Bus> From<&'c Cpu<S>> for &FullBus<S> {
-    fn from(value: &'c Cpu<S>) -> Self {
-        unsafe { mem::transmute(value) }
-    }
-}
-
-impl<'c, S: Bus> From<&'c mut Cpu<S>> for &mut FullBus<S> {
-    fn from(value: &'c mut Cpu<S>) -> Self {
-        unsafe { mem::transmute(value) }
     }
 }

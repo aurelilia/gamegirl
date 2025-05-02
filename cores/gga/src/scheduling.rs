@@ -34,7 +34,7 @@ pub enum AdvEvent {
     TimerOverflow(u8),
 }
 
-impl GgaFullBus<'_> {
+impl GgaFullBus {
     /// Handle the event by delegating to the appropriate handler.
     pub fn dispatch(&mut self, event: AdvEvent, late_by: TimeS) {
         match event {

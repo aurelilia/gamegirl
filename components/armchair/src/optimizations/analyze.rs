@@ -125,7 +125,11 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
         self.uses_all_flags()
     }
 
-    fn call(&mut self, _address: Address) -> InstructionAnalysis {
+    fn call_absolute(&mut self, _address: Address) -> InstructionAnalysis {
+        self.uses_all_flags()
+    }
+
+    fn call_relative(&mut self, _offset: RelativeOffset) -> InstructionAnalysis {
         self.uses_all_flags()
     }
 
@@ -343,7 +347,7 @@ impl<'s, R: FnMut(Address) -> u32> ThumbVisitor for InstructionAnalyzer<'s, R> {
     }
 
     fn thumb_bl(&mut self, offset: Address, _thumb: bool) -> Self::Output {
-        self.call(offset)
+        self.call_absolute(offset)
     }
 }
 
@@ -351,146 +355,173 @@ impl<'s, R: FnMut(Address) -> u32> ArmVisitor for InstructionAnalyzer<'s, R> {
     const IS_V5: bool = true;
     type Output = InstructionAnalysis;
 
-    fn arm_unknown_opcode(&mut self, inst: ArmInst) -> Self::Output {
+    fn arm_unknown_opcode(&mut self, _inst: ArmInst) -> Self::Output {
         self.uses_nothing()
     }
 
     fn arm_swi(&mut self) -> Self::Output {
+        // TODO consider SWI
         self.uses_nothing()
     }
 
     fn arm_b(&mut self, offset: RelativeOffset) -> Self::Output {
-        self.uses_nothing()
+        self.branch(offset)
     }
 
     fn arm_bl(&mut self, offset: RelativeOffset) -> Self::Output {
-        self.uses_nothing()
+        self.call_relative(offset)
     }
 
-    fn arm_bx(&mut self, n: Register) -> Self::Output {
-        self.uses_nothing()
+    fn arm_bx(&mut self, _n: Register) -> Self::Output {
+        self.unconditional_return()
     }
 
     fn arm_blx(&mut self, src: ArmSignedOperandKind) -> Self::Output {
-        self.uses_nothing()
+        match src {
+            ArmSignedOperandKind::Immediate(offs) => self.call_relative(offs),
+            ArmSignedOperandKind::Register(reg) => self.call_register(reg),
+        }
     }
 
     fn arm_alu_reg(
         &mut self,
-        n: Register,
-        d: Register,
-        m: Register,
+        _n: Register,
+        _d: Register,
+        _m: Register,
         op: ArmAluOp,
-        shift_kind: ArmAluShift,
-        shift_operand: ArmOperandKind,
+        _shift_kind: ArmAluShift,
+        _shift_operand: ArmOperandKind,
         cpsr: bool,
     ) -> Self::Output {
-        self.uses_nothing()
+        use ArmAluOp::*;
+        if cpsr {
+            match op {
+                Adc | Sbc | Cmp | Cmn => self.sets_nzco(),
+                _ => self.sets_nzc(),
+            }
+        }
+        match op {
+            Adc | Sbc => self.uses_carry(),
+            _ => self.uses_nothing(),
+        }
     }
 
     fn arm_alu_imm(
         &mut self,
-        n: Register,
-        d: Register,
-        imm: u32,
-        imm_ror: u32,
+        _n: Register,
+        _d: Register,
+        _imm: u32,
+        _imm_ror: u32,
         op: ArmAluOp,
         cpsr: bool,
     ) -> Self::Output {
-        self.uses_nothing()
+        use ArmAluOp::*;
+        if cpsr {
+            match op {
+                Adc | Sbc | Cmp | Cmn => self.sets_nzco(),
+                _ => self.sets_nzc(),
+            }
+        }
+        match op {
+            Adc | Sbc => self.uses_carry(),
+            _ => self.uses_nothing(),
+        }
     }
 
     fn arm_mul(
         &mut self,
-        n: Register,
-        s: Register,
-        d: Register,
-        m: Register,
-        op: ArmMulOp,
+        _n: Register,
+        _s: Register,
+        _d: Register,
+        _m: Register,
+        _op: ArmMulOp,
         cpsr: bool,
     ) -> Self::Output {
+        if cpsr {
+            self.sets_nzc();
+        }
         self.uses_nothing()
     }
 
     fn arm_sh_mul(
         &mut self,
-        n: Register,
-        s: Register,
-        d: Register,
-        m: Register,
-        op: ArmShMulOp,
-        x_top: bool,
-        y_top: bool,
+        _n: Register,
+        _s: Register,
+        _d: Register,
+        _m: Register,
+        _op: ArmShMulOp,
+        _x_top: bool,
+        _y_top: bool,
     ) -> Self::Output {
         self.uses_nothing()
     }
 
-    fn arm_clz(&mut self, m: Register, d: Register) -> Self::Output {
+    fn arm_clz(&mut self, _m: Register, _d: Register) -> Self::Output {
         self.uses_nothing()
     }
 
-    fn arm_q(&mut self, n: Register, m: Register, d: Register, op: ArmQOp) -> Self::Output {
+    fn arm_q(&mut self, _n: Register, _m: Register, _d: Register, _op: ArmQOp) -> Self::Output {
         self.uses_nothing()
     }
 
     fn arm_msr(
         &mut self,
-        src: ArmOperandKind,
-        flags: bool,
-        ctrl: bool,
-        spsr: bool,
+        _src: ArmOperandKind,
+        _flags: bool,
+        _ctrl: bool,
+        _spsr: bool,
     ) -> Self::Output {
         self.uses_nothing()
     }
 
-    fn arm_mrs(&mut self, d: Register, spsr: bool) -> Self::Output {
+    fn arm_mrs(&mut self, _d: Register, _spsr: bool) -> Self::Output {
         self.uses_nothing()
     }
 
     fn arm_ldrstr(
         &mut self,
-        n: Register,
-        d: Register,
-        offset: ArmLdrStrOperandKind,
-        config: ArmLdrStrConfig,
+        _n: Register,
+        _d: Register,
+        _offset: ArmLdrStrOperandKind,
+        _config: ArmLdrStrConfig,
     ) -> Self::Output {
         self.uses_nothing()
     }
 
     fn arm_ldmstm(
         &mut self,
-        n: Register,
-        rlist: u16,
-        force_user: bool,
-        config: ArmLdmStmConfig,
+        _n: Register,
+        _rlist: u16,
+        _force_user: bool,
+        _config: ArmLdmStmConfig,
     ) -> Self::Output {
         self.uses_nothing()
     }
 
-    fn arm_swp(&mut self, n: Register, d: Register, m: Register, word: bool) -> Self::Output {
+    fn arm_swp(&mut self, _n: Register, _d: Register, _m: Register, _word: bool) -> Self::Output {
         self.uses_nothing()
     }
 
     fn arm_mrc(
         &mut self,
-        cm: u32,
-        cp: u32,
-        pn: u32,
-        rd: Register,
-        cn: u32,
-        opc: u32,
+        _cm: u32,
+        _cp: u32,
+        _pn: u32,
+        _rd: Register,
+        _cn: u32,
+        _opc: u32,
     ) -> Self::Output {
         self.uses_nothing()
     }
 
     fn arm_mcr(
         &mut self,
-        cm: u32,
-        cp: u32,
-        pn: u32,
-        rd: Register,
-        cn: u32,
-        opc: u32,
+        _cm: u32,
+        _cp: u32,
+        _pn: u32,
+        _rd: Register,
+        _cn: u32,
+        _opc: u32,
     ) -> Self::Output {
         self.uses_nothing()
     }

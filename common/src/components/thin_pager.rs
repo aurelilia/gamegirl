@@ -101,7 +101,7 @@ impl ThinPager {
         addr.us() >> 14
     }
 
-    fn addr_to_page_range(addr: Range<u32>) -> Range<usize> {
+    pub fn addr_to_page_range(addr: Range<u32>) -> Range<usize> {
         Self::addr_to_page(addr.start)..Self::addr_to_page(addr.end)
     }
 }

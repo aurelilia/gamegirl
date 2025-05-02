@@ -55,7 +55,7 @@ pub struct Timers {
 
 impl Timers {
     /// Handle overflow of a scheduled timer.
-    pub fn handle_overflow_event(gg: &mut GgaFullBus<'_>, idx: u8, late_by: TimeS) {
+    pub fn handle_overflow_event(gg: &mut GgaFullBus, idx: u8, late_by: TimeS) {
         Self::overflow(gg, idx, -late_by);
     }
 
@@ -136,7 +136,7 @@ impl Timers {
     }
 
     /// Handle an overflow and return time until next.
-    fn overflow(gg: &mut GgaFullBus<'_>, idx: u8, offset: TimeS) {
+    fn overflow(gg: &mut GgaFullBus, idx: u8, offset: TimeS) {
         let ctrl = gg.timers.control[idx.us()];
         let reload = gg.timers.reload[idx.us()];
         let mut value = Self::time_read_inner(&gg.timers, idx.us(), gg.scheduler.now());
@@ -144,7 +144,7 @@ impl Timers {
         // Fire IRQ if enabled
         if ctrl.irq_en() {
             gg.cpu
-                .request_interrupt_with_index(gg.bus, Interrupt::Timer0 as u16 + idx.u16());
+                .request_interrupt_with_index(&mut gg.bus, Interrupt::Timer0 as u16 + idx.u16());
         }
 
         if idx < 2 {
@@ -191,7 +191,7 @@ impl Timers {
 
     /// Increment a timer. Used for cascading timers.
     #[inline]
-    fn inc_timer(gg: &mut GgaFullBus<'_>, idx: usize) {
+    fn inc_timer(gg: &mut GgaFullBus, idx: usize) {
         let new = gg.timers.counters[idx].checked_add(1);
         match new {
             Some(val) => gg.timers.counters[idx] = val,

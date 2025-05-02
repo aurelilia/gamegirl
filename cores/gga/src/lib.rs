@@ -112,9 +112,7 @@ impl Core for GameGirlAdv {
     }
 
     fn get_memory(&self, addr: u32, width: Width) -> u32 {
-        // self.bus().get::<u32>(Address(addr)) & width.mask()
-        // todo
-        0
+        Into::<&GgaFullBus>::into(self).get::<u32>(Address(addr)) & width.mask()
     }
 
     fn search_memory(&self, value: u32, width: Width, kind: Ordering) -> Vec<u32> {
@@ -241,12 +239,12 @@ impl GameGirlAdv {
         Some(buf)
     }
 
-    fn bus(&mut self) -> GgaFullBus {
+    fn bus(&mut self) -> &mut GgaFullBus {
         self.into()
     }
 }
 
-impl GgaFullBus<'_> {
+impl GgaFullBus {
     /// Advance everything but the CPU.
     fn advance_clock(&mut self) {
         if self.scheduler.has_events() {

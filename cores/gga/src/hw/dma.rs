@@ -57,14 +57,14 @@ pub struct Dmas {
 
 impl Dmas {
     /// Update all DMAs to see if they need ticking.
-    pub fn update_all(gg: &mut GgaFullBus<'_>, reason: Reason) {
+    pub fn update_all(gg: &mut GgaFullBus, reason: Reason) {
         for idx in 0..4 {
             Self::step_dma(gg, idx, reason);
         }
     }
 
     /// Update a given DMA after it's control register was written.
-    pub fn ctrl_write(gg: &mut GgaFullBus<'_>, idx: usize, new_ctrl: IoSection<u16>) {
+    pub fn ctrl_write(gg: &mut GgaFullBus, idx: usize, new_ctrl: IoSection<u16>) {
         let channel = &mut gg.dma.channels[idx];
         let old_ctrl = channel.ctrl;
         let mut new_ctrl = new_ctrl.apply_io_ret(&mut channel.ctrl);
@@ -82,12 +82,12 @@ impl Dmas {
 
     /// Try to perform a FIFO transfer, if the DMA is otherwise configured for
     /// it.
-    pub fn try_fifo_transfer(gg: &mut GgaFullBus<'_>, idx: usize) {
+    pub fn try_fifo_transfer(gg: &mut GgaFullBus, idx: usize) {
         Self::step_dma(gg, idx, Reason::Fifo);
     }
 
     /// Step a DMA and perform a transfer if possible.
-    fn step_dma(gg: &mut GgaFullBus<'_>, idx: usize, reason: Reason) {
+    fn step_dma(gg: &mut GgaFullBus, idx: usize, reason: Reason) {
         let mut channel = gg.dma.channels[idx];
         let ctrl = channel.ctrl;
 
@@ -158,7 +158,7 @@ impl Dmas {
         if ctrl.irq_en() {
             // Fire interrupt if configured
             gg.cpu
-                .request_interrupt_with_index(gg.bus, Interrupt::Dma0 as u16 + idx.u16());
+                .request_interrupt_with_index(&mut gg.bus, Interrupt::Dma0 as u16 + idx.u16());
         }
 
         gg.dma.running = prev_dma;
@@ -169,7 +169,7 @@ impl Dmas {
 
     /// Perform a transfer.
     fn perform_transfer<T: RwType>(
-        gg: &mut GgaFullBus<'_>,
+        gg: &mut GgaFullBus,
         mut channel: Dma,
         idx: usize,
         count: u32,
@@ -187,9 +187,9 @@ impl Dmas {
             channel.dst = channel.dst.align(T::WIDTH);
 
             for _ in 0..count {
-                let value = gg.bus.read::<T>(gg.cpu, channel.src, kind).u32();
+                let value = gg.bus.read::<T>(&mut gg.cpu, channel.src, kind).u32();
                 gg.bus
-                    .write::<T>(gg.cpu, channel.dst, T::from_u32(value), kind);
+                    .write::<T>(&mut gg.cpu, channel.dst, T::from_u32(value), kind);
 
                 channel.src = channel.src.add_rel(src_mod);
                 channel.dst = channel.dst.add_rel(dst_mod);
@@ -208,13 +208,18 @@ impl Dmas {
         } else {
             for _ in 0..count {
                 if T::WIDTH == 4 {
-                    gg.bus.write::<u32>(gg.cpu, channel.dst, gg.dma.cache, kind);
-                } else if channel.dst.0.is_bit(1) {
                     gg.bus
-                        .write::<u16>(gg.cpu, channel.dst, (gg.dma.cache >> 16).u16(), kind);
+                        .write::<u32>(&mut gg.cpu, channel.dst, gg.bus.dma.cache, kind);
+                } else if channel.dst.0.is_bit(1) {
+                    gg.bus.write::<u16>(
+                        &mut gg.cpu,
+                        channel.dst,
+                        (gg.bus.dma.cache >> 16).u16(),
+                        kind,
+                    );
                 } else {
                     gg.bus
-                        .write::<u16>(gg.cpu, channel.dst, gg.dma.cache.u16(), kind);
+                        .write::<u16>(&mut gg.cpu, channel.dst, gg.bus.dma.cache.u16(), kind);
                 }
                 channel.src = channel.src.add_rel(src_mod);
                 channel.dst = channel.dst.add_rel(dst_mod);

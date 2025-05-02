@@ -1,5 +1,5 @@
 use alloc::{vec, vec::Vec};
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ops::Range};
 
 use analyze::{BlockAnalysis, InstructionAnalyzer};
 use common::{components::thin_pager::ThinPager, numutil::NumExt};
@@ -77,6 +77,12 @@ impl<S: Bus> OptimizationData<S> {
     pub fn invalidate_address(&mut self, addr: Address) {
         let page = ThinPager::addr_to_page(addr.0);
         self.pages[page] = None;
+    }
+
+    pub fn invalidate_address_range(&mut self, addrs: Range<u32>) {
+        for entry in ThinPager::addr_to_page_range(addrs) {
+            self.pages[entry] = None;
+        }
     }
 }
 
