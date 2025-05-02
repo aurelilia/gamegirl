@@ -208,9 +208,8 @@ impl GgaFullBus {
         }
 
         if let Some(write) = self.memory.pager.write(addr.0) {
-            // TODO
-            // self.cpu.cache.invalidate_address(addr);
             *write = value;
+            self.opt.table.invalidate_address(addr);
             return;
         }
 
