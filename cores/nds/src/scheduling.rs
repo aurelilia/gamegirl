@@ -51,21 +51,19 @@ impl NdsEvent {
                 ds.scheduler.schedule(self, time);
             }
             TimerOverflow { timer, is_arm9 } if is_arm9 => {
-                Timers::handle_overflow_event(&mut ds.nds9(), timer, late_by)
+                Timers::handle_overflow_event(ds.nds9(), timer, late_by)
             }
-            TimerOverflow { timer, .. } => {
-                Timers::handle_overflow_event(&mut ds.nds7(), timer, late_by)
-            }
+            TimerOverflow { timer, .. } => Timers::handle_overflow_event(ds.nds7(), timer, late_by),
             UpdateKeypad => {
-                Nds::check_keycnt(&mut ds.nds7());
-                Nds::check_keycnt(&mut ds.nds9());
+                Nds::check_keycnt(ds.nds7());
+                Nds::check_keycnt(ds.nds9());
                 ds.scheduler
                     .schedule(NdsEvent::UpdateKeypad, (NDS9_CLOCK as f64 / 120.0) as TimeS);
             }
             CartEvent(evt) => {
                 if ds.cart.handle_evt(evt) {
-                    Dmas::update_all(&mut ds.nds7(), crate::hw::dma::Reason::CartridgeReady);
-                    Dmas::update_all(&mut ds.nds9(), crate::hw::dma::Reason::CartridgeReady);
+                    Dmas::update_all(ds.nds7(), crate::hw::dma::Reason::CartridgeReady);
+                    Dmas::update_all(ds.nds9(), crate::hw::dma::Reason::CartridgeReady);
                 }
             }
         }

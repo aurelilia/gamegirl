@@ -32,7 +32,7 @@ mod render;
 
 use alloc::{sync::Arc, vec::Vec};
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::{Cpu, Interrupt};
 use common::{common::video::FrameBuffer, numutil::NumExt, Colour, UnsafeArc};
 use registers::*;
 use render::{PpuRender, PpuRendererKind};

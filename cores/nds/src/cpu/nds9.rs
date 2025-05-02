@@ -6,10 +6,12 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arm_cpu::{
-    interface::{ArmSystem, RwType},
-    registers::Flag::IrqDisable,
-    Access, Cpu, Exception,
+use core::ops::Add;
+
+use armchair::{
+    interface::{Arm946Es, Bus, BusCpuConfig, RwType},
+    state::Flag::IrqDisable,
+    Access, Address, Cpu, CpuState, Exception,
 };
 use common::{
     common::debugger::Debugger,
@@ -26,20 +28,18 @@ use crate::{
     Nds, Nds7, Nds9, NdsCpu,
 };
 
-impl ArmSystem for Nds9 {
-    const IS_V5: bool = true;
-    const IF_ADDR: u32 = IF;
-    const EXCEPTION_VECTOR_BASE: u32 = 0xFFFF_0000;
+impl Bus for Nds9 {
+    type Version = Arm946Es;
 
-    fn cpur(&self) -> &Cpu<Self> {
-        &self.cpu9
+    const CONFIG: BusCpuConfig = BusCpuConfig {
+        exception_vector_base_address: Address(0xFFFF_0000),
+    };
+
+    fn tick(&mut self, cycles: Time) {
+        self.scheduler.advance(cycles);
     }
 
-    fn cpu(&mut self) -> &mut Cpu<Self> {
-        &mut self.cpu9
-    }
-
-    fn advance_clock(&mut self) {
+    fn handle_events(&mut self, cpu: &mut armchair::CpuState) {
         if self.scheduler.has_events() {
             while let Some(event) = self.scheduler.get_next_pending() {
                 event.kind.dispatch(self, event.late_by);
@@ -47,35 +47,30 @@ impl ArmSystem for Nds9 {
         }
     }
 
-    fn add_sn_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles as Time);
+    fn exception_happened(&mut self, _cpu: &mut CpuState, _kind: Exception) {}
+
+    fn pipeline_stalled(&mut self, _cpu: &mut CpuState) {}
+
+    fn get<T: RwType>(&mut self, _cpu: &mut CpuState, addr: Address) -> T {
+        self.get(addr.0)
     }
 
-    fn add_i_cycles(&mut self, cycles: u16) {
-        self.scheduler.advance(cycles as Time);
+    fn set<T: RwType>(&mut self, _cpu: &mut CpuState, addr: Address, value: T) {
+        self.set(addr.0, value)
     }
 
-    fn exception_happened(&mut self, _kind: Exception) {}
-
-    fn pipeline_stalled(&mut self) {}
-
-    fn get<T: RwType>(&mut self, addr: u32) -> T {
-        Nds9::get(self, addr)
-    }
-
-    fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        Nds9::set(self, addr, value)
-    }
-
-    fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {
+    fn wait_time<T: RwType>(
+        &mut self,
+        _cpu: &mut CpuState,
+        _addr: Address,
+        _access: Access,
+    ) -> u16 {
         1
     }
 
     fn debugger(&mut self) -> &mut Debugger {
         &mut self.c.debugger
     }
-
-    fn will_execute(&mut self, _pc: u32) {}
 
     fn get_cp15(&self, cm: u32, cp: u32, cn: u32) -> u32 {
         match (cn, cm, cp) {
@@ -116,7 +111,7 @@ impl ArmSystem for Nds9 {
             (5, 0, 2 | 3) => self.cp15.access_protection_bits_ext[cp.us() - 2] = rd,
             (6, _, 0 | 1) => self.cp15.protection_unit_regions[cp.us()][cm.us()] = rd,
 
-            (7, 0, 4) => self.cpu9.halt_on_irq(),
+            (7, 0, 4) => self.cpu9.state.halt_on_irq(),
             // TODO Cache control stuff?
             (9, 0, 0 | 1) => self.cp15.cache_lockdown[cp.us()] = rd,
             (9, 1, 0) => {

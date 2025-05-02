@@ -85,6 +85,12 @@ impl<S: Bus> Cpu<S> {
         self.state.request_interrupt_with_index(&mut self.bus, idx);
     }
 
+    /// Check if an interrupt needs to be handled and jump to the handler if so.
+    /// Called on any events that might cause an interrupt to be triggered.
+    pub fn check_if_interrupt(&mut self) {
+        self.state.check_if_interrupt(&mut self.bus);
+    }
+
     pub(crate) fn exception_occured(&mut self, kind: Exception) {
         self.state.exception_occured(&mut self.bus, kind);
     }

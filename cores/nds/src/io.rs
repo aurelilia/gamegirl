@@ -10,7 +10,7 @@
 
 use core::{marker::PhantomData, mem};
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::{Cpu, Interrupt};
 pub use common::components::io::*;
 use common::{io08, io16, io32, iow08, iow16, iow32, numutil::NumExt};
 
@@ -18,7 +18,7 @@ use crate::{
     addr::*,
     graphics::vram::*,
     hw::{cartridge::Cartridge, dma::Dmas},
-    Nds, Nds7, Nds9, NdsCpu,
+    Nds, Nds7, Nds9, NdsCpu, NdsInner,
 };
 
 impl Nds {
@@ -115,7 +115,8 @@ impl Nds {
                 s16.apply(&mut self.timers[DS::I].reload[idx])
             );
             iow16!(a, TM0CNT_H + (idx.u32() * 4), {
-                self.timers[DS::I].hi_write(DS::I == 1, &mut self.scheduler, idx, s16)
+                let this = &mut **self;
+                this.timers[DS::I].hi_write(DS::I == 1, &mut this.scheduler, idx, s16)
             });
 
             iow32!(
@@ -138,13 +139,13 @@ impl Nds {
                 iow16!(
                     a,
                     0xBA + (idx.u32() * 0xC),
-                    Dmas::ctrl_write(&mut self.nds7(), idx, s16)
+                    Dmas::ctrl_write(self.nds7(), idx, s16)
                 );
             } else {
                 iow16!(
                     a,
                     0xBA + (idx.u32() * 0xC),
-                    Dmas::ctrl_write(&mut self.nds9(), idx, s16)
+                    Dmas::ctrl_write(self.nds9(), idx, s16)
                 );
             }
         }
@@ -165,16 +166,14 @@ impl Nds {
             AUXSPICNT,
             s16.mask(0xE0C3).apply_io(&mut self.cart.spictrl)
         );
-        iow16!(
-            a,
-            AUXSPIDATA,
-            self.cart.data_write(&mut self.scheduler, s16.raw())
-        );
-        iow32!(
-            a,
-            ROMCTRL,
-            self.cart.romctrl_write(&mut self.scheduler, s32)
-        );
+        iow16!(a, AUXSPIDATA, {
+            let this = &mut **self;
+            this.cart.data_write(&mut this.scheduler, s16.raw())
+        });
+        iow32!(a, ROMCTRL, {
+            let this = &mut **self;
+            this.cart.romctrl_write(&mut this.scheduler, s32)
+        });
         iow32!(a, AUXSPICMD_L, {
             self.send_irq(DS::I, Interrupt::CardTransferComplete);
             self.cart.cmd_write(s32, true)
@@ -196,9 +195,9 @@ impl Nds7 {
     pub fn get_mmio<T: NumExt>(&mut self, addr: u32) -> T {
         let value = get_mmio_apply(addr, |a| {
             // Memory / IRQ control
-            io32!(a, IME, self.cpu7.ime as u32);
-            io32!(a, IE, self.cpu7.ie);
-            io32!(a, IF, self.cpu7.if_);
+            io32!(a, IME, self.cpu7.state.intr.ime as u32);
+            io32!(a, IE, self.cpu7.state.intr.ie);
+            io32!(a, IF, self.cpu7.state.intr.if_);
             io08!(a, VRAMSTAT, self.gpu.vram.vram_stat());
             io08!(a, WRAMSTAT, self.memory.wram_status as u8);
 
@@ -228,24 +227,24 @@ impl Nds7 {
 
             // Memory / IRQ control
             iow32!(a, IME, {
-                self.cpu7.ime = s32.with(0).is_bit(0);
-                Cpu::check_if_interrupt(self);
+                self.cpu7.state.intr.ime = s32.with(0).is_bit(0);
+                self.cpu7.check_if_interrupt();
             });
             iow32!(a, IE, {
-                s32.apply(&mut self.cpu7.ie);
-                Cpu::check_if_interrupt(self);
+                s32.apply(&mut self.cpu7.state.intr.ie);
+                self.cpu7.check_if_interrupt();
             });
             iow32!(a, IF, {
-                self.cpu7.if_ &= !s32.raw();
-                Cpu::check_if_interrupt(self);
+                self.cpu7.state.intr.if_ &= !s32.raw();
+                self.cpu7.check_if_interrupt();
             });
-            iow08!(a, HALTCNT, self.cpu7.halt_on_irq());
+            iow08!(a, HALTCNT, self.cpu7.state.halt_on_irq());
 
             // SPI
             iow16!(a, SPICNT, self.spi.ctrl_write(s16));
             iow16!(a, SPIDATA, {
                 self.spi.data_write(s16.raw());
-                Cpu::request_interrupt(self, Interrupt::SpiBus)
+                self.cpu7.request_interrupt(Interrupt::SpiBus);
             });
 
             // Sound
@@ -264,9 +263,9 @@ impl Nds9 {
     pub fn get_mmio<T: NumExt>(&mut self, addr: u32) -> T {
         let value = get_mmio_apply(addr, |a| {
             // Memory / IRQ control
-            io32!(a, IME, self.cpu9.ime as u32);
-            io32!(a, IE, self.cpu9.ie);
-            io32!(a, IF, self.cpu9.if_);
+            io32!(a, IME, self.cpu9.state.intr.ime as u32);
+            io32!(a, IE, self.cpu9.state.intr.ie);
+            io32!(a, IF, self.cpu9.state.intr.if_);
 
             // Graphics
             if matches!(a, 0x00..=0x03 | 0x08..0x60) {
@@ -322,16 +321,16 @@ impl Nds9 {
 
             // Memory / IRQ control
             iow32!(a, IME, {
-                self.cpu9.ime = s32.with(0).is_bit(0);
-                Cpu::check_if_interrupt(self);
+                self.cpu9.state.intr.ime = s32.with(0).is_bit(0);
+                self.cpu9.check_if_interrupt();
             });
             iow32!(a, IE, {
-                s32.apply(&mut self.cpu9.ie);
-                Cpu::check_if_interrupt(self);
+                s32.apply(&mut self.cpu9.state.intr.ie);
+                self.cpu9.check_if_interrupt();
             });
             iow32!(a, IF, {
-                self.cpu9.if_ &= !s32.raw();
-                Cpu::check_if_interrupt(self);
+                self.cpu9.state.intr.if_ &= !s32.raw();
+                self.cpu9.check_if_interrupt();
             });
 
             // Graphics
@@ -346,7 +345,7 @@ impl Nds9 {
             iow32!(a, POWCNT1, s32.apply_io(&mut self.gpu.powcnt1));
 
             // RAM control
-            let dsx: &mut Nds = &mut *self;
+            let dsx: &mut NdsInner = &mut **self;
             for i in A..=G {
                 iow08!(
                     a,
@@ -361,7 +360,7 @@ impl Nds9 {
             }
             iow08!(a, WRAMCNT, {
                 dsx.memory.wram_status = unsafe { mem::transmute(s8.raw() & 3) };
-                dsx.update_wram();
+                self.update_wram();
             });
             iow16!(a, EXMEM, s16.mask(0xE8FF).apply(&mut self.memory.exmem));
             for i in H..=I {

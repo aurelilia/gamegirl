@@ -95,16 +95,16 @@ fn load_inner(cart: GameCart, config: &SystemConfig) -> Result<Box<dyn Core>, Ga
     }
     let mut cart = Some(cart);
 
+    #[cfg(feature = "nds")]
+    if let Some(core) = nds::Nds::try_new(&mut cart, config) {
+        return Ok(core);
+    }
     #[cfg(feature = "ggc")]
     if let Some(core) = ggc::GameGirl::try_new(&mut cart, config) {
         return Ok(core);
     }
     #[cfg(feature = "gga")]
     if let Some(core) = gga::GameGirlAdv::try_new(&mut cart, config) {
-        return Ok(core);
-    }
-    #[cfg(feature = "nds")]
-    if let Some(core) = nds::Nds::try_new(&mut cart, config) {
         return Ok(core);
     }
 

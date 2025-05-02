@@ -8,7 +8,7 @@
 
 //! Input handler.
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::{Cpu, Interrupt};
 use common::TimeS;
 use modular_bitfield::{bitfield, specifiers::B14};
 
@@ -56,7 +56,7 @@ impl Nds {
                     cond & input == cond
                 };
             if fire {
-                Cpu::request_interrupt(ds, Interrupt::Joypad);
+                ds.cpu().request_interrupt(Interrupt::Joypad);
             }
         }
 

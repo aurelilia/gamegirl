@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 use core::default;
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::{Cpu, Interrupt};
 use common::{
     components::{io::IoSection, scheduler::Scheduler},
     numutil::{dword, word, ByteArrayExt, NumExt},
@@ -18,7 +18,7 @@ use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};
 
 use crate::{
     scheduling::{CartEvent, NdsEvent},
-    Nds, NdsCpu,
+    Nds, NdsCpu, NdsInner,
 };
 
 #[bitfield]
@@ -158,7 +158,7 @@ impl Cartridge {
     }
 
     pub fn data_in_read(ds: &mut impl NdsCpu) -> u32 {
-        let dsx: &mut Nds = &mut *ds;
+        let dsx: &mut NdsInner = &mut **ds;
         let value = match &mut dsx.cart.rom_read_addr {
             RomRead::EndlessFF => u32::MAX,
             RomRead::Word(word) => *word,
@@ -171,7 +171,7 @@ impl Cartridge {
 
         ds.cart.rom_read_left -= 4;
         if ds.cart.rom_read_left == 0 && ds.cart.spictrl.rom_complete_irq() {
-            Cpu::request_interrupt(ds, Interrupt::CardTransferComplete)
+            ds.cpu().request_interrupt(Interrupt::CardTransferComplete);
         }
         ds.cart.romctrl = ds.cart.romctrl.set_bit(23, false);
         ds.cart.romctrl = ds.cart.romctrl.set_bit(31, true);

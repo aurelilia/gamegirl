@@ -9,7 +9,7 @@
 use alloc::collections::vec_deque::VecDeque;
 use core::{default, mem};
 
-use arm_cpu::Interrupt;
+use armchair::Interrupt;
 use arrayvec::ArrayVec;
 use common::numutil::U32Ext;
 use modular_bitfield::{bitfield, specifiers::*, BitfieldSpecifier};

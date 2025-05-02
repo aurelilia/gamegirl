@@ -9,8 +9,8 @@
 use alloc::boxed::Box;
 use core::{mem, ptr};
 
-use arm_cpu::{
-    interface::{ArmSystem, RwType},
+use armchair::{
+    interface::{Bus, RwType},
     Cpu, Interrupt,
 };
 use common::{
@@ -74,63 +74,57 @@ pub struct Memory {
 impl Nds {
     /// Initialize page tables and wait times.
     pub fn init_memory(&mut self) {
+        let this = &mut **self;
+
         // Init 7
-        let p7 = &mut self.memory.pager7;
+        let p7 = &mut this.memory.pager7;
         p7.init(0xFFF_FFFF);
-        p7.map(&self.memory.bios7, 0x000_0000..0x100_0000, RO);
-        p7.map(&self.memory.psram, 0x200_0000..0x300_0000, RW);
-        p7.map(&self.memory.wram7, 0x380_0000..0x400_0000, RW);
+        p7.map(&this.memory.bios7, 0x000_0000..0x100_0000, RO);
+        p7.map(&this.memory.psram, 0x200_0000..0x300_0000, RW);
+        p7.map(&this.memory.wram7, 0x380_0000..0x400_0000, RW);
 
         // Init 9
-        let p9 = &mut self.memory.pager9;
+        let p9 = &mut this.memory.pager9;
         p9.init(0xFFF_FFFF);
-        p9.map(&self.memory.tcm[1], 0x000_0000..0x200_0000, RW);
-        p9.map(&self.memory.psram, 0x200_0000..0x300_0000, RW);
+        p9.map(&this.memory.tcm[1], 0x000_0000..0x200_0000, RW);
+        p9.map(&this.memory.psram, 0x200_0000..0x300_0000, RW);
 
         // Init V/WRAM
-        self.gpu.vram.init_mappings(p7, p9);
+        this.gpu.vram.init_mappings(p7, p9);
         self.update_wram();
 
         if self.c.config.cached_interpreter {
-            self.cpu7.cache.init();
-            self.cpu9.cache.init();
+            // TODO
         }
     }
 
     /// Evict and recreate WRAM mappings.
     pub(super) fn update_wram(&mut self) {
-        self.memory.pager7.evict(0x300_0000..0x380_0000);
-        self.memory.pager9.evict(0x300_0000..0x400_0000);
-        match self.memory.wram_status {
-            WramStatus::All7 => {
-                self.memory
-                    .pager7
-                    .map(&self.memory.wram, 0x300_0000..0x380_0000, RW)
-            }
+        let memory = &mut self.memory;
+        memory.pager7.evict(0x300_0000..0x380_0000);
+        memory.pager9.evict(0x300_0000..0x400_0000);
+        match memory.wram_status {
+            WramStatus::All7 => memory.pager7.map(&memory.wram, 0x300_0000..0x380_0000, RW),
             WramStatus::First9 => {
-                self.memory
+                memory
                     .pager9
-                    .map(&self.memory.wram[..(16 * KB)], 0x300_0000..0x400_0000, RW);
-                self.memory
+                    .map(&memory.wram[..(16 * KB)], 0x300_0000..0x400_0000, RW);
+                memory
                     .pager7
-                    .map(&self.memory.wram[(16 * KB)..], 0x300_0000..0x380_0000, RW);
+                    .map(&memory.wram[(16 * KB)..], 0x300_0000..0x380_0000, RW);
             }
             WramStatus::First7 => {
-                self.memory
+                memory
                     .pager7
-                    .map(&self.memory.wram[..(16 * KB)], 0x300_0000..0x380_0000, RW);
-                self.memory
+                    .map(&memory.wram[..(16 * KB)], 0x300_0000..0x380_0000, RW);
+                memory
                     .pager9
-                    .map(&self.memory.wram[(16 * KB)..], 0x300_0000..0x400_0000, RW);
+                    .map(&memory.wram[(16 * KB)..], 0x300_0000..0x400_0000, RW);
             }
             WramStatus::All9 => {
-                self.memory
-                    .pager9
-                    .map(&self.memory.wram, 0x300_0000..0x400_0000, RW);
+                memory.pager9.map(&memory.wram, 0x300_0000..0x400_0000, RW);
                 // When the shared WRAM isn't mapped, the ARM7 WRAM takes over
-                self.memory
-                    .pager7
-                    .map(&self.memory.wram7, 0x300_0000..0x380_0000, RW)
+                memory.pager7.map(&memory.wram7, 0x300_0000..0x380_0000, RW)
             }
         }
     }
@@ -143,9 +137,9 @@ impl Nds {
 
     pub fn send_irq(&mut self, cpu: usize, irq: Interrupt) {
         if cpu == 0 {
-            Cpu::request_interrupt(&mut self.nds7(), irq);
+            self.cpu7.request_interrupt(irq);
         } else {
-            Cpu::request_interrupt(&mut self.nds9(), irq);
+            self.cpu9.request_interrupt(irq);
         }
     }
 }
@@ -178,7 +172,8 @@ impl Nds7 {
         }
         if let Some(write) = self.memory.pager7.write(addr) {
             *write = value;
-            self.cpu7.cache.invalidate_address(addr);
+            // todo
+            // self.cpu7.cache.invalidate_address(addr);
             return;
         }
 
@@ -239,7 +234,8 @@ impl Nds9 {
             if self.cp15.tcm_state[tcm] != TcmState::None
                 && self.cp15.tcm_range[tcm].contains(&addr)
             {
-                self.cpu9.cache.invalidate_address(addr);
+                // todo
+                // self.cpu9.cache.invalidate_address(addr);
                 return self.memory.tcm[tcm]
                     .set_wrap(addr.us() - self.cp15.tcm_range[tcm].start.us(), value);
             }
@@ -249,7 +245,8 @@ impl Nds9 {
         }
         if let Some(write) = self.memory.pager9.write(addr) {
             *write = value;
-            self.cpu9.cache.invalidate_address(addr);
+            // todo
+            // self.cpu9.cache.invalidate_address(addr);
             return;
         }
 

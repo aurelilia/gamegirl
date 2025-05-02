@@ -34,14 +34,15 @@ mod io;
 mod memory;
 mod scheduling;
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, sync::Weak, vec::Vec};
 use core::{
-    mem,
+    cell::UnsafeCell,
+    mem::{self, MaybeUninit},
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
 use addr::{BIOSPROT, SOUNDBIAS};
-use arm_cpu::{interface::ArmSystem, registers::Flag, Cpu, Interrupt};
+use armchair::{interface::Bus, state::Flag, Address, Cpu, Interrupt};
 use common::{
     common::options::{EmulateOptions, SystemConfig},
     common_functions,
@@ -50,7 +51,7 @@ use common::{
         storage::{GameCart, GameSave},
     },
     numutil::NumExt,
-    Colour, Common, Core, Time, TimeS,
+    Colour, Common, Core, Time, TimeS, UnsafeArc,
 };
 use cpu::{
     cp15::Cp15,
@@ -72,36 +73,37 @@ use crate::{
 /// the use case of being able to implement ARM CPU support twice,
 /// since the NDS has 2 CPUs.
 macro_rules! nds_wrapper {
-    ($name:ident, $idx:expr) => {
+    ($name:ident, $idx:expr, $cpu:ident) => {
         /// Wrapper for one of the CPUs.
         /// Raw pointer was chosen to avoid lifetimes.
         #[repr(transparent)]
-        pub struct $name(*mut Nds);
+        pub struct $name(UnsafeArc<NdsInner>);
 
         impl Deref for $name {
             type Target = Nds;
 
             #[inline]
             fn deref(&self) -> &Self::Target {
-                unsafe { &*self.0 }
+                unsafe { core::mem::transmute(self) }
             }
         }
 
         impl DerefMut for $name {
             #[inline]
             fn deref_mut(&mut self) -> &mut Self::Target {
-                unsafe { &mut *self.0 }
+                unsafe { core::mem::transmute(self) }
             }
         }
 
         impl NdsCpu for $name {
             const I: usize = $idx;
             fn mk(ds: &mut Nds) -> Self {
-                $name(ds as *mut Nds)
+                Self(ds.0.clone())
+            }
+            fn cpu(&mut self) -> &mut Cpu<Self> {
+                &mut self.$cpu
             }
         }
-
-        unsafe impl Send for $name {}
 
         // Satisfy serde...
         impl Default for $name {
@@ -112,12 +114,15 @@ macro_rules! nds_wrapper {
     };
 }
 
-nds_wrapper!(Nds7, 0);
-nds_wrapper!(Nds9, 1);
+nds_wrapper!(Nds7, 0, cpu7);
+nds_wrapper!(Nds9, 1, cpu9);
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Nds {
-    cpu7: Cpu<Nds7>,
+//#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct Nds(UnsafeArc<NdsInner>);
+
+//#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct NdsInner {
+    pub cpu7: Cpu<Nds7>,
     pub cpu9: Cpu<Nds9>,
     cp15: Cp15,
     div: Div,
@@ -136,7 +141,7 @@ pub struct Nds {
     scheduler: Scheduler<NdsEvent>,
     time_7: Time,
 
-    #[cfg_attr(feature = "serde", serde(skip, default))]
+    // #[cfg_attr(feature = "serde", serde(skip, default))]
     pub c: Common,
 }
 
@@ -146,19 +151,19 @@ impl Core for Nds {
     fn advance(&mut self) {
         // Run the ARM9, then keep running the ARM7
         // until it has caught up
-        if self.cpu9.is_halted {
+        if self.cpu9.state.is_halted {
             let evt = self.scheduler.pop();
             evt.kind.dispatch(self, evt.late_by);
-            Cpu::check_unsuspend(&mut self.nds9());
+            self.cpu9.check_unsuspend();
         } else {
-            Cpu::continue_running(&mut self.nds9());
+            self.cpu9.continue_running();
         }
 
-        if self.cpu7.is_halted {
-            Cpu::check_unsuspend(&mut self.nds7());
+        if self.cpu7.state.is_halted {
+            self.cpu9.check_unsuspend();
         } else {
             while self.time_7 < self.scheduler.now() {
-                Cpu::continue_running(&mut self.nds7());
+                self.cpu7.continue_running();
             }
         }
     }
@@ -172,47 +177,41 @@ impl Core for Nds {
         /// Really HLE init on NDS
         // Write out header
         for addr in 0..0x200 {
-            self.nds9().set(
-                0x27FFE00 + addr as u32,
-                self.cart.rom[addr % self.cart.rom.len()],
-            )
+            let value = self.cart.rom[addr % self.cart.rom.len()];
+            self.nds9().set(0x27FFE00 + addr as u32, value)
         }
 
         // Write binaries and set registers
         let header = self.cart.header();
         {
-            let mut ds = self.nds7();
             for i in 0..header.arm7_size {
-                ds.set(
-                    header.arm7_ram_addr + i,
-                    self.cart.rom[header.arm7_offset.us() + i.us()],
-                )
+                let value = self.cart.rom[header.arm7_offset.us() + i.us()];
+                self.cpu7.bus.set(header.arm7_ram_addr + i, value)
             }
 
-            ds.cpu().sp[0] = 0x0380_FD80;
-            ds.cpu().sp[2] = 0x0380_FFC0;
-            ds.cpu().sp[4] = 0x0380_FF80;
-            ds.cpu().set_cpsr(0x1F);
+            self.cpu7.state.sp[0] = 0x0380_FD80;
+            self.cpu7.state.registers[13] = 0x0380_FD80;
+            self.cpu7.state.sp[2] = 0x0380_FFC0;
+            self.cpu7.state.sp[4] = 0x0380_FF80;
+            self.cpu7.state.set_cpsr(0x1F);
 
-            ds.cpu().registers[14] = header.arm7_entry_addr;
-            ds.cpu().registers[15] = header.arm7_entry_addr + 4;
+            self.cpu7.state.registers[14] = header.arm7_entry_addr;
+            self.cpu7.state.registers[15] = header.arm7_entry_addr + 4;
         }
         {
-            let mut ds = self.nds9();
             for i in 0..header.arm9_size {
-                ds.set(
-                    header.arm9_ram_addr + i,
-                    self.cart.rom[header.arm9_offset.us() + i.us()],
-                )
+                let value = self.cart.rom[header.arm9_offset.us() + i.us()];
+                self.cpu9.bus.set(header.arm9_ram_addr + i, value)
             }
 
-            ds.cpu().sp[0] = 0x0300_2F7C;
-            ds.cpu().sp[2] = 0x0300_2FC0;
-            ds.cpu().sp[4] = 0x0300_2F80;
-            ds.cpu().set_cpsr(0x1F);
+            self.cpu9.state.sp[0] = 0x0300_2F7C;
+            self.cpu9.state.registers[13] = 0x0300_2F7C;
+            self.cpu9.state.sp[2] = 0x0300_2FC0;
+            self.cpu9.state.sp[4] = 0x0300_2F80;
+            self.cpu9.state.set_cpsr(0x1F);
 
-            ds.cpu().registers[14] = header.arm9_entry_addr;
-            ds.cpu().registers[15] = header.arm9_entry_addr + 4;
+            self.cpu9.state.registers[14] = header.arm9_entry_addr;
+            self.cpu9.state.registers[15] = header.arm9_entry_addr + 4;
         }
 
         // Setup system state
@@ -232,8 +231,9 @@ impl Core for Nds {
         self.nds9().set::<u16>(0x027FFC10, 0x5835);
         self.nds9().set::<u16>(0x027FFC40, 0x0001);
 
-        /// Write user settings
-        let settings = UserSettings::get_bogus();
+        // Write user settings
+        // TODO
+        // let settings = UserSettings::get_bogus();
     }
 
     fn make_save(&self) -> Option<GameSave> {
@@ -275,32 +275,38 @@ impl Core for Nds {
 
 impl Nds {
     #[inline]
-    pub fn nds7(&mut self) -> Nds7 {
-        Nds7(self as *mut Nds)
+    pub fn nds7(&mut self) -> &mut Nds7 {
+        unsafe { core::mem::transmute(self) }
     }
 
     #[inline]
-    pub fn nds9(&mut self) -> Nds9 {
-        Nds9(self as *mut Nds)
+    pub fn nds9(&mut self) -> &mut Nds9 {
+        unsafe { core::mem::transmute(self) }
     }
 
-    pub fn get_inst_mnemonic<DS: NdsCpu>(ds: &mut DS, ptr: u32) -> String {
-        Cpu::<DS>::get_inst(ds, ptr)
+    pub fn get_inst_mnemonic<DS: NdsCpu>(ds: &mut DS, ptr: Address) -> String {
+        let cpu = ds.cpu();
+        let inst = cpu.bus.get(&mut cpu.state, ptr);
+        cpu.state.get_inst_mnemonic(inst)
     }
 
     /// Restore state after a savestate load. `old_self` should be the
     /// system state before the state was loaded.
     pub fn restore_from(&mut self, old_self: Self) {
-        self.c.restore_from(old_self.c);
-        self.init_memory();
+        // TODO
+        // self.c.restore_from(old_self.c);
+        // self.init_memory();
     }
 }
 
 impl Default for Nds {
     fn default() -> Self {
-        let mut nds = Self {
-            cpu7: Cpu::default(),
-            cpu9: Cpu::default(),
+        let mut uninit: UnsafeArc<MaybeUninit<NdsInner>> = UnsafeArc::new(MaybeUninit::uninit());
+        let nds7 = uninit.clone();
+        let nds9 = uninit.clone();
+        uninit.write(NdsInner {
+            cpu7: Cpu::new(unsafe { core::mem::transmute(nds7) }),
+            cpu9: Cpu::new(unsafe { core::mem::transmute(nds9) }),
             cp15: Cp15::default(),
             div: Div::default(),
             sqrt: Sqrt::default(),
@@ -316,10 +322,11 @@ impl Default for Nds {
             scheduler: Scheduler::default(),
             time_7: 0,
             c: Common::default(),
-        };
+        });
+        let mut nds = Nds(unsafe { core::mem::transmute(uninit) });
 
         // ARM9 has a different entry point compared to ARM7.
-        nds.cpu9.registers[15] = 0xFFFF_0000;
+        nds.cpu9.state.registers[15] = 0xFFFF_0000;
 
         // Initialize scheduler
         nds.scheduler.schedule(
@@ -340,10 +347,25 @@ impl Default for Nds {
 /// I = 0 for the ARM7, I = 1 for the ARM9;
 /// things separated by CPU generally use CpuDevice for easy
 /// access with I.
-pub trait NdsCpu: ArmSystem + DerefMut<Target = Nds> {
+pub trait NdsCpu: Bus + DerefMut<Target = Nds> {
     const I: usize;
     fn mk(ds: &mut Nds) -> Self;
+    fn cpu(&mut self) -> &mut Cpu<Self>;
 }
 
 /// Type for devices that both CPUs have.
 type CpuDevice<T> = [T; 2];
+
+impl core::ops::Deref for Nds {
+    type Target = NdsInner;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.0 }
+    }
+}
+
+impl core::ops::DerefMut for Nds {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.0 }
+    }
+}

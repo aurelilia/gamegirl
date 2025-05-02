@@ -6,10 +6,10 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arm_cpu::{
-    interface::{ArmSystem, RwType},
-    registers::Flag::IrqDisable,
-    Access, Cpu, Exception,
+use armchair::{
+    interface::{Arm7Dtmi, Bus, BusCpuConfig, RwType},
+    state::Flag::IrqDisable,
+    Access, Address, Cpu, CpuState, Exception,
 };
 use common::{
     common::debugger::Debugger,
@@ -23,48 +23,47 @@ use crate::{
     Nds7, Nds9, NdsCpu,
 };
 
-impl ArmSystem for Nds7 {
-    const IS_V5: bool = false;
-    const IF_ADDR: u32 = IF;
-    const EXCEPTION_VECTOR_BASE: u32 = 0;
+impl Bus for Nds7 {
+    type Version = Arm7Dtmi;
 
-    fn cpur(&self) -> &Cpu<Self> {
-        &self.cpu7
+    const CONFIG: BusCpuConfig = BusCpuConfig {
+        exception_vector_base_address: Address(0),
+    };
+
+    fn tick(&mut self, cycles: Time) {
+        self.time_7 += cycles << 1;
     }
 
-    fn cpu(&mut self) -> &mut Cpu<Self> {
-        &mut self.cpu7
+    fn handle_events(&mut self, cpu: &mut CpuState) {
+        if self.scheduler.has_events() {
+            while let Some(event) = self.scheduler.get_next_pending() {
+                event.kind.dispatch(self, event.late_by);
+            }
+        }
     }
 
-    fn advance_clock(&mut self) {}
+    fn exception_happened(&mut self, _cpu: &mut CpuState, _kind: Exception) {}
 
-    fn add_sn_cycles(&mut self, cycles: u16) {
-        self.time_7 += (cycles as Time) << 1;
+    fn pipeline_stalled(&mut self, _cpu: &mut CpuState) {}
+
+    fn get<T: RwType>(&mut self, _cpu: &mut CpuState, addr: Address) -> T {
+        self.get(addr.0)
     }
 
-    fn add_i_cycles(&mut self, cycles: u16) {
-        self.time_7 += (cycles as Time) << 1;
+    fn set<T: RwType>(&mut self, _cpu: &mut CpuState, addr: Address, value: T) {
+        self.set(addr.0, value)
     }
 
-    fn exception_happened(&mut self, _kind: Exception) {}
-
-    fn pipeline_stalled(&mut self) {}
-
-    fn get<T: RwType>(&mut self, addr: u32) -> T {
-        Nds7::get(self, addr)
-    }
-
-    fn set<T: RwType>(&mut self, addr: u32, value: T) {
-        Nds7::set(self, addr, value)
-    }
-
-    fn wait_time<T: RwType>(&mut self, _addr: u32, _access: Access) -> u16 {
+    fn wait_time<T: RwType>(
+        &mut self,
+        _cpu: &mut CpuState,
+        _addr: Address,
+        _access: Access,
+    ) -> u16 {
         1
     }
 
     fn debugger(&mut self) -> &mut Debugger {
         &mut self.c.debugger
     }
-
-    fn will_execute(&mut self, _pc: u32) {}
 }

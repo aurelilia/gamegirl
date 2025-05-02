@@ -216,22 +216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arm-cpu"
-version = "0.1.0"
-dependencies = [
- "bitmatch",
- "common",
- "cranelift",
- "cranelift-jit",
- "cranelift-module",
- "cranelift-native",
- "log",
- "num-derive",
- "num-traits",
- "serde",
-]
-
-[[package]]
 name = "armchair"
 version = "0.1.0"
 dependencies = [
@@ -3271,7 +3255,7 @@ dependencies = [
 name = "nds"
 version = "0.1.0"
 dependencies = [
- "arm-cpu",
+ "armchair",
  "arrayvec",
  "common",
  "log",

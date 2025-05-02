@@ -6,10 +6,10 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arm_cpu::{
+use armchair::{
     access::{DMA, NONSEQ, SEQ},
     interface::RwType,
-    Access, Cpu, Interrupt,
+    Access, Address, Cpu, Interrupt,
 };
 use arrayvec::ArrayVec;
 use common::numutil::{word, NumExt};
@@ -143,7 +143,8 @@ impl Dmas {
         }
         if ctrl.irq_en() {
             // Fire interrupt if configured
-            Cpu::request_interrupt_idx(ds, Interrupt::Dma0 as u16 + idx.u16());
+            ds.cpu()
+                .request_interrupt_with_index(Interrupt::Dma0 as u16 + idx.u16());
         }
     }
 
@@ -156,7 +157,7 @@ impl Dmas {
         src_mod: i32,
         dst_mod: i32,
     ) {
-        ds.add_i_cycles(2);
+        ds.tick(2);
         let mut kind = NONSEQ | DMA;
 
         // First, align SRC/DST
@@ -164,22 +165,26 @@ impl Dmas {
         channel.src &= !align;
         channel.dst &= !align;
 
+        let cpu_outer = ds.cpu();
+        let ds = &mut cpu_outer.bus;
+        let cpu = &mut cpu_outer.state;
         for _ in 0..count {
-            let value = ds.read::<T>(channel.src, kind).u32();
-            ds.write::<T>(channel.dst, T::from_u32(value), kind);
+            let value = ds.read::<T>(cpu, Address(channel.src), kind).u32();
+            ds.write::<T>(cpu, Address(channel.dst), T::from_u32(value), kind);
 
             channel.src = channel.src.wrapping_add_signed(src_mod);
             channel.dst = channel.dst.wrapping_add_signed(dst_mod);
             // Only first is NonSeq
             kind = SEQ;
-            ds.advance_clock();
+            ds.handle_events(cpu);
         }
 
         // Put last value into cache
         if T::WIDTH == 4 {
-            ds.dmas[DS::I].cache = ds.get::<u32>(channel.src.wrapping_add_signed(-src_mod));
+            ds.dmas[DS::I].cache =
+                ds.get::<u32>(cpu, Address(channel.src.wrapping_add_signed(-src_mod)));
         } else {
-            let value = ds.get::<u16>(channel.src.wrapping_add_signed(-src_mod));
+            let value = ds.get::<u16>(cpu, Address(channel.src.wrapping_add_signed(-src_mod)));
             ds.dmas[DS::I].cache = word(value, value);
         }
     }

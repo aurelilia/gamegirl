@@ -6,7 +6,7 @@
 // If a copy of these licenses was not distributed with this file, you can
 // obtain them at https://mozilla.org/MPL/2.0/ and http://www.gnu.org/licenses/.
 
-use arm_cpu::{Cpu, Interrupt};
+use armchair::{Cpu, Interrupt};
 use common::{components::scheduler::Scheduler, numutil::NumExt, Time, TimeS};
 use modular_bitfield::{bitfield, specifiers::*};
 
@@ -138,7 +138,8 @@ impl Timers {
         ds.timers[DS::I].counters[idx.us()] = reload;
         // Fire IRQ if enabled
         if ctrl.irq_en() {
-            Cpu::request_interrupt_idx(ds, Interrupt::Timer0 as u16 + idx.u16());
+            ds.cpu()
+                .request_interrupt_with_index(Interrupt::Timer0 as u16 + idx.u16());
         }
 
         if idx != 3 && ds.timers[DS::I].control[idx.us() + 1].count_up() {
