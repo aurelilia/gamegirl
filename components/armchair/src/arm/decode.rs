@@ -16,6 +16,10 @@ impl ArmInst {
         Self(inst)
     }
 
+    pub fn raw(self) -> u32 {
+        self.0
+    }
+
     pub fn reg(self, idx: u32) -> Register {
         Register(self.0.bits(idx, 4) as u16)
     }

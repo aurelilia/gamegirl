@@ -13,6 +13,7 @@ use crate::{
 pub struct InstructionAnalyzer<'s, R: FnMut(Address) -> u32> {
     bus: &'s mut R,
     ana: BlockAnalysis,
+    stop_at_first_branch: bool,
 
     current_pc: Address,
     furthest_branch: Address,
@@ -25,7 +26,12 @@ pub struct InstructionAnalyzer<'s, R: FnMut(Address) -> u32> {
 }
 
 impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
-    pub fn analyze(bus: &'s mut R, entry: Address, kind: InstructionKind) -> BlockAnalysis {
+    pub fn analyze(
+        bus: &'s mut R,
+        entry: Address,
+        kind: InstructionKind,
+        stop_at_first_branch: bool,
+    ) -> BlockAnalysis {
         let mut analyzer = Self {
             bus,
             ana: BlockAnalysis {
@@ -34,6 +40,8 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
                 kind,
                 instructions: Vec::new(),
             },
+            stop_at_first_branch,
+
             current_pc: entry,
             furthest_branch: entry,
             found_exit: false,
@@ -69,7 +77,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
                 // Do not go past page boundaries. This serves 2 purposes:
                 // - Prevents us from making giant functions when code is malformed
                 // - Makes caching analysis in [super::OptimizationData] possible
-                log::error!("Analysis hit page boundary, aborting.");
+                log::debug!("Analysis hit page boundary, aborting.");
                 break;
             }
         }
@@ -109,12 +117,12 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
     fn unconditional_return(&mut self) -> InstructionAnalysis {
         // If we found an unconditional branch that is past any forward branches, assume
         // that we hit the end of the function
-        self.found_exit |= self.current_pc > self.furthest_branch;
+        self.found_exit |= self.stop_at_first_branch || (self.current_pc > self.furthest_branch);
         self.uses_all_flags()
     }
 
     fn branch(&mut self, offset: RelativeOffset) -> InstructionAnalysis {
-        self.uses_all_flags();
+        self.found_exit |= self.stop_at_first_branch;
         let addr = self.current_pc.add_rel(offset);
         if let Some(target) = self.instruction_at_index(addr) {
             target.is_branch_target = true;
@@ -126,14 +134,17 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
     }
 
     fn call_absolute(&mut self, _address: Address) -> InstructionAnalysis {
+        self.found_exit |= self.stop_at_first_branch;
         self.uses_all_flags()
     }
 
     fn call_relative(&mut self, _offset: RelativeOffset) -> InstructionAnalysis {
+        self.found_exit |= self.stop_at_first_branch;
         self.uses_all_flags()
     }
 
     fn call_register(&mut self, _reg: Register) -> InstructionAnalysis {
+        self.found_exit |= self.stop_at_first_branch;
         self.uses_all_flags()
     }
 
@@ -159,7 +170,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
 
     fn instruction_at_index(&mut self, addr: Address) -> Option<&mut InstructionAnalysis> {
         if addr < self.ana.entry {
-            log::error!("Backwards-to-earlier jump!");
+            log::debug!("Backwards-to-earlier jump!");
             return None;
         }
         let index = ((addr.0 - self.ana.entry.0) >> 1).us();
@@ -537,7 +548,8 @@ mod tests {
         // adc r6, r7
         // bx r6
         let mut bus = fake_bus_thumb("1829417E4736");
-        let analysis = InstructionAnalyzer::analyze(&mut bus, Address(0), InstructionKind::Thumb);
+        let analysis =
+            InstructionAnalyzer::analyze(&mut bus, Address(0), InstructionKind::Thumb, false);
 
         assert_eq!(3, analysis.instructions.len());
         assert_eq!(Address(0), analysis.entry);
@@ -553,11 +565,29 @@ mod tests {
         // beq loop ($-4)
         // bx r6
         let mut bus = fake_bus_thumb("1829505442BED0FE4736");
-        let analysis = InstructionAnalyzer::analyze(&mut bus, Address(0), InstructionKind::Thumb);
+        let analysis =
+            InstructionAnalyzer::analyze(&mut bus, Address(0), InstructionKind::Thumb, false);
 
         assert_eq!(5, analysis.instructions.len());
         assert_eq!(Address(0), analysis.entry);
         assert_eq!(Address(8), analysis.exit);
+        assert!(analysis.instructions[1].is_branch_target);
+    }
+
+    #[test]
+    fn analyze_thumb_small_loop_stop_early() {
+        // add r1, r5, r0
+        // loop: str r4, [r2, r1]
+        // cmp r6, r7
+        // beq loop ($-4)
+        // bx r6
+        let mut bus = fake_bus_thumb("1829505442BED0FE4736");
+        let analysis =
+            InstructionAnalyzer::analyze(&mut bus, Address(0), InstructionKind::Thumb, true);
+
+        assert_eq!(4, analysis.instructions.len());
+        assert_eq!(Address(0), analysis.entry);
+        assert_eq!(Address(6), analysis.exit);
         assert!(analysis.instructions[1].is_branch_target);
     }
 

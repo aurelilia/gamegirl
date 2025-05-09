@@ -121,7 +121,7 @@ pub struct CpuState {
 
     // Pipeline + Memory
     pipeline: [u32; 2],
-    pipeline_valid: bool,
+    pub(crate) pipeline_valid: bool,
     pub access_type: Access,
 
     // Interrupt control

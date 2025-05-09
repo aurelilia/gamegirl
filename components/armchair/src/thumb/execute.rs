@@ -423,6 +423,6 @@ impl<S: Bus> ThumbVisitor for Cpu<S> {
         self.state.set_lr(pc - Address::BYTE);
         self.state.set_flag(Thumb, thumb);
         // This is a function call!
-        self.analyze_now();
+        self.just_called_function();
     }
 }

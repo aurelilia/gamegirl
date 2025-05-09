@@ -20,12 +20,22 @@ pub mod state;
 mod thumb;
 pub mod tracing;
 
-use common::numutil::NumExt;
+use alloc::vec::Vec;
+use core::mem;
+
+use arm::ArmInst;
+use common::{numutil::NumExt, Time};
 pub use exceptions::*;
 use interface::Bus;
+use memory::access::SEQ;
 pub use memory::{access, Access, Address, RelativeOffset};
-use optimizations::Optimizations;
+use misc::InstructionKind;
+use optimizations::{
+    cache::{CacheEntryKind, CacheStatus, CachedInstruction},
+    CacheIndex, Optimizations,
+};
 pub use state::CpuState;
+use thumb::ThumbInst;
 
 use crate::{interface::RwType, state::Flag::Thumb};
 
@@ -49,7 +59,14 @@ impl<S: Bus> Cpu<S> {
             return;
         }
 
-        self.interpret_next_instruction();
+        match mem::replace(&mut self.opt.cache, CacheStatus::JustInterpret) {
+            CacheStatus::JustInterpret => self.interpret_next_instruction(),
+            CacheStatus::MakeCacheNow => self.try_make_cache(None),
+            CacheStatus::RunCacheNowAt(index) => {
+                let block = self.opt.table.get_cache(index);
+                self.run_cache_block(index, block);
+            }
+        }
     }
 
     /// Interpret the next instruction and advance the scheduler.
@@ -77,6 +94,121 @@ impl<S: Bus> Cpu<S> {
 
         self.trace_inst::<TY>(inst);
         (inst, sn_cycles, pc)
+    }
+
+    fn try_make_cache(&mut self, index: Option<CacheIndex>) {
+        self.state.revalidate_pipeline(&mut self.bus);
+        self.opt
+            .table
+            .insert_cache(index, CacheEntryKind::FailedRetry);
+        if self.state.current_instruction_type() == InstructionKind::Thumb {
+            let mut block = Vec::with_capacity(10);
+            while self.state.pipeline_valid {
+                self.bus.handle_events(&mut self.state);
+                if !self.state.pipeline_valid {
+                    // CPU got interrupted by system, discard the block
+                    self.opt
+                        .table
+                        .insert_cache(index, CacheEntryKind::FailedRetry);
+                    return;
+                }
+
+                let (inst, cycles, _) = self.fetch_next_inst::<u16>();
+                let instruction = inst.u16();
+                let handler = Self::get_interpreter_handler_thumb(instruction);
+
+                handler(self, ThumbInst::of(instruction));
+                block.push(CachedInstruction {
+                    instruction,
+                    handler,
+                    cycles: cycles as Time,
+                });
+                if self.state.pc().on_page_boundary() {
+                    // Block hit a page boundary, finish the block
+                    break;
+                }
+            }
+            self.opt
+                .table
+                .insert_cache(index, CacheEntryKind::Thumb(block));
+        } else {
+            let mut block = Vec::with_capacity(10);
+            while self.state.pipeline_valid {
+                self.bus.handle_events(&mut self.state);
+                if !self.state.pipeline_valid {
+                    // CPU got interrupted by system, discard the block
+                    self.opt
+                        .table
+                        .insert_cache(index, CacheEntryKind::FailedRetry);
+                    return;
+                }
+
+                let (instruction, cycles, _) = self.fetch_next_inst::<u32>();
+                let handler = Self::get_interpreter_handler_arm(instruction);
+
+                if self.check_arm_cond(instruction) {
+                    handler(self, ArmInst::of(instruction));
+                }
+                block.push(CachedInstruction {
+                    instruction,
+                    handler,
+                    cycles: cycles as Time,
+                });
+                if self.state.pc().on_page_boundary() {
+                    // Block hit a page boundary, finish the block
+                    break;
+                }
+            }
+            self.opt
+                .table
+                .insert_cache(index, CacheEntryKind::Arm(block));
+        }
+    }
+
+    fn run_cache_block(&mut self, index: CacheIndex, block: &CacheEntryKind<S>) {
+        self.state.revalidate_pipeline(&mut self.bus);
+        match (block, self.state.current_instruction_type()) {
+            (CacheEntryKind::Arm(cache), InstructionKind::Arm) => {
+                for inst in cache.iter() {
+                    self.bus.handle_events(&mut self.state);
+                    if !self.state.pipeline_valid {
+                        return;
+                    }
+
+                    let _pc = self.state.bump_pc(4);
+                    self.bus.tick(inst.cycles);
+                    if self.check_arm_cond(inst.instruction) {
+                        self.state.access_type = SEQ;
+                        (inst.handler)(self, ArmInst::of(inst.instruction));
+                    }
+                }
+            }
+
+            (CacheEntryKind::Thumb(cache), InstructionKind::Thumb) => {
+                for inst in cache.iter() {
+                    self.bus.handle_events(&mut self.state);
+                    if !self.state.pipeline_valid {
+                        return;
+                    }
+
+                    let _pc = self.state.bump_pc(2);
+                    self.bus.tick(inst.cycles);
+                    self.state.access_type = SEQ;
+                    (inst.handler)(self, ThumbInst::of(inst.instruction));
+                }
+            }
+
+            (CacheEntryKind::FailedRetry, _) => {
+                // We failed making a cache block here in the past.
+                // Try again.
+                self.try_make_cache(Some(index));
+            }
+
+            // Edge case: Somehow we got a cache entry that doesn't match the CPU state
+            // Just advance regularly and ignore the cache
+            // (The only game known to me that triggers this is "Hello Kitty - Happy Party Pals")
+            _ => self.interpret_next_instruction(),
+        }
     }
 
     pub fn new(bus: S) -> Self {
