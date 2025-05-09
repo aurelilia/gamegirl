@@ -3,13 +3,14 @@ use core::mem;
 
 use common::Time;
 
-use super::CacheIndex;
+use super::{CacheIndex, JitIndex};
 use crate::{arm::ArmHandler, interface::Bus, thumb::ThumbHandler, Cpu};
 
-pub enum CacheStatus {
+pub enum CodeOptimizationStatus {
     JustInterpret,
     MakeCacheNow,
     RunCacheNowAt(CacheIndex),
+    RunJitNowAt(JitIndex),
 }
 
 pub struct CacheEntry<S: Bus> {

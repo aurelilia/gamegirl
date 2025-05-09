@@ -31,7 +31,7 @@ use memory::access::SEQ;
 pub use memory::{access, Access, Address, RelativeOffset};
 use misc::InstructionKind;
 use optimizations::{
-    cache::{CacheEntryKind, CacheStatus, CachedInstruction},
+    cache::{CacheEntryKind, CachedInstruction, CodeOptimizationStatus},
     CacheIndex, Optimizations,
 };
 pub use state::CpuState;
@@ -59,12 +59,20 @@ impl<S: Bus> Cpu<S> {
             return;
         }
 
-        match mem::replace(&mut self.opt.cache, CacheStatus::JustInterpret) {
-            CacheStatus::JustInterpret => self.interpret_next_instruction(),
-            CacheStatus::MakeCacheNow => self.try_make_cache(None),
-            CacheStatus::RunCacheNowAt(index) => {
+        match mem::replace(
+            &mut self.opt.code_opt,
+            CodeOptimizationStatus::JustInterpret,
+        ) {
+            CodeOptimizationStatus::JustInterpret => self.interpret_next_instruction(),
+            CodeOptimizationStatus::MakeCacheNow => self.try_make_cache(None),
+            CodeOptimizationStatus::RunCacheNowAt(index) => {
                 let block = self.opt.table.get_cache(index);
                 self.run_cache_block(index, block);
+            }
+            CodeOptimizationStatus::RunJitNowAt(jit) => {
+                let jit = self.opt.table.get_jit(jit);
+                jit.call(self);
+                self.interpret_next_instruction();
             }
         }
     }

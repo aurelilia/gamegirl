@@ -11,7 +11,8 @@ use crate::{
 };
 
 pub(crate) mod decode;
-mod execute;
+mod interpret;
+mod jit;
 mod trace;
 
 pub type ArmHandler<C> = fn(&mut C, ArmInst);

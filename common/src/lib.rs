@@ -42,7 +42,7 @@ pub type Pointer = u32;
 /// to depend on the rather heavy egui.
 pub type Colour = [u8; 4];
 
-pub trait Core: Any + Send + Sync {
+pub trait Core: Any + Send {
     /// Try to create a core instance from the given game cart, if it is
     /// valid for this core's system.
     /// Can also create an instance with no cart loaded, if possible.

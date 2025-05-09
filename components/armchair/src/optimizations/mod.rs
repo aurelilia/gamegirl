@@ -2,19 +2,22 @@ use alloc::{vec, vec::Vec};
 use core::ops::Range;
 
 use analyze::{BlockAnalysis, InstructionAnalyzer};
-use cache::{CacheEntry, CacheEntryKind, CacheStatus};
+use cache::{CacheEntry, CacheEntryKind, CodeOptimizationStatus};
 use common::{components::thin_pager::ThinPager, numutil::NumExt};
+use jit::{Jit, JitBlock};
 use waitloop::{WaitloopData, WaitloopPoint};
 
 use crate::{interface::Bus, Address, Cpu};
 
 pub mod analyze;
 pub mod cache;
+pub mod jit;
 pub mod waitloop;
 
 pub struct Optimizations<S: Bus> {
     pub waitloop: WaitloopData,
-    pub cache: CacheStatus,
+    pub code_opt: CodeOptimizationStatus,
+    jit: Jit<S>,
     pub table: OptimizationData<S>,
 }
 
@@ -22,12 +25,14 @@ impl<S: Bus> Default for Optimizations<S> {
     fn default() -> Self {
         let mut s = Self {
             waitloop: Default::default(),
-            cache: CacheStatus::JustInterpret,
+            code_opt: CodeOptimizationStatus::JustInterpret,
+            jit: Jit::default(),
             table: OptimizationData {
                 pages: Vec::new(),
                 functions: Vec::new(),
                 blocks: Vec::new(),
                 caches: Vec::new(),
+                jits: Vec::new(),
             },
         };
         s.table
@@ -42,6 +47,7 @@ pub struct OptimizationData<S: Bus> {
     functions: Vec<BlockAnalysis>,
     blocks: Vec<BlockAnalysis>,
     caches: Vec<CacheEntry<S>>,
+    jits: Vec<JitBlock>,
 }
 
 impl<S: Bus> OptimizationData<S> {
@@ -58,6 +64,7 @@ impl<S: Bus> OptimizationData<S> {
                             function_exit_analysis: None,
                             block_entry_analysis: None,
                             cache_entry: None,
+                            jit_entry: None
                         };
                         0x2000
                     ],
@@ -83,6 +90,10 @@ impl<S: Bus> OptimizationData<S> {
 
     pub fn get_cache(&mut self, index: CacheIndex) -> &'static CacheEntryKind<S> {
         self.caches[index].borrow()
+    }
+
+    pub fn get_jit(&mut self, index: JitIndex) -> JitBlock {
+        self.jits[index]
     }
 
     pub fn invalidate_address(&mut self, addr: Address) {
@@ -111,6 +122,7 @@ struct PageData {
 struct OptEntry {
     waitloop: WaitloopPoint,
     cache_entry: Option<CacheIndex>,
+    jit_entry: Option<JitIndex>,
 
     function_entry_analysis: Option<BlockAnalysisIndex>,
     function_exit_analysis: Option<BlockAnalysisIndex>,
@@ -122,6 +134,7 @@ impl Clone for OptEntry {
         Self {
             waitloop: self.waitloop.clone(),
             cache_entry: None,
+            jit_entry: None,
             function_entry_analysis: None,
             function_exit_analysis: None,
             block_entry_analysis: None,
@@ -131,6 +144,7 @@ impl Clone for OptEntry {
 
 pub type BlockAnalysisIndex = usize;
 pub type CacheIndex = usize;
+pub type JitIndex = usize;
 
 impl<S: Bus> Cpu<S> {
     pub fn just_called_function(&mut self) {
@@ -140,9 +154,25 @@ impl<S: Bus> Cpu<S> {
         };
         match data_at_pc {
             OptEntry {
-                cache_entry: Some(index),
+                jit_entry: Some(index),
                 ..
-            } => self.opt.cache = CacheStatus::RunCacheNowAt(*index),
+            } => self.opt.code_opt = CodeOptimizationStatus::RunJitNowAt(*index),
+
+            OptEntry {
+                function_entry_analysis: Some(fn_index),
+                ..
+            } => {
+                let fn_index = *fn_index;
+                let ana = &self.opt.table.functions[fn_index];
+                let index = self.opt.table.jits.len();
+                let jit = self
+                    .opt
+                    .jit
+                    .compile(index, &mut self.state, &mut self.bus, ana);
+                self.opt.table.jits.push(jit);
+                self.opt.table.get_or_create_entry(entry).unwrap().jit_entry = Some(index);
+                self.opt.code_opt = CodeOptimizationStatus::RunJitNowAt(index)
+            }
 
             OptEntry {
                 function_entry_analysis: None,

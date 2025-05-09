@@ -122,7 +122,6 @@ impl Default for Page {
 }
 
 unsafe impl Send for Page {}
-unsafe impl Sync for Page {}
 
 #[cfg(test)]
 mod test {

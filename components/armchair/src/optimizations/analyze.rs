@@ -59,16 +59,18 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
         while !self.found_exit {
             match self.ana.kind {
                 InstructionKind::Arm => {
-                    let inst = (self.bus)(self.current_pc);
-                    let inst = ArmInst::of(inst);
-                    let ana = (arm::decode::get_instruction_handler(inst, false))(self, inst);
+                    let instr = (self.bus)(self.current_pc);
+                    let inst = ArmInst::of(instr);
+                    let mut ana = (arm::decode::get_instruction_handler(inst, false))(self, inst);
+                    ana.instr = instr;
                     self.insert_analysis(ana);
                     self.current_pc += Address::WORD;
                 }
                 InstructionKind::Thumb => {
-                    let inst = (self.bus)(self.current_pc).u16();
-                    let inst = ThumbInst::of(inst);
-                    let ana = (thumb::decode::get_instruction_handler(inst))(self, inst);
+                    let instr = (self.bus)(self.current_pc).u16();
+                    let inst = ThumbInst::of(instr);
+                    let mut ana = (thumb::decode::get_instruction_handler(inst))(self, inst);
+                    ana.instr = instr as u32;
                     self.insert_analysis(ana);
                     self.current_pc += Address::HW;
                 }
@@ -194,12 +196,13 @@ pub struct BlockAnalysis {
 #[derive(Debug, Clone, Default)]
 #[allow(unused)]
 pub struct InstructionAnalysis {
-    is_branch_target: bool,
-    is_used: bool,
-    uses_neg_flag: bool,
-    uses_zero_flag: bool,
-    uses_carry_flag: bool,
-    uses_overflow_flag: bool,
+    pub instr: u32,
+    pub is_branch_target: bool,
+    pub is_used: bool,
+    pub uses_neg_flag: bool,
+    pub uses_zero_flag: bool,
+    pub uses_carry_flag: bool,
+    pub uses_overflow_flag: bool,
 }
 
 impl<'s, R: FnMut(Address) -> u32> ThumbVisitor for InstructionAnalyzer<'s, R> {
