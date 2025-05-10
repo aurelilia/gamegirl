@@ -70,7 +70,7 @@ impl Bus for GgaBus {
 pub struct GgaFullBus {
     pub cpu: CpuState,
     pub bus: GgaBus,
-    pub opt: Optimizations<GgaBus>,
+    pub opt: Optimizations,
 }
 
 impl GgaFullBus {

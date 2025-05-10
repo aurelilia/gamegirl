@@ -34,7 +34,7 @@ pub enum WaitloopData {
 }
 
 impl WaitloopData {
-    pub fn on_read<S: Bus>(&mut self, addr: Address, value: u32, table: &mut OptimizationData<S>) {
+    pub fn on_read(&mut self, addr: Address, value: u32, table: &mut OptimizationData) {
         *self = match *self {
             WaitloopData::FindReads {
                 br_address,
@@ -60,7 +60,7 @@ impl WaitloopData {
         };
     }
 
-    pub fn on_write<S: Bus>(&mut self, table: &mut OptimizationData<S>) {
+    pub fn on_write(&mut self, table: &mut OptimizationData) {
         match *self {
             WaitloopData::SuspicousJump { br_address }
             | WaitloopData::FindReads { br_address, .. } => {
@@ -73,11 +73,11 @@ impl WaitloopData {
 
     /// To be called before a relative jump.
     /// Returns if CPU is still running.
-    pub fn on_jump<S: Bus>(
+    pub fn on_jump(
         &mut self,
         regs: &CpuState,
         dest: RelativeOffset,
-        table: &mut OptimizationData<S>,
+        table: &mut OptimizationData,
     ) -> bool {
         if !(-16..0).contains(&dest.0) {
             return true;

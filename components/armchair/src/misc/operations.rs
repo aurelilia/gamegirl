@@ -99,6 +99,5 @@ impl<S: Bus> Cpu<S> {
             .waitloop
             .on_jump(&self.state, offset, &mut self.opt.table);
         self.set_pc(self.state.pc().add_rel(offset));
-        self.just_jumped();
     }
 }
