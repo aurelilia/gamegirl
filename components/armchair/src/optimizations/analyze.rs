@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::fmt::Display;
 
 use common::numutil::NumExt;
 
@@ -74,6 +75,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
                 // - Prevents us from making giant functions when code is malformed
                 // - Makes JIT analysis in [super::OptimizationData] possible
                 log::debug!("Analysis hit page boundary, aborting.");
+                self.ana.pure = false;
                 break;
             }
         }
@@ -187,6 +189,31 @@ pub struct BlockAnalysis {
     pub kind: InstructionKind,
     pub pure: bool,
     pub instructions: Vec<InstructionAnalysis>,
+}
+
+impl Display for BlockAnalysis {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "Block Analysis at {}-{}:", self.entry, self.exit)?;
+        writeln!(f, "   Kind: {:?}", self.kind)?;
+        writeln!(f, "   Pure: {:?}", self.pure)?;
+        writeln!(f, "   Instructions:")?;
+        match self.kind {
+            InstructionKind::Arm => {
+                for instr in &self.instructions {
+                    let inst = ArmInst::of(instr.instr);
+                    writeln!(f, "       {:08X}: {}", instr.instr, inst)?;
+                }
+            }
+            InstructionKind::Thumb => {
+                for instr in &self.instructions {
+                    let inst = ThumbInst::of(instr.instr.u16());
+                    writeln!(f, "           {:04X}: {}", instr.instr, inst)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Default)]

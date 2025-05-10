@@ -1,5 +1,5 @@
 use alloc::{vec, vec::Vec};
-use core::ops::Range;
+use core::ops::{Add, Range};
 
 use analyze::{BlockAnalysis, InstructionAnalyzer};
 use common::{components::thin_pager::ThinPager, numutil::NumExt};
@@ -135,7 +135,7 @@ impl<S: Bus> Cpu<S> {
             } => {
                 let fn_index = *fn_index;
                 let ana = &self.opt.table.analyses[fn_index];
-                if ana.instructions.len() < 5 || !ana.pure || ana.kind == InstructionKind::Arm {
+                if ana.instructions.len() < 5 || !ana.pure {
                     return;
                 }
 

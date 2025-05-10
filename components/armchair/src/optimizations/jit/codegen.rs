@@ -69,8 +69,8 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
             0xF => Condition::RunNever,
             _ => {
                 let cpsr = self.get_cpsr();
-                let cond_bits = self.builder.ins().ishl_imm(cpsr, 28);
-                let cond_shift = self.builder.ins().ushr(self.consts.one_i32, cond_bits);
+                let cond_bits = self.builder.ins().ushr_imm(cpsr, 28);
+                let cond_shift = self.builder.ins().ishl(self.consts.one_i32, cond_bits);
                 let mask = self
                     .builder
                     .ins()
