@@ -134,8 +134,9 @@ impl<S: Bus> Cpu<S> {
                 ..
             } => {
                 let fn_index = *fn_index;
-                let ana = &self.opt.table.analyses[fn_index];
-                if ana.instructions.len() < 5 || !ana.pure {
+                let ana = &mut self.opt.table.analyses[fn_index];
+                ana.seen_count += 1;
+                if ana.instructions.len() < 5 || !ana.pure || ana.seen_count < 5 {
                     return;
                 }
 

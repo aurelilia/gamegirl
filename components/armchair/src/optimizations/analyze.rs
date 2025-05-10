@@ -34,6 +34,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
                 exit: Address(0),
                 kind,
                 pure: true,
+                seen_count: 1,
                 instructions: Vec::new(),
             },
 
@@ -188,6 +189,7 @@ pub struct BlockAnalysis {
     pub exit: Address,
     pub kind: InstructionKind,
     pub pure: bool,
+    pub seen_count: usize,
     pub instructions: Vec<InstructionAnalysis>,
 }
 
