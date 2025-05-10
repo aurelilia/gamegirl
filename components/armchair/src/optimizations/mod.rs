@@ -7,7 +7,7 @@ use common::{components::thin_pager::ThinPager, numutil::NumExt};
 use jit::{Jit, JitBlock};
 use waitloop::{WaitloopData, WaitloopPoint};
 
-use crate::{interface::Bus, Address, Cpu};
+use crate::{interface::Bus, misc::InstructionKind, Address, Cpu};
 
 pub mod analyze;
 pub mod cache;
@@ -17,7 +17,7 @@ pub mod waitloop;
 pub struct Optimizations<S: Bus> {
     pub waitloop: WaitloopData,
     pub code_opt: CodeOptimizationStatus,
-    jit: Jit<S>,
+    jit: Jit,
     pub table: OptimizationData<S>,
 }
 
@@ -26,7 +26,7 @@ impl<S: Bus> Default for Optimizations<S> {
         let mut s = Self {
             waitloop: Default::default(),
             code_opt: CodeOptimizationStatus::JustInterpret,
-            jit: Jit::default(),
+            jit: Jit::new::<S>(),
             table: OptimizationData {
                 pages: Vec::new(),
                 functions: Vec::new(),
@@ -164,6 +164,10 @@ impl<S: Bus> Cpu<S> {
             } => {
                 let fn_index = *fn_index;
                 let ana = &self.opt.table.functions[fn_index];
+                assert_eq!(ana.entry, entry);
+                if ana.instructions.len() < 5 || ana.kind != InstructionKind::Thumb {
+                    return;
+                }
                 let index = self.opt.table.jits.len();
                 let jit = self
                     .opt
@@ -189,20 +193,30 @@ impl<S: Bus> Cpu<S> {
             } => {
                 self.perform_function_analysis();
             }
-
-            _ => (),
         }
     }
 
     fn perform_function_analysis(&mut self) {
         let entry = self.state.pc();
         let kind = self.state.current_instruction_type();
-        let mut bus = |addr| self.bus.get::<u32>(&mut self.state, addr);
+        let analysis = match kind {
+            InstructionKind::Arm => InstructionAnalyzer::analyze(
+                &mut |addr| self.bus.get::<u32>(&mut self.state, addr),
+                entry,
+                kind,
+                false,
+            ),
 
-        let analysis = InstructionAnalyzer::analyze(&mut bus, entry, kind, false);
+            InstructionKind::Thumb => InstructionAnalyzer::analyze(
+                &mut |addr| self.bus.get::<u16>(&mut self.state, addr).u32(),
+                entry,
+                kind,
+                false,
+            ),
+        };
+
         let data_at_exit = self.opt.table.get_or_create_entry(analysis.exit).unwrap();
-
-        if let Some(index) = data_at_exit.function_exit_analysis {
+        if let Some(index) = data_at_exit.function_exit_analysis.and(None) {
             // We have seen this exit before!
             // Use the index of the existing analysis for the current location.
             self.opt

@@ -20,6 +20,7 @@ use crate::{
 };
 
 #[derive(Copy, Clone)]
+#[repr(transparent)]
 pub struct ThumbInst(u16);
 
 impl ThumbInst {

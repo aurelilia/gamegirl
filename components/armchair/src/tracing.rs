@@ -23,6 +23,9 @@ impl<S: Bus> Cpu<S> {
             let mut buf = String::with_capacity(100);
             let num = ('4' as u8 + S::Version::IS_V5 as u8) as char;
             buf.push(num);
+            if !self.state.pipeline_valid {
+                buf.push('!');
+            }
             for reg in Register::from_rlist(u16::MAX) {
                 write!(buf, "{:08X} ", self.state[reg]).ok();
             }

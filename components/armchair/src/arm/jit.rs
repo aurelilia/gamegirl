@@ -1,18 +1,12 @@
-use common::numutil::{NumExt, U32Ext};
-
 use super::{
-    decode::{self, *},
-    ArmHandler, ArmVisitor,
+    decode::*,
+    ArmVisitor,
 };
 use crate::{
     interface::{Bus, CpuVersion},
-    memory::{
-        access::{NONSEQ, SEQ},
-        Address, RelativeOffset,
-    },
+    memory::RelativeOffset,
     optimizations::jit::InstructionTranslator,
-    state::{Flag::*, Mode, Register},
-    Cpu,
+    state::Register,
 };
 
 impl<S: Bus> ArmVisitor for InstructionTranslator<'_, '_, '_, S> {

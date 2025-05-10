@@ -669,7 +669,10 @@ const fn get_instruction_handler_inner<I: ArmVisitor>(
                 i.bits(21..=23),
             )
         },
-        "1100010?_????" => |_, _| panic!("unexpected MRRC/MCRR!"),
+        "1100010?_????" => |e, i| {
+            log::debug!("unexpected MRRC/MCRR!");
+            e.arm_unknown_opcode(i)
+        },
 
         _ => I::arm_unknown_opcode,
     }

@@ -54,7 +54,7 @@ cpal = { version = "0.15.3", features = ["wasm-bindgen"] }
 web-sys = "0.3.77"
 
 [features]
-default = ["savestates", "dep:ehttp"]
+default = ["dep:ehttp"]
 savestates = ["gamegirl/serde"]
 remote-debugger = ["gamegirl/remote-debugger", "once_cell"]
 filters = ["hqx"]

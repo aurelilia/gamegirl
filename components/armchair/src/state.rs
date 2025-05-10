@@ -113,14 +113,14 @@ type ModeReg = [u32; 6];
 pub struct CpuState {
     // Registers
     pub registers: [u32; 16],
-    fiqs: [FiqReg; 5],
+    pub(crate) fiqs: [FiqReg; 5],
     pub sp: ModeReg,
-    lr: ModeReg,
-    cpsr: u32,
-    spsr: ModeReg,
+    pub(crate) lr: ModeReg,
+    pub(crate) cpsr: u32,
+    pub(crate) spsr: ModeReg,
 
     // Pipeline + Memory
-    pipeline: [u32; 2],
+    pub(crate) pipeline: [u32; 2],
     pub(crate) pipeline_valid: bool,
     pub access_type: Access,
 

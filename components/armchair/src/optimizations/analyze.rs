@@ -59,7 +59,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
         while !self.found_exit {
             match self.ana.kind {
                 InstructionKind::Arm => {
-                    let instr = (self.bus)(self.current_pc);
+                    let instr = (self.bus)(self.current_pc - Address::WORD);
                     let inst = ArmInst::of(instr);
                     let mut ana = (arm::decode::get_instruction_handler(inst, false))(self, inst);
                     ana.instr = instr;
@@ -67,7 +67,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
                     self.current_pc += Address::WORD;
                 }
                 InstructionKind::Thumb => {
-                    let instr = (self.bus)(self.current_pc).u16();
+                    let instr = (self.bus)(self.current_pc - Address::HW).u16();
                     let inst = ThumbInst::of(instr);
                     let mut ana = (thumb::decode::get_instruction_handler(inst))(self, inst);
                     ana.instr = instr as u32;

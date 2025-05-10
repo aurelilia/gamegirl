@@ -72,7 +72,8 @@ impl<S: Bus> Cpu<S> {
             CodeOptimizationStatus::RunJitNowAt(jit) => {
                 let jit = self.opt.table.get_jit(jit);
                 jit.call(self);
-                self.interpret_next_instruction();
+                log::debug!("JIT block ended with PC at {}", self.state.pc());
+                self.state.revalidate_pipeline(&mut self.bus);
             }
         }
     }

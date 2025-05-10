@@ -3,7 +3,6 @@ use alloc::{fmt::Debug, format, string::String};
 use crate::Address;
 
 mod alu;
-mod jit_support;
 mod operations;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
