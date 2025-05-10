@@ -70,6 +70,7 @@ impl CpuState {
     /// Immediately halt the CPU until an IRQ is pending
     pub fn halt_on_irq(&mut self) {
         self.is_halted = true;
+        self.pipeline_valid = false;
     }
 }
 

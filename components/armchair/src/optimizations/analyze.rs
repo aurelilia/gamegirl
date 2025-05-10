@@ -32,6 +32,7 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
                 entry,
                 exit: Address(0),
                 kind,
+                pure: true,
                 instructions: Vec::new(),
             },
 
@@ -162,9 +163,14 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
     fn instruction_at_index(&mut self, addr: Address) -> Option<&mut InstructionAnalysis> {
         if addr < self.ana.entry {
             log::debug!("Backwards-to-earlier jump!");
+            self.ana.pure = false;
             return None;
         }
-        let index = ((addr.0 - self.ana.entry.0) >> 1).us();
+        let index = if self.ana.kind == InstructionKind::Thumb {
+            ((addr.0 - self.ana.entry.0) >> 1).us()
+        } else {
+            ((addr.0 - self.ana.entry.0) >> 2).us()
+        };
         if self.ana.instructions.len() <= index {
             self.ana
                 .instructions
@@ -179,6 +185,7 @@ pub struct BlockAnalysis {
     pub entry: Address,
     pub exit: Address,
     pub kind: InstructionKind,
+    pub pure: bool,
     pub instructions: Vec<InstructionAnalysis>,
 }
 

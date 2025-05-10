@@ -40,7 +40,7 @@ pub extern "C" fn new_core(cart: Vec<u8>) -> Box<dyn Core> {
 
 pub struct DynamicContext {
     loaded_cores: Vec<DynCore>,
-    _watcher: INotifyWatcher,
+    _watcher: Option<INotifyWatcher>,
 }
 
 impl DynamicContext {
@@ -60,8 +60,19 @@ impl DynamicContext {
             .unwrap();
         Self {
             loaded_cores: Vec::new(),
-            _watcher,
+            _watcher: Some(_watcher),
         }
+    }
+
+    pub fn from_paths(paths: &[PathBuf]) -> Self {
+        let mut this = Self {
+            loaded_cores: Vec::new(),
+            _watcher: None,
+        };
+        for path in paths {
+            this.load_core(path).unwrap();
+        }
+        this
     }
 
     pub fn load_core(&mut self, path: &Path) -> Result<usize, libloading::Error> {

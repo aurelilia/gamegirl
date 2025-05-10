@@ -40,7 +40,7 @@ impl Optimizations {
 
 pub struct OptimizationData {
     pages: Vec<Option<PageData>>,
-    analyses: Vec<BlockAnalysis>,
+    pub analyses: Vec<BlockAnalysis>,
     jits: Vec<JitBlock>,
 }
 
@@ -135,7 +135,7 @@ impl<S: Bus> Cpu<S> {
             } => {
                 let fn_index = *fn_index;
                 let ana = &self.opt.table.analyses[fn_index];
-                if ana.instructions.len() < 5 || ana.kind != InstructionKind::Thumb {
+                if ana.instructions.len() < 5 || !ana.pure || ana.kind == InstructionKind::Arm {
                     return;
                 }
 

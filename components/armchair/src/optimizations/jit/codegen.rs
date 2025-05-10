@@ -1,6 +1,7 @@
+use common::numutil::NumExt;
 use cranelift::prelude::*;
 
-use super::InstructionTranslator;
+use super::{Condition, InstructionTranslator};
 use crate::{interface::Bus, Cpu};
 
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
@@ -39,6 +40,44 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         let pc = self.get_pc();
         let pc_new = self.builder.ins().iadd(pc, instr_size);
         self.set_pc(pc_new);
+    }
+
+    /// Emit code evaluating the given condition, given current CPSR.
+    /// Returns non-0 for "run", 0 for "don't".
+    pub fn evaluate_condition(&mut self, cond: u16) -> Condition {
+        // This condition table is taken from mGBA sources, which are licensed under
+        // MPL2 at https://github.com/mgba-emu/mgba
+        // Thank you to endrift and other mGBA contributors!
+        const COND_MASKS: [u16; 14] = [
+            0xF0F0, // EQ [-Z--]
+            0x0F0F, // NE [-z--]
+            0xCCCC, // CS [--C-]
+            0x3333, // CC [--c-]
+            0xFF00, // MI [N---]
+            0x00FF, // PL [n---]
+            0xAAAA, // VS [---V]
+            0x5555, // VC [---v]
+            0x0C0C, // HI [-zC-]
+            0xF3F3, // LS [-Z--] || [--c-]
+            0xAA55, // GE [N--V] || [n--v]
+            0x55AA, // LT [N--v] || [n--V]
+            0x0A05, // GT [Nz-V] || [nz-v]
+            0xF5FA, // LE [-Z--] || [Nz-v] || [nz-V]
+        ];
+        match cond {
+            0xE => Condition::RunAlways,
+            0xF => Condition::RunNever,
+            _ => {
+                let cpsr = self.get_cpsr();
+                let cond_bits = self.builder.ins().ishl_imm(cpsr, 28);
+                let cond_shift = self.builder.ins().ushr(self.consts.one_i32, cond_bits);
+                let mask = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, COND_MASKS[cond.us()] as u64 as i64);
+                Condition::RunIf(self.builder.ins().band(mask, cond_shift))
+            }
+        }
     }
 
     pub fn tick_bus(&mut self, by: u64) {

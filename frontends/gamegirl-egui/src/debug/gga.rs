@@ -59,6 +59,13 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     ui.label(format!("Reported Title: {}", gg.cart.title()));
     ui.label(format!("Reported Game Code: AGB-{}", gg.cart.game_code()));
     ui.label(format!("Detected Save Type: {:?}", gg.cart.save_type));
+
+    let pure = gg.cpu.opt.table.analyses.iter().filter(|a| a.pure).count();
+    ui.label(format!(
+        "Function Purity: {}/{}",
+        pure,
+        gg.cpu.opt.table.analyses.len()
+    ));
 }
 
 /// Window showing status of the remote debugger.

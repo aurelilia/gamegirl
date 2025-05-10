@@ -18,12 +18,12 @@ use crate::{
     Cpu,
 };
 
-const TRACE: bool = false;
+const TRACE: bool = true;
 
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
     pub fn translate_thumb(&mut self, addr: Address, instr: &InstructionAnalysis) {
         let wait = self.bus.wait_time::<u16>(&mut self.cpu, addr, SEQ);
-        self.insert_instruction_preamble(wait as u64, self.consts.two);
+        self.insert_instruction_preamble(wait as u64, self.consts.two_i32);
         if TRACE {
             let inst = self.imm(instr.instr as i64, types::I32);
             self.call_cpui32(Cpu::<S>::trace_inst::<u16>, inst);
@@ -75,7 +75,9 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
     }
 
     fn thumb_hi_add(&mut self, r: (Register, Register)) -> Self::Output {
-        self.may_have_invalidated_pc();
+        if r.1.is_pc() {
+            self.may_have_invalidated_pc();
+        }
         false
     }
 
@@ -84,7 +86,9 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
     }
 
     fn thumb_hi_mov(&mut self, r: (Register, Register)) -> Self::Output {
-        self.may_have_invalidated_pc();
+        if r.1.is_pc() {
+            self.may_have_invalidated_pc();
+        }
         false
     }
 
@@ -148,7 +152,9 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
     }
 
     fn thumb_pop(&mut self, reg_list: u8, pc: bool) -> Self::Output {
-        self.may_have_invalidated_pc();
+        if pc {
+            self.may_have_invalidated_pc();
+        }
         false
     }
 

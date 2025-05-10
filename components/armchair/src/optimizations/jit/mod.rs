@@ -15,6 +15,13 @@ mod fields;
 mod support;
 
 #[derive(Copy, Clone)]
+pub enum Condition {
+    RunNever,
+    RunAlways,
+    RunIf(Value),
+}
+
+#[derive(Copy, Clone)]
 pub struct JitBlock {
     inner: usize,
     entry: Address,
@@ -22,7 +29,10 @@ pub struct JitBlock {
 
 impl JitBlock {
     pub fn call<S: Bus>(&self, cpu: &mut Cpu<S>) {
-        assert_eq!(self.entry, cpu.state.pc());
+        if self.entry != cpu.state.pc() {
+            log::error!("THIS SHOULD NEVER HAPPEN: JIT block to be executed in wrong location!");
+            return;
+        }
         unsafe {
             let inner: unsafe extern "C" fn(&mut Cpu<S>) = mem::transmute(self.inner);
             (inner)(cpu);
@@ -65,7 +75,9 @@ impl Jit {
             .ins()
             .iconst(ptr_ty, mem::offset_of!(Cpu<S>, bus) as i64);
         let bus_val = builder.ins().iadd(sys, bus_offset);
+        let one_i32 = builder.ins().iconst(types::I32, 1);
         let two_i32 = builder.ins().iconst(types::I32, 2);
+        let four_i32 = builder.ins().iconst(types::I32, 4);
         let mut trans = InstructionTranslator {
             ana: analysis,
             builder,
@@ -83,13 +95,23 @@ impl Jit {
                 bus: bus_val,
                 abort_block,
             },
-            consts: Constants { two: two_i32 },
+            consts: Constants {
+                one_i32,
+                two_i32,
+                four_i32,
+            },
         };
 
         // Translate instructions...
         trans.insert_block_preamble();
         match analysis.kind {
-            InstructionKind::Arm => {}
+            InstructionKind::Arm => {
+                let mut addr = analysis.entry;
+                for instr in &analysis.instructions {
+                    trans.translate_arm(addr, instr);
+                    addr += Address::WORD;
+                }
+            }
             InstructionKind::Thumb => {
                 let mut addr = analysis.entry;
                 for instr in &analysis.instructions {
@@ -170,5 +192,7 @@ pub struct Values {
 }
 
 pub struct Constants {
-    pub two: Value,
+    pub one_i32: Value,
+    pub two_i32: Value,
+    pub four_i32: Value,
 }

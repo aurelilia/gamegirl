@@ -43,6 +43,7 @@ pub fn get_module_with_symbols<S: Bus>(mut builder: JITBuilder) -> (JITModule, S
         builder.symbol(entry.0, entry.1 as *const _);
     }
     builder.symbol("cpu_interpret_thumb", Cpu::<S>::interpret_thumb as *const _);
+    builder.symbol("cpu_interpret_arm", Cpu::<S>::interpret_arm as *const _);
     builder.symbol("bus_tick", S::tick as *const _);
     builder.symbol("cpu_trace_thumb", Cpu::<S>::trace_inst::<u16> as *const _);
     builder.symbol("cpu_trace_arm", Cpu::<S>::trace_inst::<u32> as *const _);
@@ -138,6 +139,16 @@ pub fn get_module_with_symbols<S: Bus>(mut builder: JITBuilder) -> (JITModule, S
             .unwrap();
         symbols.insert(
             Cpu::<S>::trace_inst::<u32> as *const u8 as usize,
+            Symbol {
+                id,
+                kind: SymbolKind::CpuWithI32,
+            },
+        );
+        let id = module
+            .declare_function("cpu_interpret_arm", Linkage::Import, &sig)
+            .unwrap();
+        symbols.insert(
+            Cpu::<S>::interpret_arm as *const u8 as usize,
             Symbol {
                 id,
                 kind: SymbolKind::CpuWithI32,

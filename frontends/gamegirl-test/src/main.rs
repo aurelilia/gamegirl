@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    cmp,
     fs::{self, DirEntry, File},
     io::Read,
     panic,
@@ -13,6 +14,7 @@ use gamegirl::{
         input::Button,
         options::{ConsoleBios, SystemConfig},
     },
+    dynamic::DynamicContext,
     Core, GameCart,
 };
 use indicatif::{MultiProgress, ProgressBar};
@@ -62,6 +64,13 @@ enum Commands {
         /// Directory to place screenshots in
         output_path: PathBuf,
     },
+    /// Compare current core to reference
+    CompareCores {
+        /// Reference core
+        core: PathBuf,
+        /// Game to use
+        game: PathBuf,
+    },
 }
 
 fn main() {
@@ -101,6 +110,60 @@ fn main() {
             rom_path,
             output_path,
         ),
+
+        Commands::CompareCores { core, game } => {
+            let game = fs::read(game).unwrap();
+            let mut cores = DynamicContext::from_paths(&[core]);
+            let mut core1 = (cores.get_core(0).loader)(game.clone());
+            let mut core2 = gamegirl::load_cart(
+                GameCart {
+                    rom: game,
+                    save: None,
+                },
+                &SystemConfig::default(),
+            )
+            .unwrap();
+            core1.c_mut().debugger.traced_instructions = Some(String::with_capacity(20_000_000));
+            core2.c_mut().debugger.traced_instructions = Some(String::with_capacity(20_000_000));
+
+            let mut time = 0;
+            loop {
+                core1.advance_delta(0.01);
+                core2.advance_delta(0.01);
+                time += 1;
+
+                let mut a = core1.c_mut().debugger.traced_instructions.take().unwrap();
+                let mut b = core2.c_mut().debugger.traced_instructions.take().unwrap();
+                let shorter = cmp::min(a.len(), b.len());
+                let a_rest = a.split_off(shorter);
+                let b_rest = b.split_off(shorter);
+                core1.c_mut().debugger.traced_instructions = Some(a_rest);
+                core2.c_mut().debugger.traced_instructions = Some(b_rest);
+
+                if a == b {
+                    println!("All good so far");
+                } else {
+                    let mut last = "";
+                    let mut lines = 0;
+                    for (a_line, b_line) in a.lines().zip(b.lines()) {
+                        if a_line != b_line {
+                            println!(
+                                "Catastrophe after {}.{:02}s and {lines} lines!",
+                                time / 100,
+                                time % 100
+                            );
+                            println!("AFTER   => {last}...");
+                            println!("WANTED  => {a_line}");
+                            println!("REALITY => {b_line}");
+                            return;
+                        } else {
+                            last = a_line;
+                            lines += 1;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
