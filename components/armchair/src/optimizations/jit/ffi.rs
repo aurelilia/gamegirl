@@ -10,8 +10,10 @@ use cranelift_module::{FuncId, Linkage, Module};
 use super::InstructionTranslator;
 use crate::{interface::Bus, Cpu};
 
+pub const SYM_COUNT: usize = 9;
+
 pub type SymbolTable = Vec<FuncId>;
-pub type DefinedSymbolTable = Vec<Option<FuncRef>>;
+pub type DefinedSymbolTable = [Option<FuncRef>; SYM_COUNT];
 
 pub fn get_module_with_symbols<S: Bus>(mut builder: JITBuilder) -> (JITModule, SymbolTable) {
     fn apply(sig: &mut Signature, params: &[Type], ret: &[Type]) {
@@ -41,7 +43,8 @@ pub fn get_module_with_symbols<S: Bus>(mut builder: JITBuilder) -> (JITModule, S
     (module, symbols)
 }
 
-fn get_table<S: Bus>() -> &'static [(&'static str, *const u8, &'static [Type], &'static [Type])] {
+fn get_table<S: Bus>(
+) -> &'static [(&'static str, *const u8, &'static [Type], &'static [Type]); SYM_COUNT] {
     &[
         (
             "handle_events",

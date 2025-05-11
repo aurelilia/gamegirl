@@ -4,7 +4,7 @@ use core::mem;
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{Linkage, Module, ModuleResult};
-use ffi::{DefinedSymbolTable, SymbolTable};
+use ffi::{DefinedSymbolTable, SymbolTable, SYM_COUNT};
 use hashbrown::HashMap;
 
 use super::analyze::BlockAnalysis;
@@ -47,6 +47,7 @@ pub struct Jit {
     ctx: cranelift::codegen::Context,
     module: JITModule,
     symbols: SymbolTable,
+    targets_map: HashMap<Address, Block>,
     pub stats: JitStats,
 }
 
@@ -58,6 +59,7 @@ impl Jit {
         bus: &mut S,
         analysis: &BlockAnalysis,
     ) -> JitBlock {
+        self.targets_map.clear();
         let ptr_ty = self.module.target_config().pointer_type();
         self.ctx.func.signature.params.push(AbiParam::new(ptr_ty)); // Parameter 1: System itself
 
@@ -77,8 +79,6 @@ impl Jit {
             .ins()
             .iconst(ptr_ty, mem::offset_of!(Cpu<S>, bus) as i64);
         let bus_val = builder.ins().iadd(sys, bus_offset);
-        let false_i8 = builder.ins().iconst(types::I8, 0);
-        let true_i8 = builder.ins().iconst(types::I8, 1);
         let zero_i32 = builder.ins().iconst(types::I32, 0);
         let one_i32 = builder.ins().iconst(types::I32, 1);
         let two_i32 = builder.ins().iconst(types::I32, 2);
@@ -88,9 +88,9 @@ impl Jit {
             builder,
             module: &mut self.module,
             symbols: &self.symbols,
-            defined_symbols: vec![None; self.symbols.len()],
+            defined_symbols: [None; SYM_COUNT],
             current_instruction: analysis.entry,
-            instruction_target_blocks: HashMap::with_capacity(5),
+            instruction_target_blocks: &mut self.targets_map,
             instructions_since_sync: 0,
             wait_time_collected: 0,
 
@@ -103,8 +103,6 @@ impl Jit {
                 abort_block,
             },
             consts: Constants {
-                false_i8,
-                true_i8,
                 zero_i32,
                 one_i32,
                 two_i32,
@@ -181,6 +179,7 @@ impl Jit {
             ctx: module.make_context(),
             module,
             symbols,
+            targets_map: HashMap::with_capacity(5),
             stats: JitStats::default(),
         }
     }
@@ -194,7 +193,7 @@ pub struct InstructionTranslator<'a, 'b, 'c, S: Bus> {
     defined_symbols: DefinedSymbolTable,
 
     pub current_instruction: Address,
-    instruction_target_blocks: HashMap<Address, Block>,
+    instruction_target_blocks: &'b mut HashMap<Address, Block>,
 
     instructions_since_sync: usize,
     wait_time_collected: usize,
@@ -213,8 +212,6 @@ pub struct Values {
 }
 
 pub struct Constants {
-    pub false_i8: Value,
-    pub true_i8: Value,
     pub zero_i32: Value,
     pub one_i32: Value,
     pub two_i32: Value,

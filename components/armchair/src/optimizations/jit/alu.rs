@@ -81,7 +81,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
     pub fn mul(&mut self, set_cpsr: bool, a: Value, b: Value) -> Value {
         let res = self.builder.ins().imul(a, b);
         if set_cpsr {
-            self.set_nzc(res, self.consts.false_i8);
+            self.set_nz(res);
         }
         res
     }
