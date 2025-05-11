@@ -2,44 +2,106 @@ use common::numutil::NumExt;
 use cranelift::prelude::*;
 
 use super::{Condition, InstructionTranslator};
-use crate::{interface::Bus, Cpu};
+use crate::{access::*, interface::Bus, misc::InstructionKind, Cpu, RelativeOffset};
 
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
     pub fn insert_block_preamble(&mut self) {
         self.call_cpu(Cpu::setup_cpu_state);
+        let mut addr = self.current_instruction;
+        for instr in &self.ana.instructions {
+            if instr.is_branch_target {
+                self.instruction_target_blocks
+                    .insert(addr, self.builder.create_block());
+            }
+            addr += self.ana.kind.addr_width();
+        }
     }
 
     pub fn insert_block_destructor(&mut self) {}
 
-    pub fn insert_instruction_preamble(&mut self, wait_time: u64, instr_size: Value) {
-        self.inst_count += 1;
+    pub fn insert_instruction_preamble(
+        &mut self,
+        wait_time: u64,
+        instr_size: Value,
+        is_target: bool,
+    ) {
+        if is_target {
+            let block = self.instruction_target_blocks[&self.current_instruction];
+            self.builder.ins().jump(block, &[]);
+            self.builder.switch_to_block(block);
+        }
+
+        self.instructions_since_sync += 1;
         self.wait_time_collected += wait_time as usize;
-
-        if self.inst_count > 8 {
-            self.inst_count = 0;
-
-            // Handle events, make sure we didn't jump somewhere else
-            self.call_buscpu(S::handle_events);
-            let should_keep_going = self.get_valid();
-            let cont_block = self.builder.create_block();
-            self.builder.ins().brif(
-                should_keep_going,
-                cont_block,
-                &[],
-                self.vals.abort_block,
-                &[],
-            );
-            self.builder.switch_to_block(cont_block);
-
-            // Tick bus
-            self.tick_bus(self.wait_time_collected as u64);
-            self.wait_time_collected = 0;
+        if self.instructions_since_sync > 0 || is_target {
+            if !is_target {
+                self.instructions_since_sync = 0;
+            }
+            self.synchronize_with_system();
         }
 
         // Bump PC
-        let pc = self.get_pc();
+        let pc = self.load_pc();
         let pc_new = self.builder.ins().iadd(pc, instr_size);
-        self.set_pc(pc_new);
+        self.store_pc(pc_new);
+    }
+
+    pub fn relative_jump(&mut self, offset: RelativeOffset) {
+        let width = self.ana.kind.width() as i64;
+        self.stall_pipeline();
+
+        // Update PC
+        let pc = self.load_pc();
+        let value = self.builder.ins().iadd_imm(pc, offset.0 as i64 + width);
+        self.store_pc(value);
+
+        // Get target block and jump to it
+        let target_addr = self
+            .current_instruction
+            .add_rel(RelativeOffset(offset.0 + self.ana.kind.width() as i32 * 2));
+        let block = self.instruction_target_blocks[&target_addr];
+        self.builder.ins().jump(block, &[]);
+    }
+
+    pub fn stall_pipeline(&mut self) {
+        if self.ana.kind == InstructionKind::Arm {
+            self.wait_time_collected +=
+                self.bus
+                    .wait_time::<u32>(&mut self.cpu, self.current_instruction, NONSEQ | CODE)
+                    as usize;
+            self.wait_time_collected +=
+                self.bus
+                    .wait_time::<u32>(&mut self.cpu, self.current_instruction, SEQ | CODE)
+                    as usize;
+        } else {
+            self.wait_time_collected +=
+                self.bus
+                    .wait_time::<u16>(&mut self.cpu, self.current_instruction, NONSEQ | CODE)
+                    as usize;
+            self.wait_time_collected +=
+                self.bus
+                    .wait_time::<u16>(&mut self.cpu, self.current_instruction, SEQ | CODE)
+                    as usize;
+        }
+    }
+
+    fn synchronize_with_system(&mut self) {
+        // Handle events, make sure we didn't jump somewhere else
+        self.call_buscpu(S::handle_events);
+        let should_keep_going = self.get_valid();
+        let cont_block = self.builder.create_block();
+        self.builder.ins().brif(
+            should_keep_going,
+            cont_block,
+            &[],
+            self.vals.abort_block,
+            &[],
+        );
+        self.builder.switch_to_block(cont_block);
+
+        // Tick bus
+        self.tick_bus(self.wait_time_collected as u64);
+        self.wait_time_collected = 0;
     }
 
     /// Emit code evaluating the given condition, given current CPSR.
@@ -86,7 +148,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
     }
 
     pub fn may_have_invalidated_pc(&mut self) {
-        self.inst_count += 8;
+        self.instructions_since_sync += 8;
     }
 
     pub fn imm(&mut self, value: i64, kind: Type) -> Value {

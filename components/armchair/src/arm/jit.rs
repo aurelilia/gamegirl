@@ -17,13 +17,13 @@ use crate::{
     Address, Cpu,
 };
 
-const TRACE: bool = true;
-
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
-    pub fn translate_arm(&mut self, addr: Address, instr: &InstructionAnalysis) {
-        let wait = self.bus.wait_time::<u16>(&mut self.cpu, addr, SEQ);
-        self.insert_instruction_preamble(wait as u64, self.consts.four_i32);
-        if TRACE {
+    pub fn translate_arm(&mut self, instr: &InstructionAnalysis) {
+        let wait = self
+            .bus
+            .wait_time::<u16>(&mut self.cpu, self.current_instruction, SEQ);
+        self.insert_instruction_preamble(wait as u64, self.consts.four_i32, instr.is_branch_target);
+        if self.bus.debugger().tracing() {
             let inst = self.imm(instr.instr as i64, types::I32);
             self.call_cpui32(Cpu::<S>::trace_inst::<u32>, inst);
         }
@@ -62,6 +62,8 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
             let inst = self.imm(instr.instr as i64, types::I32);
             self.call_cpui32(Cpu::<S>::interpret_arm, inst);
         }
+        self.stats.total_instructions += 1;
+        self.stats.native_instructions += implemented as usize;
     }
 }
 

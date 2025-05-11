@@ -4,7 +4,11 @@ use cranelift::prelude::*;
 use types::*;
 
 use super::InstructionTranslator;
-use crate::{interface::Bus, Cpu};
+use crate::{
+    interface::Bus,
+    state::{LowRegister, Register},
+    Cpu,
+};
 
 macro_rules! cpu_field {
     ($path:expr, $typ:expr, $getter:ident, $setter:ident) => {
@@ -52,8 +56,38 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         self.builder.ins().iadd(self.vals.sys, offset_const)
     }
 
+    pub fn load_reg(&mut self, reg: Register) -> Value {
+        self.load_at_offset(
+            types::I32,
+            mem::offset_of!(Cpu<S>, state.registers) + reg.0 as usize * mem::size_of::<u32>(),
+        )
+    }
+
+    pub fn store_reg(&mut self, reg: Register, value: Value) {
+        self.store_at_offset(
+            value,
+            mem::offset_of!(Cpu<S>, state.registers) + reg.0 as usize * mem::size_of::<u32>(),
+        )
+    }
+
+    pub fn load_lreg(&mut self, reg: LowRegister) -> Value {
+        self.load_at_offset(
+            types::I32,
+            mem::offset_of!(Cpu<S>, state.registers) + reg.0 as usize * mem::size_of::<u32>(),
+        )
+    }
+
+    pub fn store_lreg(&mut self, reg: LowRegister, value: Value) {
+        self.store_at_offset(
+            value,
+            mem::offset_of!(Cpu<S>, state.registers) + reg.0 as usize * mem::size_of::<u32>(),
+        )
+    }
+
     cpu_field!(state.pipeline_valid, I8, get_valid, set_valid);
     cpu_field!(state.cpsr, I32, get_cpsr, set_cpsr);
 
-    cpu_register!(15, get_pc, set_pc);
+    cpu_register!(13, load_sp, store_sp);
+    cpu_register!(14, load_lr, store_lr);
+    cpu_register!(15, load_pc, store_pc);
 }

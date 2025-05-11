@@ -121,7 +121,9 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
     }
 
     fn branch(&mut self, offset: RelativeOffset) -> InstructionAnalysis {
-        let addr = self.current_pc.add_rel(offset);
+        let addr = self
+            .current_pc
+            .add_rel(RelativeOffset(offset.0 + self.ana.kind.width() as i32 * 2));
         if let Some(target) = self.instruction_at_index(addr) {
             target.is_branch_target = true;
             if addr > self.furthest_branch {
@@ -159,8 +161,10 @@ impl<'s, R: FnMut(Address) -> u32> InstructionAnalyzer<'s, R> {
     }
 
     // Internal helpers
-    fn insert_analysis(&mut self, analysis: InstructionAnalysis) {
-        *self.instruction_at_index(self.current_pc).unwrap() = analysis;
+    fn insert_analysis(&mut self, mut analysis: InstructionAnalysis) {
+        let prev = self.instruction_at_index(self.current_pc).unwrap();
+        analysis.is_branch_target |= prev.is_branch_target;
+        *prev = analysis;
     }
 
     fn instruction_at_index(&mut self, addr: Address) -> Option<&mut InstructionAnalysis> {
@@ -203,13 +207,25 @@ impl Display for BlockAnalysis {
             InstructionKind::Arm => {
                 for instr in &self.instructions {
                     let inst = ArmInst::of(instr.instr);
-                    writeln!(f, "       {:08X}: {}", instr.instr, inst)?;
+                    writeln!(
+                        f,
+                        "     {} {:08X}: {}",
+                        if instr.is_branch_target { 'T' } else { ' ' },
+                        instr.instr,
+                        inst
+                    )?;
                 }
             }
             InstructionKind::Thumb => {
                 for instr in &self.instructions {
                     let inst = ThumbInst::of(instr.instr.u16());
-                    writeln!(f, "           {:04X}: {}", instr.instr, inst)?;
+                    writeln!(
+                        f,
+                        "         {} {:04X}: {}",
+                        if instr.is_branch_target { 'T' } else { ' ' },
+                        instr.instr,
+                        inst
+                    )?;
                 }
             }
         }
@@ -286,7 +302,10 @@ impl<'s, R: FnMut(Address) -> u32> ThumbVisitor for InstructionAnalyzer<'s, R> {
         self.uses_nothing()
     }
 
-    fn thumb_hi_mov(&mut self, _r: (Register, Register)) -> Self::Output {
+    fn thumb_hi_mov(&mut self, (s, d): (Register, Register)) -> Self::Output {
+        if d.is_pc() {
+            self.ana.pure = false;
+        }
         self.uses_nothing()
     }
 

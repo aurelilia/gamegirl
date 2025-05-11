@@ -10,7 +10,7 @@ use crate::{
     Cpu,
 };
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Address(pub u32);
 

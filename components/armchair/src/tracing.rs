@@ -16,29 +16,27 @@ use crate::{
 
 impl<S: Bus> Cpu<S> {
     pub fn trace_inst<TY: NumExt + 'static>(&mut self, inst: u32) {
-        if self.bus.debugger().tracing() {
-            let cpsr = self.state.cpsr();
-            let mnem = self.state.get_inst_mnemonic(inst);
+        let cpsr = self.state.cpsr();
+        let mnem = self.state.get_inst_mnemonic(inst);
 
-            let mut buf = String::with_capacity(100);
-            let num = ('4' as u8 + S::Version::IS_V5 as u8) as char;
-            buf.push(num);
-            if !self.state.pipeline_valid {
-                buf.push('!');
-            }
-            for reg in Register::from_rlist(u16::MAX) {
-                write!(buf, "{:08X} ", self.state[reg]).ok();
-            }
+        let mut buf = String::with_capacity(100);
+        let num = ('4' as u8 + S::Version::IS_V5 as u8) as char;
+        buf.push(num);
+        if !self.state.pipeline_valid {
+            buf.push('!');
+        }
+        for reg in Register::from_rlist(u16::MAX) {
+            write!(buf, "{:08X} ", self.state[reg]).ok();
+        }
 
-            if TY::WIDTH == 2 {
-                self.bus.debugger().add_traced_instruction(|| {
-                    format!("{buf}cpsr: {cpsr:08X} |     {inst:04X}: {mnem}")
-                });
-            } else {
-                self.bus.debugger().add_traced_instruction(|| {
-                    format!("{buf}cpsr: {cpsr:08X} | {inst:08X}: {mnem}")
-                });
-            }
+        if TY::WIDTH == 2 {
+            self.bus.debugger().add_traced_instruction(|| {
+                format!("{buf}cpsr: {cpsr:08X} |     {inst:04X}: {mnem}")
+            });
+        } else {
+            self.bus
+                .debugger()
+                .add_traced_instruction(|| format!("{buf}cpsr: {cpsr:08X} | {inst:08X}: {mnem}"));
         }
     }
 }

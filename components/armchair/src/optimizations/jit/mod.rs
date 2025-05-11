@@ -3,12 +3,14 @@ use core::mem;
 
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::{Linkage, Module};
+use cranelift_module::{Linkage, Module, ModuleResult};
 use ffi::{DefinedSymbolTable, SymbolTable};
+use hashbrown::HashMap;
 
 use super::analyze::BlockAnalysis;
 use crate::{interface::Bus, misc::InstructionKind, Address, Cpu, CpuState};
 
+mod alu;
 mod codegen;
 mod ffi;
 mod fields;
@@ -45,6 +47,7 @@ pub struct Jit {
     ctx: cranelift::codegen::Context,
     module: JITModule,
     symbols: SymbolTable,
+    pub stats: JitStats,
 }
 
 impl Jit {
@@ -55,7 +58,6 @@ impl Jit {
         bus: &mut S,
         analysis: &BlockAnalysis,
     ) -> JitBlock {
-        log::error!("Compiling at {}", analysis.entry);
         let ptr_ty = self.module.target_config().pointer_type();
         self.ctx.func.signature.params.push(AbiParam::new(ptr_ty)); // Parameter 1: System itself
 
@@ -84,7 +86,9 @@ impl Jit {
             module: &mut self.module,
             symbols: &self.symbols,
             defined_symbols: Default::default(),
-            inst_count: 0,
+            current_instruction: analysis.entry,
+            instruction_target_blocks: HashMap::with_capacity(5),
+            instructions_since_sync: 0,
             wait_time_collected: 0,
 
             cpu,
@@ -100,23 +104,22 @@ impl Jit {
                 two_i32,
                 four_i32,
             },
+            stats: &mut self.stats,
         };
 
         // Translate instructions...
         trans.insert_block_preamble();
         match analysis.kind {
             InstructionKind::Arm => {
-                let mut addr = analysis.entry;
                 for instr in &analysis.instructions {
-                    trans.translate_arm(addr, instr);
-                    addr += Address::WORD;
+                    trans.translate_arm(instr);
+                    trans.current_instruction += Address::WORD;
                 }
             }
             InstructionKind::Thumb => {
-                let mut addr = analysis.entry;
                 for instr in &analysis.instructions {
-                    trans.translate_thumb(addr, instr);
-                    addr += Address::HW;
+                    trans.translate_thumb(instr);
+                    trans.current_instruction += Address::HW;
                 }
             }
         }
@@ -127,23 +130,30 @@ impl Jit {
         trans.builder.switch_to_block(abort_block);
         trans.builder.ins().return_(&[]);
         trans.builder.finalize();
-        let id = self
-            .module
-            .declare_function(
+
+        let result: ModuleResult<usize> = (|| {
+            let id = self.module.declare_function(
                 &format!("jit{index}-{}", analysis.entry),
                 Linkage::Export,
                 &self.ctx.func.signature,
-            )
-            .unwrap();
-        self.module.define_function(id, &mut self.ctx).unwrap();
+            )?;
+            self.module.define_function(id, &mut self.ctx)?;
 
-        // Reset JIT state and finalize
-        self.module.clear_context(&mut self.ctx);
-        self.module.finalize_definitions().unwrap();
-        let inner = self.module.get_finalized_function(id) as usize;
-        JitBlock {
-            inner,
-            entry: analysis.entry,
+            // Reset JIT state and finalize
+            self.module.clear_context(&mut self.ctx);
+            self.module.finalize_definitions()?;
+            let inner = self.module.get_finalized_function(id) as usize;
+            Ok(inner)
+        })();
+
+        match result {
+            Ok(inner) => JitBlock {
+                inner,
+                entry: analysis.entry,
+            },
+            Err(err) => {
+                panic!("{:#?} during function {}", err, self.ctx.func);
+            }
         }
     }
 
@@ -165,6 +175,7 @@ impl Jit {
             ctx: module.make_context(),
             module,
             symbols,
+            stats: JitStats::default(),
         }
     }
 }
@@ -176,13 +187,17 @@ pub struct InstructionTranslator<'a, 'b, 'c, S: Bus> {
     symbols: &'b SymbolTable,
     defined_symbols: DefinedSymbolTable,
 
-    inst_count: usize,
+    pub current_instruction: Address,
+    instruction_target_blocks: HashMap<Address, Block>,
+
+    instructions_since_sync: usize,
     wait_time_collected: usize,
 
     pub cpu: &'c mut CpuState,
     pub bus: &'c mut S,
     pub vals: Values,
     pub consts: Constants,
+    pub stats: &'b mut JitStats,
 }
 
 pub struct Values {
@@ -195,4 +210,10 @@ pub struct Constants {
     pub one_i32: Value,
     pub two_i32: Value,
     pub four_i32: Value,
+}
+
+#[derive(Debug, Default)]
+pub struct JitStats {
+    pub total_instructions: usize,
+    pub native_instructions: usize,
 }

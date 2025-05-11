@@ -127,6 +127,7 @@ fn main() {
             core2.c_mut().debugger.traced_instructions = Some(String::with_capacity(20_000_000));
 
             let mut time = 0;
+            let mut last = "".to_string();
             loop {
                 core1.advance_delta(0.01);
                 core2.advance_delta(0.01);
@@ -142,22 +143,32 @@ fn main() {
 
                 if a == b {
                     println!("All good so far");
+                    if let Some(l) = a.lines().last() {
+                        last = l.to_string();
+                    }
                 } else {
-                    let mut last = "";
                     let mut lines = 0;
+                    let mut count = 0;
                     for (a_line, b_line) in a.lines().zip(b.lines()) {
                         if a_line != b_line {
-                            println!(
-                                "Catastrophe after {}.{:02}s and {lines} lines!",
-                                time / 100,
-                                time % 100
-                            );
-                            println!("AFTER   => {last}...");
+                            if count == 0 {
+                                println!(
+                                    "Catastrophe after {}.{:02}s and {lines} lines!",
+                                    time / 100,
+                                    time % 100
+                                );
+                                println!("AFTER   => {last}...");
+                            }
                             println!("WANTED  => {a_line}");
                             println!("REALITY => {b_line}");
-                            return;
+                            count += 1;
+                            if count == 5 {
+                                return;
+                            }
                         } else {
-                            last = a_line;
+                            if a_line != "" {
+                                last = a_line.to_string();
+                            }
                             lines += 1;
                         }
                     }

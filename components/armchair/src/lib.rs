@@ -83,7 +83,9 @@ impl<S: Bus> Cpu<S> {
         let future_inst = self.bus.get::<TY>(&mut self.state, pc).u32();
         let inst = self.state.advance_pipeline(future_inst);
 
-        self.trace_inst::<TY>(inst);
+        if self.bus.debugger().tracing() {
+            self.trace_inst::<TY>(inst);
+        }
         (inst, sn_cycles, pc)
     }
 

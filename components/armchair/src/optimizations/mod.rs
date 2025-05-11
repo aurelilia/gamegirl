@@ -15,7 +15,7 @@ pub mod waitloop;
 pub struct Optimizations {
     pub waitloop: WaitloopData,
     pub jit_block: Option<JitIndex>,
-    jit_ctx: Jit,
+    pub jit_ctx: Jit,
     pub table: OptimizationData,
 }
 
