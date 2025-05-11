@@ -25,7 +25,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         self.insert_instruction_preamble(wait as u64, self.consts.four_i32, instr.is_branch_target);
         if self.bus.debugger().tracing() {
             let inst = self.imm(instr.instr as i64, types::I32);
-            self.call_cpui32(Cpu::<S>::trace_inst::<u32>, "cpu_trace_arm", inst);
+            self.trace_inst_arm(inst);
         }
 
         // BLX/CP15 on ARMv5 is a special case: it is encoded with NV.
@@ -60,7 +60,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         let implemented = handle(self, inst);
         if !implemented {
             let inst = self.imm(instr.instr as i64, types::I32);
-            self.call_cpui32(Cpu::<S>::interpret_arm, "cpu_interpret_arm", inst);
+            self.interpret_arm(inst);
         }
         self.stats.total_instructions += 1;
         self.stats.native_instructions += implemented as usize;

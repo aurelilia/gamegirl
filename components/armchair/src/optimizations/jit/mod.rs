@@ -1,4 +1,4 @@
-use alloc::format;
+use alloc::{format, vec};
 use core::mem;
 
 use cranelift::prelude::*;
@@ -88,7 +88,7 @@ impl Jit {
             builder,
             module: &mut self.module,
             symbols: &self.symbols,
-            defined_symbols: Default::default(),
+            defined_symbols: vec![None; self.symbols.len()],
             current_instruction: analysis.entry,
             instruction_target_blocks: HashMap::with_capacity(5),
             instructions_since_sync: 0,

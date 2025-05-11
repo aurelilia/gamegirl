@@ -1,8 +1,7 @@
-use common::numutil::NumExt;
 use cranelift::prelude::*;
 
-use super::{Condition, InstructionTranslator};
-use crate::{interface::Bus, Cpu};
+use super::InstructionTranslator;
+use crate::interface::Bus;
 
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
     pub fn lsl(&mut self, set_cpsr: bool, value: Value, by: Value) -> Value {
@@ -129,17 +128,5 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
 
     pub fn neg(&mut self, set_cpsr: bool, a: Value) -> Value {
         self.sub(set_cpsr, self.consts.zero_i32, a)
-    }
-
-    pub fn set_nz(&mut self, value: Value) {
-        self.call_set_nz(value);
-    }
-
-    pub fn set_nzc(&mut self, value: Value, carry: Value) {
-        self.call_set_nzc(value, carry);
-    }
-
-    pub fn set_nzcv(&mut self, value: Value, carry: Value, overflow: Value) {
-        self.call_set_nzcv(value, carry, overflow);
     }
 }

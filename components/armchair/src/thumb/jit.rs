@@ -29,7 +29,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         self.insert_instruction_preamble(wait as u64, self.consts.two_i32, instr.is_branch_target);
         if self.bus.debugger().tracing() {
             let inst = self.imm(instr.instr as i64, types::I32);
-            self.call_cpui32(Cpu::<S>::trace_inst::<u16>, "cpu_trace_thumb", inst);
+            self.trace_inst_thumb(inst);
         }
 
         let inst = ThumbInst::of(instr.instr.u16());
@@ -37,7 +37,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         let implemented = handle(self, inst);
         if !implemented {
             let inst = self.imm(instr.instr as i64, types::I16);
-            self.call_cpui16(Cpu::<S>::interpret_thumb, inst);
+            self.interpret_thumb(inst);
         }
         self.stats.total_instructions += 1;
         self.stats.native_instructions += implemented as usize;

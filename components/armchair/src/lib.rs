@@ -51,6 +51,7 @@ impl<S: Bus> Cpu<S> {
 
         match self.opt.jit_block.take() {
             Some(jit) => {
+                self.state.pipeline_valid = true;
                 let jit = self.opt.table.get_jit(jit);
                 jit.call(self);
                 log::debug!("JIT block ended with PC at {}", self.state.pc());

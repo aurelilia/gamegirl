@@ -2,11 +2,10 @@ use common::numutil::NumExt;
 use cranelift::prelude::*;
 
 use super::{Condition, InstructionTranslator};
-use crate::{access::*, interface::Bus, misc::InstructionKind, Cpu, RelativeOffset};
+use crate::{access::*, interface::Bus, misc::InstructionKind, RelativeOffset};
 
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
     pub fn insert_function_preamble(&mut self) {
-        self.call_cpu(Cpu::setup_cpu_state);
         let mut addr = self.current_instruction;
         for instr in &self.ana.instructions {
             if instr.is_branch_target {
@@ -87,7 +86,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
 
     fn synchronize_with_system(&mut self) {
         // Handle events, make sure we didn't jump somewhere else
-        self.call_buscpu(S::handle_events);
+        self.bus_handle_events();
         let should_keep_going = self.get_valid();
         let cont_block = self.builder.create_block();
         self.builder.ins().brif(
@@ -144,7 +143,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
 
     pub fn tick_bus(&mut self, by: u64) {
         let ticks = self.imm(by as i64, types::I64);
-        self.call_busi64(S::tick, ticks);
+        self.bus_tick(ticks);
     }
 
     pub fn may_have_invalidated_pc(&mut self) {
