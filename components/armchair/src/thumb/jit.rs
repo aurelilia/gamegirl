@@ -29,7 +29,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         self.insert_instruction_preamble(wait as u64, self.consts.two_i32, instr.is_branch_target);
         if self.bus.debugger().tracing() {
             let inst = self.imm(instr.instr as i64, types::I32);
-            self.call_cpui32(Cpu::<S>::trace_inst::<u16>, inst);
+            self.call_cpui32(Cpu::<S>::trace_inst::<u16>, "cpu_trace_thumb", inst);
         }
 
         let inst = ThumbInst::of(instr.instr.u16());
@@ -63,7 +63,16 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
         s: LowRegister,
         n: u32,
     ) -> Self::Output {
-        false
+        use Thumb1Op::*;
+        let rs = self.load_lreg(s);
+        let value = match kind {
+            Lsl => self.lsl_imm(true, rs, n),
+            Add => self.add_imm(true, rs, n),
+            Sub => self.sub_imm(true, rs, n),
+            _ => return false,
+        };
+        self.store_lreg(d, value);
+        true
     }
 
     fn thumb_2_reg(
@@ -73,15 +82,78 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
         s: LowRegister,
         n: LowRegister,
     ) -> Self::Output {
-        false
+        let rs = self.load_lreg(s);
+        let rn = self.load_lreg(n);
+        let value = match kind {
+            Thumb2Op::Add => self.add(true, rs, rn),
+            Thumb2Op::Sub => self.sub(true, rs, rn),
+        };
+        self.store_lreg(d, value);
+        true
     }
 
     fn thumb_3(&mut self, kind: Thumb3Op, d: LowRegister, n: u32) -> Self::Output {
-        false
+        use Thumb3Op::*;
+        let rd = self.load_lreg(d);
+        let nn = self.builder.ins().iconst(types::I32, n as i64);
+        match kind {
+            Mov => {
+                self.set_nz(nn);
+                self.store_lreg(d, nn);
+            }
+            Cmp => {
+                self.sub(true, rd, nn);
+            }
+            Add => {
+                let value = self.add(true, rd, nn);
+                self.store_lreg(d, value);
+            }
+            Sub => {
+                let value = self.sub(true, rd, nn);
+                self.store_lreg(d, value);
+            }
+        };
+        true
     }
 
     fn thumb_alu(&mut self, kind: Thumb4Op, d: LowRegister, s: LowRegister) -> Self::Output {
-        false
+        use Thumb4Op::*;
+        let rs = self.load_lreg(s);
+        let rd = self.load_lreg(d);
+
+        let value = match kind {
+            And => self.and(true, rd, rs),
+            Eor => self.xor(true, rd, rs),
+            Lsl => {
+                // TODO tick
+                let rs = self.builder.ins().band_imm(rs, 0xFF);
+                self.lsl(true, rd, rs)
+            }
+            Tst => {
+                self.and(true, rd, rs);
+                return true;
+            }
+            Neg => self.neg(true, rs),
+            Cmp => {
+                self.sub(true, rd, rs);
+                return true;
+            }
+            Cmn => {
+                self.add(true, rd, rs);
+                return true;
+            }
+            Orr => self.or(true, rd, rs),
+            Mul => {
+                // TODO tick
+                self.mul(true, rd, rs)
+            }
+            Bic => self.bit_clear(true, rd, rs),
+            Mvn => self.not(true, rs),
+            _ => return false,
+        };
+
+        self.store_lreg(d, value);
+        true
     }
 
     fn thumb_hi_add(&mut self, (s, d): (Register, Register)) -> Self::Output {
@@ -95,8 +167,11 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
         true
     }
 
-    fn thumb_hi_cmp(&mut self, r: (Register, Register)) -> Self::Output {
-        false
+    fn thumb_hi_cmp(&mut self, (s, d): (Register, Register)) -> Self::Output {
+        let rs = self.load_reg(s);
+        let rd = self.load_reg(d);
+        self.sub(true, rd, rs);
+        true
     }
 
     fn thumb_hi_mov(&mut self, (s, d): (Register, Register)) -> Self::Output {
@@ -124,6 +199,10 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
         b: LowRegister,
         o: LowRegister,
     ) -> Self::Output {
+        use ThumbStrLdrOp::*;
+        if matches!(op, Str | Strb | Strh) {
+            self.may_have_invalidated_pc();
+        }
         false
     }
 
@@ -134,6 +213,10 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
         b: LowRegister,
         offset: Address,
     ) -> Self::Output {
+        use ThumbStrLdrOp::*;
+        if matches!(op, Str | Strb | Strh) {
+            self.may_have_invalidated_pc();
+        }
         false
     }
 
@@ -144,10 +227,14 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
         b: LowRegister,
         offset: Address,
     ) -> Self::Output {
+        if str {
+            self.may_have_invalidated_pc();
+        }
         false
     }
 
     fn thumb_str_sp(&mut self, d: LowRegister, offset: Address) -> Self::Output {
+        self.may_have_invalidated_pc();
         false
     }
 
@@ -185,6 +272,7 @@ impl<S: Bus> ThumbVisitor for InstructionTranslator<'_, '_, '_, S> {
     }
 
     fn thumb_stmia(&mut self, b: LowRegister, reg_list: u8) -> Self::Output {
+        self.may_have_invalidated_pc();
         false
     }
 

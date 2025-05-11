@@ -183,13 +183,24 @@ impl<S: Bus> Cpu<S> {
         }
     }
 
-    fn set_nzc(&mut self, enable: bool, value: u32, carry: bool) {
+    pub fn set_nzc(&mut self, enable: bool, value: u32, carry: bool) {
         if enable {
             let neg = value & (1 << 31);
             let zero = ((value == 0) as u32) << 30;
             let carry = (carry as u32) << 29;
             self.state
                 .set_cpsr_flags((self.state.cpsr() & 0x1FFF_FFFF) | zero | neg | carry);
+        }
+    }
+
+    pub fn set_nzcv(&mut self, enable: bool, value: u32, carry: bool, overflow: bool) {
+        if enable {
+            let neg = value & (1 << 31);
+            let zero = ((value == 0) as u32) << 30;
+            let carry = (carry as u32) << 29;
+            let overflow = (overflow as u32) << 28;
+            self.state
+                .set_cpsr_flags((self.state.cpsr() & 0x1FFF_FFFF) | zero | neg | carry | overflow);
         }
     }
 

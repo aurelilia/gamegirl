@@ -77,6 +77,9 @@ impl Jit {
             .ins()
             .iconst(ptr_ty, mem::offset_of!(Cpu<S>, bus) as i64);
         let bus_val = builder.ins().iadd(sys, bus_offset);
+        let false_i8 = builder.ins().iconst(types::I8, 0);
+        let true_i8 = builder.ins().iconst(types::I8, 1);
+        let zero_i32 = builder.ins().iconst(types::I32, 0);
         let one_i32 = builder.ins().iconst(types::I32, 1);
         let two_i32 = builder.ins().iconst(types::I32, 2);
         let four_i32 = builder.ins().iconst(types::I32, 4);
@@ -100,6 +103,9 @@ impl Jit {
                 abort_block,
             },
             consts: Constants {
+                false_i8,
+                true_i8,
+                zero_i32,
                 one_i32,
                 two_i32,
                 four_i32,
@@ -207,6 +213,9 @@ pub struct Values {
 }
 
 pub struct Constants {
+    pub false_i8: Value,
+    pub true_i8: Value,
+    pub zero_i32: Value,
     pub one_i32: Value,
     pub two_i32: Value,
     pub four_i32: Value,

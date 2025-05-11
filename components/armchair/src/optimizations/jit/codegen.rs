@@ -33,7 +33,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
 
         self.instructions_since_sync += 1;
         self.wait_time_collected += wait_time as usize;
-        if self.instructions_since_sync > 0 || is_target {
+        if self.instructions_since_sync > 8 || is_target {
             if !is_target {
                 self.instructions_since_sync = 0;
             }
