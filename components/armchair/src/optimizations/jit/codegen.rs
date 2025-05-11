@@ -5,7 +5,7 @@ use super::{Condition, InstructionTranslator};
 use crate::{access::*, interface::Bus, misc::InstructionKind, Cpu, RelativeOffset};
 
 impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
-    pub fn insert_block_preamble(&mut self) {
+    pub fn insert_function_preamble(&mut self) {
         self.call_cpu(Cpu::setup_cpu_state);
         let mut addr = self.current_instruction;
         for instr in &self.ana.instructions {
@@ -17,7 +17,7 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         }
     }
 
-    pub fn insert_block_destructor(&mut self) {}
+    pub fn insert_function_exit(&mut self) {}
 
     pub fn insert_instruction_preamble(
         &mut self,

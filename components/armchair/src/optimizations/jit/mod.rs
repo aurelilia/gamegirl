@@ -108,7 +108,7 @@ impl Jit {
         };
 
         // Translate instructions...
-        trans.insert_block_preamble();
+        trans.insert_function_preamble();
         match analysis.kind {
             InstructionKind::Arm => {
                 for instr in &analysis.instructions {
@@ -123,7 +123,7 @@ impl Jit {
                 }
             }
         }
-        trans.insert_block_destructor();
+        trans.insert_function_exit();
 
         // Finalize the function and declare + define it
         trans.builder.ins().jump(abort_block, &[]);
