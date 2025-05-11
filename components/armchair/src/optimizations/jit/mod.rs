@@ -220,6 +220,36 @@ pub struct Constants {
 
 #[derive(Debug, Default)]
 pub struct JitStats {
-    pub total_instructions: usize,
+    pub interpreted_instructions: usize,
+    pub fallback_instructions: usize,
     pub native_instructions: usize,
+
+    pub thumb_instructions: usize,
+    pub arm_instructions: usize,
+}
+
+impl JitStats {
+    pub fn total(&self) -> usize {
+        self.interpreted_instructions + self.fallback_instructions + self.native_instructions
+    }
+
+    pub fn arm_percent(&self) -> f64 {
+        self.arm_instructions as f64 / (self.thumb_instructions + self.arm_instructions) as f64
+    }
+
+    pub fn thumb_percent(&self) -> f64 {
+        self.thumb_instructions as f64 / (self.thumb_instructions + self.arm_instructions) as f64
+    }
+
+    pub fn interpreted_percent(&self) -> f64 {
+        self.interpreted_instructions as f64 / self.total() as f64
+    }
+
+    pub fn fallback_percent(&self) -> f64 {
+        self.fallback_instructions as f64 / self.total() as f64
+    }
+
+    pub fn native_percent(&self) -> f64 {
+        self.native_instructions as f64 / self.total() as f64
+    }
 }

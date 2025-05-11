@@ -59,21 +59,6 @@ pub fn cart_info(gg: &mut GameGirlAdv, ui: &mut Ui, _: &mut App, _: &Context) {
     ui.label(format!("Reported Title: {}", gg.cart.title()));
     ui.label(format!("Reported Game Code: AGB-{}", gg.cart.game_code()));
     ui.label(format!("Detected Save Type: {:?}", gg.cart.save_type));
-
-    let pure = gg.cpu.opt.table.analyses.iter().filter(|a| a.pure).count();
-    ui.label(format!(
-        "Function Purity: {}/{}",
-        pure,
-        gg.cpu.opt.table.analyses.len()
-    ));
-    let percent_native = gg.cpu.opt.jit_ctx.stats.native_instructions as f32
-        / gg.cpu.opt.jit_ctx.stats.total_instructions as f32;
-    ui.label(format!(
-        "JIT nativity: {}/{} ({:.2}%)",
-        gg.cpu.opt.jit_ctx.stats.native_instructions,
-        gg.cpu.opt.jit_ctx.stats.total_instructions,
-        percent_native * 100.0
-    ));
 }
 
 /// Window showing status of the remote debugger.

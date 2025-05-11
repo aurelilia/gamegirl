@@ -61,9 +61,10 @@ impl<S: Bus> InstructionTranslator<'_, '_, '_, S> {
         if !implemented {
             let inst = self.imm(instr.instr as i64, types::I32);
             self.interpret_arm(inst);
+            self.stats.fallback_instructions += 1;
+        } else {
+            self.stats.native_instructions += 1;
         }
-        self.stats.total_instructions += 1;
-        self.stats.native_instructions += implemented as usize;
     }
 }
 

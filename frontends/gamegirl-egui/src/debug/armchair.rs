@@ -1,4 +1,4 @@
-use egui::{Context, Label, RichText, Ui};
+use egui::{Align, Context, Label, Layout, ProgressBar, RichText, Ui};
 use gamegirl::gga::armchair::{interface::Bus, state::Register, Address, Cpu};
 
 use crate::{App, Colour};
@@ -100,6 +100,42 @@ pub fn debugger<S: Bus>(cpu: &mut Cpu<S>, ui: &mut Ui, _: &mut App, _: &Context)
         if cpu.state.intr.ime {
             ui.label("(IME on)");
         }
+    });
+
+    ui.add_space(10.0);
+    ui.horizontal(|ui| {
+        ui.heading("Recompilation Statistics");
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let pure = cpu.opt.table.analyses.iter().filter(|a| a.pure).count();
+            ui.label(format!(
+                "(Well-formed functions: {}/{})",
+                pure,
+                cpu.opt.table.analyses.len()
+            ));
+        });
+    });
+
+    egui::Grid::new("jitstuff").show(ui, |ui| {
+        let mut add_progress = |title: &'static str, percent: f64| {
+            ui.add(Label::new(RichText::new(title).strong().raised()));
+            ui.add(
+                ProgressBar::new(percent as f32)
+                    .show_percentage()
+                    .desired_width(780.0),
+            );
+            ui.end_row();
+        };
+        add_progress(
+            "Interpreted code",
+            cpu.opt.jit_ctx.stats.interpreted_percent(),
+        );
+        add_progress(
+            "JIT-fallback code",
+            cpu.opt.jit_ctx.stats.fallback_percent(),
+        );
+        add_progress("Native code", cpu.opt.jit_ctx.stats.native_percent());
+        add_progress("ARM32 code", cpu.opt.jit_ctx.stats.arm_percent());
+        add_progress("THUMB16 code", cpu.opt.jit_ctx.stats.thumb_percent());
     });
 
     super::debugger_footer(&mut cpu.bus.debugger(), ui);

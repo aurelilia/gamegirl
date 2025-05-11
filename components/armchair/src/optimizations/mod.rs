@@ -175,13 +175,18 @@ impl<S: Bus> Cpu<S> {
                 kind,
             ),
         };
+        if !analysis.pure {
+            self.opt.jit_ctx.stats.interpreted_instructions += analysis.instructions.len();
+        }
+        match kind {
+            InstructionKind::Arm => {
+                self.opt.jit_ctx.stats.arm_instructions += analysis.instructions.len()
+            }
+            InstructionKind::Thumb => {
+                self.opt.jit_ctx.stats.thumb_instructions += analysis.instructions.len()
+            }
+        }
 
-        log::debug!(
-            "Analysis concluded with function from {}-{}, length {}.",
-            analysis.entry,
-            analysis.exit,
-            analysis.instructions.len()
-        );
         let index = self.opt.table.analyses.len();
         self.opt
             .table
